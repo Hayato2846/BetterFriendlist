@@ -2,30 +2,6 @@
 	<!-- Match the portraitless ButtonFrameTemplate shell used by Legacy Settings. -->
 	<Frame name="BFLAppearanceOnboardingFrame" parent="UIParent" inherits="ButtonFrameTemplate" hidden="true" enableMouse="true" toplevel="true" frameStrata="DIALOG" clampedToScreen="true">
 		<Size x="560" y="590" />
-		<Layers>
-			<Layer level="ARTWORK">
-				<FontString parentKey="StepText" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="29" y="-45" />
-						<Anchor point="TOPRIGHT" x="-160" y="-45" />
-					</Anchors>
-				</FontString>
-				<FontString parentKey="Subtitle" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" maxLines="3" wordwrap="true">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="29" y="-70" />
-						<Anchor point="TOPRIGHT" x="-29" y="-70" />
-					</Anchors>
-				</FontString>
-				<Texture parentKey="HeaderDivider" file="Interface\Buttons\WHITE8X8">
-					<Size y="1" />
-					<Anchors>
-						<Anchor point="TOPLEFT" x="27" y="-118" />
-						<Anchor point="TOPRIGHT" x="-27" y="-118" />
-					</Anchors>
-					<Color r="0.5" g="0.5" b="0.5" a="0.35" />
-				</Texture>
-			</Layer>
-		</Layers>
 		<Frames>
 			<!-- The default template inset is hidden at runtime, exactly like Legacy Settings. -->
 			<Frame parentKey="MainInset" mixin="BackdropTemplateMixin">
@@ -42,6 +18,28 @@
 								<Anchor point="TOPLEFT" x="6" y="-6" />
 								<Anchor point="TOPRIGHT" x="-6" y="-6" />
 							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString parentKey="StepText" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="19" y="-15" />
+								<Anchor point="TOPRIGHT" x="-150" y="-15" />
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Subtitle" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" maxLines="3" wordwrap="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="19" y="-40" />
+								<Anchor point="TOPRIGHT" x="-19" y="-40" />
+							</Anchors>
+						</FontString>
+						<Texture parentKey="HeaderDivider" file="Interface\Buttons\WHITE8X8">
+							<Size y="1" />
+							<Anchors>
+								<Anchor point="TOPLEFT" x="17" y="-88" />
+								<Anchor point="TOPRIGHT" x="-17" y="-88" />
+							</Anchors>
+							<Color r="0.5" g="0.5" b="0.5" a="0.35" />
 						</Texture>
 					</Layer>
 				</Layers>

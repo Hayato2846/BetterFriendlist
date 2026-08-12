@@ -732,6 +732,11 @@ end
 function AppearanceOnboarding:OnFrameLoad(frame)
 	self.frame = frame
 	frame:SetMovable(false)
+	-- Header regions must live on MainInset itself. Regions owned by the parent
+	-- ButtonFrame render below child frames and become dimmed by the inset.
+	frame.StepText = frame.MainInset and frame.MainInset.StepText
+	frame.Subtitle = frame.MainInset and frame.MainInset.Subtitle
+	frame.HeaderDivider = frame.MainInset and frame.MainInset.HeaderDivider
 	if frame.portrait then
 		frame.portrait:Hide()
 	end
@@ -756,7 +761,7 @@ function AppearanceOnboarding:OnFrameLoad(frame)
 	self.palette = self:GetPalette()
 	self.progressSegments = {}
 	for index = 1, TOTAL_STEPS do
-		local segment = frame:CreateTexture(nil, "OVERLAY")
+		local segment = frame.MainInset:CreateTexture(nil, "OVERLAY")
 		segment:SetTexture("Interface\\Buttons\\WHITE8X8")
 		segment:SetSize(24, 3)
 		if index == 1 then
@@ -1477,6 +1482,11 @@ function AppearanceOnboarding:RegisterTests()
 				"Onboarding uses the portraitless Legacy Settings button-frame shell"
 			)
 			V:Assert(not self.frame.PortraitContainer:IsShown(), "Onboarding never exposes the BFL portrait ring")
+			V:Assert(
+				self.frame.StepText and self.frame.StepText:GetParent() == self.frame.MainInset
+					and self.frame.Subtitle and self.frame.Subtitle:GetParent() == self.frame.MainInset,
+				"Onboarding header text renders above the inset background"
+			)
 			V:Assert(self.stylePanel and self.themePanel and self.layoutPanel and self.summaryPanel, "All onboarding steps exist")
 			V:Assert(self.primaryButton and self.laterButton and self.backButton, "Onboarding exposes bounded navigation")
 			V:Assert(self.primaryButton.BFL_OnboardingModernButton, "Onboarding footer uses Retail's modern button template")
