@@ -2678,6 +2678,7 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 		local itemIndex = menu.offset + rowIndex - 1
 		local label = labels[itemIndex]
 		local value = values[itemIndex]
+		local enabled = not data.isOptionEnabled or data.isOptionEnabled(value, itemIndex) ~= false
 		button.ownerDropdown = dropdown
 		button.itemValue = value
 		button:ClearAllPoints()
@@ -2685,7 +2686,7 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 		button:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -3, -3 - ((rowIndex - 1) * rowHeight))
 		button:Show()
 		button.Text:SetText(label or "")
-		button.Text:SetTextColor(0.92, 0.92, 0.92, 1)
+		button.Text:SetTextColor(enabled and 0.92 or 0.45, enabled and 0.92 or 0.45, enabled and 0.92 or 0.45, 1)
 		if data.getFontObject then
 			local fontObject = data.getFontObject(itemIndex)
 			if fontObject then
@@ -2702,10 +2703,21 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 		end
 		button:SetScript("OnEnter", function(self)
 			local ownerData = self.ownerDropdown and self.ownerDropdown.BFL_DarkDropdownData
+			local itemEnabled = not ownerData or not ownerData.isOptionEnabled
+				or ownerData.isOptionEnabled(self.itemValue, self.itemIndex) ~= false
 			local isSelected = ownerData and ownerData.isSelected and ownerData.isSelected(self.itemValue)
 			if self.SetBackdrop then
 				self:SetBackdropColor(UnpackColor(isSelected and COLORS.rowHover or COLORS.controlHover))
 				self:SetBackdropBorderColor(UnpackColor(isSelected and COLORS.accent or COLORS.controlBorderHover))
+			end
+			if not itemEnabled and ownerData.getOptionTooltip and GameTooltip then
+				local tooltip = ownerData.getOptionTooltip(self.itemValue, self.itemIndex)
+				if tooltip and tooltip ~= "" then
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:SetText(self.Text:GetText() or "", 1, 1, 1)
+					GameTooltip:AddLine(tooltip, 1, 0.25, 0.25, true)
+					GameTooltip:Show()
+				end
 			end
 		end)
 		button:SetScript("OnLeave", function(self)
@@ -2715,11 +2727,17 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 				self:SetBackdropColor(UnpackColor(isSelected and COLORS.accentState or COLORS.panelSoft))
 				self:SetBackdropBorderColor(UnpackColor(isSelected and COLORS.accentSoft or COLORS.borderNone))
 			end
+			if GameTooltip and GameTooltip:GetOwner() == self then
+				GameTooltip:Hide()
+			end
 		end)
 		button:SetScript("OnClick", function(self)
 			local owner = self.ownerDropdown
 			local ownerData = owner and owner.BFL_DarkDropdownData
 			if not ownerData then
+				return
+			end
+			if ownerData.isOptionEnabled and ownerData.isOptionEnabled(self.itemValue, self.itemIndex) == false then
 				return
 			end
 			if ownerData.onSelect then
@@ -2737,6 +2755,7 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 				SkinEngine:RenderCustomDropdown(owner)
 			end
 		end)
+		button.itemIndex = itemIndex
 	end
 
 	for rowIndex = maxVisible + 1, #menu.Rows do

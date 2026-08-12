@@ -2791,6 +2791,39 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end
+	elseif msg:match("^forcemodern") then
+		local argument = msg:match("^forcemodern%s*(%S*)") or ""
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		local function Reply(text)
+			if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+				DEFAULT_CHAT_FRAME:AddMessage(text)
+			end
+		end
+		if not BFL.IsRetail then
+			Reply("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_RETAIL_ONLY)
+		elseif not FriendsUI then
+			Reply("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
+		elseif argument == "on" then
+			FriendsUI:SetModernForceEnabled(true)
+			Reply("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_ENABLED)
+		elseif argument == "off" then
+			FriendsUI:SetModernForceEnabled(false)
+			Reply("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_DISABLED)
+		elseif argument == "status" then
+			local enabledText = BFL.L.STATUS_ENABLED or "Enabled"
+			local disabledText = BFL.L.STATUS_DISABLED or "Disabled"
+			local effectiveStyle = FriendsUI:GetEffectiveStyle() == "modern"
+				and BFL.L.SETTINGS_FRIENDS_UI_STYLE_MODERN
+				or BFL.L.SETTINGS_FRIENDS_UI_STYLE_LEGACY
+			Reply(string.format(
+				BFL.L.CORE_FORCE_MODERN_STATUS,
+				FriendsUI:IsModernForceEnabled() and enabledText or disabledText,
+				FriendsUI:IsSocialUIEnabled() and enabledText or disabledText,
+				effectiveStyle
+			))
+		else
+			Reply("|cffffcc00BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_USAGE)
+		end
 
 	-- ==========================================
 	-- Preview Mode Commands (for screenshots)
@@ -3256,6 +3289,9 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print(BFL.L.CORE_HELP_CMD_HELP)
 		print(BFL.L.CORE_HELP_CMD_CHANGELOG)
 		print(BFL.L.CORE_HELP_CMD_RESET)
+		if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage(BFL.L.CORE_HELP_CMD_FORCE_MODERN)
+		end
 		print("")
 		print(BFL.L.CORE_HELP_LINK)
 	end

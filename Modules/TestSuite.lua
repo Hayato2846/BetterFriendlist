@@ -1557,6 +1557,8 @@ local function RegisterBuiltInTests()
 
 			V:AssertNil(controls.simpleMode.visibleWhen, "Simple Mode should be available in both Modern and Legacy")
 			V:AssertNil(controls.simpleModeShowSearch.visibleWhen, "Simple Mode search should be available in Modern and Legacy")
+			V:AssertEqual(controls.friendsFrameStyle.type, "custom", "Style selector should own per-option capability state")
+			V:AssertType(controls.friendsFrameStyle.render, "function", "Style selector should provide its host renderer")
 			V:AssertEqual(controls.friendsFrameStyle.refreshOnChange, true, "Style changes should refresh Settings visibility")
 		end,
 	})
@@ -1965,6 +1967,7 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(tempDB.quickFilter, "all", "quickFilter default should be 'all'")
 				V:AssertEqual(tempDB.primarySort, "status", "primarySort default should be 'status'")
 				V:AssertEqual(tempDB.theme, "blizzard", "theme default should be 'blizzard'")
+				V:AssertEqual(tempDB.forceModernFriendsUI, false, "Modern capability override should default to off")
 				V:Assert(tempDB.groupOrder == nil, "groupOrder default should be nil")
 				V:Assert(type(tempDB.groupStates) == "table", "groupStates should be a table")
 				V:Assert(type(tempDB.groupColors) == "table", "groupColors should be a table")
@@ -6765,6 +6768,58 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("classic", "InitializeDropdown_ModernDisabledOptionTooltip", {
+		description = "Shared modern dropdowns should keep unavailable options visible, disabled, and explained",
+		action = function(V)
+			local capturedGenerator
+			local radio = {
+				SetEnabled = function(self, enabled)
+					self.enabled = enabled
+				end,
+				SetTooltip = function(self, tooltip)
+					self.tooltip = tooltip
+				end,
+			}
+			local dropdown = {
+				SetupMenu = function(_, generator)
+					capturedGenerator = generator
+				end,
+			}
+			local rootDescription = {
+				CreateRadio = function()
+					return radio
+				end,
+			}
+			BFL.InitializeDropdown(dropdown, {
+				labels = { "Modern" },
+				values = { "modern" },
+				isOptionEnabled = function()
+					return false
+				end,
+				getOptionTooltip = function()
+					return "Social UI disabled"
+				end,
+			}, function()
+				return false
+			end, function() end)
+			V:AssertType(capturedGenerator, "function", "Modern dropdown should receive its menu generator")
+			capturedGenerator(dropdown, rootDescription)
+			V:AssertEqual(radio.enabled, false, "Unavailable modern dropdown option should be disabled")
+			V:AssertType(radio.tooltip, "function", "Unavailable modern dropdown option should expose a tooltip")
+			local tooltip = {
+				SetText = function(self, text)
+					self.title = text
+				end,
+				AddLine = function(self, text)
+					self.body = text
+				end,
+			}
+			radio.tooltip(tooltip)
+			V:AssertEqual(tooltip.title, "Modern", "Disabled option tooltip should name the option")
+			V:AssertEqual(tooltip.body, "Social UI disabled", "Disabled option tooltip should explain the capability")
+		end,
+	})
+
 	TS:RegisterTest("classic", "InitializeDropdown_UsesSelectionText", {
 		description = "Shared dropdown initializer should allow legacy menu labels and button text to differ",
 		action = function(V)
@@ -6803,17 +6858,25 @@ local function RegisterBuiltInTests()
 				end
 
 				BFL.InitializeDropdown(dropdown, {
-					labels = { "Verbose Label", "Hidden Label" },
-					values = { "value1", "value2" },
+					labels = { "Verbose Label", "Hidden Label", "Disabled Label" },
+					values = { "value1", "value2", "value3" },
 					getSelectionText = function(value)
 						return "IconOnly:" .. tostring(value)
 					end,
 					isOptionHidden = function(value)
 						return value == "value2"
 					end,
+					isOptionEnabled = function(value)
+						return value ~= "value3"
+					end,
+					getOptionTooltip = function(value)
+						return value == "value3" and "Unavailable for this client" or nil
+					end,
 					getItemFontObject = function(value, index)
-						V:AssertEqual(value, "value1", "Font resolver should receive item value")
-						V:AssertEqual(index, 1, "Font resolver should receive item index")
+						V:Assert(
+							(value == "value1" and index == 1) or (value == "value3" and index == 3),
+							"Font resolver should receive the original item value and index"
+						)
 						return "BFLTestFontObject"
 					end,
 				}, function(value)
@@ -6824,8 +6887,11 @@ local function RegisterBuiltInTests()
 
 				V:AssertEqual(selectedValue, "value1", "Initial selected value should be set")
 				V:AssertEqual(dropdown.text, "IconOnly:value1", "Initial legacy dropdown text should use getSelectionText")
-				V:AssertEqual(#buttons, 1, "One dropdown button should be created")
+				V:AssertEqual(#buttons, 2, "Hidden options should be omitted while disabled options remain visible")
 				V:AssertEqual(buttons[1].fontObject, "BFLTestFontObject", "Legacy dropdown item should receive item font object")
+				V:AssertEqual(buttons[2].disabled, true, "Unavailable legacy dropdown item should be disabled")
+				V:AssertEqual(buttons[2].tooltipWhileDisabled, true, "Disabled legacy dropdown item should retain its tooltip")
+				V:AssertEqual(buttons[2].tooltipText, "Unavailable for this client", "Disabled item should explain why it is unavailable")
 				buttons[1].func()
 				V:AssertEqual(setValue, "value1", "Selection callback should receive the selected value")
 				V:AssertEqual(dropdown.text, "IconOnly:value1", "Post-click legacy dropdown text should use getSelectionText")

@@ -684,9 +684,29 @@ local function GetDropdownSelectionText(options, value, fallbackLabel)
 	return fallbackLabel or tostring(value or "")
 end
 
+local function IsDropdownOptionEnabled(options, value, index)
+	if options and type(options.isOptionEnabled) == "function" then
+		local ok, enabled = pcall(options.isOptionEnabled, value, index)
+		return not ok or enabled ~= false
+	end
+	return true
+end
+
+local function GetDropdownOptionTooltip(options, value, index)
+	if options and type(options.getOptionTooltip) == "function" then
+		local ok, tooltip = pcall(options.getOptionTooltip, value, index)
+		if ok and type(tooltip) == "string" and tooltip ~= "" then
+			return tooltip
+		end
+	end
+	return nil
+end
+
 -- Initialize dropdown with options
 -- @param dropdown: The dropdown frame
 -- @param options: Table with { labels = {...}, values = {...} }
+--   Optional isOptionEnabled(value, index) and getOptionTooltip(value, index)
+--   keep unavailable entries visible but non-interactive with an explanation.
 -- @param getter: Function(value) -> boolean (is this value selected?)
 -- @param setter: Function(value) called when selection changes
 -- @param scrollHeight: Optional max pixel height before the dropdown scrolls (Retail only)
@@ -711,6 +731,17 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 					local value = values[i]
 					if not (type(options.isOptionHidden) == "function" and options.isOptionHidden(value, i)) then
 						local element = rootDescription:CreateRadio(label, getter, setter, value)
+						local enabled = IsDropdownOptionEnabled(options, value, i)
+						if element and element.SetEnabled then
+							element:SetEnabled(enabled)
+						end
+						local tooltip = not enabled and GetDropdownOptionTooltip(options, value, i) or nil
+						if tooltip and element and element.SetTooltip then
+							element:SetTooltip(function(menuTooltip)
+								menuTooltip:SetText(label, 1, 1, 1)
+								menuTooltip:AddLine(tooltip, 1, 0.25, 0.25, true)
+							end)
+						end
 						if type(options.getItemFontObject) == "function" and element and element.AddInitializer then
 							local fontObject = options.getItemFontObject(value, i)
 							if fontObject then
@@ -757,6 +788,17 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 					info.checked = getter(capturedValue)
 					if options and type(options.getItemFontObject) == "function" then
 						info.fontObject = options.getItemFontObject(capturedValue, i)
+					end
+					local enabled = IsDropdownOptionEnabled(options, capturedValue, i)
+					if not enabled then
+						info.disabled = true
+						local tooltip = GetDropdownOptionTooltip(options, capturedValue, i)
+						if tooltip then
+							info.tooltipTitle = label
+							info.tooltipText = tooltip
+							info.tooltipWhileDisabled = true
+							info.tooltipOnButton = true
+						end
 					end
 					info.func = function()
 						-- Use closured values, NOT self.value/self:GetText()
