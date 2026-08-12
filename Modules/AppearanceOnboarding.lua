@@ -169,7 +169,7 @@ function AppearanceOnboarding:EvaluateEligibility(context)
 	if context.frameShown ~= true then
 		return false, "frame"
 	end
-	if context.socialUIEnabled ~= true and context.forceModern ~= true then
+	if context.socialUIAvailable ~= true and context.forceModern ~= true then
 		return false, "social-ui"
 	end
 	if context.inCombat == true then
@@ -186,9 +186,9 @@ function AppearanceOnboarding:IsComplete()
 	return (tonumber(completedVersion) or 0) >= ONBOARDING_VERSION
 end
 
-function AppearanceOnboarding:IsSocialUIEnabled()
+function AppearanceOnboarding:IsSocialUIAvailable()
 	local FriendsUI = BFL:GetModule("FriendsUI")
-	return FriendsUI and FriendsUI.IsSocialUIEnabled and FriendsUI:IsSocialUIEnabled() == true
+	return FriendsUI and FriendsUI.IsSocialUIAvailable and FriendsUI:IsSocialUIAvailable() == true
 end
 
 local function ApplyAtlasTexture(texture, atlas, fallback)
@@ -222,7 +222,7 @@ function AppearanceOnboarding:IsModernForceEnabled()
 end
 
 function AppearanceOnboarding:IsModernStyleAvailable()
-	return self:IsSocialUIEnabled() or self:IsModernForceEnabled()
+	return self:IsSocialUIAvailable() or self:IsModernForceEnabled()
 end
 
 function AppearanceOnboarding:IsInCombat()
@@ -1259,7 +1259,7 @@ function AppearanceOnboarding:TryShow(reason)
 		sessionDeferred = self.sessionDeferred,
 		playerLoggedIn = self.playerLoggedIn,
 		frameShown = BetterFriendsFrame:IsShown() == true,
-		socialUIEnabled = self:IsSocialUIEnabled(),
+		socialUIAvailable = self:IsSocialUIAvailable(),
 		forceModern = self:IsModernForceEnabled(),
 		inCombat = self:IsInCombat(),
 	})
@@ -1597,7 +1597,7 @@ function AppearanceOnboarding:RegisterTests()
 				sessionDeferred = false,
 				playerLoggedIn = true,
 				frameShown = true,
-				socialUIEnabled = true,
+				socialUIAvailable = true,
 				forceModern = false,
 				inCombat = false,
 			}
@@ -1615,10 +1615,10 @@ function AppearanceOnboarding:RegisterTests()
 			base.sessionDeferred = true
 			V:Assert(not self:EvaluateEligibility(base), "Decide later suppresses the prompt for the current session")
 			base.sessionDeferred = false
-			base.socialUIEnabled = false
-			V:Assert(not self:EvaluateEligibility(base), "Unavailable SocialUI keeps Retail on the safe Legacy fallback")
+			base.socialUIAvailable = false
+			V:Assert(not self:EvaluateEligibility(base), "Missing SocialUI API keeps Retail on the safe Legacy fallback")
 			base.forceModern = true
-			V:Assert(self:EvaluateEligibility(base), "Developer override makes onboarding available while SocialUI is disabled")
+			V:Assert(self:EvaluateEligibility(base), "Developer override makes onboarding available without the SocialUI API")
 			base.isRetail = false
 			V:Assert(not self:EvaluateEligibility(base), "Developer override never enables onboarding on Classic")
 		end,

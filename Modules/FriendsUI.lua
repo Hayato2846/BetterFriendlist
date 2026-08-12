@@ -902,18 +902,24 @@ function FriendsUI:ResolveRequestedStyle(storedStyle, isRetail, onboardingVersio
 	return self:GetDefaultRequestedStyle(isRetail)
 end
 
-function FriendsUI:ComputeEffectiveStyle(requestedStyle, isRetail, socialUIEnabled, forceModern)
+function FriendsUI:ComputeEffectiveStyle(requestedStyle, isRetail, socialUIAvailable, forceModern)
 	if requestedStyle ~= STYLE_MODERN then
 		return STYLE_LEGACY
 	end
-	if isRetail ~= true or (socialUIEnabled ~= true and forceModern ~= true) then
+	if isRetail ~= true or (socialUIAvailable ~= true and forceModern ~= true) then
 		return STYLE_LEGACY
 	end
 	return STYLE_MODERN
 end
 
+function FriendsUI:IsSocialUIAvailable()
+	return BFL.IsRetail == true
+		and C_SocialUI ~= nil
+		and type(C_SocialUI.IsSystemEnabled) == "function"
+end
+
 function FriendsUI:IsSocialUIEnabled()
-	if not (BFL.IsRetail and C_SocialUI and C_SocialUI.IsSystemEnabled) then
+	if not self:IsSocialUIAvailable() then
 		return false
 	end
 	local ok, enabled = pcall(C_SocialUI.IsSystemEnabled)
@@ -928,10 +934,11 @@ function FriendsUI:IsModernForceEnabled()
 	return db and db.forceModernFriendsUI == true or false
 end
 
--- This deliberately reports Blizzard's native capability only. Settings use
--- it to disable their Modern entry even when the developer override is active.
+-- Modern is BFL-owned. Blizzard may remotely disable its SocialUI frame while
+-- leaving the 12.1 social backends enabled, so API presence is the capability
+-- gate while IsSocialUIEnabled remains reserved for native-frame integration.
 function FriendsUI:IsModernStyleSelectable()
-	return BFL.IsRetail == true and self:IsSocialUIEnabled()
+	return self:IsSocialUIAvailable()
 end
 
 function FriendsUI:GetModernUnavailableReason()
@@ -939,7 +946,7 @@ function FriendsUI:GetModernUnavailableReason()
 		return nil
 	end
 	return L.SETTINGS_FRIENDS_UI_MODERN_UNAVAILABLE
-		or "Blizzard's Social UI system is currently disabled. Modern can only be forced with /bfl forcemodern on."
+		or "This client does not provide Blizzard's Social UI API. Modern is unavailable."
 end
 
 function FriendsUI:GetRequestedStyle()
@@ -958,7 +965,7 @@ function FriendsUI:GetEffectiveStyle()
 	return self:ComputeEffectiveStyle(
 		self:GetRequestedStyle(),
 		BFL.IsRetail == true,
-		self:IsSocialUIEnabled(),
+		self:IsSocialUIAvailable(),
 		self:IsModernForceEnabled()
 	)
 end
@@ -4041,7 +4048,7 @@ function FriendsUI:InstallTabHooks()
 end
 
 function FriendsUI:InstallSocialUIRedirects()
-	if self.redirectsInstalled or not BFL.IsRetail then
+	if self.redirectsInstalled or not (BFL.IsRetail and self:IsSocialUIEnabled()) then
 		return
 	end
 	if not _G.SocialUIControl then
@@ -4055,28 +4062,61 @@ function FriendsUI:InstallSocialUIRedirects()
 			self.originalSocialUIControl[key] = SocialUIControl[key]
 		end
 	end
-	_G.ToggleSocialUI = function()
+	self.socialUIRedirectControl = SocialUIControl
+	self.socialUIRedirectFunctions = {}
+	self.socialUIRedirectFunctions.ToggleSocialUI = function()
 		self:ToggleSection(self:GetSelectedSection())
 	end
+	_G.ToggleSocialUI = self.socialUIRedirectFunctions.ToggleSocialUI
 	if SocialUIControl then
-		SocialUIControl.Toggle = function()
+		self.socialUIRedirectFunctions.Toggle = function()
 			self:ToggleSection(self:GetSelectedSection())
 		end
-		SocialUIControl.OpenToTab = function(tabType)
+		self.socialUIRedirectFunctions.OpenToTab = function(tabType)
 			local section = self:GetSectionForSocialTab(tabType) or "friends"
 			if not BetterFriendsFrame:IsShown() then
 				ShowUIPanel(BetterFriendsFrame)
 			end
 			self:SelectSection(section)
 		end
-		SocialUIControl.ToggleToTab = function(tabType)
+		self.socialUIRedirectFunctions.ToggleToTab = function(tabType)
 			self:ToggleSection(self:GetSectionForSocialTab(tabType) or "friends")
 		end
+		SocialUIControl.Toggle = self.socialUIRedirectFunctions.Toggle
+		SocialUIControl.OpenToTab = self.socialUIRedirectFunctions.OpenToTab
+		SocialUIControl.ToggleToTab = self.socialUIRedirectFunctions.ToggleToTab
 	end
 end
 
+function FriendsUI:RestoreSocialUIRedirects()
+	if not self.redirectsInstalled then
+		return
+	end
+	local redirects = self.socialUIRedirectFunctions or {}
+	if _G.ToggleSocialUI == redirects.ToggleSocialUI then
+		_G.ToggleSocialUI = self.originalToggleSocialUI
+	end
+	local control = self.socialUIRedirectControl
+	if control and self.originalSocialUIControl then
+		for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab" }) do
+			if control[key] == redirects[key] then
+				control[key] = self.originalSocialUIControl[key]
+			end
+		end
+	end
+	self.redirectsInstalled = false
+	self.originalToggleSocialUI = nil
+	self.originalSocialUIControl = nil
+	self.socialUIRedirectControl = nil
+	self.socialUIRedirectFunctions = nil
+end
+
 function FriendsUI:EnsureSocialUIRedirects()
-	if not (BFL.IsRetail and self:IsSocialUIEnabled()) then
+	if not BFL.IsRetail then
+		return
+	end
+	if not self:IsSocialUIEnabled() then
+		self:RestoreSocialUIRedirects()
 		return
 	end
 	if not _G.SocialUIControl and C_AddOns and C_AddOns.LoadAddOn then
@@ -5216,12 +5256,17 @@ function FriendsUI:RegisterTests()
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_CapabilityFallback", {
 		action = function(V)
-			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, true, true), STYLE_MODERN, "Modern requires Retail SocialUI")
-			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, true, false), STYLE_LEGACY, "Disabled SocialUI falls back")
+			V:AssertEqual(
+				self:IsModernStyleSelectable(),
+				self:IsSocialUIAvailable(),
+				"Modern selection follows SocialUI API presence, not Blizzard's runtime frame switch"
+			)
+			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, true, true), STYLE_MODERN, "Modern requires the Retail SocialUI API")
+			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, true, false), STYLE_LEGACY, "Missing SocialUI API falls back")
 			V:AssertEqual(
 				self:ComputeEffectiveStyle(STYLE_MODERN, true, false, true),
 				STYLE_MODERN,
-				"Retail developer override can force Modern while SocialUI is disabled"
+				"Retail developer override can force Modern without the SocialUI API"
 			)
 			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, false, true), STYLE_LEGACY, "Classic remains Legacy")
 			V:AssertEqual(
@@ -6068,7 +6113,7 @@ function FriendsUI:RegisterTests()
 	TestSuite:RegisterTest("ui", "FriendsUI_LiveStyleSwitch", {
 		condition = function()
 			return BetterFriendsFrame ~= nil
-				and self:IsSocialUIEnabled()
+				and self:IsSocialUIAvailable()
 				and not (InCombatLockdown and InCombatLockdown())
 		end,
 		setup = function()

@@ -192,7 +192,7 @@ local defaults = {
 
 	-- Main Frame Edit Mode (Phase EditMode)
 	friendsFrameStyle = BFL.IsRetail and "modern" or "legacy", -- Requested UI style; capability fallback never overwrites this value
-	forceModernFriendsUI = false, -- Developer override for testing Modern while Blizzard disables C_SocialUI
+	forceModernFriendsUI = false, -- Developer override for testing Modern when the client does not expose C_SocialUI
 	appearanceOnboardingVersion = 0, -- One-time Retail style/theme onboarding schema; installation-local and not imported
 	appearanceOnboardingResume = false, -- Temporary reload-resume state; installation-local and not imported
 	modernFriendTabOrder = {}, -- Modern SocialUI side-tab order; missing IDs are appended in their default order

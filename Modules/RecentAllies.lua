@@ -219,7 +219,30 @@ function RecentAllies:Initialize()
 		-- BFL:DebugPrint("|cffffcc00BFL RecentAllies:|r Not available in Classic - module disabled")
 		return
 	end
-	-- Nothing else to initialize yet
+	BFL:RegisterEventCallback("RECENT_ALLIES_SYSTEM_STATUS_UPDATED", function()
+		self:OnSystemStatusUpdated()
+	end, 20)
+end
+
+function RecentAllies:OnSystemStatusUpdated()
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI then
+		if FriendsUI:IsModernActive() then
+			FriendsUI:RefreshNavigation()
+		else
+			local selectedSection = FriendsUI:GetSelectedSection()
+			if not FriendsUI:IsSectionAvailable(selectedSection) then
+				FriendsUI:SelectSection(FriendsUI:BuildAvailableSectionIDs()[1] or "friends")
+			else
+				FriendsUI:RestoreLegacyTabs(false)
+			end
+		end
+	end
+
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame
+	if frame and frame:IsShown() then
+		self:Refresh(frame, ScrollBoxConstants.RetainScrollPosition)
+	end
 end
 
 -- Initialize Recent Allies Frame (RecentAlliesListMixin:OnLoad)
