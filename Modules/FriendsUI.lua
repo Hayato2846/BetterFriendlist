@@ -6013,7 +6013,7 @@ function FriendsUI:RegisterTests()
 				and control.ReadyCheckButton
 				and control.ReadyCheckButton:IsShown()
 			local db = GetDB()
-			for _, key in ipairs({ LEGACY_LAYOUT_KEY, MODERN_LAYOUT_KEY }) do
+			for _, key in ipairs({ LEGACY_LAYOUT_KEY, MODERN_LAYOUT_KEY, "Shared" }) do
 				local position = db and db.mainFramePosition and db.mainFramePosition[key]
 				self.testOriginalPositions[key] = position and {
 					point = position.point,

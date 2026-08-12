@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Friend Tab Settings** - Modern Retail users can reorder every side tab, hide individual tabs, and optionally show Friend Requests or Quick Join only while they contain entries. Hidden tabs are removed from the layout without leaving gaps.
 
 ### Improved
+- **Appearance Onboarding** - Reworked the style cards to mirror Modern's right-side navigation and Legacy's top/bottom tab layout, added a solid themed dialog surface, and removed the theme-step scrollbar with a compact responsive card grid.
+- **Shared Friendlist Position** - Modern and Legacy now reuse the currently saved Friendlist position while retaining independent width and height settings.
 - **EllesmereUI Visual Parity** - The friendlist now uses EUI's translucent shell, pure accent-colored BFL icons, matched custom side-tab states, aligned header branding, EUI-styled Guild and Who search/dropdown controls, and matching RAF, Raid, Who, and footer actions, while preserving Blizzard's side-tab chrome, group headers, invite buttons, font geometry, and transparent Battle.net bar.
 - **Social Entry Points** - Retail SocialUI toggles and tab-opening calls now route to matching BetterFriendlist sections, while the menu option for Blizzard's friendlist opens Blizzard's original SocialUI.
 - **Retail 12.1 Contact Views** - Friends, Recent Allies, Friend Requests, Quick Join, Guild, and Who now use section-specific Modern search, filter, divider, list, and action-bar layouts. Recent Allies supports Blizzard's new status and interest filters with an older-client fallback.

@@ -231,7 +231,7 @@ function AppearanceOnboarding:CreateChoiceCard(parent, height, onClick)
 
 	card.Title = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	card.Title:SetPoint("TOPLEFT", 18, -16)
-	card.Title:SetPoint("TOPRIGHT", -142, -16)
+	card.Title:SetPoint("TOPRIGHT", -188, -16)
 	card.Title:SetJustifyH("LEFT")
 	card.Title:SetMaxLines(1)
 	card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -267,25 +267,45 @@ local function CreatePreviewTexture(parent, left, top, width, height)
 	return texture
 end
 
+local function AddPreviewPiece(preview, role, left, top, width, height)
+	local texture = CreatePreviewTexture(preview, left, top, width, height)
+	texture.BFL_PreviewRole = role
+	preview.Pieces[#preview.Pieces + 1] = texture
+	return texture
+end
+
 function AppearanceOnboarding:CreateStyleDiagram(card, style)
 	local preview = CreateBackdropFrame("Frame", card)
-	preview:SetSize(104, 88)
+	preview:SetSize(154, 112)
 	preview:SetPoint("RIGHT", -18, 0)
 	card.Diagram = preview
 	preview.Pieces = {}
+	-- These diagrams deliberately mirror the live structures rather than only
+	-- suggesting a generic list: Modern has right-side navigation, while Legacy
+	-- has top content tabs and bottom section tabs.
 	if style == STYLE_MODERN then
+		AddPreviewPiece(preview, "accent", 8, -8, 22, 17)
+		AddPreviewPiece(preview, "control", 34, -8, 88, 17)
+		AddPreviewPiece(preview, "control", 8, -29, 114, 12)
 		for index = 1, 3 do
-			preview.Pieces[#preview.Pieces + 1] = CreatePreviewTexture(preview, 8, -10 - ((index - 1) * 22), 12, 15)
+			AddPreviewPiece(preview, index == 1 and "selected" or "row", 8, -47 - ((index - 1) * 18), 114, 14)
 		end
-		for index = 1, 3 do
-			preview.Pieces[#preview.Pieces + 1] = CreatePreviewTexture(preview, 28, -10 - ((index - 1) * 22), 67, 15)
+		for index = 1, 5 do
+			AddPreviewPiece(preview, index == 1 and "accent" or "tab", 127, -8 - ((index - 1) * 20), 18, 18)
 		end
+		AddPreviewPiece(preview, "control", 36, -101, 58, 6)
 	else
+		AddPreviewPiece(preview, "accent", 8, -8, 22, 17)
+		AddPreviewPiece(preview, "control", 34, -8, 112, 17)
+		AddPreviewPiece(preview, "control", 8, -29, 138, 12)
 		for index = 1, 3 do
-			preview.Pieces[#preview.Pieces + 1] = CreatePreviewTexture(preview, 8 + ((index - 1) * 29), -9, 25, 10)
+			AddPreviewPiece(preview, index == 1 and "accent" or "tab", 8 + ((index - 1) * 46), -45, 43, 11)
 		end
 		for index = 1, 3 do
-			preview.Pieces[#preview.Pieces + 1] = CreatePreviewTexture(preview, 8, -27 - ((index - 1) * 18), 87, 12)
+			AddPreviewPiece(preview, index == 1 and "selected" or "row", 8, -60 - ((index - 1) * 15), 138, 12)
+		end
+		for index = 1, 4 do
+			AddPreviewPiece(preview, index == 1 and "accent" or "tab", 8 + ((index - 1) * 35), -102, 32, 7)
 		end
 	end
 	return preview
@@ -297,9 +317,13 @@ function AppearanceOnboarding:RefreshStyleDiagram(card)
 	end
 	local palette = self.palette or self:GetPalette()
 	SetBackdropColors(card.Diagram, WithAlpha(palette.window, 0.82), palette.border)
-	for index, texture in ipairs(card.Diagram.Pieces or {}) do
-		local useAccent = card.BFL_Value == STYLE_MODERN and index <= 3
-		local color = useAccent and WithAlpha(palette.accent, 0.82) or WithAlpha(palette.text, 0.38)
+	for _, texture in ipairs(card.Diagram.Pieces or {}) do
+		local role = texture.BFL_PreviewRole
+		local color = role == "accent" and WithAlpha(palette.accent, 0.88)
+			or role == "selected" and WithAlpha(palette.accent, 0.28)
+			or role == "row" and WithAlpha(palette.text, 0.17)
+			or role == "tab" and WithAlpha(palette.text, 0.30)
+			or WithAlpha(palette.text, 0.22)
 		texture:SetColorTexture(UnpackColor(color))
 	end
 end
@@ -350,10 +374,10 @@ function AppearanceOnboarding:BuildStyleStep(parent)
 	}
 
 	for index, definition in ipairs(definitions) do
-		local card = self:CreateChoiceCard(panel, 142, function(value)
+		local card = self:CreateChoiceCard(panel, 154, function(value)
 			self:SelectStyle(value)
 		end)
-		local yOffset = -((index - 1) * 154)
+		local yOffset = -((index - 1) * 166)
 		card:SetPoint("TOPLEFT", 0, yOffset)
 		card:SetPoint("TOPRIGHT", 0, yOffset)
 		card.BFL_Kind = "style"
@@ -379,15 +403,6 @@ end
 function AppearanceOnboarding:BuildThemeStep(parent)
 	local panel = CreateFrame("Frame", nil, parent)
 	panel:SetAllPoints()
-	local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-	scrollFrame:SetPoint("TOPLEFT", 0, 0)
-	scrollFrame:SetPoint("BOTTOMRIGHT", -26, 0)
-	local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-	scrollChild:SetWidth(420)
-	scrollChild:SetHeight(1)
-	scrollFrame:SetScrollChild(scrollChild)
-	panel.ScrollFrame = scrollFrame
-	panel.ScrollChild = scrollChild
 	panel.Cards = {}
 	self.themePanel = panel
 	self.themeCards = panel.Cards
@@ -406,25 +421,30 @@ function AppearanceOnboarding:RebuildThemeCards()
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	local themes = ThemeManager and ThemeManager.GetAvailableThemeIDs and ThemeManager:GetAvailableThemeIDs() or { "blizzard" }
 	local locale = GetL()
-	local cardHeight = 96
-	local spacing = 10
+	local cardHeight = 86
+	local spacing = 8
+	local columns = #themes > 4 and 2 or 1
 	for index, theme in ipairs(themes) do
-		local card = self:CreateChoiceCard(self.themePanel.ScrollChild, cardHeight, function(value)
+		local card = self:CreateChoiceCard(self.themePanel, cardHeight, function(value)
 			self:SelectTheme(value)
 		end)
-		local yOffset = -((index - 1) * (cardHeight + spacing))
-		card:SetPoint("TOPLEFT", 0, yOffset)
-		card:SetPoint("TOPRIGHT", 0, yOffset)
+		local column = (index - 1) % columns
+		local row = math.floor((index - 1) / columns)
+		card:SetPoint("TOPLEFT", column == 0 and 0 or 253, -(row * (cardHeight + spacing)))
+		card:SetPoint("TOPRIGHT", column == 0 and (columns == 1 and 0 or -253) or 0, -(row * (cardHeight + spacing)))
 		card.BFL_Kind = "theme"
 		card.BFL_Value = theme
 		card.BFL_Available = true
 		card.Title:ClearAllPoints()
-		card.Title:SetPoint("TOPLEFT", 18, -16)
-		card.Title:SetPoint("TOPRIGHT", -48, -16)
+		card.Title:SetPoint("TOPLEFT", 14, -11)
+		card.Title:SetPoint("TOPRIGHT", -44, -11)
 		card.Description:ClearAllPoints()
-		card.Description:SetPoint("TOPLEFT", card.Title, "BOTTOMLEFT", 0, -8)
-		card.Description:SetPoint("TOPRIGHT", card.Title, "BOTTOMRIGHT", 0, -8)
+		card.Description:SetPoint("TOPLEFT", card.Title, "BOTTOMLEFT", 0, -5)
+		card.Description:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 24)
 		card.Description:SetMaxLines(3)
+		card.Badge:ClearAllPoints()
+		card.Badge:SetPoint("BOTTOMRIGHT", -12, 8)
+		card.Badge:SetJustifyH("RIGHT")
 		card.Title:SetText(ThemeManager and ThemeManager.GetThemeLabel and ThemeManager:GetThemeLabel(theme) or theme)
 		card.Description:SetText(
 			ThemeManager and ThemeManager.GetThemeOnboardingDescription
@@ -439,9 +459,6 @@ function AppearanceOnboarding:RebuildThemeCards()
 		self.themeCards[#self.themeCards + 1] = card
 	end
 
-	local height = math.max(1, (#themes * (cardHeight + spacing)) - spacing)
-	self.themePanel.ScrollChild:SetHeight(height)
-	self.themePanel.ScrollFrame:SetVerticalScroll(0)
 end
 
 function AppearanceOnboarding:CreateSummaryRow(parent, yOffset)
@@ -634,8 +651,18 @@ function AppearanceOnboarding:ApplySkin()
 	self.palette = self:GetPalette()
 	local palette = self.palette
 	SetBackdropColors(self.frame, palette.window, palette.border)
+	if self.frame.PanelBackground then
+		self.frame.PanelBackground:SetColorTexture(UnpackColor(WithAlpha(palette.window, 0.995)))
+	end
+	if self.frame.HeaderBackground then
+		self.frame.HeaderBackground:SetColorTexture(UnpackColor(WithAlpha(palette.card, 0.99)))
+	end
+	if self.frame.ContentBackground then
+		self.frame.ContentBackground:SetColorTexture(UnpackColor(WithAlpha(palette.window, 0.97)))
+	end
 	self.frame.AccentBar:SetColorTexture(UnpackColor(palette.accent))
 	self.frame.HeaderDivider:SetColorTexture(UnpackColor(WithAlpha(palette.accent, 0.36)))
+	self.frame.FooterDivider:SetColorTexture(UnpackColor(WithAlpha(palette.accent, 0.18)))
 	SetFontColor(self.frame.Title, palette.text)
 	SetFontColor(self.frame.StepText, palette.accent)
 	SetFontColor(self.frame.Subtitle, WithAlpha(palette.text, 0.84))

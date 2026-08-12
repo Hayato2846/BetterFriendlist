@@ -198,7 +198,7 @@ local defaults = {
 	modernFriendTabVisibility = {}, -- Per-tab visibility; missing IDs remain visible
 	modernFriendTabPopulatedOnly = { quick_join = false, friend_requests = false }, -- Optional empty-state hiding for count-driven tabs
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
-	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
+	mainFramePosition = {}, -- {Shared = {point, x, y}}; legacy per-layout keys migrate on FrameSettings initialization
 	settingsCenterWindow = { width = 1080, height = 700, locked = false, density = "compact" }, -- LibSettingsDesigner window state
 	settingsCenterSeenNewTags = {}, -- Host-owned seen state for LibSettingsDesigner new badges
 	mainFramePositionMigrated = false, -- Track if old position has been migrated (one-time)

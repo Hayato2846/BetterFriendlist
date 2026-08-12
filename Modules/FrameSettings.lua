@@ -11,6 +11,7 @@ local MAX_SCALE = 2.0
 
 local LEGACY_LAYOUT_KEY = "Default"
 local MODERN_LAYOUT_KEY = "RetailModern"
+local SHARED_POSITION_KEY = "Shared"
 
 function FrameSettings:GetLayoutKey()
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
@@ -50,6 +51,22 @@ function FrameSettings:EnsureLayout(layoutKey)
 	end
 end
 
+function FrameSettings:MigrateSharedPosition()
+	local positions = self.db.mainFramePosition
+	if not positions[SHARED_POSITION_KEY] then
+		local activeLayoutKey = self:GetLayoutKey()
+		positions[SHARED_POSITION_KEY] = positions[activeLayoutKey]
+			or positions[LEGACY_LAYOUT_KEY]
+			or positions[MODERN_LAYOUT_KEY]
+	end
+	positions[LEGACY_LAYOUT_KEY] = nil
+	positions[MODERN_LAYOUT_KEY] = nil
+end
+
+function FrameSettings:GetPositionKey()
+	return SHARED_POSITION_KEY
+end
+
 function FrameSettings:Initialize()
 	self.db = BetterFriendlistDB
 
@@ -67,11 +84,13 @@ function FrameSettings:Initialize()
 		self.db.lockWindow = false
 	end
 
-	-- Keep Legacy and Retail Modern geometry independent.
+	-- Keep Legacy and Retail Modern sizes independent, but use one shared
+	-- position so a style switch never moves the window to a stale location.
 	self:EnsureLayout(LEGACY_LAYOUT_KEY)
 	if BFL.IsRetail then
 		self:EnsureLayout(MODERN_LAYOUT_KEY)
 	end
+	self:MigrateSharedPosition()
 
 	-- Hook MainFrame movement to save position
 	-- Fix: Ensure BFL.MainFrame is set
@@ -229,7 +248,7 @@ function FrameSettings:ApplyPosition()
 		return
 	end
 
-	local pos = self.db.mainFramePosition[self:GetLayoutKey()]
+	local pos = self.db.mainFramePosition[self:GetPositionKey()]
 	if pos and pos.point then
 		frame:ClearAllPoints()
 		-- Safety check for bad coordinates
@@ -255,7 +274,7 @@ function FrameSettings:SavePosition()
 	local point, _, relativePoint, x, y = frame:GetPoint()
 
 	if point then
-		self.db.mainFramePosition[self:GetLayoutKey()] = {
+		self.db.mainFramePosition[self:GetPositionKey()] = {
 			point = point,
 			relativePoint = relativePoint,
 			x = x,
@@ -273,7 +292,7 @@ function FrameSettings:ResetDefaults()
 	self.db.mainFrameSize[layoutKey] = { width = width, height = height }
 
 	-- Reset position to center
-	self.db.mainFramePosition[layoutKey] = {
+	self.db.mainFramePosition[self:GetPositionKey()] = {
 		point = "CENTER",
 		relativePoint = "CENTER",
 		x = 0,
