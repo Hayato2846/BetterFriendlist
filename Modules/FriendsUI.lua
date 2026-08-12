@@ -708,6 +708,11 @@ function FriendsUI:GetModernThemeColors(theme)
 	return resolved, true
 end
 
+function FriendsUI:GetModernHeaderControlOffsetY()
+	local palette = self:GetModernThemeColors()
+	return tonumber(palette and palette.headerControlOffsetY) or 4
+end
+
 local function ApplyModernSearchBoxVisual(searchBox)
 	if not searchBox then
 		return
@@ -1862,6 +1867,16 @@ function FriendsUI:LayoutBattleTagActions()
 	if not (root and tag) then
 		return
 	end
+	local headerControlOffsetY = self:GetModernHeaderControlOffsetY()
+
+	if header.StatusDropdown then
+		header.StatusDropdown:ClearAllPoints()
+		header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+	end
+	if root.BattleNetBar.MenuButton then
+		root.BattleNetBar.MenuButton:ClearAllPoints()
+		root.BattleNetBar.MenuButton:SetPoint("RIGHT", root.BattleNetBar, "RIGHT", -8, headerControlOffsetY)
+	end
 
 	local copyButton = root.BattleNetBar.CopyBattleTagButton
 	copyButton:ClearAllPoints()
@@ -1878,8 +1893,8 @@ function FriendsUI:LayoutBattleTagActions()
 	end
 	if bnetFrame then
 		bnetFrame:ClearAllPoints()
-		bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, 4)
-		bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, 4)
+		bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+		bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, headerControlOffsetY)
 	end
 end
 
@@ -3250,12 +3265,15 @@ function FriendsUI:ApplyModernRootGeometry()
 	local frame = BetterFriendsFrame
 	local background = frame.Bg or frame
 	local _, themed = self:GetModernThemeColors()
+	local headerControlOffsetY = self:GetModernHeaderControlOffsetY()
 
 	root.BattleNetBar:ClearAllPoints()
 	root.BattleNetBar:SetPoint("TOPLEFT", background, "TOPLEFT", -3, -1)
 	root.BattleNetBar:SetPoint("TOPRIGHT", background, "TOPRIGHT", 3, -1)
 	local menuButtonSize = themed and MODERN_THEMED_MENU_BUTTON_SIZE or 34
 	root.BattleNetBar.MenuButton:SetSize(menuButtonSize, menuButtonSize)
+	root.BattleNetBar.MenuButton:ClearAllPoints()
+	root.BattleNetBar.MenuButton:SetPoint("RIGHT", root.BattleNetBar, "RIGHT", -8, headerControlOffsetY)
 
 	root.ContentBackground:ClearAllPoints()
 	root.ContentBackground:SetPoint("TOP", root.BattleNetBar, "BOTTOM", 0, 5)
@@ -3428,13 +3446,14 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 	end
 	local frame = BetterFriendsFrame
 	local header = frame.FriendsTabHeader
+	local headerControlOffsetY = self:GetModernHeaderControlOffsetY()
 	self:ApplyModernRootGeometry()
 	self:HideLegacyTabs()
 	if header then
 		if header.StatusDropdown then
 			header.StatusDropdown:SetParent(self.root.BattleNetBar)
 			header.StatusDropdown:ClearAllPoints()
-			header.StatusDropdown:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, 4)
+			header.StatusDropdown:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
 			header.StatusDropdown:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
 			ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
 		end
@@ -3442,8 +3461,8 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 		if bnetFrame then
 			bnetFrame:SetParent(self.root.BattleNetBar)
 			bnetFrame:ClearAllPoints()
-			bnetFrame:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, 4)
-			bnetFrame:SetPoint("RIGHT", self.root.BattleNetBar.MenuButton, "LEFT", -7, 4)
+			bnetFrame:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+			bnetFrame:SetPoint("RIGHT", self.root.BattleNetBar.MenuButton, "LEFT", -7, headerControlOffsetY)
 			bnetFrame:Show()
 			SafeShow(bnetFrame.Background, not (BFL.UsesFlatTheme and BFL:UsesFlatTheme()))
 			SafeShow(bnetFrame.ContactsMenuButton, false)
@@ -3588,6 +3607,7 @@ function FriendsUI:ApplyModernLayout()
 	root:Show()
 	local frame = BetterFriendsFrame
 	local header = frame.FriendsTabHeader
+	local headerControlOffsetY = self:GetModernHeaderControlOffsetY()
 	if BFL.FrameInitializer and BFL.FrameInitializer.InitializeStatusDropdown then
 		BFL.FrameInitializer:InitializeStatusDropdown(frame)
 	end
@@ -3600,7 +3620,7 @@ function FriendsUI:ApplyModernLayout()
 		if header.StatusDropdown then
 			header.StatusDropdown:SetParent(root.BattleNetBar)
 			header.StatusDropdown:ClearAllPoints()
-			header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, 4)
+			header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
 			header.StatusDropdown:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
 			ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
 			header.StatusDropdown:Show()
@@ -3609,8 +3629,8 @@ function FriendsUI:ApplyModernLayout()
 			local bnetFrame = header.BattlenetFrame
 			bnetFrame:SetParent(root.BattleNetBar)
 			bnetFrame:ClearAllPoints()
-			bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, 4)
-			bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, 4)
+			bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+			bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, headerControlOffsetY)
 			bnetFrame:Show()
 			SafeShow(bnetFrame.Background, not (BFL.UsesFlatTheme and BFL:UsesFlatTheme()))
 			SafeShow(bnetFrame.ContactsMenuButton, false)

@@ -775,6 +775,12 @@ local TAB_DEFINITIONS = {
 		modernOnly = true,
 	},
 	{
+		id = 13,
+		name = L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags",
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag.blp",
+		beta = false,
+	},
+	{
 		id = 10,
 		name = L.SETTINGS_TAB_THEME or "Theme",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders.blp",
@@ -822,12 +828,6 @@ local TAB_DEFINITIONS = {
 		name = L.CONTACT_MEMORY_TITLE or "Private Notes",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\file-text.blp",
 		beta = true,
-	},
-	{
-		id = 13,
-		name = L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags",
-		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag.blp",
-		beta = false,
 	},
 	{
 		id = 12,

@@ -294,6 +294,7 @@ function EllesmereUISkin:GetPalette()
 		preserveNativeGroupHeaders = true,
 		preserveNativeInviteButtons = true,
 		transparentBattleNetBar = true,
+		headerControlOffsetY = 0,
 		portraitOffsetX = EUI_PORTRAIT_OFFSET_X,
 		portraitOffsetY = EUI_PORTRAIT_OFFSET_Y,
 		portraitSize = EUI_PORTRAIT_SIZE,
