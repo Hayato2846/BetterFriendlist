@@ -4393,9 +4393,17 @@ function Settings:RefreshGeneralTab()
 					L.SETTINGS_FRIENDS_UI_STYLE_LEGACY or "Legacy",
 				},
 				values = { "modern", "legacy" },
+				isOptionEnabled = function(value)
+					return value ~= "modern" or (FriendsUI and FriendsUI:IsModernStyleSelectable())
+				end,
+				getOptionTooltip = function(value)
+					if value == "modern" and FriendsUI then
+						return FriendsUI:GetModernUnavailableReason()
+					end
+				end,
 			},
 			function(value)
-				return FriendsUI and FriendsUI:GetRequestedStyle() == value
+				return FriendsUI and FriendsUI:GetEffectiveStyle() == value
 			end,
 			function(value)
 				if FriendsUI then

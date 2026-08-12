@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **EllesmereUI Theme** - Added conditional EllesmereUI styling for Retail Legacy and Modern interface styles through EUI's public skinning API, including live accent and appearance updates when EllesmereUI skinning is enabled.
 - **Retail 12.1 Friendlist UI** - Added a new Retail interface based on Blizzard's 12.1 SocialUI, including vertical section tabs, modern friend cards and group headers, a Battle.net bar, compact search/filter/sort controls, and a dedicated Friend Requests view.
 - **Interface Style Setting** - Retail can switch between Modern and Legacy without reloading. Modern is the Retail default when Blizzard's SocialUI is enabled; Classic and unsupported Retail states continue to use Legacy.
+- **Modern UI Development Override** - Retail developers can use `/bfl forcemodern on|off|status` to test the Modern Friendlist while Blizzard disables SocialUI. Both settings interfaces disable the normal Modern choice and explain the unavailable Blizzard capability when no override is being used.
 - **Friend Tab Settings** - Modern Retail users can reorder every side tab, hide individual tabs, and optionally show Friend Requests or Quick Join only while they contain entries. Hidden tabs are removed from the layout without leaving gaps.
 
 ### Improved

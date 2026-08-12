@@ -1630,6 +1630,8 @@ local function CreateSettingsDropdown(parent, entries, selectedValue, onSelectio
 		BFL.InitializeDropdown(dropdown, {
 			labels = entries.labels or {},
 			values = entries.values or {},
+			isOptionEnabled = entries.isOptionEnabled,
+			getOptionTooltip = entries.getOptionTooltip,
 			getSelectionText = function(value)
 				return GetDropdownLabel(entries, value)
 			end,
@@ -1648,6 +1650,8 @@ local function CreateSettingsDropdown(parent, entries, selectedValue, onSelectio
 		BFL.InitializeDropdown(dropdown, {
 			labels = entries.labels or {},
 			values = entries.values or {},
+			isOptionEnabled = entries.isOptionEnabled,
+			getOptionTooltip = entries.getOptionTooltip,
 			getSelectionText = function(value)
 				return GetDropdownLabel(entries, value)
 			end,
@@ -1683,6 +1687,49 @@ local function RefreshVisibleSettingsCenter()
 			state:RenderContent()
 		end
 	end)
+end
+
+function SettingsDesigner:RefreshFriendsUIAvailability()
+	RefreshVisibleSettingsCenter()
+end
+
+function SettingsDesigner:GetFriendsUIStyleControlHeight()
+	return 116
+end
+
+function SettingsDesigner:RenderFriendsUIStyle(parent, _, _, state)
+	if not parent then
+		return nil
+	end
+	local FriendsUI = self:GetFriendsUI()
+	local entries = {
+		labels = {
+			T("SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern (Retail 12.1)"),
+			T("SETTINGS_FRIENDS_UI_STYLE_LEGACY", "Legacy"),
+		},
+		values = { "modern", "legacy" },
+		isOptionEnabled = function(value)
+			return value ~= "modern" or (FriendsUI and FriendsUI:IsModernStyleSelectable())
+		end,
+		getOptionTooltip = function(value)
+			if value == "modern" and FriendsUI then
+				return FriendsUI:GetModernUnavailableReason()
+			end
+		end,
+	}
+	local selected = FriendsUI and FriendsUI:GetEffectiveStyle() or "legacy"
+	local dropdown = CreateSettingsDropdown(parent, entries, selected, function(value)
+		if FriendsUI and FriendsUI:SetStyle(value) then
+			RefreshSettingsCenter(state)
+		end
+	end, 300)
+	dropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -2)
+	return {
+		Release = function()
+			dropdown:Hide()
+			dropdown:SetParent(nil)
+		end,
+	}
 end
 
 local function GetGroupOrderPageHeight()
@@ -3299,28 +3346,23 @@ local function RegisterFriendsPages()
 		visibleWhen = function() return BFL.IsRetail == true end,
 	})
 	AddGroup("friends.general", "interface", T("SETTINGS_FRIENDS_UI_STYLE_HEADER", "Friendlist UI"), 100)
-	AddDropdown("friends.general", {
+	app:RegisterControl("friends.general", {
+		id = "friendsFrameStyle",
 		key = "friendsFrameStyle",
-		group = "interface",
+		groupID = "interface",
+		groupTitle = T("SETTINGS_FRIENDS_UI_STYLE_HEADER", "Friendlist UI"),
+		type = "custom",
 		label = T("SETTINGS_FRIENDS_UI_STYLE", "Interface Style"),
-		desc = T("SETTINGS_FRIENDS_UI_STYLE_DESC", "Choose the Retail 12.1 layout or the previous BetterFriendlist layout."),
-		list = {
-			modern = T("SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern (Retail 12.1)"),
-			legacy = T("SETTINGS_FRIENDS_UI_STYLE_LEGACY", "Legacy"),
-		},
-		orderList = { "modern", "legacy" },
+		description = T("SETTINGS_FRIENDS_UI_STYLE_DESC", "Choose the Retail 12.1 layout or the previous BetterFriendlist layout."),
 		default = BFL.IsRetail and "modern" or "legacy",
 		order = 100,
 		visibleWhen = function() return BFL.IsRetail == true end,
-		getValue = function()
-			local FriendsUI = SettingsDesigner:GetFriendsUI()
-			return FriendsUI and FriendsUI:GetRequestedStyle() or "legacy"
+		trackCustomized = false,
+		getHeight = function()
+			return SettingsDesigner:GetFriendsUIStyleControlHeight()
 		end,
-		setValue = function(value)
-			local FriendsUI = SettingsDesigner:GetFriendsUI()
-			if FriendsUI then
-				FriendsUI:SetStyle(value)
-			end
+		render = function(parent, pageApp, control, state)
+			return SettingsDesigner:RenderFriendsUIStyle(parent, pageApp, control, state)
 		end,
 		refreshOnChange = true,
 	})

@@ -398,6 +398,8 @@ local function AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onS
 		useCheckboxes = entries.useCheckboxes,
 		isSelected = isSelectedCallback,
 		onSelect = onSelectionCallback,
+		isOptionEnabled = entries.isOptionEnabled,
+		getOptionTooltip = entries.getOptionTooltip,
 		applyFont = applySelectionFont,
 		getFontObject = function(index)
 			local fontPath = entryFontPaths and entryFontPaths[index]
@@ -548,6 +550,8 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 		BFL.InitializeDropdown(dropdown, {
 			labels = entryLabels,
 			values = entryValues,
+			isOptionEnabled = entries.isOptionEnabled,
+			getOptionTooltip = entries.getOptionTooltip,
 			getSelectionText = function(selectionValue)
 				if getSelectionText then
 					return getSelectionText()
@@ -686,6 +690,8 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 				BFL.InitializeDropdown(dropdown, {
 					labels = entryLabels,
 					values = entryValues,
+					isOptionEnabled = entries.isOptionEnabled,
+					getOptionTooltip = entries.getOptionTooltip,
 					getSelectionText = function(selectionValue)
 						if getSelectionText then
 							return getSelectionText()

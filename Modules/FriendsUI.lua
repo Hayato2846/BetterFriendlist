@@ -887,11 +887,11 @@ function FriendsUI:GetDefaultRequestedStyle(isRetail)
 	return isRetail and STYLE_MODERN or STYLE_LEGACY
 end
 
-function FriendsUI:ComputeEffectiveStyle(requestedStyle, isRetail, socialUIEnabled)
+function FriendsUI:ComputeEffectiveStyle(requestedStyle, isRetail, socialUIEnabled, forceModern)
 	if requestedStyle ~= STYLE_MODERN then
 		return STYLE_LEGACY
 	end
-	if isRetail ~= true or socialUIEnabled ~= true then
+	if isRetail ~= true or (socialUIEnabled ~= true and forceModern ~= true) then
 		return STYLE_LEGACY
 	end
 	return STYLE_MODERN
@@ -905,6 +905,28 @@ function FriendsUI:IsSocialUIEnabled()
 	return ok and enabled == true
 end
 
+function FriendsUI:IsModernForceEnabled()
+	if not BFL.IsRetail then
+		return false
+	end
+	local db = GetDB()
+	return db and db.forceModernFriendsUI == true or false
+end
+
+-- This deliberately reports Blizzard's native capability only. Settings use
+-- it to disable their Modern entry even when the developer override is active.
+function FriendsUI:IsModernStyleSelectable()
+	return BFL.IsRetail == true and self:IsSocialUIEnabled()
+end
+
+function FriendsUI:GetModernUnavailableReason()
+	if self:IsModernStyleSelectable() then
+		return nil
+	end
+	return L.SETTINGS_FRIENDS_UI_MODERN_UNAVAILABLE
+		or "Blizzard's Social UI system is currently disabled. Modern can only be forced with /bfl forcemodern on."
+end
+
 function FriendsUI:GetRequestedStyle()
 	local db = GetDB()
 	local style = db and db.friendsFrameStyle
@@ -915,7 +937,12 @@ function FriendsUI:GetRequestedStyle()
 end
 
 function FriendsUI:GetEffectiveStyle()
-	return self:ComputeEffectiveStyle(self:GetRequestedStyle(), BFL.IsRetail == true, self:IsSocialUIEnabled())
+	return self:ComputeEffectiveStyle(
+		self:GetRequestedStyle(),
+		BFL.IsRetail == true,
+		self:IsSocialUIEnabled(),
+		self:IsModernForceEnabled()
+	)
 end
 
 function FriendsUI:GetAppliedStyle()
@@ -3780,6 +3807,9 @@ function FriendsUI:SetStyle(style)
 	if style ~= STYLE_MODERN and style ~= STYLE_LEGACY then
 		return false
 	end
+	if style == STYLE_MODERN and not self:IsModernStyleSelectable() and not self:IsModernForceEnabled() then
+		return false
+	end
 	local FrameSettings = BFL:GetModule("FrameSettings")
 	if FrameSettings and FrameSettings.SavePosition then
 		FrameSettings:SavePosition()
@@ -3791,6 +3821,35 @@ function FriendsUI:SetStyle(style)
 		BetterFriendlistDB.friendsFrameStyle = style
 	end
 	self:ApplyEffectiveStyle("setting")
+	return true
+end
+
+function FriendsUI:SetModernForceEnabled(enabled)
+	if not BFL.IsRetail then
+		return false
+	end
+	enabled = enabled == true
+	local DB = BFL:GetModule("DB")
+	if DB then
+		DB:Set("forceModernFriendsUI", enabled)
+		if enabled then
+			DB:Set("friendsFrameStyle", STYLE_MODERN)
+		end
+	elseif BetterFriendlistDB then
+		BetterFriendlistDB.forceModernFriendsUI = enabled
+		if enabled then
+			BetterFriendlistDB.friendsFrameStyle = STYLE_MODERN
+		end
+	end
+	self:ApplyEffectiveStyle("force-modern")
+	local Settings = BFL:GetModule("Settings")
+	if Settings and Settings.RefreshGeneralTab then
+		Settings:RefreshGeneralTab()
+	end
+	local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+	if SettingsDesigner and SettingsDesigner.RefreshFriendsUIAvailability then
+		SettingsDesigner:RefreshFriendsUIAvailability()
+	end
 	return true
 end
 
@@ -5060,7 +5119,22 @@ function FriendsUI:RegisterTests()
 		action = function(V)
 			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, true, true), STYLE_MODERN, "Modern requires Retail SocialUI")
 			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, true, false), STYLE_LEGACY, "Disabled SocialUI falls back")
+			V:AssertEqual(
+				self:ComputeEffectiveStyle(STYLE_MODERN, true, false, true),
+				STYLE_MODERN,
+				"Retail developer override can force Modern while SocialUI is disabled"
+			)
 			V:AssertEqual(self:ComputeEffectiveStyle(STYLE_MODERN, false, true), STYLE_LEGACY, "Classic remains Legacy")
+			V:AssertEqual(
+				self:ComputeEffectiveStyle(STYLE_MODERN, false, false, true),
+				STYLE_LEGACY,
+				"Developer override never enables Modern on Classic"
+			)
+			V:AssertEqual(
+				self:ComputeEffectiveStyle(STYLE_LEGACY, true, true, true),
+				STYLE_LEGACY,
+				"Requested Legacy wins over the developer override"
+			)
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_SectionOrder", {
@@ -6269,6 +6343,14 @@ function FriendsUI:Initialize()
 		BFL:RegisterEventCallback("SOCIAL_UI_SYSTEM_STATUS_UPDATED", function()
 			self:EnsureSocialUIRedirects()
 			self:ApplyEffectiveStyle("social-ui-status")
+			local Settings = BFL:GetModule("Settings")
+			if Settings and Settings.RefreshGeneralTab then
+				Settings:RefreshGeneralTab()
+			end
+			local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+			if SettingsDesigner and SettingsDesigner.RefreshFriendsUIAvailability then
+				SettingsDesigner:RefreshFriendsUIAvailability()
+			end
 		end, 10)
 	end)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
