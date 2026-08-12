@@ -3037,7 +3037,11 @@ local function ApplyModernElvUIBackdrop(E, control, overrideR, overrideG, overri
 	if surface.SetBackdropBorderColor then
 		surface:SetBackdropBorderColor(borderR, borderG, borderB, 1)
 	end
-	if surface.Show then
+	-- Some BackdropTemplate controls expose SetBackdropColor on the control
+	-- itself. Showing that surface would also show the entire control and can
+	-- resurrect filters or action buttons owned by a previously selected tab.
+	-- Only a dedicated ElvUI backdrop child needs to be made visible here.
+	if surface ~= control and surface.Show then
 		surface:Show()
 	end
 	return surface, bgR, bgG, bgB
@@ -3355,6 +3359,11 @@ function ElvUISkin:SkinModernBorderlessActionButton(S, button)
 	self:SkinModernActionButton(S, button)
 	if button.backdrop and button.backdrop.Hide then
 		button.backdrop:Hide()
+	elseif button.SetBackdropColor then
+		button:SetBackdropColor(0, 0, 0, 0)
+		if button.SetBackdropBorderColor then
+			button:SetBackdropBorderColor(0, 0, 0, 0)
+		end
 	end
 end
 
@@ -3362,10 +3371,12 @@ function ElvUISkin:SkinModernButton(S, button)
 	if not button then
 		return
 	end
-	CallElvUIHandler(S, "HandleButton", button)
+	if not button.BFL_ElvUIModernButtonSkinned then
+		CallElvUIHandler(S, "HandleButton", button)
+		button.BFL_ElvUIModernButtonSkinned = true
+	end
 	HideButtonStateTextures(button)
 	ApplyModernElvUIBackdrop(self.ElvUIEngine, button)
-	button.BFL_ElvUIModernButtonSkinned = true
 end
 
 function ElvUISkin:SkinModernDeclineButton(S, button)
@@ -3411,7 +3422,10 @@ function ElvUISkin:SkinModernSideTab(tab)
 		tab.SelectedTexture:SetAllPoints(backdrop or tab)
 	end
 	if tab.HighlightTexture then
-		SetTextureColor(tab.HighlightTexture, 1, 1, 1, 0.3)
+		if tab.HighlightTexture.SetDrawLayer then
+			tab.HighlightTexture:SetDrawLayer("OVERLAY", 1)
+		end
+		SetTextureColor(tab.HighlightTexture, 1, 0.82, 0, 0.2)
 		tab.HighlightTexture:ClearAllPoints()
 		tab.HighlightTexture:SetAllPoints(backdrop or tab)
 	end
@@ -3422,12 +3436,36 @@ function ElvUISkin:SkinModernSideTab(tab)
 	if tab.TabGlow and tab.TabGlow.Hide then
 		tab.TabGlow:Hide()
 	end
-	if tab.ThemeGlowAnimation and tab.ThemeGlowAnimation.Stop then
-		tab.ThemeGlowAnimation:Stop()
+	-- Keep Blizzard's glow suppressed because it still follows the wider native
+	-- side-tab silhouette. ThemeGlow is BFL-owned and fits the compact ElvUI
+	-- backdrop exactly, so use it for pending requests instead of disabling the
+	-- notification altogether.
+	if tab.ThemeGlow then
+		if tab.ThemeGlow.SetDrawLayer then
+			tab.ThemeGlow:SetDrawLayer("OVERLAY", 2)
+		end
+		tab.ThemeGlow:ClearAllPoints()
+		tab.ThemeGlow:SetAllPoints(backdrop or tab)
+		SetTextureColor(tab.ThemeGlow, 1, 0.82, 0, 0.2)
 	end
-	SetTextureAlpha(tab.ThemeGlow, 0)
-	if tab.ThemeGlow and tab.ThemeGlow.Hide then
-		tab.ThemeGlow:Hide()
+	if tab.BFL_RequestGlowActive then
+		if tab.ThemeGlow then
+			tab.ThemeGlow:Show()
+		end
+		if
+			tab.ThemeGlowAnimation
+			and tab.ThemeGlowAnimation.Play
+			and (not tab.ThemeGlowAnimation.IsPlaying or not tab.ThemeGlowAnimation:IsPlaying())
+		then
+			tab.ThemeGlowAnimation:Play()
+		end
+	else
+		if tab.ThemeGlowAnimation and tab.ThemeGlowAnimation.Stop then
+			tab.ThemeGlowAnimation:Stop()
+		end
+		if tab.ThemeGlow and tab.ThemeGlow.Hide then
+			tab.ThemeGlow:Hide()
+		end
 	end
 	for _, glow in pairs({ tab.Glow, tab.SelectedGlow, tab.NewFeatureGlow }) do
 		SetTextureAlpha(glow, 0)
@@ -3439,6 +3477,7 @@ function ElvUISkin:SkinModernSideTab(tab)
 		tab.Icon:ClearAllPoints()
 		tab.Icon:SetPoint("CENTER", backdrop or tab, "CENTER")
 	end
+	tab.BFL_ElvUIModernHighlightReady = true
 	tab.BFL_ElvUIModernTabSkinned = true
 end
 
@@ -3496,9 +3535,14 @@ function ElvUISkin:SkinModernSocialCard(S, button)
 		button.PartyButton,
 		button.RAFSummonButton,
 	}) do
-		self:SkinModernActionButton(S, actionButton)
+		self:SkinModernBorderlessActionButton(S, actionButton)
 	end
 	if button.AcceptButton then
+		local declineHeight = button.DeclineButton and button.DeclineButton.GetHeight and button.DeclineButton:GetHeight()
+		if declineHeight and declineHeight > 0 then
+			button.AcceptButton.baseHeight = button.DeclineButton.baseHeight or declineHeight
+			button.AcceptButton:SetHeight(declineHeight)
+		end
 		self:SkinModernButton(S, button.AcceptButton)
 	end
 	if button.DeclineButton then
@@ -3511,12 +3555,9 @@ function ElvUISkin:SkinModernScrollableHeader(S, button)
 	if not button then
 		return
 	end
-	if button.HeaderText then
-		-- BFL group headers deliberately keep their existing SocialUI styling.
-		-- Only request section headers (ButtonText) use ElvUI button chrome.
-		return
-	end
-
+	-- Both group and request-section headers use ElvUI's opaque control surface.
+	-- The collapse button remains a child and therefore keeps its existing icon
+	-- and click behavior while the translucent Blizzard atlas is removed.
 	self:SkinModernDirectoryHeader(S, button)
 	button.BFL_ElvUIModernHeaderSkinned = true
 	SetTextureAlpha(button.GetNormalTexture and button:GetNormalTexture(), 0)
@@ -3856,6 +3897,16 @@ function ElvUISkin:RegisterTests()
 			V:Assert(self:IsEngineInitialized({ initialized = true }, nil), "Legacy ElvUI initialization flag remains supported")
 			V:Assert(self:IsEngineInitialized({}, { Initialized = true }), "Initialized Skins module is supported")
 			V:Assert(not self:IsEngineInitialized({}, {}), "Uninitialized ElvUI is not treated as ready")
+			local controlShown = false
+			local hiddenControl = {
+				SetBackdropColor = function() end,
+				SetBackdropBorderColor = function() end,
+				Show = function()
+					controlShown = true
+				end,
+			}
+			ApplyModernElvUIBackdrop({}, hiddenControl)
+			V:Assert(not controlShown, "ElvUI backdrop refresh does not resurrect hidden controls")
 		end,
 	})
 
@@ -3877,6 +3928,16 @@ function ElvUISkin:RegisterTests()
 			V:AssertEqual(header.StatusDropdown:GetHeight(), 30, "Modern ElvUI status keeps the manifest height")
 			V:Assert(header.SearchBox.BFL_ElvUIModernEditBoxSkinned, "Modern ElvUI owns the shared search field")
 			V:Assert(root.FilterBar.FilterDropdown.BFL_ElvUIModernFilterSkinned, "Modern filter uses ElvUI filter chrome")
+			local selectedSection = FriendsUI:GetSelectedSection()
+			if selectedSection == "friends" and not FriendsUI:IsSimpleModeContactSection(selectedSection) then
+				V:Assert(root.FilterBar.FilterDropdown:IsShown(), "Friends keeps its filter visible after the ElvUI pass")
+				V:Assert(not root.FilterBar.RecentFilterDropdown:IsShown(), "Friends does not resurrect the Recent Allies filter")
+				V:Assert(root.FilterBar.SortButton:IsShown(), "Friends keeps its sorter visible after the ElvUI pass")
+			elseif selectedSection == "recent_allies" and not FriendsUI:IsSimpleModeContactSection(selectedSection) then
+				V:Assert(not root.FilterBar.FilterDropdown:IsShown(), "Recent Allies does not resurrect the Friends filter")
+				V:Assert(root.FilterBar.RecentFilterDropdown:IsShown(), "Recent Allies keeps its own filter visible")
+				V:Assert(not root.FilterBar.SortButton:IsShown(), "Recent Allies does not resurrect the Friends sorter")
+			end
 			V:AssertEqual(portrait:GetWidth(), 42, "Modern ElvUI portrait matches the Legacy logo width")
 			V:AssertEqual(portrait:GetHeight(), 42, "Modern ElvUI portrait matches the Legacy logo height")
 			local point, relativeTo, relativePoint, x, y = portrait:GetPoint(1)
@@ -3897,7 +3958,12 @@ function ElvUISkin:RegisterTests()
 				if tab:IsShown() then
 					V:AssertEqual(tab:GetWidth(), 30, "Modern ElvUI side tabs match SocialUI width")
 					V:AssertEqual(tab:GetHeight(), 40, "Modern ElvUI side tabs match SocialUI height")
-					V:Assert(not tab.ThemeGlow or tab.ThemeGlow:GetAlpha() == 0, "Modern ElvUI suppresses BFL tab glow")
+					V:Assert(tab.BFL_ElvUIModernHighlightReady, "Modern ElvUI side tabs own a fitted hover highlight")
+					if tab.BFL_RequestGlowActive then
+						V:Assert(tab.ThemeGlow and tab.ThemeGlow:IsShown(), "Modern ElvUI keeps the fitted request glow functional")
+					else
+						V:Assert(not tab.ThemeGlow or not tab.ThemeGlow:IsShown(), "Modern ElvUI hides idle request glows")
+					end
 					local tabPoint, tabRelativeTo, tabRelativePoint, tabX, tabY = tab:GetPoint(1)
 					V:AssertEqual(tabPoint, "TOPLEFT", "Modern ElvUI side tabs use top-left chaining")
 					if previousTab then
