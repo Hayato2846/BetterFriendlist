@@ -2135,6 +2135,74 @@ function ElvUISkin:SkinSettings(E, S)
 	end
 end
 
+function ElvUISkin:SkinAppearanceOnboarding(frame, onboarding)
+	if not self:IsSkinEnabled() or not frame then
+		return false
+	end
+	local E = self.ElvUIEngine or (BFL.GetElvUIEngine and BFL:GetElvUIEngine(false))
+	local S = self.ElvUISkinProxy or (E and E.GetModule and E:GetModule("Skins"))
+	if not S then
+		return false
+	end
+
+	if not frame.BFL_ElvOnboardingSkinned then
+		S:HandlePortraitFrame(frame)
+		for _, button in ipairs({ onboarding.backButton, onboarding.laterButton, onboarding.primaryButton }) do
+			S:HandleButton(button)
+		end
+		frame.BFL_ElvOnboardingSkinned = true
+	end
+	for _, card in ipairs(onboarding.styleCards or {}) do
+		if not card.BFL_ElvOnboardingSkinned then
+			if card.SetBackdrop then
+				card:SetBackdrop(nil)
+			end
+			card:CreateBackdrop("Transparent")
+			S:HandleCheckBox(card.SelectControl)
+			if card.Diagram.SetBackdrop then
+				card.Diagram:SetBackdrop(nil)
+			end
+			card.Diagram:CreateBackdrop("Transparent")
+			card.BFL_ElvOnboardingSkinned = true
+		end
+	end
+	for _, card in ipairs(onboarding.themeCards or {}) do
+		if not card.BFL_ElvOnboardingSkinned then
+			if card.SetBackdrop then
+				card:SetBackdrop(nil)
+			end
+			card:CreateBackdrop("Transparent")
+			S:HandleCheckBox(card.SelectControl)
+			card.BFL_ElvOnboardingSkinned = true
+		end
+	end
+	for _, card in ipairs(onboarding.layoutCards or {}) do
+		if not card.BFL_ElvOnboardingSkinned then
+			if card.SetBackdrop then
+				card:SetBackdrop(nil)
+			end
+			card:CreateBackdrop("Transparent")
+			S:HandleCheckBox(card.Check)
+			card.BFL_ElvOnboardingSkinned = true
+		end
+	end
+	for _, row in ipairs({
+		onboarding.summaryPanel and onboarding.summaryPanel.StyleRow,
+		onboarding.summaryPanel and onboarding.summaryPanel.ThemeRow,
+		onboarding.summaryPanel and onboarding.summaryPanel.SimpleModeRow,
+		onboarding.summaryPanel and onboarding.summaryPanel.CompactModeRow,
+	}) do
+		if row and not row.BFL_ElvOnboardingSkinned then
+			if row.SetBackdrop then
+				row:SetBackdrop(nil)
+			end
+			row:CreateBackdrop("Transparent")
+			row.BFL_ElvOnboardingSkinned = true
+		end
+	end
+	return true
+end
+
 function ElvUISkin:SkinChangelog(E, S)
 	local Changelog = BFL:GetModule("Changelog")
 	if not Changelog then

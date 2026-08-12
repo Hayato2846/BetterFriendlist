@@ -688,6 +688,57 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 	end
 end
 
+function EllesmereUISkin:SkinAppearanceOnboarding(frame, onboarding)
+	if not self:IsSkinEnabled() or not frame then
+		return false
+	end
+	local api = self.facade
+	SafeCall(api, "Shell", frame)
+	SafeCall(api, "Inset", frame.Inset)
+	SafeCall(api, "CloseButton", frame.CloseButton)
+	for _, button in ipairs({ onboarding.backButton, onboarding.laterButton, onboarding.primaryButton }) do
+		SafeCall(api, "Button", button)
+		SafeCall(api, "StateButtonLabel", button)
+	end
+	for _, card in ipairs(onboarding.styleCards or {}) do
+		if card.SetBackdrop then
+			card:SetBackdrop(nil)
+		end
+		SafeCall(api, "Panel", card, { inset = true })
+		SkinCheckbox(api, card.SelectControl)
+		if card.Diagram.SetBackdrop then
+			card.Diagram:SetBackdrop(nil)
+		end
+		SafeCall(api, "Panel", card.Diagram, { inset = true })
+	end
+	for _, card in ipairs(onboarding.themeCards or {}) do
+		if card.SetBackdrop then
+			card:SetBackdrop(nil)
+		end
+		SafeCall(api, "Panel", card, { inset = true })
+		SkinCheckbox(api, card.SelectControl)
+	end
+	for _, card in ipairs(onboarding.layoutCards or {}) do
+		if card.SetBackdrop then
+			card:SetBackdrop(nil)
+		end
+		SafeCall(api, "Panel", card, { inset = true })
+		SkinCheckbox(api, card.Check)
+	end
+	for _, row in ipairs({
+		onboarding.summaryPanel and onboarding.summaryPanel.StyleRow,
+		onboarding.summaryPanel and onboarding.summaryPanel.ThemeRow,
+		onboarding.summaryPanel and onboarding.summaryPanel.SimpleModeRow,
+		onboarding.summaryPanel and onboarding.summaryPanel.CompactModeRow,
+	}) do
+		if row and row.SetBackdrop then
+			row:SetBackdrop(nil)
+		end
+		SafeCall(api, "Panel", row, { inset = true })
+	end
+	return true
+end
+
 function EllesmereUISkin:SkinMainFrame()
 	local frame = _G.BetterFriendsFrame
 	if not self:IsSkinEnabled() or not frame then

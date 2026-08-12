@@ -4,16 +4,25 @@
 local ADDON_NAME, BFL = ...
 local AppearanceOnboarding = BFL:RegisterModule("AppearanceOnboarding", {})
 
-local ONBOARDING_VERSION = 1
+local ONBOARDING_VERSION = 2
 local STYLE_MODERN = "modern"
 local STYLE_LEGACY = "legacy"
-local TOTAL_STEPS = 3
+local TOTAL_STEPS = 4
 local CARD_BACKDROP = {
-	bgFile = "Interface\\Buttons\\WHITE8X8",
-	edgeFile = "Interface\\Buttons\\WHITE8X8",
+	bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 	tile = false,
-	edgeSize = 1,
-	insets = { left = 1, right = 1, top = 1, bottom = 1 },
+	edgeSize = 12,
+	insets = { left = 3, right = 3, top = 3, bottom = 3 },
+}
+
+local PREVIEW_BACKDROP = {
+	bgFile = "Interface\\FrameGeneral\\UI-Background-Marble",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	tile = true,
+	tileSize = 32,
+	edgeSize = 10,
+	insets = { left = 3, right = 3, top = 3, bottom = 3 },
 }
 
 BFL.APPEARANCE_ONBOARDING_VERSION = ONBOARDING_VERSION
@@ -49,11 +58,11 @@ local function UnpackColor(color)
 	return color[1], color[2], color[3], color[4]
 end
 
-local function CreateBackdropFrame(frameType, parent)
+local function CreateBackdropFrame(frameType, parent, backdrop)
 	local template = BackdropTemplateMixin and "BackdropTemplate" or nil
 	local frame = CreateFrame(frameType or "Frame", nil, parent, template)
 	if frame.SetBackdrop then
-		frame:SetBackdrop(CARD_BACKDROP)
+		frame:SetBackdrop(backdrop or CARD_BACKDROP)
 	else
 		frame.BFL_Background = frame:CreateTexture(nil, "BACKGROUND")
 		frame.BFL_Background:SetAllPoints()
@@ -119,6 +128,20 @@ function AppearanceOnboarding:IsSocialUIEnabled()
 	return FriendsUI and FriendsUI.IsSocialUIEnabled and FriendsUI:IsSocialUIEnabled() == true
 end
 
+local function SetNativeButtonText(button, text)
+	if button and button.SetText then
+		button:SetText(text or "")
+	end
+end
+
+local function SetNativeButtonEnabled(button, enabled)
+	if not button then
+		return
+	end
+	button.BFL_Enabled = enabled == true
+	button:SetEnabled(enabled == true)
+end
+
 function AppearanceOnboarding:IsModernForceEnabled()
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	return FriendsUI and FriendsUI.IsModernForceEnabled and FriendsUI:IsModernForceEnabled() == true
@@ -165,51 +188,23 @@ function AppearanceOnboarding:GetPalette()
 	}
 end
 
-function AppearanceOnboarding:CreateFlatButton(parent, width, height, onClick)
-	local button = CreateBackdropFrame("Button", parent)
+function AppearanceOnboarding:CreateNavigationButton(parent, width, height, onClick)
+	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
 	button:SetSize(width, height)
 	button.BFL_Enabled = true
-	button.Label = button:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	button.Label:SetPoint("CENTER")
-	button.Label:SetJustifyH("CENTER")
 	button:SetScript("OnClick", function(control)
 		if control.BFL_Enabled ~= false and onClick then
 			onClick()
 		end
 	end)
-	button:SetScript("OnEnter", function(control)
-		control.BFL_Hovered = true
-		self:RefreshFlatButton(control)
-	end)
-	button:SetScript("OnLeave", function(control)
-		control.BFL_Hovered = nil
-		self:RefreshFlatButton(control)
-	end)
 	return button
 end
 
-function AppearanceOnboarding:SetFlatButtonEnabled(button, enabled)
+function AppearanceOnboarding:SetNavigationButtonEnabled(button, enabled)
 	if not button then
 		return
 	end
-	button.BFL_Enabled = enabled == true
-	button:SetEnabled(enabled == true)
-	self:RefreshFlatButton(button)
-end
-
-function AppearanceOnboarding:RefreshFlatButton(button)
-	if not button then
-		return
-	end
-	local palette = self.palette or self:GetPalette()
-	local enabled = button.BFL_Enabled ~= false
-	local background = button.BFL_Hovered and enabled and palette.hover or palette.card
-	local border = button.BFL_Primary and palette.accent or palette.border
-	if button.BFL_Primary and enabled then
-		background = button.BFL_Hovered and WithAlpha(palette.accent, 0.32) or WithAlpha(palette.accent, 0.20)
-	end
-	SetBackdropColors(button, background, border)
-	SetFontColor(button.Label, enabled and palette.text or palette.disabledText)
+	SetNativeButtonEnabled(button, enabled)
 end
 
 function AppearanceOnboarding:CreateChoiceCard(parent, height, onClick)
@@ -230,7 +225,15 @@ function AppearanceOnboarding:CreateChoiceCard(parent, height, onClick)
 	end)
 
 	card.Title = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	card.Title:SetPoint("TOPLEFT", 18, -16)
+	card.SelectControl = CreateFrame("CheckButton", nil, card, "UIRadioButtonTemplate")
+	card.SelectControl:SetPoint("TOPLEFT", 15, -16)
+	card.SelectControl:SetScript("OnClick", function()
+		if card.BFL_Available ~= false and not self:IsInCombat() and onClick then
+			onClick(card.BFL_Value)
+		end
+	end)
+
+	card.Title:SetPoint("TOPLEFT", 42, -14)
 	card.Title:SetPoint("TOPRIGHT", -188, -16)
 	card.Title:SetJustifyH("LEFT")
 	card.Title:SetMaxLines(1)
@@ -242,14 +245,9 @@ function AppearanceOnboarding:CreateChoiceCard(parent, height, onClick)
 	card.Description:SetWordWrap(true)
 	card.Description:SetMaxLines(4)
 	card.Badge = card:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	card.Badge:SetPoint("BOTTOMLEFT", 18, 13)
+	card.Badge:SetPoint("BOTTOMLEFT", 42, 13)
 	card.Badge:SetJustifyH("LEFT")
 	card.Badge:Hide()
-	card.Check = card:CreateTexture(nil, "OVERLAY")
-	card.Check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-	card.Check:SetSize(32, 32)
-	card.Check:SetPoint("TOPRIGHT", -8, -7)
-	card.Check:Hide()
 	card.Accent = card:CreateTexture(nil, "ARTWORK")
 	card.Accent:SetTexture("Interface\\Buttons\\WHITE8X8")
 	card.Accent:SetWidth(4)
@@ -275,7 +273,7 @@ local function AddPreviewPiece(preview, role, left, top, width, height)
 end
 
 function AppearanceOnboarding:CreateStyleDiagram(card, style)
-	local preview = CreateBackdropFrame("Frame", card)
+	local preview = CreateBackdropFrame("Frame", card, PREVIEW_BACKDROP)
 	preview:SetSize(154, 112)
 	preview:SetPoint("RIGHT", -18, 0)
 	card.Diagram = preview
@@ -339,10 +337,14 @@ function AppearanceOnboarding:RefreshChoiceCard(card)
 	local background = selected and palette.selected or (card.BFL_Hovered and available and palette.hover or palette.card)
 	local border = selected and palette.accent or palette.border
 	SetBackdropColors(card, background, border)
+	local engine = BFL:GetModule("SkinEngine")
+	if engine and engine.IsActive and engine:IsActive() and card.BFL_DarkBackdrop then
+		engine:StyleBackdrop(card, background, border)
+	end
 	card.Accent:SetColorTexture(UnpackColor(palette.accent))
 	card.Accent:SetShown(selected)
-	card.Check:SetVertexColor(UnpackColor(palette.accent))
-	card.Check:SetShown(selected)
+	card.SelectControl:SetChecked(selected)
+	card.SelectControl:SetEnabled(available)
 	SetFontColor(card.Title, available and palette.text or palette.disabledText)
 	SetFontColor(card.Description, available and WithAlpha(palette.text, 0.78) or palette.disabledText)
 	SetFontColor(card.Badge, palette.accent)
@@ -436,7 +438,9 @@ function AppearanceOnboarding:RebuildThemeCards()
 		card.BFL_Value = theme
 		card.BFL_Available = true
 		card.Title:ClearAllPoints()
-		card.Title:SetPoint("TOPLEFT", 14, -11)
+		card.SelectControl:ClearAllPoints()
+		card.SelectControl:SetPoint("TOPLEFT", 12, -11)
+		card.Title:SetPoint("TOPLEFT", 38, -10)
 		card.Title:SetPoint("TOPRIGHT", -44, -11)
 		card.Description:ClearAllPoints()
 		card.Description:SetPoint("TOPLEFT", card.Title, "BOTTOMLEFT", 0, -5)
@@ -461,6 +465,85 @@ function AppearanceOnboarding:RebuildThemeCards()
 
 end
 
+function AppearanceOnboarding:CreateLayoutOption(parent, yOffset, key, titleKey, descriptionKey)
+	local card = CreateBackdropFrame("Button", parent)
+	card:SetHeight(118)
+	card:SetPoint("TOPLEFT", 0, yOffset)
+	card:SetPoint("TOPRIGHT", 0, yOffset)
+	card.BFL_LayoutKey = key
+
+	card.Check = CreateFrame("CheckButton", nil, card, "UICheckButtonTemplate")
+	card.Check:SetPoint("TOPLEFT", 12, -13)
+	card.Title = card:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	card.Title:SetPoint("TOPLEFT", 50, -18)
+	card.Title:SetPoint("TOPRIGHT", -18, -18)
+	card.Title:SetJustifyH("LEFT")
+	card.Description = card:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	card.Description:SetPoint("TOPLEFT", card.Title, "BOTTOMLEFT", 0, -9)
+	card.Description:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -18, 15)
+	card.Description:SetJustifyH("LEFT")
+	card.Description:SetJustifyV("TOP")
+	card.Description:SetWordWrap(true)
+	card.Description:SetMaxLines(4)
+
+	local function SetValue(value)
+		self:SelectLayoutMode(key, value == true)
+	end
+	card.Check:SetScript("OnClick", function(control)
+		SetValue(control:GetChecked() == true)
+	end)
+	card:SetScript("OnClick", function()
+		local selected = key == "simpleMode" and self.selectedSimpleMode or self.selectedCompactMode
+		SetValue(not selected)
+	end)
+	card:SetScript("OnEnter", function(control)
+		control.BFL_Hovered = true
+		self:RefreshLayoutOption(control)
+	end)
+	card:SetScript("OnLeave", function(control)
+		control.BFL_Hovered = nil
+		self:RefreshLayoutOption(control)
+	end)
+
+	card.BFL_TitleKey = titleKey
+	card.BFL_DescriptionKey = descriptionKey
+	card.BFL_TitleFallback = key == "simpleMode" and "Simple Mode" or "Compact Mode"
+	card.BFL_DescriptionFallback = key == "simpleMode"
+		and "Use a simplified Friends frame layout."
+		or "Reduce friend-row height to fit more entries on screen."
+	return card
+end
+
+function AppearanceOnboarding:BuildLayoutStep(parent)
+	local panel = CreateFrame("Frame", nil, parent)
+	panel:SetAllPoints()
+	panel.Cards = {
+		self:CreateLayoutOption(panel, 0, "simpleMode", "SETTINGS_SIMPLE_MODE", "SETTINGS_SIMPLE_MODE_DESC"),
+		self:CreateLayoutOption(panel, -132, "compactMode", "SETTINGS_COMPACT_MODE", "SETTINGS_COMPACT_MODE_DESC"),
+	}
+	self.layoutPanel = panel
+	self.layoutCards = panel.Cards
+end
+
+function AppearanceOnboarding:RefreshLayoutOption(card)
+	if not card then
+		return
+	end
+	local palette = self.palette or self:GetPalette()
+	local selected = card.BFL_LayoutKey == "simpleMode" and self.selectedSimpleMode == true
+		or card.BFL_LayoutKey == "compactMode" and self.selectedCompactMode == true
+	local background = selected and palette.selected or (card.BFL_Hovered and palette.hover or palette.card)
+	local border = selected and palette.accent or palette.border
+	SetBackdropColors(card, background, border)
+	local engine = BFL:GetModule("SkinEngine")
+	if engine and engine.IsActive and engine:IsActive() and card.BFL_DarkBackdrop then
+		engine:StyleBackdrop(card, background, border)
+	end
+	card.Check:SetChecked(selected)
+	SetFontColor(card.Title, palette.text)
+	SetFontColor(card.Description, WithAlpha(palette.text, 0.78))
+end
+
 function AppearanceOnboarding:CreateSummaryRow(parent, yOffset)
 	local row = CreateBackdropFrame("Frame", parent)
 	row:SetHeight(64)
@@ -481,10 +564,12 @@ function AppearanceOnboarding:BuildSummaryStep(parent)
 	local panel = CreateFrame("Frame", nil, parent)
 	panel:SetAllPoints()
 	panel.StyleRow = self:CreateSummaryRow(panel, 0)
-	panel.ThemeRow = self:CreateSummaryRow(panel, -78)
+	panel.ThemeRow = self:CreateSummaryRow(panel, -68)
+	panel.SimpleModeRow = self:CreateSummaryRow(panel, -136)
+	panel.CompactModeRow = self:CreateSummaryRow(panel, -204)
 	panel.ChangeLater = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	panel.ChangeLater:SetPoint("TOPLEFT", panel.ThemeRow, "BOTTOMLEFT", 10, -26)
-	panel.ChangeLater:SetPoint("TOPRIGHT", panel.ThemeRow, "BOTTOMRIGHT", -10, -26)
+	panel.ChangeLater:SetPoint("TOPLEFT", panel.CompactModeRow, "BOTTOMLEFT", 10, -22)
+	panel.ChangeLater:SetPoint("TOPRIGHT", panel.CompactModeRow, "BOTTOMRIGHT", -10, -22)
 	panel.ChangeLater:SetJustifyH("CENTER")
 	panel.ChangeLater:SetWordWrap(true)
 	panel.ReloadNote = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -497,21 +582,21 @@ function AppearanceOnboarding:BuildSummaryStep(parent)
 end
 
 function AppearanceOnboarding:BuildFooter(frame)
-	self.backButton = self:CreateFlatButton(frame, 108, 36, function()
+	self.backButton = self:CreateNavigationButton(frame, 108, 26, function()
 		self:PreviousStep()
 	end)
-	self.backButton:SetPoint("BOTTOMLEFT", 31, 22)
-	self.laterButton = self:CreateFlatButton(frame, 138, 36, function()
+	self.backButton:SetPoint("BOTTOMLEFT", 14, 5)
+	self.laterButton = self:CreateNavigationButton(frame, 138, 26, function()
 		self:Defer()
 	end)
-	self.laterButton:SetPoint("BOTTOM", 0, 22)
-	self.primaryButton = self:CreateFlatButton(frame, 154, 36, function()
+	self.laterButton:SetPoint("BOTTOMRIGHT", -174, 5)
+	self.primaryButton = self:CreateNavigationButton(frame, 154, 26, function()
 		self:ActivatePrimaryAction()
 	end)
-	self.primaryButton:SetPoint("BOTTOMRIGHT", -31, 22)
+	self.primaryButton:SetPoint("BOTTOMRIGHT", -14, 5)
 	self.primaryButton.BFL_Primary = true
 	self.combatNotice = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	self.combatNotice:SetPoint("BOTTOM", frame, "BOTTOM", 0, 63)
+	self.combatNotice:SetPoint("BOTTOM", frame, "BOTTOM", 0, 35)
 	self.combatNotice:SetWidth(450)
 	self.combatNotice:SetJustifyH("CENTER")
 	self.combatNotice:Hide()
@@ -520,11 +605,29 @@ end
 function AppearanceOnboarding:OnFrameLoad(frame)
 	self.frame = frame
 	frame:SetMovable(false)
+	if ButtonFrameTemplate_ShowPortrait then
+		ButtonFrameTemplate_ShowPortrait(frame)
+	end
+	if ButtonFrameTemplate_ShowButtonBar then
+		ButtonFrameTemplate_ShowButtonBar(frame)
+	end
+	if ButtonFrameTemplate_HideAttic then
+		ButtonFrameTemplate_HideAttic(frame)
+	end
+	if frame.SetPortraitToAsset then
+		frame:SetPortraitToAsset("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon")
+	elseif frame.PortraitContainer and frame.PortraitContainer.portrait then
+		frame.PortraitContainer.portrait:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon")
+	end
+	if frame.SetPortraitTexCoord then
+		frame:SetPortraitTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
 	frame.CloseButton:SetScript("OnClick", function()
 		self:Defer()
 	end)
 	self:BuildStyleStep(frame.Content)
 	self:BuildThemeStep(frame.Content)
+	self:BuildLayoutStep(frame.Content)
 	self:BuildSummaryStep(frame.Content)
 	self:BuildFooter(frame)
 	if BFL.AddUniqueUISpecialFrame then
@@ -546,13 +649,19 @@ function AppearanceOnboarding:RefreshLocalizedText()
 			card.Badge:SetText(locale[card.BFL_BadgeKey] or card.BFL_BadgeFallback)
 		end
 	end
-	self.backButton.Label:SetText(locale.ONBOARDING_BACK or "Back")
-	self.laterButton.Label:SetText(locale.ONBOARDING_LATER or "Decide later")
+	for _, card in ipairs(self.layoutCards or {}) do
+		card.Title:SetText(locale[card.BFL_TitleKey] or card.BFL_TitleFallback)
+		card.Description:SetText(locale[card.BFL_DescriptionKey] or card.BFL_DescriptionFallback)
+	end
+	SetNativeButtonText(self.backButton, locale.ONBOARDING_BACK or "Back")
+	SetNativeButtonText(self.laterButton, locale.ONBOARDING_LATER or "Decide later")
 	self.combatNotice:SetText(locale.ONBOARDING_COMBAT_WAIT or "Finish combat to continue setup.")
 	self.summaryPanel.StyleRow.Label:SetText(locale.ONBOARDING_SUMMARY_STYLE or "Interface style")
 	self.summaryPanel.ThemeRow.Label:SetText(locale.ONBOARDING_SUMMARY_THEME or "Theme")
+	self.summaryPanel.SimpleModeRow.Label:SetText(locale.SETTINGS_SIMPLE_MODE or "Simple Mode")
+	self.summaryPanel.CompactModeRow.Label:SetText(locale.SETTINGS_COMPACT_MODE or "Compact Mode")
 	self.summaryPanel.ChangeLater:SetText(
-		locale.ONBOARDING_CHANGE_LATER or "You can change both choices at any time in BetterFriendlist Settings."
+		locale.ONBOARDING_CHANGE_LATER or "You can change all of these choices at any time in BetterFriendlist Settings."
 	)
 	self:RefreshStep()
 end
@@ -588,6 +697,8 @@ function AppearanceOnboarding:RefreshSummary()
 	local locale = GetL()
 	self.summaryPanel.StyleRow.Value:SetText(self:GetStyleLabel(self.selectedStyle))
 	self.summaryPanel.ThemeRow.Value:SetText(self:GetThemeLabel(self.selectedTheme))
+	self.summaryPanel.SimpleModeRow.Value:SetText(self.selectedSimpleMode and (YES or "Enabled") or (NO or "Disabled"))
+	self.summaryPanel.CompactModeRow.Value:SetText(self.selectedCompactMode and (YES or "Enabled") or (NO or "Disabled"))
 	self.summaryPanel.ReloadNote:SetText(
 		locale.ONBOARDING_RELOAD_NOTE or "This theme change will offer a UI reload after confirmation."
 	)
@@ -602,36 +713,48 @@ function AppearanceOnboarding:RefreshStep()
 	local step = self.currentStep or 1
 	self.frame.StepText:SetText(SafeFormat(locale.ONBOARDING_STEP_FORMAT or "Step %d of %d", step, TOTAL_STEPS))
 	if step == 1 then
-		self.frame.Title:SetText(locale.ONBOARDING_WELCOME_TITLE or "Welcome to the new BetterFriendlist")
+		self.frame.TitleContainer.TitleText:SetText(locale.ONBOARDING_WELCOME_TITLE or "Welcome to the new BetterFriendlist")
 		self.frame.Subtitle:SetText(
 			locale.ONBOARDING_WELCOME_DESC
 				or "Retail 12.1 brings a fundamentally redesigned friendlist. Choose the interface that feels right for you."
 		)
 	elseif step == 2 then
-		self.frame.Title:SetText(locale.ONBOARDING_THEME_TITLE or "Make BetterFriendlist yours")
+		self.frame.TitleContainer.TitleText:SetText(locale.ONBOARDING_THEME_TITLE or "Make BetterFriendlist yours")
 		self.frame.Subtitle:SetText(
 			locale.ONBOARDING_THEME_DESC
 				or "Choose a visual theme. Available themes are detected dynamically and most can be previewed immediately."
 		)
-	else
-		self.frame.Title:SetText(locale.ONBOARDING_SUMMARY_TITLE or "Your BetterFriendlist is ready")
+	elseif step == 3 then
+		self.frame.TitleContainer.TitleText:SetText(locale.ONBOARDING_LAYOUT_TITLE or "Shape your friendlist")
 		self.frame.Subtitle:SetText(
-			locale.ONBOARDING_SUMMARY_DESC or "Confirm your interface style and theme to finish setup."
+			locale.ONBOARDING_LAYOUT_DESC
+				or "Choose a simplified frame layout and denser friend rows. Both options can be combined."
+		)
+	else
+		self.frame.TitleContainer.TitleText:SetText(locale.ONBOARDING_SUMMARY_TITLE or "Your BetterFriendlist is ready")
+		self.frame.Subtitle:SetText(
+			locale.ONBOARDING_SUMMARY_DESC
+				or "Confirm your interface style, theme, and layout options to finish setup."
 		)
 	end
 
 	self.stylePanel:SetShown(step == 1)
 	self.themePanel:SetShown(step == 2)
-	self.summaryPanel:SetShown(step == 3)
+	self.layoutPanel:SetShown(step == 3)
+	self.summaryPanel:SetShown(step == 4)
 	self.backButton:SetShown(step > 1)
-	self.primaryButton.Label:SetText(step == 3 and (locale.ONBOARDING_CONFIRM or "Use this setup") or (locale.ONBOARDING_NEXT or "Next"))
+	SetNativeButtonText(
+		self.primaryButton,
+		step == 4 and (locale.ONBOARDING_CONFIRM or "Use this setup") or (locale.ONBOARDING_NEXT or "Next")
+	)
 	local modernStyleAvailable = self:IsModernStyleAvailable()
 	local selectedStyleAvailable = self.selectedStyle ~= STYLE_MODERN or modernStyleAvailable
 	local canContinue = step == 1 and IsValidStyle(self.selectedStyle)
 		or step == 2 and self.selectedTheme ~= nil
-		or step == 3 and IsValidStyle(self.selectedStyle) and self.selectedTheme ~= nil
+		or step == 3
+		or step == 4 and IsValidStyle(self.selectedStyle) and self.selectedTheme ~= nil
 	canContinue = canContinue and selectedStyleAvailable and not self:IsInCombat()
-	self:SetFlatButtonEnabled(self.primaryButton, canContinue)
+	self:SetNavigationButtonEnabled(self.primaryButton, canContinue)
 	self.combatNotice:SetShown(self:IsInCombat())
 	self:RefreshSummary()
 	for _, card in ipairs(self.styleCards or {}) do
@@ -640,6 +763,9 @@ function AppearanceOnboarding:RefreshStep()
 	end
 	for _, card in ipairs(self.themeCards or {}) do
 		self:RefreshChoiceCard(card)
+	end
+	for _, card in ipairs(self.layoutCards or {}) do
+		self:RefreshLayoutOption(card)
 	end
 	self:ApplySkin("step")
 end
@@ -650,33 +776,25 @@ function AppearanceOnboarding:ApplySkin()
 	end
 	self.palette = self:GetPalette()
 	local palette = self.palette
-	SetBackdropColors(self.frame, palette.window, palette.border)
-	if self.frame.PanelBackground then
-		self.frame.PanelBackground:SetColorTexture(UnpackColor(WithAlpha(palette.window, 0.995)))
-	end
-	if self.frame.HeaderBackground then
-		self.frame.HeaderBackground:SetColorTexture(UnpackColor(WithAlpha(palette.card, 0.99)))
-	end
-	if self.frame.ContentBackground then
-		self.frame.ContentBackground:SetColorTexture(UnpackColor(WithAlpha(palette.window, 0.97)))
-	end
-	self.frame.AccentBar:SetColorTexture(UnpackColor(palette.accent))
 	self.frame.HeaderDivider:SetColorTexture(UnpackColor(WithAlpha(palette.accent, 0.36)))
-	self.frame.FooterDivider:SetColorTexture(UnpackColor(WithAlpha(palette.accent, 0.18)))
-	SetFontColor(self.frame.Title, palette.text)
 	SetFontColor(self.frame.StepText, palette.accent)
 	SetFontColor(self.frame.Subtitle, WithAlpha(palette.text, 0.84))
 	SetFontColor(self.combatNotice, palette.accent)
-	for _, button in ipairs({ self.backButton, self.laterButton, self.primaryButton }) do
-		self:RefreshFlatButton(button)
-	end
 	for _, card in ipairs(self.styleCards or {}) do
 		self:RefreshChoiceCard(card)
 	end
 	for _, card in ipairs(self.themeCards or {}) do
 		self:RefreshChoiceCard(card)
 	end
-	for _, row in ipairs({ self.summaryPanel and self.summaryPanel.StyleRow, self.summaryPanel and self.summaryPanel.ThemeRow }) do
+	for _, card in ipairs(self.layoutCards or {}) do
+		self:RefreshLayoutOption(card)
+	end
+	for _, row in ipairs({
+		self.summaryPanel and self.summaryPanel.StyleRow,
+		self.summaryPanel and self.summaryPanel.ThemeRow,
+		self.summaryPanel and self.summaryPanel.SimpleModeRow,
+		self.summaryPanel and self.summaryPanel.CompactModeRow,
+	}) do
 		if row then
 			SetBackdropColors(row, palette.card, palette.border)
 			SetFontColor(row.Label, WithAlpha(palette.text, 0.70))
@@ -686,6 +804,63 @@ function AppearanceOnboarding:ApplySkin()
 	if self.summaryPanel then
 		SetFontColor(self.summaryPanel.ChangeLater, WithAlpha(palette.text, 0.78))
 		SetFontColor(self.summaryPanel.ReloadNote, palette.accent)
+	end
+
+	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
+	if theme == "dark" or theme == "custom" then
+		local engine = BFL:GetModule("SkinEngine")
+		if engine and engine.IsActive and engine:IsActive() then
+			engine:SkinFrame(self.frame, "popup", { stripTextures = true, textureAlpha = 0.04 })
+			engine:StripButtonFrameArtwork(self.frame)
+			engine:SkinFrame(self.frame.Inset, "inset", { stripTextures = true })
+			for _, button in ipairs({ self.backButton, self.laterButton, self.primaryButton }) do
+				engine:SkinButton(button)
+			end
+			for _, card in ipairs(self.styleCards or {}) do
+				engine:SkinFrame(card, "panel")
+				engine:ClearNativeBackdrop(card)
+				card.SelectControl.BFL_DarkCompactCheckButton = true
+				engine:SkinCheckButton(card.SelectControl)
+				engine:SkinFrame(card.Diagram, "inset")
+				engine:ClearNativeBackdrop(card.Diagram)
+				self:RefreshChoiceCard(card)
+			end
+			for _, card in ipairs(self.themeCards or {}) do
+				engine:SkinFrame(card, "panel")
+				engine:ClearNativeBackdrop(card)
+				card.SelectControl.BFL_DarkCompactCheckButton = true
+				engine:SkinCheckButton(card.SelectControl)
+				self:RefreshChoiceCard(card)
+			end
+			for _, card in ipairs(self.layoutCards or {}) do
+				engine:SkinFrame(card, "panel")
+				engine:ClearNativeBackdrop(card)
+				card.Check.BFL_DarkCompactCheckButton = true
+				engine:SkinCheckButton(card.Check)
+				self:RefreshLayoutOption(card)
+			end
+			for _, row in ipairs({
+				self.summaryPanel and self.summaryPanel.StyleRow,
+				self.summaryPanel and self.summaryPanel.ThemeRow,
+				self.summaryPanel and self.summaryPanel.SimpleModeRow,
+				self.summaryPanel and self.summaryPanel.CompactModeRow,
+			}) do
+				if row then
+					engine:SkinFrame(row, "panel")
+					engine:ClearNativeBackdrop(row)
+				end
+			end
+		end
+	elseif theme == "elvui" then
+		local ElvUISkin = BFL:GetModule("ElvUISkin")
+		if ElvUISkin and ElvUISkin.SkinAppearanceOnboarding then
+			ElvUISkin:SkinAppearanceOnboarding(self.frame, self)
+		end
+	elseif theme == "ellesmereui" then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.SkinAppearanceOnboarding then
+			EllesmereUISkin:SkinAppearanceOnboarding(self.frame, self)
+		end
 	end
 end
 
@@ -766,12 +941,16 @@ function AppearanceOnboarding:Begin()
 		style = BetterFriendlistDB.friendsFrameStyle,
 		theme = storedTheme,
 		enableElvUISkin = BetterFriendlistDB.enableElvUISkin == true,
+		simpleMode = BetterFriendlistDB.simpleMode == true,
+		compactMode = BetterFriendlistDB.compactMode == true,
 		completedVersion = BetterFriendlistDB.appearanceOnboardingVersion,
 	}
 	self.selectedStyle = IsValidStyle(self.snapshot.style) and self.snapshot.style or nil
 	self.selectedTheme = ThemeManager and ThemeManager.IsThemeAvailable and ThemeManager:IsThemeAvailable(storedTheme)
 		and storedTheme
 		or nil
+	self.selectedSimpleMode = self.snapshot.simpleMode
+	self.selectedCompactMode = self.snapshot.compactMode
 	self.currentStep = 1
 	self.active = true
 	self.confirmed = false
@@ -823,6 +1002,28 @@ function AppearanceOnboarding:SelectTheme(theme)
 	return true
 end
 
+function AppearanceOnboarding:SelectLayoutMode(key, enabled)
+	if self:IsInCombat() or (key ~= "simpleMode" and key ~= "compactMode") then
+		return false
+	end
+	if key == "simpleMode" then
+		self.selectedSimpleMode = enabled == true
+	else
+		self.selectedCompactMode = enabled == true
+	end
+	local Settings = BFL:GetModule("Settings")
+	if key == "simpleMode" and Settings and Settings.OnSimpleModeChanged then
+		Settings:OnSimpleModeChanged(self.selectedSimpleMode)
+	elseif key == "compactMode" and Settings and Settings.OnCompactModeChanged then
+		Settings:OnCompactModeChanged(self.selectedCompactMode)
+	elseif BetterFriendlistDB then
+		BetterFriendlistDB[key] = enabled == true
+	end
+	self:AnchorFrame()
+	self:RefreshStep()
+	return true
+end
+
 function AppearanceOnboarding:ActivatePrimaryAction()
 	if self:IsInCombat() then
 		return
@@ -837,6 +1038,8 @@ function AppearanceOnboarding:ActivatePrimaryAction()
 			return
 		end
 		self.currentStep = 3
+	elseif self.currentStep == 3 then
+		self.currentStep = 4
 	else
 		self:Commit()
 		return
@@ -859,6 +1062,8 @@ function AppearanceOnboarding:RestoreSnapshot(skipVisualRefresh)
 	BetterFriendlistDB.friendsFrameStyle = snapshot.style
 	BetterFriendlistDB.theme = snapshot.theme
 	BetterFriendlistDB.enableElvUISkin = snapshot.enableElvUISkin
+	BetterFriendlistDB.simpleMode = snapshot.simpleMode
+	BetterFriendlistDB.compactMode = snapshot.compactMode
 	BetterFriendlistDB.appearanceOnboardingVersion = snapshot.completedVersion
 	if skipVisualRefresh then
 		return
@@ -873,6 +1078,13 @@ function AppearanceOnboarding:RestoreSnapshot(skipVisualRefresh)
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.ApplyEffectiveStyle then
 		FriendsUI:ApplyEffectiveStyle("appearance-onboarding-rollback")
+	end
+	local Settings = BFL:GetModule("Settings")
+	if Settings and Settings.OnSimpleModeChanged then
+		Settings:OnSimpleModeChanged(snapshot.simpleMode == true)
+	end
+	if Settings and Settings.OnCompactModeChanged then
+		Settings:OnCompactModeChanged(snapshot.compactMode == true)
 	end
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	if ThemeManager and ThemeManager.ApplyCurrentTheme then
@@ -915,6 +1127,17 @@ function AppearanceOnboarding:Commit()
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	if ThemeManager and ThemeManager.SetTheme then
 		ThemeManager:SetTheme(self.selectedTheme, "appearance-onboarding-confirm")
+	end
+	local Settings = BFL:GetModule("Settings")
+	if Settings and Settings.OnSimpleModeChanged then
+		Settings:OnSimpleModeChanged(self.selectedSimpleMode == true)
+	else
+		BetterFriendlistDB.simpleMode = self.selectedSimpleMode == true
+	end
+	if Settings and Settings.OnCompactModeChanged then
+		Settings:OnCompactModeChanged(self.selectedCompactMode == true)
+	else
+		BetterFriendlistDB.compactMode = self.selectedCompactMode == true
 	end
 	local DB = BFL:GetModule("DB")
 	if DB then
@@ -1030,8 +1253,20 @@ function AppearanceOnboarding:RegisterTests()
 	TestSuite:RegisterTest("ui", "AppearanceOnboarding_FrameContract", {
 		action = function(V)
 			V:Assert(self.frame ~= nil, "Onboarding XML creates its Retail dialog")
-			V:Assert(self.stylePanel and self.themePanel and self.summaryPanel, "All onboarding steps exist")
+			V:Assert(
+				self.frame and self.frame.NineSlice and self.frame.Inset and self.frame.PortraitContainer,
+				"Onboarding uses Blizzard's portrait button-frame shell"
+			)
+			V:Assert(self.stylePanel and self.themePanel and self.layoutPanel and self.summaryPanel, "All onboarding steps exist")
 			V:Assert(self.primaryButton and self.laterButton and self.backButton, "Onboarding exposes bounded navigation")
+			for _, card in ipairs(self.styleCards or {}) do
+				V:Assert(card.SelectControl ~= nil, "Style cards expose a dedicated Blizzard radio control")
+				V:Assert(card.Diagram ~= nil, "Style cards retain an isolated interface preview")
+			end
+			V:Assert(#(self.layoutCards or {}) == 2, "Layout step exposes Simple and Compact Mode")
+			for _, card in ipairs(self.layoutCards or {}) do
+				V:Assert(card.Check ~= nil, "Layout options use Blizzard checkboxes")
+			end
 		end,
 	})
 end

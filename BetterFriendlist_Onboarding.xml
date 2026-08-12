@@ -1,81 +1,36 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<Frame name="BFLAppearanceOnboardingFrame" parent="UIParent" hidden="true" enableMouse="true" toplevel="true" frameStrata="DIALOG" clampedToScreen="true" inherits="BackdropTemplate">
+	<!-- Native Blizzard shell; theme integrations replace this surface after it exists. -->
+	<Frame name="BFLAppearanceOnboardingFrame" parent="UIParent" inherits="ButtonFrameTemplate" hidden="true" enableMouse="true" toplevel="true" frameStrata="DIALOG" clampedToScreen="true">
 		<Size x="560" y="590" />
-		<KeyValues>
-			<KeyValue key="backdropInfo" value="BACKDROP_DIALOG_32_32" type="global" />
-		</KeyValues>
 		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture parentKey="PanelBackground" file="Interface\Buttons\WHITE8X8">
-					<Anchors><Anchor point="TOPLEFT" x="3" y="-3" /><Anchor point="BOTTOMRIGHT" x="-3" y="3" /></Anchors>
-					<Color r="0.025" g="0.022" b="0.019" a="0.985" />
-				</Texture>
-				<Texture parentKey="HeaderBackground" file="Interface\Buttons\WHITE8X8">
-					<Anchors><Anchor point="TOPLEFT" x="16" y="-16" /><Anchor point="TOPRIGHT" x="-16" y="-16" /></Anchors>
-					<Size y="68" />
-					<Color r="0.075" g="0.060" b="0.043" a="1" />
-				</Texture>
-				<Texture parentKey="ContentBackground" file="Interface\Buttons\WHITE8X8">
-					<Anchors><Anchor point="TOPLEFT" x="20" y="-144" /><Anchor point="BOTTOMRIGHT" x="-20" y="68" /></Anchors>
-					<Color r="0.012" g="0.012" b="0.013" a="0.98" />
-				</Texture>
-				<Texture parentKey="AccentBar" file="Interface\Buttons\WHITE8X8">
-					<Size x="4" y="68" />
-					<Anchors>
-						<Anchor point="TOPLEFT" x="16" y="-16" />
-					</Anchors>
-					<Color r="1" g="0.82" b="0" a="1" />
-				</Texture>
-			</Layer>
 			<Layer level="ARTWORK">
-				<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp">
-					<Size x="42" y="42" />
-					<Anchors><Anchor point="TOPLEFT" x="31" y="-25" /></Anchors>
-				</Texture>
-				<FontString parentKey="Title" inherits="GameFontNormalLarge" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+				<FontString parentKey="StepText" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="86" y="-27" />
-						<Anchor point="TOPRIGHT" x="-54" y="-25" />
-					</Anchors>
-				</FontString>
-				<FontString parentKey="StepText" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
-					<Anchors>
-						<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" y="-4" />
-						<Anchor point="TOPRIGHT" relativeKey="$parent.Title" relativePoint="BOTTOMRIGHT" y="-4" />
+						<Anchor point="TOPLEFT" x="62" y="-35" />
+						<Anchor point="TOPRIGHT" x="-30" y="-35" />
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Subtitle" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" maxLines="3" wordwrap="true">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="31" y="-96" />
-						<Anchor point="TOPRIGHT" x="-31" y="-96" />
+						<Anchor point="TOPLEFT" relativeKey="$parent.Inset" relativePoint="TOPLEFT" x="17" y="-15" />
+						<Anchor point="TOPRIGHT" relativeKey="$parent.Inset" relativePoint="TOPRIGHT" x="-17" y="-15" />
 					</Anchors>
 				</FontString>
 				<Texture parentKey="HeaderDivider" file="Interface\Buttons\WHITE8X8">
 					<Size y="1" />
 					<Anchors>
-						<Anchor point="TOPLEFT" x="31" y="-139" />
-						<Anchor point="TOPRIGHT" x="-31" y="-139" />
+						<Anchor point="TOPLEFT" relativeKey="$parent.Inset" relativePoint="TOPLEFT" x="17" y="-73" />
+						<Anchor point="TOPRIGHT" relativeKey="$parent.Inset" relativePoint="TOPRIGHT" x="-17" y="-73" />
 					</Anchors>
-					<Color r="1" g="0.82" b="0" a="0.35" />
-				</Texture>
-				<Texture parentKey="FooterDivider" file="Interface\Buttons\WHITE8X8">
-					<Size y="1" />
-					<Anchors>
-						<Anchor point="BOTTOMLEFT" x="20" y="67" />
-						<Anchor point="BOTTOMRIGHT" x="-20" y="67" />
-					</Anchors>
-					<Color r="1" g="0.82" b="0" a="0.18" />
+					<Color r="0.5" g="0.5" b="0.5" a="0.35" />
 				</Texture>
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
-				<Anchors><Anchor point="TOPRIGHT" x="-8" y="-8" /></Anchors>
-			</Button>
 			<Frame parentKey="Content">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="31" y="-156" />
-					<Anchor point="BOTTOMRIGHT" x="-31" y="72" />
+					<Anchor point="TOPLEFT" relativeKey="$parent.Inset" relativePoint="TOPLEFT" x="17" y="-87" />
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Inset" relativePoint="BOTTOMRIGHT" x="-17" y="16" />
 				</Anchors>
 			</Frame>
 		</Frames>

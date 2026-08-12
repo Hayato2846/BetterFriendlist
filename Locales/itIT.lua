@@ -2181,7 +2181,10 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Mostra una colonna del livello oggetto nell‚
 	L.ONBOARDING_COMBAT_WAIT = "Termina il combattimento per continuare la configurazione."
 	L.ONBOARDING_SUMMARY_STYLE = "Stile interfaccia"
 	L.ONBOARDING_SUMMARY_THEME = "Tema"
-	L.ONBOARDING_CHANGE_LATER = "Puoi cambiare entrambe le scelte in qualsiasi momento nelle impostazioni di BetterFriendlist."
+	L.ONBOARDING_CHANGE_LATER = "Puoi cambiare tutte queste scelte in qualsiasi momento nelle impostazioni di BetterFriendlist."
+	L.ONBOARDING_LAYOUT_TITLE = "Personalizza la lista amici"
+	L.ONBOARDING_LAYOUT_DESC =
+		"Scegli una finestra semplificata e righe degli amici pi√π compatte. Le due opzioni possono essere combinate."
 	L.ONBOARDING_RELOAD_NOTE = "Dopo la conferma potrai ricaricare l'interfaccia per applicare questo cambio di tema."
 	L.ONBOARDING_STEP_FORMAT = "Passaggio %d di %d"
 	L.ONBOARDING_WELCOME_TITLE = "Benvenuto nel nuovo BetterFriendlist"
@@ -2189,7 +2192,8 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Mostra una colonna del livello oggetto nell‚
 	L.ONBOARDING_THEME_TITLE = "Rendi BetterFriendlist davvero tuo"
 	L.ONBOARDING_THEME_DESC = "Scegli un tema visivo. I temi disponibili vengono rilevati automaticamente e quasi tutti possono essere provati subito."
 	L.ONBOARDING_SUMMARY_TITLE = "BetterFriendlist √® pronto"
-	L.ONBOARDING_SUMMARY_DESC = "Conferma lo stile dell'interfaccia e il tema per completare la configurazione."
+	L.ONBOARDING_SUMMARY_DESC =
+		"Conferma lo stile dell'interfaccia, il tema e le opzioni di layout per completare la configurazione."
 	L.ONBOARDING_CONFIRM = "Usa questa configurazione"
 	L.ONBOARDING_NEXT = "Avanti"
 	L.SETTINGS_CENTER_PAGE_FRIEND_TABS = "Schede amici"

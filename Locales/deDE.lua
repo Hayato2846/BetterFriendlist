@@ -2158,7 +2158,10 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Fuegt eine Gegenstandsstufen-Spalte zur Gild
 	L.ONBOARDING_COMBAT_WAIT = "Beende den Kampf, um die Einrichtung fortzusetzen."
 	L.ONBOARDING_SUMMARY_STYLE = "Oberflächenstil"
 	L.ONBOARDING_SUMMARY_THEME = "Design"
-	L.ONBOARDING_CHANGE_LATER = "Du kannst beide Entscheidungen jederzeit in den BetterFriendlist-Einstellungen ändern."
+	L.ONBOARDING_CHANGE_LATER = "Du kannst alle diese Einstellungen jederzeit in den BetterFriendlist-Einstellungen ändern."
+	L.ONBOARDING_LAYOUT_TITLE = "Passe deine Freundesliste an"
+	L.ONBOARDING_LAYOUT_DESC =
+		"Wähle ein vereinfachtes Fensterlayout und kompaktere Freundeszeilen. Beide Optionen lassen sich kombinieren."
 	L.ONBOARDING_RELOAD_NOTE = "Nach der Bestätigung kannst du die Benutzeroberfläche für diesen Theme-Wechsel neu laden."
 	L.ONBOARDING_STEP_FORMAT = "Schritt %d von %d"
 	L.ONBOARDING_WELCOME_TITLE = "Willkommen beim neuen BetterFriendlist"
@@ -2166,7 +2169,8 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Fuegt eine Gegenstandsstufen-Spalte zur Gild
 	L.ONBOARDING_THEME_TITLE = "Mach BetterFriendlist zu deinem"
 	L.ONBOARDING_THEME_DESC = "Wähle ein visuelles Theme. Verfügbare Themes werden automatisch erkannt und die meisten lassen sich sofort ansehen."
 	L.ONBOARDING_SUMMARY_TITLE = "Dein BetterFriendlist ist bereit"
-	L.ONBOARDING_SUMMARY_DESC = "Bestätige deinen Oberflächenstil und dein Theme, um die Einrichtung abzuschließen."
+	L.ONBOARDING_SUMMARY_DESC =
+		"Bestätige deinen Oberflächenstil, dein Theme und deine Layoutoptionen, um die Einrichtung abzuschließen."
 	L.ONBOARDING_CONFIRM = "Diese Auswahl verwenden"
 	L.ONBOARDING_NEXT = "Weiter"
 	L.SETTINGS_CENTER_PAGE_FRIEND_TABS = "Freunde-Tabs"

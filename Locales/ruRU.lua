@@ -2258,7 +2258,10 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Показывает столбец уров
 	L.ONBOARDING_COMBAT_WAIT = "Завершите бой, чтобы продолжить настройку."
 	L.ONBOARDING_SUMMARY_STYLE = "Стиль интерфейса"
 	L.ONBOARDING_SUMMARY_THEME = "Тема"
-	L.ONBOARDING_CHANGE_LATER = "Оба варианта можно изменить в любой момент в настройках BetterFriendlist."
+	L.ONBOARDING_CHANGE_LATER = "Все эти параметры можно изменить в любой момент в настройках BetterFriendlist."
+	L.ONBOARDING_LAYOUT_TITLE = "Настройте список друзей"
+	L.ONBOARDING_LAYOUT_DESC =
+		"Выберите упрощённый вид окна и более плотные строки друзей. Оба параметра можно сочетать."
 	L.ONBOARDING_RELOAD_NOTE = "После подтверждения вы сможете перезагрузить интерфейс и применить смену темы."
 	L.ONBOARDING_STEP_FORMAT = "Шаг %d из %d"
 	L.ONBOARDING_WELCOME_TITLE = "Добро пожаловать в новый BetterFriendlist"
@@ -2266,7 +2269,8 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Показывает столбец уров
 	L.ONBOARDING_THEME_TITLE = "Настройте BetterFriendlist под себя"
 	L.ONBOARDING_THEME_DESC = "Выберите визуальную тему. Доступные темы определяются автоматически, и большинство можно просмотреть сразу."
 	L.ONBOARDING_SUMMARY_TITLE = "BetterFriendlist готов"
-	L.ONBOARDING_SUMMARY_DESC = "Подтвердите стиль интерфейса и тему, чтобы завершить настройку."
+	L.ONBOARDING_SUMMARY_DESC =
+		"Подтвердите стиль интерфейса, тему и параметры компоновки, чтобы завершить настройку."
 	L.ONBOARDING_CONFIRM = "Использовать эти настройки"
 	L.ONBOARDING_NEXT = "Далее"
 	L.SETTINGS_CENTER_PAGE_FRIEND_TABS = "Вкладки друзей"
