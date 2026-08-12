@@ -2171,6 +2171,7 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Mostra uma coluna de nível do item na lista
 	L.ONBOARDING_THEME_DARK_DESC = "Uma interface escura e objetiva, com contraste suave e detalhes do BetterFriendlist."
 	L.ONBOARDING_THEME_CUSTOM_DESC = "Use sua paleta de cores pessoal e suas configurações de tema do BetterFriendlist."
 	L.ONBOARDING_THEME_ELVUI_DESC = "Combine o BetterFriendlist com o ElvUI. Este tema exige recarregar a interface."
+	L.ONBOARDING_THEME_ELLESMEREUI_DESC = "Combine o BetterFriendlist com o EllesmereUI. Este tema exige recarregar a interface."
 	L.ONBOARDING_THEME_GENERIC_DESC = "Veja uma prévia do tema %s no BetterFriendlist."
 	L.ONBOARDING_RECOMMENDED = "Recomendado"
 	L.ONBOARDING_STYLE_MODERN_DESC = "Conheça a lista de amigos reformulada para o Retail 12.1, com navegação lateral, cartões modernos e acesso mais rápido a todas as áreas sociais."

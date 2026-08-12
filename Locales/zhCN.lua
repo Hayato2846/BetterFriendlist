@@ -2088,6 +2088,7 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "在公会分页名单中显示物品等级�
 	L.ONBOARDING_THEME_DARK_DESC = "专注的深色界面，采用柔和对比度与 BetterFriendlist 强调色。"
 	L.ONBOARDING_THEME_CUSTOM_DESC = "使用你的 BetterFriendlist 个性配色与主题设置。"
 	L.ONBOARDING_THEME_ELVUI_DESC = "让 BetterFriendlist 与 ElvUI 风格一致。应用此主题需要重载界面。"
+	L.ONBOARDING_THEME_ELLESMEREUI_DESC = "让 BetterFriendlist 与 EllesmereUI 风格一致。应用此主题需要重载界面。"
 	L.ONBOARDING_THEME_GENERIC_DESC = "在 BetterFriendlist 中预览 %s 主题。"
 	L.ONBOARDING_RECOMMENDED = "推荐"
 	L.ONBOARDING_STYLE_MODERN_DESC = "体验为 Retail 12.1 重新设计的好友列表，包括侧边导航、现代好友卡片，以及更快捷的社交视图入口。"

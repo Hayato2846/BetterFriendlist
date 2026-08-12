@@ -2206,6 +2206,7 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "길드 탭 목록에 아이템 레벨 열을
 	L.ONBOARDING_THEME_DARK_DESC = "절제된 대비와 BetterFriendlist 포인트 색상을 갖춘 집중도 높은 어두운 인터페이스입니다."
 	L.ONBOARDING_THEME_CUSTOM_DESC = "개인 BetterFriendlist 색상 팔레트와 테마 설정을 사용합니다."
 	L.ONBOARDING_THEME_ELVUI_DESC = "BetterFriendlist를 ElvUI와 조화시킵니다. 이 테마는 UI 새로고침이 필요합니다."
+	L.ONBOARDING_THEME_ELLESMEREUI_DESC = "BetterFriendlist를 EllesmereUI와 조화시킵니다. 이 테마는 UI 새로고침이 필요합니다."
 	L.ONBOARDING_THEME_GENERIC_DESC = "%s 테마를 BetterFriendlist에서 미리 봅니다."
 	L.ONBOARDING_RECOMMENDED = "추천"
 	L.ONBOARDING_STYLE_MODERN_DESC = "측면 탐색, 현대적인 친구 카드, 모든 소셜 화면으로 빠르게 이동하는 Retail 12.1용 새 친구 목록을 만나 보세요."

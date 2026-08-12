@@ -694,8 +694,14 @@ function EllesmereUISkin:SkinAppearanceOnboarding(frame, onboarding)
 	end
 	local api = self.facade
 	SafeCall(api, "Shell", frame)
-	SafeCall(api, "Inset", frame.Inset)
+	SafeCall(api, "Inset", frame.MainInset)
 	SafeCall(api, "CloseButton", frame.CloseButton)
+	if frame.PortraitContainer then
+		frame.PortraitContainer:Hide()
+	end
+	if frame.portrait then
+		frame.portrait:Hide()
+	end
 	for _, button in ipairs({ onboarding.backButton, onboarding.laterButton, onboarding.primaryButton }) do
 		SafeCall(api, "Button", button)
 		SafeCall(api, "StateButtonLabel", button)

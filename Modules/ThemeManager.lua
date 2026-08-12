@@ -69,6 +69,7 @@ RegisterThemeDefinition("elvui", {
 RegisterThemeDefinition("ellesmereui", {
 	order = 910,
 	labelKey = "SETTINGS_THEME_ELLESMEREUI",
+	onboardingDescriptionKey = "ONBOARDING_THEME_ELLESMEREUI_DESC",
 	isAvailable = IsEllesmereUIAvailable,
 	requiresReload = true,
 	previewable = false,
@@ -259,11 +260,21 @@ local function GetThemeLocalizationToken(theme)
 	return tostring(theme or ""):gsub("[^%w]", "_"):upper()
 end
 
+local function ResolveLocalizedText(locale, key)
+	local value = locale and locale[key]
+	-- BFL's locale table returns the requested key when a translation is
+	-- missing. Do not mistake that diagnostic fallback for user-facing copy.
+	if type(value) == "string" and value ~= "" and value ~= key then
+		return value
+	end
+	return nil
+end
+
 function ThemeManager:GetThemeLabel(theme)
 	local definition = THEME_DEFINITIONS[theme] or {}
 	local locale = BFL.L or _G.BFL_L or {}
 	local labelKey = definition.labelKey or ("SETTINGS_THEME_" .. GetThemeLocalizationToken(theme))
-	return locale[labelKey] or definition.label or tostring(theme or "")
+	return ResolveLocalizedText(locale, labelKey) or definition.label or tostring(theme or "")
 end
 
 function ThemeManager:GetThemeOnboardingDescription(theme)
@@ -271,10 +282,12 @@ function ThemeManager:GetThemeOnboardingDescription(theme)
 	local locale = BFL.L or _G.BFL_L or {}
 	local descriptionKey = definition.onboardingDescriptionKey
 		or ("ONBOARDING_THEME_" .. GetThemeLocalizationToken(theme) .. "_DESC")
-	if locale[descriptionKey] then
-		return locale[descriptionKey]
+	local description = ResolveLocalizedText(locale, descriptionKey)
+	if description then
+		return description
 	end
-	local fallback = locale.ONBOARDING_THEME_GENERIC_DESC or "Preview the %s theme on your BetterFriendlist."
+	local fallback = ResolveLocalizedText(locale, "ONBOARDING_THEME_GENERIC_DESC")
+		or "Preview the %s theme on your BetterFriendlist."
 	local ok, text = pcall(string.format, fallback, self:GetThemeLabel(theme))
 	return ok and text or fallback
 end

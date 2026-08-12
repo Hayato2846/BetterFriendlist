@@ -2148,6 +2148,7 @@ L.SETTINGS_SHOW_ILVL_COLUMN_DESC = "Fuegt eine Gegenstandsstufen-Spalte zur Gild
 	L.ONBOARDING_THEME_DARK_DESC = "Eine fokussierte dunkle Oberfläche mit ruhigen Kontrasten und BetterFriendlist-Akzenten."
 	L.ONBOARDING_THEME_CUSTOM_DESC = "Nutze deine persönliche BetterFriendlist-Farbpalette und deine Theme-Einstellungen."
 	L.ONBOARDING_THEME_ELVUI_DESC = "Passe BetterFriendlist an ElvUI an. Dieses Theme erfordert ein Neuladen der Benutzeroberfläche."
+	L.ONBOARDING_THEME_ELLESMEREUI_DESC = "Passe BetterFriendlist an EllesmereUI an. Dieses Theme erfordert ein Neuladen der Benutzeroberfläche."
 	L.ONBOARDING_THEME_GENERIC_DESC = "Sieh dir das Theme %s direkt in BetterFriendlist an."
 	L.ONBOARDING_RECOMMENDED = "Empfohlen"
 	L.ONBOARDING_STYLE_MODERN_DESC = "Entdecke die für Retail 12.1 neu gestaltete Freundesliste mit Seitennavigation, modernen Freundeskarten und schnellerem Zugriff auf alle sozialen Bereiche."

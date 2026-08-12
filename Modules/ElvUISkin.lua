@@ -2147,10 +2147,20 @@ function ElvUISkin:SkinAppearanceOnboarding(frame, onboarding)
 
 	if not frame.BFL_ElvOnboardingSkinned then
 		S:HandlePortraitFrame(frame)
+		if frame.MainInset then
+			frame.MainInset:StripTextures()
+			frame.MainInset:CreateBackdrop("Transparent")
+		end
 		for _, button in ipairs({ onboarding.backButton, onboarding.laterButton, onboarding.primaryButton }) do
 			S:HandleButton(button)
 		end
 		frame.BFL_ElvOnboardingSkinned = true
+	end
+	if frame.PortraitContainer then
+		frame.PortraitContainer:Hide()
+	end
+	if frame.portrait then
+		frame.portrait:Hide()
 	end
 	for _, card in ipairs(onboarding.styleCards or {}) do
 		if not card.BFL_ElvOnboardingSkinned then

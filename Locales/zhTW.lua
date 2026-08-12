@@ -2182,6 +2182,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.ONBOARDING_THEME_DARK_DESC = "專注的深色介面，採用柔和對比與 BetterFriendlist 強調色。"
 	L.ONBOARDING_THEME_CUSTOM_DESC = "使用你的 BetterFriendlist 個人配色與主題設定。"
 	L.ONBOARDING_THEME_ELVUI_DESC = "讓 BetterFriendlist 與 ElvUI 風格一致。套用此主題需要重新載入介面。"
+	L.ONBOARDING_THEME_ELLESMEREUI_DESC = "讓 BetterFriendlist 與 EllesmereUI 風格一致。套用此主題需要重新載入介面。"
 	L.ONBOARDING_THEME_GENERIC_DESC = "在 BetterFriendlist 中預覽 %s 主題。"
 	L.ONBOARDING_RECOMMENDED = "推薦"
 	L.ONBOARDING_STYLE_MODERN_DESC = "體驗為 Retail 12.1 重新設計的好友名單，包括側邊導覽、現代好友卡片，以及更快速的社交檢視入口。"

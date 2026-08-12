@@ -2180,6 +2180,7 @@ local function LoadEnUS()
 	L.ONBOARDING_THEME_DARK_DESC = "A focused dark interface with restrained contrast and BetterFriendlist accents."
 	L.ONBOARDING_THEME_CUSTOM_DESC = "Use your personal BetterFriendlist color palette and theme settings."
 	L.ONBOARDING_THEME_ELVUI_DESC = "Match BetterFriendlist to ElvUI. Applying this theme requires a UI reload."
+	L.ONBOARDING_THEME_ELLESMEREUI_DESC = "Match BetterFriendlist to EllesmereUI. Applying this theme requires a UI reload."
 	L.ONBOARDING_THEME_GENERIC_DESC = "Preview the %s theme on your BetterFriendlist."
 	L.ONBOARDING_RECOMMENDED = "Recommended"
 	L.ONBOARDING_STYLE_MODERN_DESC = "Discover the redesigned Retail 12.1 friendlist with side navigation, modern friend cards, and faster access to every social view."
