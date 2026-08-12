@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Preview** - Changes from both settings interfaces now refresh every active Preview surface immediately. The fixtures cover mobile-only and multi-game friends, max-level rows, nicknames, dynamic groups, Contact Memory, Guild nicknames, and Broker columns without writing preview data to SavedVariables.
 
 ### Fixed
+- **Compact Mode Restoration** - Disabling Compact Mode now fully restores the original Modern friend-card name, info, and multi-account spacing instead of retaining the previous wrapped Compact text height.
 - **Onboarding Theme Reload** - Confirming an ElvUI or EllesmereUI reload during onboarding now records that persisted theme as the active session baseline, so completing the resumed setup no longer asks for the same reload again.
 - **Forced Modern Onboarding** - The Retail appearance onboarding can now be opened and completed while `/bfl forcemodern on` is active, even when Blizzard disables SocialUI on the PTR.
 - **Modern Theme Runtime** - Fixed a nil palette access while styling group headers and kept their original darkened texture visible.

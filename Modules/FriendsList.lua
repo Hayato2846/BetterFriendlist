@@ -553,7 +553,11 @@ local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidt
 	measure:SetHeight(0)
 	measure:SetText(nameText)
 
-	local measuredHeight = math.max(measure:GetStringHeight() or 0, measure:GetHeight() or 0)
+	-- Follow Blizzard's Objective Tracker contract and consume only the height
+	-- resolved after the reset. GetStringHeight can briefly retain the previous
+	-- wrapped text when Compact Mode changes the same measuring FontString from
+	-- a long single-row label back to the normal name-only label.
+	local measuredHeight = measure:GetHeight() or 0
 	-- Keep the live row safe from sub-pixel rounding differences between the
 	-- hidden measuring string and the ScrollBox-created FontString. This also
 	-- gives CJK/non-space names an explicit multi-line minimum instead of
@@ -571,6 +575,10 @@ local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidt
 	end
 
 	return Finish(measuredHeight)
+end
+
+function FriendsList:MeasureWrappedFriendNameHeight(nameSize, nameText, nameWidth)
+	return MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidth)
 end
 
 local function CopyFriendTags(friendTags)

@@ -7467,6 +7467,35 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("integration", "Friends_NameMeasurement_ResetsAfterCompactText", {
+		description = "Friend-name measurement forgets a wrapped Compact label before restoring the normal layout",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.MeasureWrappedFriendNameHeight then
+				V:Skip("FriendsList name-height measurement is not available")
+				return
+			end
+
+			local baselineHeight = FriendsList:MeasureWrappedFriendNameHeight(12, "Anduin", 240)
+			local compactHeight = FriendsList:MeasureWrappedFriendNameHeight(
+				12,
+				"Anduin - Level 90, Orgrimmar - Diablo IV, Torment",
+				90
+			)
+			local restoredHeight = FriendsList:MeasureWrappedFriendNameHeight(12, "Anduin", 240)
+
+			V:Assert(
+				compactHeight > baselineHeight,
+				"the narrow Compact label should wrap beyond the baseline name height"
+			)
+			V:AssertEqual(
+				restoredHeight,
+				baselineHeight,
+				"the restored name-only label should recover its original height"
+			)
+		end,
+	})
+
 	TS:RegisterTest("integration", "Friends_TextWidth_ReservesRightSideControls", {
 		description = "Friend name measurement reserves current title icons, action buttons, and favorite icons",
 		action = function(V)
