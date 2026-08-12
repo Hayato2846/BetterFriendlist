@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Preview** - Changes from both settings interfaces now refresh every active Preview surface immediately. The fixtures cover mobile-only and multi-game friends, max-level rows, nicknames, dynamic groups, Contact Memory, Guild nicknames, and Broker columns without writing preview data to SavedVariables.
 
 ### Fixed
+- **Onboarding Theme Reload** - Confirming an ElvUI or EllesmereUI reload during onboarding now records that persisted theme as the active session baseline, so completing the resumed setup no longer asks for the same reload again.
 - **Forced Modern Onboarding** - The Retail appearance onboarding can now be opened and completed while `/bfl forcemodern on` is active, even when Blizzard disables SocialUI on the PTR.
 - **Modern Theme Runtime** - Fixed a nil palette access while styling group headers and kept their original darkened texture visible.
 - **Legacy UI Restoration** - Switching from Retail's Modern interface to Legacy now reconstructs the v2.7.0 tab rows, whole-pixel window geometry, header dropdowns, Guild scrollbar, Quick Join spacing, Who Search Builder, RAF ownership, and original Who/Raid button templates without changing the Modern presentation. Guild also closes the gap left by unavailable RAF, and Ready Check no longer hides Assist All on Retail Legacy.

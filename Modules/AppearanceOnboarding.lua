@@ -850,7 +850,11 @@ function AppearanceOnboarding:GetThemeLabel(theme)
 end
 
 function AppearanceOnboarding:NeedsReload()
-	local loadedTheme = self.sessionLoadedTheme or self.snapshot and self.snapshot.theme
+	-- An accepted immediate reload checkpoints the newly loaded external theme in
+	-- the snapshot before writing the resume state. Prefer that durable boundary
+	-- over sessionLoadedTheme, which can still contain Blizzard when optional skin
+	-- facades become available later in the ADDON_LOADED initialization pass.
+	local loadedTheme = self.snapshot and self.snapshot.theme or self.sessionLoadedTheme
 	if not loadedTheme or not self.selectedTheme or self.selectedTheme == loadedTheme then
 		return false
 	end
@@ -1694,6 +1698,7 @@ function AppearanceOnboarding:RegisterTests()
 			local previousState = BetterFriendlistDB.appearanceOnboardingResume
 			local previousSnapshot = self.snapshot
 			local previousLoadedTheme = self.sessionLoadedTheme
+			local previousSelectedTheme = self.selectedTheme
 			local state = {
 				version = ONBOARDING_VERSION,
 				currentStep = 2,
@@ -1718,6 +1723,12 @@ function AppearanceOnboarding:RegisterTests()
 				self.snapshot.theme == "elvui" and self.snapshot.enableElvUISkin == true,
 				"The reload checkpoint preserves the loaded external theme when onboarding is deferred"
 			)
+			self.sessionLoadedTheme = "blizzard"
+			self.selectedTheme = "elvui"
+			V:Assert(
+				not self:NeedsReload(),
+				"A resumed accepted theme does not request the same reload again when onboarding is confirmed"
+			)
 			self.snapshot = CopySnapshot(state.snapshot)
 			self.sessionLoadedTheme = "elvui"
 			V:Assert(
@@ -1728,6 +1739,7 @@ function AppearanceOnboarding:RegisterTests()
 			V:Assert(self:GetResumeState() == nil, "Stale onboarding reload state is ignored")
 			self.snapshot = previousSnapshot
 			self.sessionLoadedTheme = previousLoadedTheme
+			self.selectedTheme = previousSelectedTheme
 			BetterFriendlistDB.appearanceOnboardingResume = previousState
 		end,
 	})
@@ -1738,8 +1750,12 @@ function AppearanceOnboarding:Initialize()
 		return
 	end
 	local ThemeManager = BFL:GetModule("ThemeManager")
-	self.sessionLoadedTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()
-		or ThemeManager and ThemeManager.GetStoredTheme and ThemeManager:GetStoredTheme()
+	-- Reload decisions describe which theme was persisted when this addon session
+	-- started. Optional skin facades can become available later during module
+	-- initialization, so the availability-filtered effective theme is only a
+	-- fallback here.
+	self.sessionLoadedTheme = ThemeManager and ThemeManager.GetStoredTheme and ThemeManager:GetStoredTheme()
+		or BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()
 		or "blizzard"
 	self:HookMainFrame()
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
