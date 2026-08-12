@@ -73,6 +73,20 @@ local function CreateClassicMenuDescription(parentItem, rootItems)
 		end
 	end
 
+	function rootDescription:SetTag()
+		-- Menu tags are metadata used by the Retail menu system only.
+	end
+
+	function rootDescription:SetScrollMode()
+		-- UIDropDownMenu has no equivalent scroll-mode description API.
+	end
+
+	function rootDescription:SetCloseOnClick(closeOnClick)
+		if parentItem then
+			parentItem.keepShownOnClick = closeOnClick == false
+		end
+	end
+
 	function rootDescription:CreateTitle(text)
 		return AddItem({
 			text = text or "",
@@ -670,9 +684,29 @@ local function GetDropdownSelectionText(options, value, fallbackLabel)
 	return fallbackLabel or tostring(value or "")
 end
 
+local function IsDropdownOptionEnabled(options, value, index)
+	if options and type(options.isOptionEnabled) == "function" then
+		local ok, enabled = pcall(options.isOptionEnabled, value, index)
+		return not ok or enabled ~= false
+	end
+	return true
+end
+
+local function GetDropdownOptionTooltip(options, value, index)
+	if options and type(options.getOptionTooltip) == "function" then
+		local ok, tooltip = pcall(options.getOptionTooltip, value, index)
+		if ok and type(tooltip) == "string" and tooltip ~= "" then
+			return tooltip
+		end
+	end
+	return nil
+end
+
 -- Initialize dropdown with options
 -- @param dropdown: The dropdown frame
 -- @param options: Table with { labels = {...}, values = {...} }
+--   Optional isOptionEnabled(value, index) and getOptionTooltip(value, index)
+--   keep unavailable entries visible but non-interactive with an explanation.
 -- @param getter: Function(value) -> boolean (is this value selected?)
 -- @param setter: Function(value) called when selection changes
 -- @param scrollHeight: Optional max pixel height before the dropdown scrolls (Retail only)
@@ -697,6 +731,17 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 					local value = values[i]
 					if not (type(options.isOptionHidden) == "function" and options.isOptionHidden(value, i)) then
 						local element = rootDescription:CreateRadio(label, getter, setter, value)
+						local enabled = IsDropdownOptionEnabled(options, value, i)
+						if element and element.SetEnabled then
+							element:SetEnabled(enabled)
+						end
+						local tooltip = not enabled and GetDropdownOptionTooltip(options, value, i) or nil
+						if tooltip and element and element.SetTooltip then
+							element:SetTooltip(function(menuTooltip)
+								menuTooltip:SetText(label, 1, 1, 1)
+								menuTooltip:AddLine(tooltip, 1, 0.25, 0.25, true)
+							end)
+						end
 						if type(options.getItemFontObject) == "function" and element and element.AddInitializer then
 							local fontObject = options.getItemFontObject(value, i)
 							if fontObject then
@@ -715,6 +760,22 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 		-- Classic: UIDropDownMenu
 		UIDropDownMenu_Initialize(dropdown, function(self, level, menuList)
 			level = level or 1
+			if type(options.populateRootDescription) == "function" then
+				local menuItems = menuList
+				if level == 1 then
+					local rootDescription
+					rootDescription, menuItems = CreateClassicMenuDescription()
+					options.populateRootDescription(rootDescription, dropdown)
+				end
+				for _, item in ipairs(menuItems or {}) do
+					local info = UIDropDownMenu_CreateInfo()
+					for key, value in pairs(item) do
+						info[key] = value
+					end
+					UIDropDownMenu_AddButton(info, level)
+				end
+				return
+			end
 			local labels = options.labels or {}
 			local values = options.values or {}
 			for i, label in ipairs(labels) do
@@ -727,6 +788,17 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 					info.checked = getter(capturedValue)
 					if options and type(options.getItemFontObject) == "function" then
 						info.fontObject = options.getItemFontObject(capturedValue, i)
+					end
+					local enabled = IsDropdownOptionEnabled(options, capturedValue, i)
+					if not enabled then
+						info.disabled = true
+						local tooltip = GetDropdownOptionTooltip(options, capturedValue, i)
+						if tooltip then
+							info.tooltipTitle = label
+							info.tooltipText = tooltip
+							info.tooltipWhileDisabled = true
+							info.tooltipOnButton = true
+						end
 					end
 					info.func = function()
 						-- Use closured values, NOT self.value/self:GetText()
@@ -741,6 +813,11 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 				end
 			end
 		end)
+
+		if type(options.populateRootDescription) == "function" then
+			Compat.SetDropdownText(dropdown, GetDropdownSelectionText(options, nil, FILTER or "Filter"))
+			return
+		end
 
 		-- Set initial selection
 		for i, value in ipairs(options.values or {}) do
@@ -759,9 +836,13 @@ end
 -- @param getter: Function(value) -> boolean (is this value currently selected?)
 -- @param setter: Function(value, checked) called when a checkbox is toggled
 -- @param textFunc: Function() -> string (returns the display text for the dropdown)
-function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter, textFunc)
+-- @param scrollHeight: Optional max pixel height before the dropdown scrolls (Retail only)
+function Compat.InitializeMultiSelectDropdown(dropdown, options, getter, setter, textFunc, scrollHeight)
 	if Compat.IsModernDropdown(dropdown) then
 		dropdown:SetupMenu(function(dropdown, rootDescription)
+			if scrollHeight and rootDescription.SetScrollMode then
+				rootDescription:SetScrollMode(scrollHeight)
+			end
 			for i, label in ipairs(options.labels) do
 				local value = options.values[i]
 				local element = rootDescription:CreateCheckbox(label, function()
@@ -1277,7 +1358,10 @@ local ATLAS_FALLBACKS = {
 	["NewCharacter-Alliance"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 	["CharacterCreate-NewLabel"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 	["socialqueuing-icon-eye"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\eye",
+	["friends-icon-eye"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\eye",
 	["socialqueuing-icon-group"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\users",
+	["friends-icon-addFriend"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\user-plus",
+	["friends-icon-addFriend-logo-battleNet"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 
 	-- Clock icon
 	["icon-clock"] = "Interface\\Icons\\INV_Misc_PocketWatch_01",
@@ -1291,27 +1375,38 @@ local ATLAS_FALLBACKS = {
 	["RecruitAFriend_RecruitedFriends_ActiveChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
 	["RecruitAFriend_RecruitedFriends_OpenChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\package",
 	["RecruitAFriend_RecruitedFriends_ClaimedChest"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
+	["friends-RAF-chest-locked"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\lock",
+	["friends-RAF-chest-claimed-hover"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
+	["friends-RAF-chest-default-hover"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
+	["friends-raf-chest-default"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\gift",
+	["friends-raf-chest-ready"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\package",
+	["friends-RAF-chest-claimed"] = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle",
 }
 
-local ATLAS_AVAILABILITY = {}
+local ATLAS_INFO_CACHE = {}
+
+local function GetAtlasInfo(atlasName)
+	if not atlasName or not (C_Texture and type(C_Texture.GetAtlasInfo) == "function") then
+		return nil
+	end
+	if ATLAS_INFO_CACHE[atlasName] ~= nil then
+		return ATLAS_INFO_CACHE[atlasName] or nil
+	end
+	local ok, info = pcall(C_Texture.GetAtlasInfo, atlasName)
+	ATLAS_INFO_CACHE[atlasName] = ok and info or false
+	return ok and info or nil
+end
 
 local function HasAtlas(atlasName)
-	if not atlasName or not (C_Texture and type(C_Texture.GetAtlasInfo) == "function") then
-		return false
-	end
-
-	if ATLAS_AVAILABILITY[atlasName] ~= nil then
-		return ATLAS_AVAILABILITY[atlasName]
-	end
-
-	local ok, info = pcall(C_Texture.GetAtlasInfo, atlasName)
-	local available = ok and info ~= nil
-	ATLAS_AVAILABILITY[atlasName] = available
-	return available
+	return GetAtlasInfo(atlasName) ~= nil
 end
 
 function Compat.HasAtlas(atlasName)
 	return HasAtlas(atlasName)
+end
+
+function Compat.GetAtlasInfo(atlasName)
+	return GetAtlasInfo(atlasName)
 end
 
 -- Set texture with atlas fallback support
@@ -1361,7 +1456,7 @@ function Compat.GetAtlasOrTextureMarkup(atlasName, fallbackFile, width, height)
 	return ""
 end
 
-function Compat.GetAtlasMarkup(atlasName, width, height, offsetX, offsetY)
+function Compat.GetAtlasMarkup(atlasName, width, height, offsetX, offsetY, rVertexColor, gVertexColor, bVertexColor)
 	width = tonumber(width) or 16
 	height = tonumber(height) or width
 	offsetX = tonumber(offsetX) or 0
@@ -1372,7 +1467,30 @@ function Compat.GetAtlasMarkup(atlasName, width, height, offsetX, offsetY)
 	end
 
 	if type(CreateAtlasMarkup) == "function" then
-		return CreateAtlasMarkup(atlasName, width, height, offsetX, offsetY)
+		return CreateAtlasMarkup(
+			atlasName,
+			width,
+			height,
+			offsetX,
+			offsetY,
+			rVertexColor,
+			gVertexColor,
+			bVertexColor
+		)
+	end
+
+	if rVertexColor ~= nil or gVertexColor ~= nil or bVertexColor ~= nil then
+		return string.format(
+			"|A:%s:%d:%d:%d:%d:%d:%d:%d|a",
+			atlasName,
+			height,
+			width,
+			offsetX,
+			offsetY,
+			tonumber(rVertexColor) or 0,
+			tonumber(gVertexColor) or 0,
+			tonumber(bVertexColor) or 0
+		)
 	end
 
 	return string.format("|A:%s:%d:%d:%d:%d|a", atlasName, height, width, offsetX, offsetY)
@@ -1952,6 +2070,71 @@ function Compat.AreTitleFriendsEnabled()
 	return false
 end
 
+local function IsAddOnLoadedCompat(addOnName)
+	local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+	if not isLoaded then
+		return false
+	end
+	local ok, loadedOrLoading, loaded = pcall(isLoaded, addOnName)
+	if not ok then
+		return false
+	end
+	if loaded ~= nil then
+		return loaded == true
+	end
+	return loadedOrLoading == true
+end
+
+local function EnsureAddOnLoadedCompat(addOnName)
+	if IsAddOnLoadedCompat(addOnName) then
+		return true
+	end
+	local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+	if not loadAddOn then
+		return false
+	end
+	pcall(loadAddOn, addOnName)
+	return IsAddOnLoadedCompat(addOnName)
+end
+
+local function RequestTitleFriendInviteConfirmation(name)
+	if not BFL.IsRetail
+		or not EventRegistry
+		or not EventRegistry.TriggerEvent
+		or not EnsureAddOnLoadedCompat("Blizzard_AddFriend")
+		or not BattleNetInviteFrame
+		or not BattleNetInviteFrame.OnTitleFriendInviteByNameRequested
+	then
+		return false
+	end
+
+	local ok = pcall(
+		EventRegistry.TriggerEvent,
+		EventRegistry,
+		"BattleNetInviteFrame.TitleFriendInviteByNameRequested",
+		name
+	)
+	return ok == true
+end
+
+-- Send a title-friend invite on Retail 12.1+ through Blizzard's confirmation
+-- frame. Older Retail builds and Classic retain the direct/legacy fallbacks.
+-- This wrapper must only be called from a hardware-event path because the
+-- title-friend API is restricted and only accepts untainted arguments.
+function Compat.SendTitleFriendInviteByName(name)
+	if not name or (BFL.IsSecret and BFL:IsSecret(name)) then
+		return false
+	end
+	if Compat.AreTitleFriendsEnabled() and C_BattleNet and C_BattleNet.SendTitleFriendInviteByName then
+		if RequestTitleFriendInviteConfirmation(name) then
+			return true
+		end
+		local ok = pcall(C_BattleNet.SendTitleFriendInviteByName, name)
+		return ok == true
+	end
+	return Compat.AddFriend(name)
+end
+
 function Compat.AreTitleFriendCustomNamesEnabled()
 	if C_BattleNet and C_BattleNet.AreTitleFriendCustomNamesEnabled then
 		local ok, enabled = pcall(C_BattleNet.AreTitleFriendCustomNamesEnabled)
@@ -1965,6 +2148,29 @@ function Compat.IsTitleFriend(accountInfo)
 		and Enum
 		and Enum.BattleNetFriendLevel
 		and accountInfo.friendLevel == Enum.BattleNetFriendLevel.Title
+end
+
+function Compat.IsOfflineTitleFriend(accountInfoOrFriend, isOffline)
+	if not accountInfoOrFriend then
+		return false
+	end
+	local accountInfo = accountInfoOrFriend.accountInfo or accountInfoOrFriend
+	local friendLevel = accountInfoOrFriend.friendLevel or accountInfo.friendLevel
+	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
+	if not titleLevel or friendLevel ~= titleLevel then
+		return false
+	end
+	if isOffline ~= nil then
+		return isOffline == true
+	end
+	if accountInfoOrFriend.connected ~= nil then
+		return accountInfoOrFriend.connected == false
+	end
+	if accountInfoOrFriend.isOnline ~= nil then
+		return accountInfoOrFriend.isOnline == false
+	end
+	local gameAccountInfo = accountInfo.gameAccountInfo
+	return gameAccountInfo ~= nil and gameAccountInfo.isOnline == false
 end
 
 function Compat.GetCustomTitleFriendName(id)
@@ -2543,6 +2749,7 @@ BFL.InitializeDropdown = Compat.InitializeDropdown
 BFL.InitializeMultiSelectDropdown = Compat.InitializeMultiSelectDropdown
 BFL.RefreshDropdown = Compat.RefreshDropdown
 BFL.HasAtlas = Compat.HasAtlas
+BFL.GetAtlasInfo = Compat.GetAtlasInfo
 BFL.SetTextureOrAtlas = Compat.SetTextureOrAtlas
 BFL.GetAtlasMarkup = Compat.GetAtlasMarkup
 BFL.GetAtlasOrTextureMarkup = Compat.GetAtlasOrTextureMarkup
@@ -2571,8 +2778,10 @@ BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
 BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled
+BFL.SendTitleFriendInviteByName = Compat.SendTitleFriendInviteByName
 BFL.AreTitleFriendCustomNamesEnabled = Compat.AreTitleFriendCustomNamesEnabled
 BFL.IsTitleFriend = Compat.IsTitleFriend
+BFL.IsOfflineTitleFriend = Compat.IsOfflineTitleFriend
 BFL.GetCustomTitleFriendName = Compat.GetCustomTitleFriendName
 BFL.SetCustomTitleFriendName = Compat.SetCustomTitleFriendName
 BFL.IsRAFSystemSupported = Compat.IsRAFSystemSupported

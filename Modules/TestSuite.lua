@@ -372,6 +372,7 @@ function TestSuite:RunTest(test)
 			BetterFriendlistDB.groupColors = DeepCopy(snapshot.groupColors)
 			BetterFriendlistDB.groupCountColors = DeepCopy(snapshot.groupCountColors)
 			BetterFriendlistDB.groupArrowColors = DeepCopy(snapshot.groupArrowColors)
+			BetterFriendlistDB.quickFilterTags = DeepCopy(snapshot.quickFilterTags)
 		end
 		local Groups = BFL:GetModule("Groups")
 		if Groups and groupsSnapshot then
@@ -413,7 +414,10 @@ function TestSuite:RunTest(test)
 				groupColors = DeepCopy(BetterFriendlistDB.groupColors),
 				groupCountColors = DeepCopy(BetterFriendlistDB.groupCountColors),
 				groupArrowColors = DeepCopy(BetterFriendlistDB.groupArrowColors),
+				quickFilterTags = DeepCopy(BetterFriendlistDB.quickFilterTags),
 			}
+			-- Keep every test independent from the user's currently selected tag facets.
+			BetterFriendlistDB.quickFilterTags = {}
 		end
 		local Groups = BFL:GetModule("Groups")
 		if Groups and Groups.groups then
@@ -1481,6 +1485,84 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("settings", "SettingsDesigner_CompatibilityContracts", {
+		description = "Modern Settings Center controls must map to supported runtime settings and stable defaults",
+		action = function(V)
+			local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+			local ThemePalette = BFL:GetModule("ThemePalette")
+			if not SettingsDesigner or not ThemePalette then
+				V:Skip("SettingsDesigner or ThemePalette not loaded")
+				return
+			end
+
+			local settingsApp = SettingsDesigner:Register()
+			local controls = settingsApp and settingsApp.controlsByID
+			V:Assert(type(controls) == "table", "Settings Center controls should be registered")
+
+			local namePreset = controls and controls.nameFormatPreset
+			V:AssertNotNil(namePreset, "Name format preset control should exist")
+			local expectedPresets = {
+				"default",
+				"battletag",
+				"battletag_only",
+				"nickname",
+				"character",
+				"name_only",
+				"custom",
+			}
+			for index, value in ipairs(expectedPresets) do
+				V:AssertEqual(namePreset.orderList[index], value, "Name preset order should only contain supported values")
+				V:AssertNotNil(namePreset.list[value], "Supported name preset should have a label: " .. value)
+			end
+			V:AssertNil(namePreset.list.name_nickname, "Removed name_nickname preset must not be offered")
+			V:AssertNil(namePreset.list.name_note, "Removed name_note preset must not be offered")
+			V:AssertNil(namePreset.list.name_battletag, "Removed name_battletag preset must not be offered")
+
+			V:AssertNil(controls.showNoteIcon, "Settings Center must not expose the unimplemented note icon setting")
+			V:AssertNil(controls.guildBrokerTooltipMode, "Settings Center must not expose the unused guild tooltip mode")
+
+			local friendTagsPage = settingsApp.GetPage and settingsApp:GetPage("groups.friendtags")
+			V:AssertNotNil(friendTagsPage, "Friend Tags should have a standard Settings Center page")
+			V:AssertNil(friendTagsPage.visibleWhen, "Friend Tags page should not depend on Beta Features")
+			V:AssertNotNil(controls["friendTags.enabled"], "Friend Tags should expose its dedicated feature toggle")
+			V:AssertNil(
+				controls["friendTags.enabled"].parentCheck,
+				"Friend Tags toggle should not depend on the global Beta Features switch"
+			)
+			V:AssertNil(controls["friendTags.tagList"], "Tag management should live only in the dedicated editor")
+			V:AssertNotNil(controls["friendTags.showMenuTagCounts"], "Menu count settings should remain available")
+			local syncControl = controls["friendTags.syncLocalBlizzard"]
+			V:AssertNotNil(syncControl, "Legacy Blizzard-tag handoff should remain available when needed")
+			V:AssertType(
+				syncControl.visibleWhen,
+				"function",
+				"Legacy Blizzard-tag handoff should only appear when migration data exists"
+			)
+
+			local darkDefaults = ThemePalette:GetDefaultDarkSettings()
+			local customDefaults = ThemePalette:GetDefaultCustomSettings()
+			for _, key in ipairs({
+				"windowOpacity",
+				"popupOpacity",
+				"listOpacity",
+				"controlOpacity",
+				"hoverStrength",
+				"selectionStrength",
+				"borderStrength",
+				"avatarVisibility",
+			}) do
+				V:AssertEqual(controls["dark." .. key].default, darkDefaults[key], "Dark theme default should be canonical: " .. key)
+				V:AssertEqual(controls["custom." .. key].default, customDefaults[key], "Custom theme default should be canonical: " .. key)
+			end
+
+			V:AssertNil(controls.simpleMode.visibleWhen, "Simple Mode should be available in both Modern and Legacy")
+			V:AssertNil(controls.simpleModeShowSearch.visibleWhen, "Simple Mode search should be available in Modern and Legacy")
+			V:AssertEqual(controls.friendsFrameStyle.type, "custom", "Style selector should own per-option capability state")
+			V:AssertType(controls.friendsFrameStyle.render, "function", "Style selector should provide its host renderer")
+			V:AssertEqual(controls.friendsFrameStyle.refreshOnChange, true, "Style changes should refresh Settings visibility")
+		end,
+	})
+
 	TS:RegisterTest("ui", "Settings_GroupsTab_ListItems", {
 		description = "Groups tab should build list items with handlers",
 		setup = function()
@@ -1530,7 +1612,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("ui", "Settings_GroupsTab_Drag_Smoke", {
-		description = "Groups tab drag handlers should run without error",
+		description = "Groups tab drag update and stop handlers should run without the removed global MouseIsOver helper",
 		setup = function()
 			if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
 				ToggleBetterFriendsFrame()
@@ -1561,8 +1643,8 @@ local function RegisterBuiltInTests()
 					local onDragStart = item:GetScript("OnDragStart")
 					local onDragStop = item:GetScript("OnDragStop")
 					if onDragStart and onDragStop then
-						onDragStart(item)
-						onDragStop(item)
+						local ok, err = TS:RunSettingsGroupDragSmoke(item, onDragStart, onDragStop)
+						V:Assert(ok, "Drag lifecycle failed: " .. tostring(err))
 						break
 					end
 				end
@@ -1587,6 +1669,15 @@ local function RegisterBuiltInTests()
 		action = function(V)
 			local frame = BetterFriendsFrame
 			V:AssertNotNil(frame, "BetterFriendsFrame should exist")
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if FriendsUI then
+				local sections = FriendsUI:BuildAvailableSectionIDs()
+				for _, sectionID in ipairs(sections) do
+					FriendsUI:SelectSection(sectionID)
+					V:AssertEqual(FriendsUI:GetSelectedSection(), sectionID, "Section " .. sectionID .. " should be selected")
+				end
+				return
+			end
 
 			-- Test each tab (1=Friends, 2=Who, 3=Raid, 4=QuickJoin in Retail)
 			local maxTabs = BFL.IsRetail and 4 or 3
@@ -1599,7 +1690,10 @@ local function RegisterBuiltInTests()
 		end,
 		teardown = function()
 			-- Return to Friends tab
-			if BetterFriendsFrame then
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if FriendsUI then
+				FriendsUI:SelectSection("friends")
+			elseif BetterFriendsFrame then
 				PanelTemplates_SetTab(BetterFriendsFrame, 1)
 			end
 		end,
@@ -1620,6 +1714,199 @@ local function RegisterBuiltInTests()
 			local FriendsList = BFL:GetModule("FriendsList")
 			V:AssertNotNil(FriendsList, "FriendsList module should exist")
 			V:AssertNotNil(FriendsList.scrollBox, "FriendsList should have scrollBox")
+		end,
+	})
+
+	TS:RegisterTest("ui", "ModernFriendsUI_ControlGeometry", {
+		description = "Retail Modern controls preserve Blizzard geometry and selected labels",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if not (FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()) then
+				V:Skip("Modern Friends UI is not active")
+				return
+			end
+
+			FriendsUI:ApplyModernRootGeometry()
+			local root = FriendsUI.root
+			V:AssertNotNil(root, "Modern root should exist")
+			V:Assert(root.FilterBar.FilterDropdown:GetWidth() == 92 and root.FilterBar.FilterDropdown:GetHeight() == 29, "Filter dropdown should use compact 92x29 geometry")
+			V:Assert(root.FilterBar.SortButton:GetWidth() == 92 and root.FilterBar.SortButton:GetHeight() == 29, "Sort dropdown should use compact 92x29 geometry")
+			V:AssertEqual(root.BattleNetBar.MenuButton:GetWidth(), 34, "Menu button should match Blizzard width")
+			V:AssertNotNil(root.TopDivider, "Top divider should exist")
+			V:AssertNotNil(root.BottomDivider, "Bottom divider should exist")
+			V:AssertEqual(root.TopDivider:GetHeight(), 3, "Top divider should use Blizzard's 3px atlas")
+			V:AssertEqual(root.BottomDivider:GetHeight(), 3, "Bottom divider should use Blizzard's 3px atlas")
+			V:AssertEqual(root.BottomDivider:GetNumPoints(), 2, "Bottom divider should use responsive side anchors")
+			V:Assert(math.abs(root.BottomDivider:GetWidth() - (root.BottomActionBar:GetWidth() - 10)) < 0.5, "Bottom divider should remain inside the action bar")
+			V:Assert(math.abs(root.ContentBackground:GetLeft() - BetterFriendsFrame:GetLeft() - 4) < 0.5, "Modern content background should remain inside the left border")
+			V:Assert(math.abs(root.ContentBackground:GetRight() - BetterFriendsFrame:GetRight() + 4) < 0.5, "Modern content background should remain inside the right border")
+			V:Assert(math.abs(root.ContentBackground:GetBottom() - BetterFriendsFrame:GetBottom() - 4) < 0.5, "Modern content background should remain above the bottom border")
+
+			local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+			V:AssertEqual(header.StatusDropdown:GetWidth(), 54, "Status dropdown should match Blizzard width")
+			if BFL_Tooltip and GameTooltip then
+				BFL_Tooltip:Show()
+				V:AssertEqual(BFL_Tooltip:GetFrameStrata(), "TOOLTIP", "BFL friend tooltip should use tooltip strata")
+				V:Assert(
+					BFL_Tooltip:GetFrameLevel() > GameTooltip:GetFrameLevel(),
+					"BFL friend tooltip should render above Blizzard and SocialUI child frames"
+				)
+				BFL_Tooltip:Hide()
+			end
+			local QuickFilters = BFL:GetModule("QuickFilters")
+			if QuickFilters and QuickFilters.RefreshDropdown then
+				QuickFilters:RefreshDropdown(root.FilterBar.FilterDropdown)
+				local filterText = root.FilterBar.FilterDropdown.Text:GetText() or ""
+				V:Assert(filterText:find((FILTER or "Filter") .. " (", 1, true) == 1, "Filter dropdown should retain its compact parenthesized label")
+				V:Assert(filterText:find("|T", 1, true) or filterText:find("|A", 1, true), "Filter dropdown should show the selected icon")
+			end
+
+			FriendsUI:RefreshSortButtonText()
+			local FriendsList = BFL:GetModule("FriendsList")
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if FriendsList and Registry then
+				local sortText = root.FilterBar.SortButton.Text:GetText() or ""
+				V:Assert(sortText:find(" (", 1, true), "Sort dropdown should retain its compact parenthesized label")
+				V:Assert(sortText:find("|T", 1, true) or sortText:find("|A", 1, true), "Sort dropdown should show the selected icon")
+			end
+		end,
+	})
+
+	TS:RegisterTest("ui", "ModernFriendsUI_GroupHeaderOwnsTextLayout", {
+		description = "Modern group headers keep their multilingual text outside Button font-state layout",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if not (FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()) then
+				V:Skip("Modern Friends UI is not active")
+				return
+			end
+
+			local header = CreateFrame("Button", nil, UIParent, "BFLModernGroupHeaderTemplate")
+			header:Hide()
+			V:AssertNotNil(header.HeaderText, "Modern header should own its name FontString")
+			V:AssertNotNil(header.CountText, "Modern header should own its count FontString")
+			V:AssertNotNil(header.CollapseButton, "Modern header should retain Blizzard's collapse button")
+			V:AssertNil(header:GetFontString(), "Modern header must not use a stateful ButtonText")
+			V:AssertNil(header.GetTitleRegion, "Modern header must not inherit ListHeaderVisualMixin")
+			V:AssertEqual(header.CountText:GetNumPoints(), 1, "Count text should start with one non-circular anchor")
+
+			local FriendsList = BFL:GetModule("FriendsList")
+			V:AssertNotNil(FriendsList, "FriendsList should be available")
+			V:Assert(
+				not FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "Raid Team"),
+				"ASCII Modern headers should keep the configurable BFL font"
+			)
+			V:Assert(
+				not FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "Grüße, Équipe, São Paulo"),
+				"Extended Latin Modern headers should keep the configurable BFL font"
+			)
+			V:Assert(
+				not FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "Cafe\204\129"),
+				"Combining Latin accents should keep the configurable BFL font"
+			)
+			V:Assert(
+				FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "레이드 팀"),
+				"Non-Latin Modern headers should use Blizzard's initialized multilingual font"
+			)
+			V:Assert(
+				FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "Тестовая группа"),
+				"Cyrillic Modern headers should use Blizzard's initialized multilingual font"
+			)
+			V:Assert(
+				FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "Δοκιμή"),
+				"Other non-Latin scripts should fail safe to Blizzard's initialized multilingual font"
+			)
+			V:Assert(
+				FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(header, "\192\175"),
+				"Malformed UTF-8 should fail safe to Blizzard's initialized multilingual font"
+			)
+
+			FriendsList:UpdateGroupHeaderButton(header, {
+				groupId = "bfl-test-ascii-header",
+				name = "Raid Team",
+				count = 0,
+				onlineCount = 0,
+				totalCount = 0,
+				collapsed = false,
+			})
+			local configurableFontObject = header.HeaderText:GetFontObject()
+			V:AssertNotNil(configurableFontObject, "ASCII header should resolve the configured BFL FontFamily")
+			V:Assert(
+				configurableFontObject ~= _G.GameFontNormal,
+				"ASCII header should not use Blizzard's safety fallback"
+			)
+
+			FriendsList:UpdateGroupHeaderButton(header, {
+				groupId = "bfl-test-latin-header",
+				name = "Grüße & Équipe",
+				count = 0,
+				onlineCount = 0,
+				totalCount = 0,
+				collapsed = false,
+			})
+			V:Assert(
+				header.HeaderText:GetFontObject() == configurableFontObject,
+				"Extended Latin header should retain the same configured FontFamily as ASCII"
+			)
+			V:Assert(
+				header.CountText:GetFontObject() == configurableFontObject,
+				"Extended Latin count should retain the configured FontFamily"
+			)
+
+			FriendsList:UpdateGroupHeaderButton(header, {
+				groupId = "bfl-test-multilingual-header",
+				name = "레이드 팀",
+				count = 0,
+				onlineCount = 0,
+				totalCount = 0,
+				collapsed = false,
+			})
+			V:Assert(
+				header.HeaderText:GetFontObject() == _G.GameFontNormal,
+				"Multilingual header text should use Blizzard's initialized FontFamily"
+			)
+			V:Assert(
+				header.CountText:GetFontObject() == _G.GameFontNormal,
+				"Multilingual header count should share Blizzard's initialized FontFamily"
+			)
+		end,
+	})
+
+	TS:RegisterTest("ui", "ModernFriendsUI_CopyBattleTagDialog", {
+		description = "The Modern BattleTag copy action uses BFL's standardized copy dialog",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			local Changelog = BFL:GetModule("Changelog")
+			if not (FriendsUI and Changelog and Changelog.ShowCopyDialog) then
+				V:Skip("Modern copy dialog dependencies are unavailable")
+				return
+			end
+
+			local oldRefresh = FriendsUI.RefreshBattleTag
+			local oldBattleTag = FriendsUI.battleTag
+			local oldShowCopyDialog = Changelog.ShowCopyDialog
+			local copiedValue, copiedTitle
+			FriendsUI.RefreshBattleTag = function() end
+			FriendsUI.battleTag = "BFLTest#1234"
+			Changelog.ShowCopyDialog = function(_, value, title)
+				copiedValue, copiedTitle = value, title
+			end
+			FriendsUI:CopyBattleTag()
+			FriendsUI.RefreshBattleTag = oldRefresh
+			FriendsUI.battleTag = oldBattleTag
+			Changelog.ShowCopyDialog = oldShowCopyDialog
+
+			V:AssertEqual(copiedValue, "BFLTest#1234", "Copy dialog should receive the BattleTag")
+			V:AssertEqual(copiedTitle, BFL.L.FRIENDS_UI_COPY_BATTLETAG, "Copy dialog should use the localized title")
 		end,
 	})
 
@@ -1680,6 +1967,7 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(tempDB.quickFilter, "all", "quickFilter default should be 'all'")
 				V:AssertEqual(tempDB.primarySort, "status", "primarySort default should be 'status'")
 				V:AssertEqual(tempDB.theme, "blizzard", "theme default should be 'blizzard'")
+				V:AssertEqual(tempDB.forceModernFriendsUI, false, "Modern capability override should default to off")
 				V:Assert(tempDB.groupOrder == nil, "groupOrder default should be nil")
 				V:Assert(type(tempDB.groupStates) == "table", "groupStates should be a table")
 				V:Assert(type(tempDB.groupColors) == "table", "groupColors should be a table")
@@ -1865,8 +2153,11 @@ local function RegisterBuiltInTests()
 		action = function(V)
 			WithTemporaryDatabase({
 				enableBetaFeatures = true,
-				contactMemory = {
+				friendTagSettings = {
 					enabled = true,
+				},
+				contactMemory = {
+					enabled = false,
 				},
 			}, function()
 				local ContactMemory = BFL:GetModule("ContactMemory")
@@ -1955,7 +2246,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("data", "FriendTags_DBDefaults", {
-		description = "Friend Tags defaults should be present for Contact Memory extension data",
+		description = "Friend Tags defaults should initialize their standalone data",
 		action = function(V)
 			WithTemporaryDatabase({}, function(tempDB)
 				local FriendTags = BFL:GetModule("FriendTags")
@@ -1978,14 +2269,66 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "FriendTagEditor_IconDropdown_AllowsModernDropdown", {
-		description = "Friend Tag editor icon picker should use the shared dropdown factory without forcing legacy mode",
+	TS:RegisterTest("data", "FriendTags_StandardFeature", {
+		description = "Friend Tags should no longer depend on the global Beta Features switch",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = false,
+				friendTagSettings = { enabled = true },
+			}, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				V:Assert(FriendTags:IsEnabled(), "Friend Tags should be enabled while Beta Features are disabled")
+			end)
+
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				friendTagSettings = { enabled = false },
+			}, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:Assert(not FriendTags:IsEnabled(), "The dedicated Friend Tags toggle should still disable the feature")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_DragOrderPersists", {
+		description = "Friend tag order should persist as one atomic reordered list",
+		action = function(V)
+			WithTemporaryDatabase({ enableBetaFeatures = true }, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+				V:AssertNotNil(FriendTags:CreateCustomTag("Alpha"), "First custom tag should be created")
+				V:AssertNotNil(FriendTags:CreateCustomTag("Beta"), "Second custom tag should be created")
+
+				local definitions = FriendTags:GetAllTagDefinitions()
+				local reversedIds = {}
+				for index = #definitions, 1, -1 do
+					reversedIds[#reversedIds + 1] = definitions[index].id
+				end
+				V:Assert(FriendTags:SetTagOrder(reversedIds), "Reordered tag IDs should be accepted")
+
+				local reordered = FriendTags:GetAllTagDefinitions()
+				V:AssertEqual(reordered[1].id, reversedIds[1], "The dragged tag should persist at the first position")
+				V:AssertEqual(reordered[#reordered].id, reversedIds[#reversedIds], "The remaining order should stay stable")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTagEditor_UsesSharedIconExplorer", {
+		description = "Friend Tag editor should use BFL's searchable icon explorer instead of an inline dropdown or fixed icon grid",
 		action = function(V)
 			local FriendTagEditor = BFL:GetModule("FriendTagEditor")
 			local FriendTags = BFL:GetModule("FriendTags")
 			V:AssertNotNil(FriendTagEditor, "FriendTagEditor module should exist")
 			V:AssertNotNil(FriendTags, "FriendTags module should exist")
 			V:AssertType(FriendTagEditor.CreateIconControls, "function", "FriendTagEditor should create icon controls")
+			if BFL.ShowIconSelector then
+				V:AssertType(BFL.ShowIconSelector, "function", "FriendTagEditor should have access to BFL's shared icon explorer")
+				V:AssertType(BFL.BFLIconCatalog, "table", "Icon explorer should expose BFL's custom icon catalog")
+				V:Assert(#BFL.BFLIconCatalog > 0, "BFL custom icons should be available to the icon explorer")
+				return
+			end
 
 			local oldCreateDropdown = BFL.CreateDropdown
 			local oldInitializeDropdown = BFL.InitializeDropdown
@@ -2361,6 +2704,42 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "FriendTags_ActivityIconsUseMapLegendAtlases", {
+		description = "Friend Tags activity chips should use Blizzard's matching map legend atlases",
+		action = function(V)
+			local FriendTags = BFL:GetModule("FriendTags")
+			V:AssertNotNil(FriendTags, "FriendTags module should exist")
+
+			local dungeon = FriendTags:GetIconInfo("dungeon")
+			local raid = FriendTags:GetIconInfo("raid")
+			local delves = FriendTags:GetIconInfo("delves")
+			V:AssertEqual(dungeon.iconValue, "Dungeon", "Dungeon should use Blizzard's blue dungeon entrance atlas")
+			V:AssertEqual(raid.iconValue, "Raid", "Raid should use Blizzard's green raid entrance atlas")
+			V:AssertEqual(delves.iconValue, "delves-regular", "Delves should keep Blizzard's regular delve entrance atlas")
+			V:AssertEqual(dungeon.iconZoom, 0.25, "Dungeon should crop the entrance atlas by 25 percent")
+			V:AssertEqual(raid.iconZoom, 0.25, "Raid should crop the entrance atlas by 25 percent")
+			V:AssertEqual(delves.iconZoom, 0.20, "Delves should crop the entrance atlas by 20 percent")
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_ActivityIconsUseRequestedAtlases", {
+		description = "PvP, questing, and roleplaying chips should use their requested Blizzard atlases and exact crops",
+		action = function(V)
+			local FriendTags = BFL:GetModule("FriendTags")
+			V:AssertNotNil(FriendTags, "FriendTags module should exist")
+
+			local pvp = FriendTags:GetIconInfo("pvp")
+			local questing = FriendTags:GetIconInfo("questing")
+			local roleplaying = FriendTags:GetIconInfo("roleplaying")
+			V:AssertEqual(pvp.iconValue, "honorsystem-icon-prestige-9", "PvP should use Blizzard's prestige 9 honor atlas")
+			V:AssertEqual(questing.iconValue, "Crosshair_Questturnin_32", "Questing should use Blizzard's quest turn-in crosshair atlas")
+			V:AssertEqual(roleplaying.iconValue, "plunderstorm-nameplates-icon-1", "Roleplaying should use Blizzard's Plunderstorm nameplate atlas")
+			V:AssertEqual(pvp.iconZoom, 0.15, "PvP should crop the honor atlas by 15 percent")
+			V:AssertEqual(questing.iconZoom, 0.10, "Questing should crop the quest atlas by 10 percent")
+			V:AssertEqual(roleplaying.iconZoom, 0.30, "Roleplaying should crop the nameplate atlas by 30 percent")
+		end,
+	})
+
 	TS:RegisterTest("data", "FriendTags_RoleIconsUseRaidCountAtlases", {
 		description = "Friend Tags role chips should use the modern raid count role icon atlases",
 		action = function(V)
@@ -2446,7 +2825,7 @@ local function RegisterBuiltInTests()
 					battleTag = "Player#1234",
 				}
 
-				V:Assert(FriendTags:IsEnabled() == true, "Friend Tags should be enabled with Beta and Contact Memory")
+				V:Assert(FriendTags:IsEnabled() == true, "Friend Tags should be enabled independently from Contact Memory")
 				V:Assert(
 					FriendTags:SetBlizzardTagsForFriend(friend, { ["blizzard:raiding"] = true }),
 					"Blizzard-compatible tag should be saved locally without a native account ID"
@@ -2629,8 +3008,176 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "ContactMemory_MenuEmbedsFriendTagsOnly", {
-		description = "Contact Memory friend menus should embed FriendTags and stop exposing legacy Contact Memory tags",
+	TS:RegisterTest("data", "FriendTags_OwnMenuContainsAllTagSources", {
+		description = "BFL's own friend menu should contain both Blizzard-backed and custom tag controls",
+		action = function(V)
+			WithTemporaryDatabase({ enableBetaFeatures = true }, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:NormalizeDB()
+
+				local items = FriendTags:GetMenuItems({
+					type = "bnet",
+					uid = "bnet_Player#1234",
+					battleTag = "Player#1234",
+				}, "bnet_Player#1234", "Player")
+				local seen = {}
+				for _, item in ipairs(items) do
+					if item.text then
+						seen[item.text] = true
+					end
+				end
+
+				local L = BFL.L or {}
+				V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_SECTION or "Blizzard Tags"], "BFL's own menu should expose Blizzard-backed tags")
+				V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_DAMAGER or "DPS"], "BFL's own menu should expose Blizzard-backed tag checkboxes")
+				V:Assert(seen[L.FRIEND_TAGS_CUSTOM_SECTION or "Custom Tags"], "BFL's own menu should retain custom tags")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_NativeSurfacesRemainActiveWhenFeatureDisabled", {
+		description = "Disabling BFL Friend Tags should retain native Blizzard tags in BFL menus, search, and filters only",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				friendTagSettings = {
+					enabled = false,
+					includeBlizzardTagsInSearch = true,
+					includeCustomTagsInSearch = true,
+				},
+				customFriendTags = {
+					["custom:key_team"] = {
+						id = "custom:key_team",
+						name = "Hidden Custom Tag",
+						source = "custom",
+						order = 1000,
+					},
+				},
+				friendCustomTags = {
+					["bnet_Player#1234"] = { ["custom:key_team"] = true },
+				},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				local Registry = BFL:GetModule("FilterSortRegistry")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				V:AssertNotNil(Registry, "FilterSortRegistry module should exist")
+				FriendTags:NormalizeDB()
+
+				local oldC_BattleNet = C_BattleNet
+				local oldEnum = Enum
+				local oldIsRetail = BFL.IsRetail
+				local oldAreBattleNetFriendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled
+				local oldEnumToTagIdMap = FriendTags.enumToTagIdMap
+				local ok, err = pcall(function()
+					BFL.IsRetail = true
+					BFL.AreBattleNetFriendTagsEnabled = function()
+						return true
+					end
+					C_BattleNet = {
+						AreFriendTagsEnabled = function()
+							return true
+						end,
+						SetFriendTags = function()
+							return true
+						end,
+					}
+					Enum = {
+						BattleNetFriendTag = {
+							Raiding = 2,
+						},
+					}
+					FriendTags.enumToTagIdMap = nil
+					FriendTags:ClearCaches()
+
+					local friend = {
+						type = "bnet",
+						uid = "bnet_Player#1234",
+						bnetAccountID = 42,
+						battleTag = "Player#1234",
+						friendTags = { 2 },
+					}
+					local raidingLabel = FriendTags:GetBlizzardTagLabel("blizzard:raiding")
+					local searchText = FriendTags:GetSearchText(friend)
+					V:AssertNotNil(raidingLabel, "Raiding label should resolve")
+					V:Assert(
+						searchText:find(raidingLabel, 1, true) ~= nil,
+						"Search should retain the assigned native Blizzard tag"
+					)
+					V:Assert(
+						searchText:find("Hidden Custom Tag", 1, true) == nil,
+						"Disabled BFL custom tags must not leak into search"
+					)
+					V:AssertEqual(FriendTags:GetTagCount(friend), 1, "Tag filters should count the native Blizzard tag only")
+					V:AssertEqual(FriendTags:GetTagSourceText(friend), "blizzard", "Tag source filters should stay native-only")
+					V:AssertEqual(#FriendTags:GetTagsForFriend(friend, "row"), 0, "Disabled Friend Tags should keep row chips hidden")
+					V:AssertEqual(
+						#FriendTags:GetTagsForFriend(friend, "filter"),
+						1,
+						"Direct tag filtering should retain the native Blizzard tag"
+					)
+					local QuickFilters = BFL:GetModule("QuickFilters")
+					V:AssertNotNil(QuickFilters, "QuickFilters module should exist")
+					tempDB.quickFilterTags = { ["blizzard:raiding"] = true }
+					V:Assert(
+						QuickFilters:PassesTagFilters(friend),
+						"Direct tag facets should match native Blizzard tags while BFL Friend Tags is disabled"
+					)
+
+					local seen = {}
+					for _, item in ipairs(FriendTags:GetMenuItems(friend, friend.uid, "Player")) do
+						if item.text then
+							seen[item.text] = true
+						end
+					end
+					local L = BFL.L or {}
+					V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_SECTION or "Blizzard Tags"], "BFL's own menu should retain Blizzard tags")
+					V:Assert(seen[raidingLabel], "BFL's own menu should retain native tag checkboxes")
+					V:AssertNil(seen[L.FRIEND_TAGS_CUSTOM_SECTION or "Custom Tags"], "Disabled custom tags should not create a menu section")
+					V:AssertNil(seen[L.FRIEND_TAGS_CREATE_CUSTOM or "Create Custom Tag"], "Disabled custom tags should not expose creation")
+					V:AssertNil(seen[L.FRIEND_TAGS_MANAGE or "Manage Tags"], "Disabled custom tags should not expose the tag editor")
+
+					Registry:EnsureDB()
+					local filterId = "custom_filter_native_friend_tags_disabled"
+					tempDB.customQuickFilters[filterId] = {
+						id = filterId,
+						name = "Native Friend Tags Disabled",
+						icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter",
+						ast = {
+							type = "group",
+							op = "AND",
+							children = {
+								{ type = "condition", field = "tag", op = "contains", value = raidingLabel },
+								{ type = "condition", field = "tagSource", op = "is", value = "blizzard" },
+								{ type = "condition", field = "tagCount", op = "gte", value = 1 },
+								{ type = "condition", field = "hasTag", op = "is", value = true },
+							},
+						},
+					}
+					tempDB.quickFilterVisibility[filterId] = true
+					Registry:InvalidateCaches()
+					V:Assert(
+						Registry:EvaluateQuickFilter(filterId, friend),
+						"Custom filters should retain native Blizzard tag fields while Friend Tags is disabled"
+					)
+				end)
+
+				C_BattleNet = oldC_BattleNet
+				Enum = oldEnum
+				BFL.IsRetail = oldIsRetail
+				BFL.AreBattleNetFriendTagsEnabled = oldAreBattleNetFriendTagsEnabled
+				FriendTags.enumToTagIdMap = oldEnumToTagIdMap
+				FriendTags:ClearCaches()
+				Registry:InvalidateCaches()
+				if not ok then
+					error(err, 0)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "ContactMemory_AndFriendTagsUseSeparateMenus", {
+		description = "Private Notes should be a flat action beside the separate Friend Tags submenu",
 		action = function(V)
 			WithTemporaryDatabase({
 				enableBetaFeatures = true,
@@ -2674,17 +3221,12 @@ local function RegisterBuiltInTests()
 					return submenu
 				end
 
-				V:Assert(
-					ContactMemory:PopulateMenu(rootDescription, "player:Unit-Realm", "Unit", nil, {
-						friendData = {
-							type = "wow",
-							uid = "wow_Unit-Realm",
-							name = "Unit-Realm",
-						},
-						friendUID = "wow_Unit-Realm",
-					}),
-					"Contact Memory menu should populate"
-				)
+				V:Assert(ContactMemory:PopulateMenu(rootDescription, "player:Unit-Realm", "Unit"), "Private Notes menu should populate")
+				V:Assert(FriendTags:PopulateMenu(rootDescription, {
+					type = "wow",
+					uid = "wow_Unit-Realm",
+					name = "Unit-Realm",
+				}, "wow_Unit-Realm", "Unit"), "Friend Tags menu should populate")
 
 				local seen = {}
 				for _, entry in ipairs(entries) do
@@ -2692,11 +3234,11 @@ local function RegisterBuiltInTests()
 						seen[entry.text] = true
 					end
 				end
-				V:Assert(seen["Notes & Tags"], "Notes & Tags should be the single root menu entry")
-				V:Assert(seen["Edit Private Note"], "Contact Memory menu should keep note actions")
-				V:Assert(seen["Friend Tags"], "FriendTags should be embedded under Contact Memory")
-				V:Assert(seen["Custom Tags"], "Embedded FriendTags section should show custom tags")
-				V:Assert(seen["Key Team"], "Embedded FriendTags section should show custom tag assignments")
+				V:AssertNil(seen["Private Notes"], "A single Private Notes action should not create a redundant submenu")
+				V:Assert(seen["Edit Private Note"], "Private Notes should be exposed as a direct root action")
+				V:Assert(seen["Friend Tags"], "Friend Tags should have its own root menu entry")
+				V:Assert(seen["Custom Tags"], "Friend Tags menu should show custom tags")
+				V:Assert(seen["Key Team"], "Friend Tags menu should show custom tag assignments")
 				V:AssertNil(seen["Create Tag"], "Legacy Contact Memory tag creation should not be exposed")
 				V:AssertNil(seen["Legacy CM Tag"], "Legacy Contact Memory tags should not be exposed as a second tag system")
 			end)
@@ -4427,6 +4969,7 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(BFL.IsThemeActive, "BFL:IsThemeActive should exist")
 			V:AssertNotNil(BFL.UsesFlatTheme, "BFL:UsesFlatTheme should exist")
 			V:AssertNotNil(BFL.UsesDarkSkinTheme, "BFL:UsesDarkSkinTheme should exist")
+			V:AssertNotNil(BFL.IsEllesmereUISkinActive, "BFL:IsEllesmereUISkinActive should exist")
 			V:AssertNotNil(BFL.AreThemeFeaturesEnabled, "BFL:AreThemeFeaturesEnabled should exist")
 			V:AssertNotNil(BFL.ShouldUseLegacyElvUISkinSetting, "BFL:ShouldUseLegacyElvUISkinSetting should exist")
 			V:AssertNotNil(BFL.ShouldShowLegacyElvUISkinSetting, "BFL:ShouldShowLegacyElvUISkinSetting should exist")
@@ -4459,6 +5002,26 @@ local function RegisterBuiltInTests()
 				error(err, 2)
 			end
 
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			BFL.IsEllesmereUIAvailable = function()
+				return true
+			end
+			local euiOK, euiError = pcall(function()
+				WithTemporaryDatabase({
+					theme = "ellesmereui",
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "ellesmereui", "EllesmereUI should remain a valid stored theme")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "ellesmereui", "EllesmereUI should become effective when available")
+					V:Assert(BFL:IsThemeActive("ellesmereui"), "EllesmereUI theme should be active")
+					V:Assert(BFL:UsesFlatTheme(), "EllesmereUI should use flat-theme layout rules")
+					V:Assert(not BFL:UsesDarkSkinTheme(), "EllesmereUI should not activate the BFL skin engine")
+				end)
+			end)
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not euiOK then
+				error(euiError, 2)
+			end
+
 			WithTemporaryDatabase({
 				theme = "blizzard",
 			}, function()
@@ -4483,6 +5046,401 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "ElvUI theme should fall back to Blizzard")
 				V:Assert(not BFL:IsThemeActive("elvui"), "ElvUI theme should not be active without ElvUI")
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Theme_EllesmereUIFallbackWithoutSkinAPI", {
+		description = "Stored EllesmereUI theme should fall back to Blizzard until the EUI skin facade is active",
+		action = function(V)
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			BFL.IsEllesmereUIAvailable = function()
+				return false
+			end
+
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({
+					theme = "ellesmereui",
+				}, function(tempDB)
+					V:AssertEqual(tempDB.theme, "ellesmereui", "Unavailable EllesmereUI preference should remain stored")
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Unavailable EllesmereUI should fall back to Blizzard")
+					V:Assert(not BFL:IsThemeActive("ellesmereui"), "EllesmereUI should be inactive without its skin facade")
+				end)
+			end)
+
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "EllesmereUISkin_FacadeLifetimeAndPalette", {
+		description = "Dispatched EUI facade should remain active until reload and expose Modern palette tokens",
+		action = function(V)
+			local skin = BFL:GetModule("EllesmereUISkin")
+			V:AssertNotNil(skin, "EllesmereUISkin module should be loaded")
+			local originalFacade = skin.facade
+			local originalFacadeActivated = skin.facadeActivated
+			local originalPaletteVersion = skin.paletteVersion
+			local ok, err = pcall(function()
+				skin.facade = {
+					apiVersion = 1,
+					IsEnabled = function()
+						return false
+					end,
+					GetAccentColor = function()
+						return 0.1, 0.7, 0.5
+					end,
+					GetPanelColor = function()
+						return 0.04, 0.05, 0.06, 0.94
+					end,
+				}
+				skin.facadeActivated = true
+				V:Assert(skin:IsAvailable(), "A dispatched EUI facade should remain available until reload")
+				local accentR, accentG, accentB = skin:GetAccentColor()
+				V:AssertEqual(accentR, 0.1, "EUI accent red should come from the public facade")
+				V:AssertEqual(accentG, 0.7, "EUI accent green should come from the public facade")
+				V:AssertEqual(accentB, 0.5, "EUI accent blue should come from the public facade")
+				local palette = skin:GetPalette()
+				for _, key in ipairs({ "background", "surface", "inset", "control", "border", "accent", "text" }) do
+					V:Assert(type(palette[key]) == "table" and #palette[key] == 4, "EUI palette resolves " .. key)
+				end
+				V:Assert(palette.externalShell == true, "EUI palette should preserve the public EUI shell")
+				V:Assert(palette.externalControls == true, "EUI palette should delegate controls to the public EUI API")
+				V:Assert(palette.skinFriendCardSurface == true, "EUI palette should request EUIFriends-style friend-card surfaces")
+				V:Assert(palette.preserveNativeSideTabs == true, "EUI palette should preserve Blizzard side-tab chrome")
+				V:Assert(palette.preserveNativeGroupHeaders == true, "EUI palette should preserve Blizzard group headers")
+				V:Assert(palette.preserveNativeInviteButtons == true, "EUI palette should preserve Blizzard invite buttons")
+				V:Assert(palette.transparentBattleNetBar == true, "EUI palette should keep the Battle.net bar transparent")
+				V:AssertEqual(palette.headerControlOffsetY, 0, "EUI header controls should be vertically centered")
+				V:AssertEqual(palette.portraitOffsetX, 6, "EUI portrait should keep the refined left inset")
+				V:AssertEqual(palette.portraitOffsetY, -25, "EUI portrait artwork should fill the Battle.net header strip")
+				V:AssertEqual(palette.portraitSize, 42, "EUI portrait should keep the compact themed size")
+				V:AssertEqual(palette.customTabInactiveMultiplier, 0.68, "EUI custom tabs should match inactive Blizzard luminance")
+				V:Assert(palette.background[4] < 0.5, "BFL content wash should not cover the EUI shell")
+			end)
+			skin.facade = originalFacade
+			skin.facadeActivated = originalFacadeActivated
+			skin.paletteVersion = originalPaletteVersion
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "EllesmereUISkin_LegacyControlAllowlist", {
+		description = "EUI Legacy skinning should cover requested controls without traversing scrollbars or Modern invites",
+		action = function(V)
+			local skin = BFL:GetModule("EllesmereUISkin")
+			V:AssertNotNil(skin, "EllesmereUISkin module should be loaded")
+
+			local function MakeTexture()
+				local texture = {
+					shown = false,
+				}
+				function texture:SetAlpha(alpha)
+					self.alpha = alpha
+				end
+				function texture:SetDesaturated(desaturated)
+					self.desaturated = desaturated == true
+				end
+				function texture:SetVertexColor(r, g, b, a)
+					self.vertexColor = { r, g, b, a }
+				end
+				function texture:SetTexture(path)
+					self.texture = path
+				end
+				function texture:SetTexCoord(...)
+					self.texCoord = { ... }
+				end
+				function texture:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				function texture:SetPoint(...)
+					self.point = { ... }
+				end
+				function texture:ClearAllPoints()
+					self.point = nil
+				end
+				function texture:SetShown(shown)
+					self.shown = shown == true
+				end
+				function texture:Show()
+					self.shown = true
+				end
+				function texture:Hide()
+					self.shown = false
+				end
+				return texture
+			end
+
+			local function MakeButton(withIcon)
+				local button = {
+					hooks = {},
+				}
+				if withIcon then
+					button.Icon = MakeTexture()
+				end
+				function button:HookScript(event, callback)
+					self.hooks[event] = self.hooks[event] or {}
+					self.hooks[event][#self.hooks[event] + 1] = callback
+				end
+				function button:GetFontString()
+					return self.Text
+				end
+				function button:CreateTexture()
+					local texture = MakeTexture()
+					self.createdTexture = texture
+					return texture
+				end
+				function button:ClearAllPoints()
+					self.point = nil
+				end
+				function button:SetPoint(...)
+					self.point = { ... }
+				end
+				function button:SetSize(width, height)
+					self.width = width
+					self.height = height
+				end
+				return button
+			end
+
+			local calls = {
+				buttons = {},
+				checkboxes = {},
+				dropdowns = {},
+				editBoxes = {},
+				tabs = {},
+				scrollbar = false,
+				shells = 0,
+			}
+			local facade = {
+				apiVersion = 1,
+				Shell = function()
+					calls.shells = calls.shells + 1
+				end,
+				Inset = function() end,
+				CloseButton = function() end,
+				Button = function(button)
+					if button then
+						calls.buttons[button] = true
+					end
+				end,
+				StateButtonLabel = function() end,
+				Checkbox = function(checkbox)
+					if checkbox then
+						calls.checkboxes[checkbox] = true
+					end
+				end,
+				Dropdown = function(dropdown)
+					if dropdown then
+						calls.dropdowns[dropdown] = true
+					end
+				end,
+				EditBox = function(editBox)
+					if editBox then
+						calls.editBoxes[editBox] = true
+					end
+				end,
+				Tab = function(tab)
+					if tab then
+						calls.tabs[tab] = true
+					end
+				end,
+				ScrollBar = function()
+					calls.scrollbar = true
+				end,
+				GetAccentColor = function()
+					return 0.12, 0.73, 0.54
+				end,
+			}
+
+			local header = {
+				SearchBox = MakeButton(),
+				StatusDropdown = MakeButton(),
+				QuickFilterDropdown = MakeButton(),
+				PrimarySortDropdown = MakeButton(),
+				SecondarySortDropdown = MakeButton(),
+				BattlenetFrame = {
+					ContactsMenuButton = MakeButton(true),
+					SettingsButton = MakeButton(true),
+				},
+			}
+			local who = {
+				EditBox = MakeButton(),
+				ColumnDropdown = MakeButton(),
+				WhoButton = MakeButton(),
+				AddFriendButton = MakeButton(),
+				GroupInviteButton = MakeButton(),
+			}
+			local raid = {
+				ControlPanel = {
+					RaidInfoButton = MakeButton(),
+					ReadyCheckButton = MakeButton(true),
+				},
+				RaidToolsButton = MakeButton(),
+				ConvertToRaidButton = MakeButton(),
+			}
+			local frame = {
+				FriendsTabHeader = header,
+				AddFriendButton = MakeButton(),
+				SendMessageButton = MakeButton(),
+				RecruitmentButton = MakeButton(),
+				RecruitAFriendFrame = {
+					RewardClaiming = {
+						ClaimOrViewRewardButton = MakeButton(),
+					},
+				},
+				GuildFrame = {
+					SearchBox = MakeButton(),
+					ActionsButton = MakeButton(),
+				},
+				WhoFrame = who,
+				RaidFrame = raid,
+				PortraitButton = MakeButton(),
+				ScrollBar = MakeButton(),
+			}
+
+			local originalFacade = skin.facade
+			local originalFacadeActivated = skin.facadeActivated
+			local originalIsSkinEnabled = skin.IsSkinEnabled
+			local originalIsModernInterfaceActive = skin.IsModernInterfaceActive
+			local ok, err = pcall(function()
+				skin.facade = facade
+				skin.facadeActivated = true
+				skin.IsSkinEnabled = function()
+					return true
+				end
+				skin.IsModernInterfaceActive = function()
+					return false
+				end
+
+				skin:SkinLegacyChrome(frame)
+				local checkedTexture = MakeTexture()
+				local checkbox = MakeButton()
+				function checkbox:GetCheckedTexture()
+					return checkedTexture
+				end
+				function checkbox:GetDisabledCheckedTexture()
+					return nil
+				end
+				skin:SkinCheckbox(checkbox)
+				V:Assert(calls.checkboxes[checkbox] == true, "Legacy checkbox should use the EUI facade")
+				V:Assert(checkedTexture.desaturated == true, "Legacy checkbox should discard its native checkmark hue")
+				V:AssertEqual(checkedTexture.vertexColor[1], 0.12, "Legacy checkbox should use pure EUI accent red")
+				V:AssertEqual(checkedTexture.vertexColor[2], 0.73, "Legacy checkbox should use pure EUI accent green")
+				V:AssertEqual(checkedTexture.vertexColor[3], 0.54, "Legacy checkbox should use pure EUI accent blue")
+				checkedTexture:SetDesaturated(false)
+				checkedTexture:SetVertexColor(0, 1, 0, 1)
+				checkbox.hooks.OnShow[1]()
+				V:Assert(checkedTexture.desaturated == true, "Legacy checkbox refresh should neutralize native color again")
+				V:AssertEqual(checkedTexture.vertexColor[2], 0.73, "Legacy checkbox refresh should restore EUI accent")
+				for _, editBox in ipairs({
+					header.SearchBox,
+					frame.GuildFrame.SearchBox,
+					who.EditBox,
+				}) do
+					V:Assert(calls.editBoxes[editBox] == true, "Every tab search field should use the EUI facade")
+				end
+				for _, dropdown in ipairs({
+					header.StatusDropdown,
+					header.QuickFilterDropdown,
+					header.PrimarySortDropdown,
+					header.SecondarySortDropdown,
+					who.ColumnDropdown,
+				}) do
+					V:Assert(calls.dropdowns[dropdown] == true, "Requested Legacy dropdown should use the EUI facade")
+				end
+				for _, button in ipairs({
+					header.BattlenetFrame.ContactsMenuButton,
+					header.BattlenetFrame.SettingsButton,
+					frame.AddFriendButton,
+					frame.SendMessageButton,
+					frame.RecruitmentButton,
+					frame.RecruitAFriendFrame.RewardClaiming.ClaimOrViewRewardButton,
+					frame.GuildFrame.ActionsButton,
+					who.WhoButton,
+					who.AddFriendButton,
+					who.GroupInviteButton,
+					raid.ControlPanel.RaidInfoButton,
+					raid.ControlPanel.ReadyCheckButton,
+					raid.RaidToolsButton,
+					raid.ConvertToRaidButton,
+				}) do
+					V:Assert(calls.buttons[button] == true, "Requested Legacy action should use the EUI facade")
+				end
+				V:Assert(calls.scrollbar == false, "Legacy EUI allowlist must not skin scrollbars")
+
+				local menuIcon = header.BattlenetFrame.ContactsMenuButton.Icon
+				V:Assert(menuIcon.desaturated == true, "Legacy menu icon should discard its source hue")
+				V:AssertEqual(menuIcon.vertexColor[1], 0.12, "Legacy menu icon should use pure EUI accent red")
+				V:AssertEqual(menuIcon.vertexColor[2], 0.73, "Legacy menu icon should use pure EUI accent green")
+				V:AssertEqual(menuIcon.vertexColor[3], 0.54, "Legacy menu icon should use pure EUI accent blue")
+				menuIcon:SetVertexColor(1, 0, 0, 1)
+				header.BattlenetFrame.ContactsMenuButton.hooks.OnEnter[2]()
+				V:AssertEqual(menuIcon.vertexColor[2], 0.73, "Legacy menu hover should restore the pure EUI accent")
+
+				local tab = MakeButton()
+				tab.Text = MakeTexture()
+				skin:SkinLegacyTab(tab)
+				V:Assert(calls.tabs[tab] == true, "Legacy tab should use the EUI facade")
+				V:AssertEqual(tab.Text.alpha, 0, "Original Legacy tab label should stay hidden behind EUI's label")
+				tab.Text:SetAlpha(1)
+				tab.hooks.OnShow[1](tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab show should suppress duplicate native text again")
+				tab.Text:SetAlpha(1)
+				skin:RefreshLegacyTabLabel(tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab visual refresh should suppress duplicate native text again")
+				tab.Text:SetAlpha(1)
+				tab.hooks.OnClick[1](tab)
+				V:AssertEqual(tab.Text.alpha, 0, "Legacy tab click should suppress duplicate native text again")
+
+				skin:SkinLegacyPortrait(frame)
+				local portrait = frame.PortraitButton.BFL_EllesmerePortraitIcon
+				V:AssertNotNil(portrait, "Legacy EUI should create a logo below the shell's direct-texture strip")
+				V:AssertEqual(
+					portrait.texture,
+					"Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon",
+					"Legacy EUI logo should reuse the BFL portrait artwork"
+				)
+				V:AssertEqual(portrait.width, 34, "Legacy EUI logo should leave space above the search row")
+				V:Assert(portrait.shown == true, "Legacy EUI logo should be visible")
+				V:AssertEqual(frame.PortraitButton.point[1], "TOPLEFT", "Legacy EUI logo button should use the header anchor")
+				V:AssertEqual(frame.PortraitButton.point[2], frame, "Legacy EUI logo button should anchor to the main frame")
+				V:AssertEqual(frame.PortraitButton.point[4], 15, "Legacy EUI logo should align with the search field")
+				V:AssertEqual(frame.PortraitButton.point[5], -21, "Legacy EUI logo should meet the top header edge")
+				V:Assert(skin:RefreshMainFrame("test-reopen", frame), "EUI should expose a focused main-frame reopen pass")
+				V:AssertEqual(calls.shells, 1, "Focused EUI reopen should touch only the main frame shell once")
+
+				local invite = {
+					AcceptButton = MakeButton(),
+					DeclineButton = MakeButton(),
+				}
+				skin:SkinLegacyInviteButtons(invite)
+				V:Assert(calls.buttons[invite.AcceptButton] == true, "Legacy Accept should use the EUI facade")
+				V:Assert(calls.buttons[invite.DeclineButton] == true, "Legacy Decline should use the EUI facade")
+
+				local modernInvite = {
+					AcceptButton = MakeButton(),
+					DeclineButton = MakeButton(),
+				}
+				skin.IsModernInterfaceActive = function()
+					return true
+				end
+				skin:SkinLegacyInviteButtons(modernInvite)
+				V:Assert(calls.buttons[modernInvite.AcceptButton] ~= true, "Modern Accept should remain native")
+				V:Assert(calls.buttons[modernInvite.DeclineButton] ~= true, "Modern Decline should remain native")
+			end)
+
+			skin.facade = originalFacade
+			skin.facadeActivated = originalFacadeActivated
+			skin.IsSkinEnabled = originalIsSkinEnabled
+			skin.IsModernInterfaceActive = originalIsModernInterfaceActive
+			if not ok then
+				error(err, 2)
+			end
 		end,
 	})
 
@@ -4678,6 +5636,7 @@ local function RegisterBuiltInTests()
 				local settings = tempDB.brokerTooltipThemeSettings
 				V:AssertType(settings.blizzard, "table", "Blizzard broker tooltip settings should exist")
 				V:AssertType(settings.elvui, "table", "ElvUI broker tooltip settings should exist")
+				V:AssertType(settings.ellesmereui, "table", "EllesmereUI broker tooltip settings should exist")
 				V:AssertNil(settings.unknown, "Unknown broker tooltip themes should be discarded")
 				V:AssertEqual(settings.dark.backgroundColor.r, 0, "Broker tooltip red should be clamped")
 				V:AssertEqual(settings.dark.backgroundColor.b, 1, "Broker tooltip blue should be clamped")
@@ -5680,6 +6639,90 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("classic", "HeaderDropdownSelections_CenterAcrossTemplates", {
+		description = "Compact Legacy header selections should be vertically centered for Retail and Classic dropdown templates",
+		action = function(V)
+			local initializer = BFL.FrameInitializer
+			V:AssertNotNil(initializer, "FrameInitializer should exist")
+			V:AssertType(initializer.AlignHeaderDropdownSelection, "function", "Header alignment helper should exist")
+			V:AssertType(
+				initializer.AlignLegacyHeaderDropdownSelection,
+				"function",
+				"Legacy header alignment helper should exist"
+			)
+
+			local function MakeTextRegion()
+				return {
+					points = {},
+					ClearAllPoints = function(self)
+						self.points = {}
+					end,
+					SetPoint = function(self, ...)
+						self.points[#self.points + 1] = { ... }
+					end,
+					SetJustifyH = function(self, value)
+						self.justifyH = value
+					end,
+					SetJustifyV = function(self, value)
+						self.justifyV = value
+					end,
+					SetWordWrap = function(self, value)
+						self.wordWrap = value
+					end,
+				}
+			end
+
+			local modernText = MakeTextRegion()
+			local modern = {
+				Text = modernText,
+				SetupMenu = function() end,
+			}
+			V:Assert(initializer:AlignHeaderDropdownSelection(modern), "Retail dropdown selection should align")
+			V:AssertEqual(modernText.points[1][1], "LEFT", "Retail selection should use a left inset")
+			V:AssertEqual(modernText.points[1][5], 0, "Retail selection left anchor should be vertically centered")
+			V:AssertEqual(modernText.points[2][1], "RIGHT", "Retail selection should use a right inset")
+			V:AssertEqual(modernText.points[2][5], 0, "Retail selection right anchor should be vertically centered")
+
+			local legacyText = MakeTextRegion()
+			local legacyMiddle = {}
+			local legacy = {
+				Text = legacyText,
+				Middle = legacyMiddle,
+			}
+			V:Assert(initializer:AlignHeaderDropdownSelection(legacy), "Classic dropdown selection should align")
+			V:AssertEqual(legacyText.points[1][1], "CENTER", "Classic selection should use the middle artwork")
+			V:AssertEqual(legacyText.points[1][2], legacyMiddle, "Classic selection should stay within the middle artwork")
+			V:AssertEqual(legacyText.points[1][5], 0, "Classic selection should remove Blizzard's two-pixel Y offset")
+			V:AssertEqual(legacyText.justifyH, "CENTER", "Compact selections should be horizontally centered")
+			V:AssertEqual(legacyText.justifyV, "MIDDLE", "Compact selections should be vertically centered")
+			V:AssertEqual(legacyText.wordWrap, false, "Compact selections should never wrap")
+
+			local oldFriendsUI = BFL.FriendsUI
+			local ok, err = pcall(function()
+				BFL.FriendsUI = {
+					IsModernActive = function()
+						return true
+					end,
+				}
+				V:Assert(
+					initializer:AlignLegacyHeaderDropdownSelection(modern) == false,
+					"Legacy-only alignment should leave the active Modern style unchanged"
+				)
+				BFL.FriendsUI.IsModernActive = function()
+					return false
+				end
+				V:Assert(
+					initializer:AlignLegacyHeaderDropdownSelection(modern),
+					"Legacy style should align Retail's modern dropdown template"
+				)
+			end)
+			BFL.FriendsUI = oldFriendsUI
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("classic", "InitializeDropdown_ModernPopulateRootDescription", {
 		description = "Shared dropdown initializer should support dynamic modern menu population without caller SetupMenu usage",
 		action = function(V)
@@ -5734,6 +6777,58 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("classic", "InitializeDropdown_ModernDisabledOptionTooltip", {
+		description = "Shared modern dropdowns should keep unavailable options visible, disabled, and explained",
+		action = function(V)
+			local capturedGenerator
+			local radio = {
+				SetEnabled = function(self, enabled)
+					self.enabled = enabled
+				end,
+				SetTooltip = function(self, tooltip)
+					self.tooltip = tooltip
+				end,
+			}
+			local dropdown = {
+				SetupMenu = function(_, generator)
+					capturedGenerator = generator
+				end,
+			}
+			local rootDescription = {
+				CreateRadio = function()
+					return radio
+				end,
+			}
+			BFL.InitializeDropdown(dropdown, {
+				labels = { "Modern" },
+				values = { "modern" },
+				isOptionEnabled = function()
+					return false
+				end,
+				getOptionTooltip = function()
+					return "Social UI disabled"
+				end,
+			}, function()
+				return false
+			end, function() end)
+			V:AssertType(capturedGenerator, "function", "Modern dropdown should receive its menu generator")
+			capturedGenerator(dropdown, rootDescription)
+			V:AssertEqual(radio.enabled, false, "Unavailable modern dropdown option should be disabled")
+			V:AssertType(radio.tooltip, "function", "Unavailable modern dropdown option should expose a tooltip")
+			local tooltip = {
+				SetText = function(self, text)
+					self.title = text
+				end,
+				AddLine = function(self, text)
+					self.body = text
+				end,
+			}
+			radio.tooltip(tooltip)
+			V:AssertEqual(tooltip.title, "Modern", "Disabled option tooltip should name the option")
+			V:AssertEqual(tooltip.body, "Social UI disabled", "Disabled option tooltip should explain the capability")
+		end,
+	})
+
 	TS:RegisterTest("classic", "InitializeDropdown_UsesSelectionText", {
 		description = "Shared dropdown initializer should allow legacy menu labels and button text to differ",
 		action = function(V)
@@ -5772,17 +6867,25 @@ local function RegisterBuiltInTests()
 				end
 
 				BFL.InitializeDropdown(dropdown, {
-					labels = { "Verbose Label", "Hidden Label" },
-					values = { "value1", "value2" },
+					labels = { "Verbose Label", "Hidden Label", "Disabled Label" },
+					values = { "value1", "value2", "value3" },
 					getSelectionText = function(value)
 						return "IconOnly:" .. tostring(value)
 					end,
 					isOptionHidden = function(value)
 						return value == "value2"
 					end,
+					isOptionEnabled = function(value)
+						return value ~= "value3"
+					end,
+					getOptionTooltip = function(value)
+						return value == "value3" and "Unavailable for this client" or nil
+					end,
 					getItemFontObject = function(value, index)
-						V:AssertEqual(value, "value1", "Font resolver should receive item value")
-						V:AssertEqual(index, 1, "Font resolver should receive item index")
+						V:Assert(
+							(value == "value1" and index == 1) or (value == "value3" and index == 3),
+							"Font resolver should receive the original item value and index"
+						)
 						return "BFLTestFontObject"
 					end,
 				}, function(value)
@@ -5793,8 +6896,11 @@ local function RegisterBuiltInTests()
 
 				V:AssertEqual(selectedValue, "value1", "Initial selected value should be set")
 				V:AssertEqual(dropdown.text, "IconOnly:value1", "Initial legacy dropdown text should use getSelectionText")
-				V:AssertEqual(#buttons, 1, "One dropdown button should be created")
+				V:AssertEqual(#buttons, 2, "Hidden options should be omitted while disabled options remain visible")
 				V:AssertEqual(buttons[1].fontObject, "BFLTestFontObject", "Legacy dropdown item should receive item font object")
+				V:AssertEqual(buttons[2].disabled, true, "Unavailable legacy dropdown item should be disabled")
+				V:AssertEqual(buttons[2].tooltipWhileDisabled, true, "Disabled legacy dropdown item should retain its tooltip")
+				V:AssertEqual(buttons[2].tooltipText, "Unavailable for this client", "Disabled item should explain why it is unavailable")
 				buttons[1].func()
 				V:AssertEqual(setValue, "value1", "Selection callback should receive the selected value")
 				V:AssertEqual(dropdown.text, "IconOnly:value1", "Post-click legacy dropdown text should use getSelectionText")
@@ -5915,6 +7021,192 @@ local function RegisterBuiltInTests()
 			-- Disable
 			PreviewMode:Disable()
 			V:Assert(not PreviewMode.enabled, "PreviewMode should be disabled")
+		end,
+	})
+
+	TS:RegisterTest("integration", "PreviewMode_StagedActivation_HasDiagnosticBoundaries", {
+		description = "Slash-command preview activation exposes precise diagnostic phases",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			V:AssertNotNil(PreviewMode, "PreviewMode module should exist")
+
+			local profileID, profile = PreviewMode:GetProfileDefinition("all")
+			local originalEnabled = PreviewMode.enabled
+			local originalProfile = PreviewMode.activeProfile
+			local originalComponents = PreviewMode.activeComponents
+			PreviewMode.enabled = true
+			PreviewMode.activeProfile = profileID
+			PreviewMode.activeComponents = profile.components
+
+			local steps = PreviewMode:BuildProfileActivationSteps(profileID, profile)
+			local stepIndexes = {}
+			for index, step in ipairs(steps) do
+				stepIndexes[step.id] = index
+			end
+
+			PreviewMode.enabled = originalEnabled
+			PreviewMode.activeProfile = originalProfile
+			PreviewMode.activeComponents = originalComponents
+
+			local requiredSteps = {
+				"friends.fixtures.generate",
+				"friends.apply.hook",
+				"friends.render.prepare",
+				"friends.render.display",
+				"refresh.requests",
+				"refresh.quick_join",
+				"raf.fixtures.enable",
+				"refresh.raf",
+				"raid.guards.enable",
+				"raid.fixtures.generate",
+				"raid.render.member_buttons.prepare",
+				"raid.render.member_buttons.group_1.prepare",
+				"raid.render.member_buttons.group_1.slot_1",
+				"raid.render.member_buttons.group_8.slot_5",
+				"raid.render.layout",
+				"refresh.guild",
+				"refresh.navigation",
+			}
+			for _, stepID in ipairs(requiredSteps) do
+				V:Assert(stepIndexes[stepID] ~= nil, "missing staged diagnostic step " .. stepID)
+			end
+			V:Assert(
+				stepIndexes["friends.render.prepare"] < stepIndexes["friends.render.display"],
+				"friend render preparation should be isolated before display construction"
+			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "PreviewMode_NormalActivation_IsFrameSlicedAndQuiet", {
+		description = "Normal preview uses the safe staged runner without debug chat markers",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			V:AssertNotNil(PreviewMode, "PreviewMode module should exist")
+
+			local startedGeneration
+			local startedIndex
+			local fakePreview = setmetatable({
+				activationGeneration = 42,
+				PrepareProfileActivation = function()
+					return "all", { components = {} }
+				end,
+				BuildProfileActivationSteps = function()
+					return {
+						{ id = "fixture", label = "fixture", action = function() end },
+					}, { marker = "context" }
+				end,
+				RunStagedActivationStep = function(_, generation, index)
+					startedGeneration = generation
+					startedIndex = index
+				end,
+			}, { __index = PreviewMode })
+
+			V:Assert(fakePreview:EnableProfile("all"), "normal activation should queue successfully")
+			V:Assert(fakePreview.activationInProgress == true, "normal activation should remain in progress")
+			V:Assert(fakePreview.activationTrace ~= nil, "normal activation should retain its trace state")
+			V:Assert(
+				fakePreview.activationTrace.debugMarkers == false,
+				"normal activation should suppress diagnostic markers"
+			)
+			V:AssertEqual(startedGeneration, 42, "normal activation should use the prepared generation")
+			V:AssertEqual(startedIndex, 1, "normal activation should start at the first sliced step")
+		end,
+	})
+
+	TS:RegisterTest("integration", "PreviewMode_FinalFriendCommit_InvalidatesIntermediateProvider", {
+		description = "The final preview friend hand-off discards header-only render caches",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			V:AssertNotNil(PreviewMode, "PreviewMode module should exist")
+
+			local updateCalled = false
+			local fakeFriendsList = {
+				lastBuildSignature = "header-only",
+				cachedDisplayList = { "header" },
+				cachedGroupedFriends = { favorites = {} },
+				forceLayoutRebuild = false,
+				UpdateFriendsList = function(self, ignoreVisibility)
+					updateCalled = ignoreVisibility == true
+					V:Assert(self.lastBuildSignature == nil, "build signature should be invalidated before update")
+					V:Assert(self.cachedDisplayList == nil, "display cache should be invalidated before update")
+					V:Assert(self.cachedGroupedFriends == nil, "group cache should be invalidated before update")
+					V:Assert(self.forceLayoutRebuild == true, "final commit should force a layout rebuild")
+				end,
+			}
+			local fakePreview = setmetatable({
+				mockData = { friends = { { _isMock = true } } },
+				mockFriendsRenderState = { revision = 1 },
+				IsComponentEnabled = function()
+					return true
+				end,
+			}, { __index = PreviewMode })
+
+			V:Assert(
+				fakePreview:RenderMockFriendsNow(fakeFriendsList, true),
+				"final mock friend commit should render"
+			)
+			V:Assert(updateCalled, "final mock friend commit should request a visible update")
+			V:Assert(fakePreview.mockFriendsRenderState == nil, "render-state cache should be invalidated")
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_RaidMock_SkipsSyntheticSecureUnit", {
+		description = "Preview raid rows never register synthetic raid tokens as secure units",
+		action = function(V)
+			if InCombatLockdown() then
+				V:Skip("Secure attributes cannot be tested during combat")
+				return
+			end
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+
+			local fakeButton = {
+				memberData = { _isMock = true },
+				unit = "raid1",
+				registeredSyntheticUnit = false,
+				secureAttributeWrites = 0,
+			}
+			function fakeButton:SetAttribute(key, value)
+				self.secureAttributeWrites = self.secureAttributeWrites + 1
+				if key == "unit" and value ~= nil then
+					self.registeredSyntheticUnit = true
+				end
+			end
+
+			RaidFrame:UpdateSecureAttributesForButton(fakeButton)
+			V:Assert(
+				not fakeButton.registeredSyntheticUnit,
+				"mock raid unit should not enter the secure unit-menu resolver"
+			)
+			V:AssertEqual(
+				fakeButton.secureAttributeWrites,
+				0,
+				"mock raid rendering should not enqueue any secure attribute writes"
+			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "RaidFrame_MemberRefresh_UsesSecureSafeRenderer", {
+		description = "Legacy refresh entry points delegate to the mock-safe per-slot renderer",
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+
+			local originalUpdateAllMemberButtons = RaidFrame.UpdateAllMemberButtons
+			local calls = 0
+			RaidFrame.UpdateAllMemberButtons = function()
+				calls = calls + 1
+				return "safe-renderer"
+			end
+
+			local ok, result = pcall(RaidFrame.UpdateMemberButtons, RaidFrame)
+			RaidFrame.UpdateAllMemberButtons = originalUpdateAllMemberButtons
+			if not ok then
+				error(result, 0)
+			end
+
+			V:AssertEqual(calls, 1, "member refresh should use the shared secure-safe renderer exactly once")
+			V:AssertEqual(result, "safe-renderer", "member refresh should return the shared renderer result")
 		end,
 	})
 
@@ -6041,8 +7333,809 @@ local function RegisterBuiltInTests()
 			V:Assert(type(groupData.members) == "table", "members should be a table")
 			V:Assert(groupData.canJoin == true, "canJoin should be true")
 			V:Assert(QuickJoin.mockGroups[guid] ~= nil, "mockGroups should contain the entry")
+			V:Assert(QuickJoin:IsMockGroup(guid, groupData), "mock group should be recognized before native API access")
+			V:AssertEqual(groupData._mockLeaderName, "TestLeader", "mock leader fallback should be retained")
+			V:AssertEqual(
+				QuickJoin:GetGroupPriority(guid, groupData),
+				0,
+				"mock priority should resolve without native GUID APIs"
+			)
 
 			QuickJoin.mockGroups[guid] = nil
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_MockFriends_SkipUnchangedRender", {
+		description = "Stable preview friends should render once until local display state changes",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not PreviewMode or not FriendsList then
+				V:Skip("PreviewMode or FriendsList not available")
+				return
+			end
+
+			local originalState = PreviewMode.mockFriendsRenderState
+			local originalRevision = PreviewMode.mockFriendsRevision
+			local originalSearchText = FriendsList.searchText
+			local originalForceLayoutRebuild = FriendsList.forceLayoutRebuild
+			PreviewMode.mockFriendsRenderState = nil
+			PreviewMode.mockFriendsRevision = originalRevision + 1
+			FriendsList.forceLayoutRebuild = false
+
+			V:Assert(PreviewMode:ShouldRenderMockFriends(FriendsList), "first mock render should be allowed")
+			V:Assert(not PreviewMode:ShouldRenderMockFriends(FriendsList), "unchanged mock render should be skipped")
+			FriendsList.searchText = (originalSearchText or "") .. "preview-state-change"
+			V:Assert(PreviewMode:ShouldRenderMockFriends(FriendsList), "search changes should invalidate preview render")
+
+			FriendsList.searchText = originalSearchText
+			FriendsList.forceLayoutRebuild = originalForceLayoutRebuild
+			PreviewMode.mockFriendsRevision = originalRevision
+			PreviewMode.mockFriendsRenderState = originalState
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_MockFriends_RefreshSettingsBeforeRender", {
+		description = "Preview friends must refresh invalidated visual and font caches before rendering",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			if not PreviewMode or not PreviewMode.PrepareMockFriendsRender then
+				V:Skip("PreviewMode settings preparation is not available")
+				return
+			end
+
+			local originalSettingsVersion = BFL.SettingsVersion
+			local calls = {}
+			local fakeFriendsList = {
+				settingsCacheVersion = 40,
+				settingsCache = { treatMobileAsOffline = false },
+				UpdateFontCache = function()
+					calls[#calls + 1] = "font"
+				end,
+				UpdateSettingsCache = function(self)
+					calls[#calls + 1] = "settings"
+					self.settingsCacheVersion = BFL.SettingsVersion
+				end,
+			}
+
+			BFL.SettingsVersion = 41
+			local changed = PreviewMode:PrepareMockFriendsRender(fakeFriendsList)
+			BFL.SettingsVersion = originalSettingsVersion
+
+			V:Assert(changed, "an invalidated Preview settings cache should be detected")
+			V:AssertEqual(calls[1], "font", "font/layout cache should refresh first")
+			V:AssertEqual(calls[2], "settings", "visual settings cache should refresh before render")
+			V:AssertEqual(#calls, 2, "one Preview preparation should refresh each cache once")
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_MobileSettings_ProjectReversibly", {
+		description = "Preview mobile-only friends follow Treat Mobile as Offline and recover when it is disabled",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			if not (PreviewMode and PreviewMode.ApplyMockFriendSettingState) then
+				V:Skip("Preview mobile setting projection is not available")
+				return
+			end
+
+			local originalFriends = PreviewMode.mockData.friends
+			local originalRevision = PreviewMode.mockFriendsRevision
+			local mobile = {
+				_isMock = true,
+				_previewBaseConnected = true,
+				_previewMobileOnly = true,
+				connected = true,
+			}
+			PreviewMode.mockData.friends = { mobile }
+			PreviewMode:ApplyMockFriendSettingState({ settingsCache = { treatMobileAsOffline = true } })
+			V:Assert(not mobile.connected, "mobile-only Preview friend should become offline")
+			V:Assert(mobile.isMobileButTreatedOffline, "projected offline state should carry the mobile marker")
+			PreviewMode:ApplyMockFriendSettingState({ settingsCache = { treatMobileAsOffline = false } })
+			V:Assert(mobile.connected, "disabling the setting should restore the original online state")
+			V:AssertNil(mobile.isMobileButTreatedOffline, "restored mobile friend should clear the offline marker")
+			PreviewMode.mockData.friends = originalFriends
+			PreviewMode.mockFriendsRevision = originalRevision
+		end,
+	})
+
+	TS:RegisterTest("integration", "Friends_RowHeight_GrowsWithVisibleLines", {
+		description = "Friend rows use three-pixel outer padding and grow for info, multi-account, and tag lines",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.CalculateFriendRowHeight then
+				V:Skip("FriendsList row-height calculator is not available")
+				return
+			end
+
+			local base = FriendsList:CalculateFriendRowHeight(12, 10, false, false, 0, 1)
+			local withMultiAccount = FriendsList:CalculateFriendRowHeight(12, 10, false, true, 0, 1)
+			local withTags = FriendsList:CalculateFriendRowHeight(12, 10, false, false, 16, 1)
+			local complete = FriendsList:CalculateFriendRowHeight(12, 10, false, true, 16, 1)
+			local wrappedName = FriendsList:CalculateFriendRowHeight(12, 10, false, false, 0, 1, 28)
+			local largeFonts = FriendsList:CalculateFriendRowHeight(40, 36, false, true, 16, 1)
+
+			V:AssertEqual(base, 33, "name and info should use exact line heights plus 3px outer padding")
+			V:AssertEqual(
+				withMultiAccount - base,
+				13,
+				"multi-account details should add one info-sized line and one gap"
+			)
+			V:AssertEqual(withTags - base, 16, "one tag row should contribute its exact rendered extent")
+			V:AssertEqual(complete, 62, "all four visible rows should fit without hidden padding")
+			V:AssertEqual(wrappedName, 47, "a second rendered name line should grow the row instead of being truncated")
+			V:Assert(largeFonts > 72, "large configured fonts must grow beyond the retired 72px cap")
+		end,
+	})
+
+	TS:RegisterTest("integration", "Friends_NameMeasurement_ResetsAfterCompactText", {
+		description = "Friend-name measurement forgets a wrapped Compact label before restoring the normal layout",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.MeasureWrappedFriendNameHeight then
+				V:Skip("FriendsList name-height measurement is not available")
+				return
+			end
+
+			local baselineHeight = FriendsList:MeasureWrappedFriendNameHeight(12, "Anduin", 240)
+			local compactHeight = FriendsList:MeasureWrappedFriendNameHeight(
+				12,
+				"Anduin - Level 90, Orgrimmar - Diablo IV, Torment",
+				90
+			)
+			local restoredHeight = FriendsList:MeasureWrappedFriendNameHeight(12, "Anduin", 240)
+
+			V:Assert(
+				compactHeight > baselineHeight,
+				"the narrow Compact label should wrap beyond the baseline name height"
+			)
+			V:AssertEqual(
+				restoredHeight,
+				baselineHeight,
+				"the restored name-only label should recover its original height"
+			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "Friends_TextWidth_ReservesRightSideControls", {
+		description = "Friend name measurement reserves current title icons, action buttons, and favorite icons",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.GetFriendTextRightPadding then
+				V:Skip("FriendsList text geometry helper is not available")
+				return
+			end
+
+			local probe = {
+				settingsCache = {
+					showGameIcon = true,
+					infoDisabled = false,
+					enableFavoriteIcon = true,
+					favoriteIconStyle = "bfl",
+				},
+			}
+			local titleFriend = {
+				type = "bnet",
+				connected = true,
+				gameAccountInfo = { clientProgram = "WoW" },
+			}
+			local wowFriend = {
+				type = "wow",
+				connected = true,
+			}
+
+			local modernWoWPadding = FriendsList.GetFriendTextRightPadding(
+				probe,
+				wowFriend,
+				true,
+				false,
+				12,
+				10,
+				false
+			)
+			local legacyWoWPadding = FriendsList.GetFriendTextRightPadding(
+				probe,
+				wowFriend,
+				false,
+				false,
+				12,
+				10,
+				false
+			)
+			local titlePadding = FriendsList.GetFriendTextRightPadding(
+				probe,
+				titleFriend,
+				true,
+				false,
+				12,
+				10,
+				false
+			)
+			local favoritePadding = FriendsList.GetFriendTextRightPadding(
+				probe,
+				titleFriend,
+				true,
+				false,
+				12,
+				10,
+				true
+			)
+
+			probe.settingsCache.showGameIcon = false
+			local actionPadding = FriendsList.GetFriendTextRightPadding(
+				probe,
+				titleFriend,
+				true,
+				false,
+				12,
+				10,
+				false
+			)
+
+			V:AssertEqual(legacyWoWPadding, 25, "Legacy WoW rows without right-side controls retain the base inset")
+			V:Assert(
+				titlePadding > actionPadding and actionPadding == modernWoWPadding,
+				"title icons and every Modern action button should reduce the usable text width"
+			)
+			V:Assert(
+				favoritePadding > titlePadding,
+				"the favorite texture should reserve additional room before the right-side controls"
+			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_SettingsFixtures_CoverVisualOptions", {
+		description = "Preview fixtures expose every data shape required by visual Friends and Guild settings",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			if not PreviewMode then
+				V:Skip("PreviewMode not available")
+				return
+			end
+
+			local originalFriends = PreviewMode.mockData.friends
+			local originalGroups = PreviewMode.mockData.groups
+			local originalAssignments = PreviewMode.mockData.groupAssignments
+			local originalFriendNicknames = PreviewMode.mockData.friendNicknames
+			local originalGuildNicknames = PreviewMode.mockData.guildNicknames
+			local originalRecent = PreviewMode.mockData.recentlyAddedTimestamps
+			local originalContacts = PreviewMode.mockData.contactMemory
+			local originalGuildMembers = PreviewMode.mockData.guildRosterMembers
+			local originalGuildName = PreviewMode.mockData.guildRosterName
+			local originalGuildMOTD = PreviewMode.mockData.guildRosterMOTD
+
+			PreviewMode:GenerateMockFriends()
+			local hasMobileOnly = false
+			local hasMultipleAccounts = false
+			local hasMaxLevel = false
+			local hasAlliance = false
+			local hasHorde = false
+			local hasVisibleMobileOnly = false
+			local hasVisibleOppositeFaction = false
+			local hasLowerLevelFavorite = false
+			local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 90
+			local playerFaction = UnitFactionGroup and UnitFactionGroup("player") or "Alliance"
+			for _, friend in ipairs(PreviewMode.mockData.friends) do
+				if friend.connected and friend.clientProgram == "BSAp" and (friend.numGameAccounts or 0) == 0 then
+					hasMobileOnly = true
+					hasVisibleMobileOnly = friend.isFavorite == true
+				end
+				if friend.connected and (friend.numGameAccounts or 0) > 1 and #(friend.gameAccounts or {}) > 1 then
+					hasMultipleAccounts = true
+				end
+				if tonumber(friend.level) == tonumber(maxLevel) then
+					hasMaxLevel = true
+				end
+				hasAlliance = hasAlliance or friend.factionName == "Alliance"
+				hasHorde = hasHorde or friend.factionName == "Horde"
+				if friend.isFavorite and friend.connected and friend.factionName and friend.factionName ~= playerFaction then
+					hasVisibleOppositeFaction = true
+				end
+				if friend.isFavorite and tonumber(friend.level) and tonumber(friend.level) < tonumber(maxLevel) then
+					hasLowerLevelFavorite = true
+				end
+			end
+			V:Assert(hasMobileOnly, "Preview should include a mobile-only Battle.net friend")
+			V:Assert(hasVisibleMobileOnly, "The mobile-only fixture should be visible in Favorites")
+			V:Assert(hasMultipleAccounts, "Preview should include a friend with multiple online game accounts")
+			V:Assert(hasMaxLevel, "Preview should include a max-level friend")
+			V:Assert(hasAlliance and hasHorde, "Preview should expose both factions for faction display settings")
+			V:Assert(
+				hasVisibleOppositeFaction,
+				"Favorites should expose an opposite-faction row for faction background testing"
+			)
+			V:Assert(
+				hasLowerLevelFavorite,
+				"Favorites should expose a lower-level WoW row for difficulty-color testing"
+			)
+			V:Assert(
+				PreviewMode.mockData.friendNicknames["bnet_Anduin#1234"] ~= nil,
+				"Preview should expose a friend nickname without SavedVariables"
+			)
+			V:Assert(
+				PreviewMode.mockData.recentlyAddedTimestamps["bnet_Anduin#1234"]
+					> PreviewMode.mockData.recentlyAddedTimestamps["bnet_Thrall#9012"],
+				"Recently Added fixtures should span multiple ages"
+			)
+			V:Assert(next(PreviewMode.mockData.contactMemory) ~= nil, "Preview should expose ephemeral Contact Memory data")
+			local expectedInternationalAssignments = {
+				["bnet_안녕하세요#1111"] = "font_korean",
+				["bnet_你好世界#2222"] = "font_simplified_chinese",
+				["bnet_哈囉世界#3333"] = "font_traditional_chinese",
+				["bnet_Россия#4444"] = "font_russian",
+			}
+			for uid, expectedGroup in pairs(expectedInternationalAssignments) do
+				local assigned = false
+				for _, groupID in ipairs(PreviewMode.mockData.groupAssignments[uid] or {}) do
+					assigned = assigned or groupID == expectedGroup
+				end
+				V:Assert(assigned, uid .. " should populate " .. expectedGroup)
+			end
+
+			PreviewMode:GenerateMockGroupsData()
+			local hasInGameGroup = false
+			local hasRecentlyAddedGroup = false
+			for _, group in ipairs(PreviewMode.mockData.groups) do
+				hasInGameGroup = hasInGameGroup or group.id == "ingame"
+				hasRecentlyAddedGroup = hasRecentlyAddedGroup or group.id == "recentlyadded"
+			end
+			V:Assert(hasInGameGroup, "Complete preview should carry the opt-in In-Game group")
+			V:Assert(hasRecentlyAddedGroup, "Complete preview should carry the opt-in Recently Added group")
+
+			PreviewMode:GenerateGuildPreviewData()
+			V:Assert(
+				PreviewMode.mockData.guildNicknames["Hayato-Blackrock"] ~= nil,
+				"Guild preview should expose a nickname without SavedVariables"
+			)
+
+			PreviewMode.mockData.friends = originalFriends
+			PreviewMode.mockData.groups = originalGroups
+			PreviewMode.mockData.groupAssignments = originalAssignments
+			PreviewMode.mockData.friendNicknames = originalFriendNicknames
+			PreviewMode.mockData.guildNicknames = originalGuildNicknames
+			PreviewMode.mockData.recentlyAddedTimestamps = originalRecent
+			PreviewMode.mockData.contactMemory = originalContacts
+			PreviewMode.mockData.guildRosterMembers = originalGuildMembers
+			PreviewMode.mockData.guildRosterName = originalGuildName
+			PreviewMode.mockData.guildRosterMOTD = originalGuildMOTD
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_SettingsRefresh_IsBounded", {
+		description = "Settings changes coalesce into one session-bound Preview refresh",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			local DB = BFL:GetModule("DB")
+			if not PreviewMode or not DB then
+				V:Skip("PreviewMode or DB not available")
+				return
+			end
+
+			local originalEnabled = PreviewMode.enabled
+			local originalProfile = PreviewMode.activeProfile
+			local originalComponents = PreviewMode.activeComponents
+			local originalGeneration = PreviewMode.settingsRefreshGeneration
+			local originalPending = PreviewMode.settingsRefreshPending
+			local originalKeys = PreviewMode.pendingSettingKeys
+			local originalRefreshing = PreviewMode.refreshingSettingsPreview
+			local originalRefreshActiveComponents = PreviewMode.RefreshActiveComponents
+			local originalOnSettingChanged = PreviewMode.OnSettingChanged
+
+			local refreshCount = 0
+			PreviewMode.enabled = true
+			PreviewMode.activeProfile = "settings-test"
+			PreviewMode.activeComponents = {}
+			PreviewMode.settingsRefreshGeneration = 42
+			PreviewMode.settingsRefreshPending = true
+			PreviewMode.pendingSettingKeys = {}
+			PreviewMode.refreshingSettingsPreview = false
+			PreviewMode.RefreshActiveComponents = function()
+				refreshCount = refreshCount + 1
+				return {}
+			end
+
+			V:Assert(PreviewMode:OnSettingChanged("fontFriendName"), "first queued key should be accepted")
+			V:Assert(PreviewMode:OnSettingChanged("fontSizeFriendName"), "second queued key should be coalesced")
+			V:Assert(PreviewMode.pendingSettingKeys.fontFriendName, "first key should be retained")
+			V:Assert(PreviewMode.pendingSettingKeys.fontSizeFriendName, "second key should be retained")
+			PreviewMode:FlushPendingSettingsRefresh(42)
+			V:AssertEqual(refreshCount, 1, "one settings change burst should refresh exactly once")
+			V:Assert(not PreviewMode.settingsRefreshPending, "successful flush should release the pending gate")
+			PreviewMode:FlushPendingSettingsRefresh(41)
+			V:AssertEqual(refreshCount, 1, "a callback from an expired Preview session must be ignored")
+
+			local notifiedKey
+			PreviewMode.OnSettingChanged = function(_, key)
+				notifiedKey = key
+			end
+			local originalDebugSetting = DB:Get("debugPrintEnabled", false)
+			DB:Set("debugPrintEnabled", originalDebugSetting)
+			V:AssertEqual(notifiedKey, "debugPrintEnabled", "DB:Set should notify PreviewMode")
+
+			PreviewMode.enabled = originalEnabled
+			PreviewMode.activeProfile = originalProfile
+			PreviewMode.activeComponents = originalComponents
+			PreviewMode.settingsRefreshGeneration = originalGeneration
+			PreviewMode.settingsRefreshPending = originalPending
+			PreviewMode.pendingSettingKeys = originalKeys
+			PreviewMode.refreshingSettingsPreview = originalRefreshing
+			PreviewMode.RefreshActiveComponents = originalRefreshActiveComponents
+			PreviewMode.OnSettingChanged = originalOnSettingChanged
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_IsolationProfiles", {
+		description = "Preview profiles expose one tab fixture at a time and keep unrelated components inactive",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			if not PreviewMode then
+				V:Skip("PreviewMode not available")
+				return
+			end
+
+			local friendsID, friends = PreviewMode:GetProfileDefinition("friends")
+			local plainID, plain = PreviewMode:GetProfileDefinition("friends-plain")
+			local tagsID, tags = PreviewMode:GetProfileDefinition("friends-tags")
+			local oneHeaderID, oneHeader = PreviewMode:GetProfileDefinition("friends-header-one")
+			local headersID, headers = PreviewMode:GetProfileDefinition("friends-headers")
+			local latinHeadersID, latinHeaders = PreviewMode:GetProfileDefinition("friends-headers-latin")
+			local i18nHeadersID, i18nHeaders = PreviewMode:GetProfileDefinition("friends-headers-i18n")
+			local groupsID, groups = PreviewMode:GetProfileDefinition("friends-groups")
+			local recentID, recent = PreviewMode:GetProfileDefinition("recent-allies")
+			local quickJoinID, quickJoin = PreviewMode:GetProfileDefinition("qj")
+			local rafID, raf = PreviewMode:GetProfileDefinition("raf")
+			local raidID, raid = PreviewMode:GetProfileDefinition("raid")
+			local guildID, guild = PreviewMode:GetProfileDefinition("guild")
+			local whoID, who = PreviewMode:GetProfileDefinition("who")
+			local allID, all = PreviewMode:GetProfileDefinition("all")
+			V:AssertEqual(friendsID, "friends", "Friends profile should resolve directly")
+			V:Assert(
+				friends.components.friends
+					and friends.components.groups
+					and friends.components.group_assignments
+					and friends.components.tags,
+				"Friends should include rows, group assignments, and tags"
+			)
+			V:AssertEqual(plainID, "friends_plain", "Hyphenated friends-plain alias should normalize")
+			V:Assert(
+				plain.components.friends and not plain.components.groups and not plain.components.tags,
+				"Friends-plain should exclude groups and tags"
+			)
+			V:AssertEqual(tagsID, "friends_tags", "Hyphenated friends-tags alias should normalize")
+			V:Assert(
+				tags.components.friends and tags.components.tags and not tags.components.groups,
+				"Friends-tags should add tags without custom groups"
+			)
+			V:AssertEqual(oneHeaderID, "friends_header_one", "friends-header-one profile should resolve directly")
+			V:AssertEqual(oneHeader.groupFixture, "one", "Single-header profile should select the minimal fixture")
+			V:AssertEqual(headersID, "friends_group_headers", "friends-headers alias should resolve")
+			V:Assert(
+				headers.components.friends
+					and headers.components.groups
+					and not headers.components.group_assignments
+					and not headers.components.tags,
+				"Friends-headers should add empty custom group headers only"
+			)
+			V:AssertEqual(headers.groupFixture, "ascii", "Default header diagnostic should retain ASCII-only names")
+			V:AssertEqual(
+				latinHeadersID,
+				"friends_headers_latin",
+				"friends-headers-latin profile should resolve directly"
+			)
+			V:AssertEqual(
+				latinHeaders.groupFixture,
+				"latin",
+				"Extended Latin header profile should select the Latin fixture"
+			)
+			V:AssertEqual(
+				i18nHeadersID,
+				"friends_headers_i18n",
+				"friends-headers-i18n profile should resolve directly"
+			)
+			V:AssertEqual(
+				i18nHeaders.groupFixture,
+				"international",
+				"International header profile should retain multilingual labels"
+			)
+			V:AssertEqual(groupsID, "friends_groups", "friends-groups profile should resolve directly")
+			V:Assert(
+				groups.components.friends
+					and groups.components.groups
+					and groups.components.group_assignments
+					and not groups.components.tags,
+				"Friends-groups should add group assignments without tags"
+			)
+			V:AssertEqual(recentID, "recent_allies", "recent-allies profile should resolve directly")
+			V:Assert(recent.components.recent_allies, "Recent Allies should own a real preview fixture")
+			V:AssertEqual(quickJoinID, "quick_join", "qj alias should resolve to Quick Join")
+			V:Assert(quickJoin.components.quick_join and not quickJoin.components.raid, "Quick Join should be isolated")
+			V:AssertEqual(rafID, "recruit_a_friend", "raf alias should resolve to Recruit a Friend")
+			V:Assert(raf.components.raf and not raf.components.friends, "Recruit a Friend should own an isolated fixture")
+			V:AssertEqual(raidID, "raid", "Raid profile should resolve directly")
+			V:Assert(raid.components.raid and not raid.components.quick_join, "Raid should be isolated")
+			V:AssertEqual(guildID, "guild", "Guild profile should resolve directly")
+			V:Assert(guild.components.guild and not guild.components.friends, "Guild should own an isolated roster fixture")
+			V:AssertEqual(whoID, "who", "Who profile input should normalize without resolving")
+			V:Assert(who == nil, "Preview mode must not expose a Who mock profile")
+			V:AssertEqual(allID, "all", "All profile should resolve directly")
+			V:Assert(all.components.recent_allies, "The combined preview should include Recent Allies")
+			V:Assert(all.components.guild, "The combined preview should include the Guild roster")
+			V:Assert(all.components.raf, "The combined preview should include Recruit a Friend")
+			V:Assert(not all.components.who, "The combined preview must not activate Who mock data")
+
+			local originalMockFriends = PreviewMode.mockData.friends
+			local originalRecentAllies = PreviewMode.mockData.recentAllies
+			local originalFriendAssignments = PreviewMode.mockData.groupAssignments
+			PreviewMode:GenerateMockFriends()
+			local favoriteCount, favoriteWoWCount = 0, 0
+			for _, friend in ipairs(PreviewMode.mockData.friends) do
+				if friend.type == "bnet" and friend.connected then
+					V:Assert(
+						type(friend._previewTitleIcon) == "string" and friend._previewTitleIcon ~= "",
+						"Connected Battle.net preview rows should provide deterministic modern title art"
+					)
+					V:AssertEqual(
+						friend.gameAccountInfo and friend.gameAccountInfo._previewTitleIcon,
+						friend._previewTitleIcon,
+						"Primary mock account and friend row should share the same title art"
+					)
+				end
+				if friend.connected and friend.isFavorite then
+					favoriteCount = favoriteCount + 1
+					if friend.clientProgram == "WoW"
+						and friend.gameAccountInfo
+						and friend.gameAccountInfo.clientProgram == "WoW"
+						and friend.gameAccountInfo.characterName ~= ""
+					then
+						favoriteWoWCount = favoriteWoWCount + 1
+					end
+				end
+			end
+			V:Assert(favoriteCount > 0, "Friends preview should include online favorites")
+			V:AssertEqual(favoriteWoWCount, favoriteCount, "Leading preview favorites should expose complete WoW game status")
+			PreviewMode:GenerateRecentAlliesPreviewData()
+			V:Assert(#PreviewMode.mockData.recentAllies >= 5, "Recent Allies preview should populate representative rows")
+			V:Assert(
+				PreviewMode.mockData.recentAllies[1].stateData.isOnline
+					and PreviewMode.mockData.recentAllies[1].characterData.classID ~= nil,
+				"Recent Allies fixtures should include online and class metadata"
+			)
+			PreviewMode.mockData.friends = originalMockFriends
+			PreviewMode.mockData.recentAllies = originalRecentAllies
+			PreviewMode.mockData.groupAssignments = originalFriendAssignments
+
+			local originalMockGroups = PreviewMode.mockData.groups
+			local originalAssignments = PreviewMode.mockData.groupAssignments
+			PreviewMode.mockData.groupAssignments = {}
+			PreviewMode:GenerateMockGroupsData("one")
+			V:AssertEqual(#PreviewMode.mockData.groups, 3, "Minimal fixture should contain built-ins and one custom group")
+			PreviewMode.mockData.groupAssignments = {}
+			PreviewMode:GenerateMockGroupsData("ascii")
+			local asciiGroupCount = #PreviewMode.mockData.groups
+			for _, group in ipairs(PreviewMode.mockData.groups) do
+				V:Assert(
+					not group.name:find("[\128-\255]"),
+					"ASCII header fixture must not exercise non-Roman glyph fallback"
+				)
+			end
+			PreviewMode.mockData.groupAssignments = {}
+			PreviewMode:GenerateMockGroupsData("latin")
+			V:AssertEqual(
+				#PreviewMode.mockData.groups,
+				asciiGroupCount,
+				"ASCII and extended Latin fixtures should keep identical header counts"
+			)
+			local hasExtendedLatin = false
+			for _, group in ipairs(PreviewMode.mockData.groups) do
+				if group.name:find("[\128-\255]") then
+					hasExtendedLatin = true
+					break
+				end
+			end
+			V:Assert(hasExtendedLatin, "Extended Latin fixture should contain non-ASCII Latin labels")
+			PreviewMode.mockData.groupAssignments = {}
+			PreviewMode:GenerateMockGroupsData("international")
+			V:AssertEqual(
+				#PreviewMode.mockData.groups,
+				asciiGroupCount,
+				"ASCII and international fixtures should keep identical header counts"
+			)
+			PreviewMode.mockData.groups = originalMockGroups
+			PreviewMode.mockData.groupAssignments = originalAssignments
+
+			local originalEnabled = PreviewMode.enabled
+			local originalProfile = PreviewMode.activeProfile
+			local originalComponents = PreviewMode.activeComponents
+			local originalGuildRosterMembers = PreviewMode.mockData.guildRosterMembers
+			local originalGuildRosterName = PreviewMode.mockData.guildRosterName
+			local originalGuildRosterMOTD = PreviewMode.mockData.guildRosterMOTD
+			PreviewMode:GenerateGuildPreviewData()
+			V:Assert(#PreviewMode.mockData.guildRosterMembers >= 12, "Guild preview should populate a scrollable roster")
+			local mockOnline, mockOffline = 0, 0
+			for _, member in ipairs(PreviewMode.mockData.guildRosterMembers) do
+				V:Assert(member._isMock == true, "Guild preview rows should be marked as synthetic")
+				if member.online then
+					mockOnline = mockOnline + 1
+				else
+					mockOffline = mockOffline + 1
+				end
+			end
+			V:Assert(mockOnline > 0 and mockOffline > 0, "Guild preview should cover online and offline filters")
+			PreviewMode.enabled = true
+			PreviewMode.activeProfile = "guild"
+			PreviewMode.activeComponents = { guild = true }
+			local GuildRosterData = BFL:GetModule("GuildRosterData")
+			if GuildRosterData then
+				local online, total = GuildRosterData:GetCounts()
+				local members = GuildRosterData:CollectRoster()
+				V:AssertEqual(total, #PreviewMode.mockData.guildRosterMembers, "Guild provider should expose every preview row")
+				V:AssertEqual(online, mockOnline, "Guild provider should expose the preview online count")
+				V:AssertEqual(#members, total, "Guild provider should collect the complete preview roster")
+				V:AssertEqual(
+					GuildRosterData:GetGuildName(),
+					PreviewMode.mockData.guildRosterName,
+					"Guild provider should expose the preview guild name"
+				)
+			end
+			PreviewMode.mockData.guildRosterMembers = originalGuildRosterMembers
+			PreviewMode.mockData.guildRosterName = originalGuildRosterName
+			PreviewMode.mockData.guildRosterMOTD = originalGuildRosterMOTD
+			PreviewMode.enabled = true
+			PreviewMode.activeProfile = "raid"
+			PreviewMode.activeComponents = { raid = true }
+			V:Assert(PreviewMode:IsComponentEnabled("raid"), "Active component should be enabled")
+			V:Assert(not PreviewMode:IsComponentEnabled("friends"), "Friends should stay inactive in Raid profile")
+			V:Assert(not PreviewMode:IsComponentEnabled("quick_join"), "Quick Join should stay inactive in Raid profile")
+			PreviewMode.enabled = originalEnabled
+			PreviewMode.activeProfile = originalProfile
+			PreviewMode.activeComponents = originalComponents
+
+			local originalEnableProfile = PreviewMode.EnableProfile
+			local originalEnableProfileStaged = PreviewMode.EnableProfileStaged
+			local originalDisable = PreviewMode.Disable
+			local commandResult
+			PreviewMode.EnableProfile = function(_, profileID)
+				commandResult = "enable:" .. tostring(profileID)
+			end
+			PreviewMode.EnableProfileStaged = function(_, profileID)
+				commandResult = "debug:" .. tostring(profileID)
+			end
+			PreviewMode.Disable = function()
+				commandResult = "disable"
+			end
+			PreviewMode.enabled = false
+			PreviewMode:HandleCommand("")
+			V:AssertEqual(commandResult, "enable:all", "Bare /bfl preview should enable the complete fixture")
+			PreviewMode.enabled = true
+			PreviewMode:HandleCommand("")
+			V:AssertEqual(commandResult, "disable", "Bare /bfl preview should toggle the active fixture off")
+			PreviewMode:HandleCommand("debug")
+			V:AssertEqual(commandResult, "debug:all", "Preview debug should use the staged activation trace")
+			PreviewMode.EnableProfile = originalEnableProfile
+			PreviewMode.EnableProfileStaged = originalEnableProfileStaged
+			PreviewMode.Disable = originalDisable
+			PreviewMode.enabled = originalEnabled
+		end,
+	})
+
+	TS:RegisterTest("integration", "Preview_FriendsRenderAudit", {
+		description = "Friends preview audit requires mock rows in both the model and active DataProvider",
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not PreviewMode or not FriendsList then
+				V:Skip("PreviewMode or FriendsList not available")
+				return
+			end
+
+			local originalMockFriends = PreviewMode.mockData.friends
+			local originalFriendsList = FriendsList.friendsList
+			local originalScrollBox = FriendsList.scrollBox
+			local originalPrintProfileStep = PreviewMode.PrintProfileStep
+			local originalEnabled = PreviewMode.enabled
+			local originalProfile = PreviewMode.activeProfile
+			local originalComponents = PreviewMode.activeComponents
+			local firstMock = { _isMock = true }
+			local secondMock = { _isMock = true }
+			local providerRows = {
+				{ buttonType = 2, groupId = "nogroup" },
+				{ buttonType = 1, friend = firstMock },
+				{ buttonType = 1, friend = secondMock },
+			}
+			local fakeProvider = {}
+			function fakeProvider:Enumerate()
+				local index = 0
+				return function()
+					index = index + 1
+					if providerRows[index] then
+						return index, providerRows[index]
+					end
+				end
+			end
+
+			local auditMessage
+			PreviewMode.mockData.friends = { firstMock, secondMock }
+			PreviewMode.enabled = true
+			PreviewMode.activeProfile = "friends_plain"
+			PreviewMode.activeComponents = { friends = true }
+			local updateCalls = 0
+			local forcedVisibility
+			local routed = PreviewMode:RenderMockFriendsNow({
+				UpdateFriendsList = function(_, ignoreVisibility)
+					updateCalls = updateCalls + 1
+					forcedVisibility = ignoreVisibility
+				end,
+			})
+			FriendsList.friendsList = { firstMock, secondMock }
+			FriendsList.scrollBox = {
+				GetDataProvider = function()
+					return fakeProvider
+				end,
+			}
+			PreviewMode.PrintProfileStep = function(_, _, step)
+				auditMessage = step
+			end
+
+			local ok, rendered = pcall(PreviewMode.ReportFriendsRenderAudit, PreviewMode)
+
+			PreviewMode.mockData.friends = originalMockFriends
+			FriendsList.friendsList = originalFriendsList
+			FriendsList.scrollBox = originalScrollBox
+			PreviewMode.PrintProfileStep = originalPrintProfileStep
+			PreviewMode.enabled = originalEnabled
+			PreviewMode.activeProfile = originalProfile
+			PreviewMode.activeComponents = originalComponents
+
+			if not ok then
+				error(rendered, 0)
+			end
+			V:Assert(routed == true, "active Friends preview should own the display refresh")
+			V:AssertEqual(updateCalls, 1, "display refresh should route through mock model injection exactly once")
+			V:Assert(forcedVisibility == true, "display refresh should force the visible isolated render")
+			V:Assert(rendered == true, "render audit should accept mock model and provider rows")
+			V:Assert(
+				type(auditMessage) == "string" and auditMessage:find("render audit OK", 1, true) ~= nil,
+				"audit should report a successful visible provider handoff"
+			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "QuickJoin_PreviewIsolation_State", {
+		description = "Combined preview state should isolate and version Quick Join mock data",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			local QuickJoin = BFL:GetModule("QuickJoin")
+			if not PreviewMode or not QuickJoin then
+				V:Skip("PreviewMode or QuickJoin not available")
+				return
+			end
+
+			local originalEnabled = PreviewMode.enabled
+			local originalProfile = PreviewMode.activeProfile
+			local originalComponents = PreviewMode.activeComponents
+			local originalVersion = QuickJoin.mockGroupsVersion
+			local originalPrepared = QuickJoin.previewPreparedMockVersion
+			local originalRendered = QuickJoin.previewRenderedMockVersion
+			PreviewMode.enabled = true
+			PreviewMode.activeProfile = "raid"
+			PreviewMode.activeComponents = { raid = true }
+			V:Assert(not QuickJoin:IsCombinedPreviewActive(), "Raid preview must not activate mock-only Quick Join")
+			PreviewMode.activeProfile = "quick_join"
+			PreviewMode.activeComponents = { quick_join = true }
+			V:Assert(QuickJoin:IsCombinedPreviewActive(), "Quick Join profile should activate mock-only Quick Join")
+			QuickJoin:MarkMockGroupsChanged()
+			V:AssertEqual(QuickJoin.mockGroupsVersion, originalVersion + 1, "mock changes should increment version")
+			V:Assert(QuickJoin.previewPreparedMockVersion == nil, "mock changes should invalidate prepared data")
+			V:Assert(QuickJoin.previewRenderedMockVersion == nil, "mock changes should invalidate rendered data")
+
+			PreviewMode.enabled = originalEnabled
+			PreviewMode.activeProfile = originalProfile
+			PreviewMode.activeComponents = originalComponents
+			QuickJoin.mockGroupsVersion = originalVersion
+			QuickJoin.previewPreparedMockVersion = originalPrepared
+			QuickJoin.previewRenderedMockVersion = originalRendered
 		end,
 	})
 
@@ -6147,6 +8240,260 @@ local function RegisterBuiltInTests()
 				StaticPopupDialogs["BETTER_FRIENDLIST_RENAME_GROUP"] ~= nil,
 				"Rename group dialog should be registered"
 			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "TitleFriendInvite_UsesConfirmationWithFallback", {
+		description = "Retail title-friend invites use Blizzard's confirmation event and retain the direct fallback",
+		condition = function()
+			return BFL.IsRetail and BFL.SendTitleFriendInviteByName ~= nil
+		end,
+		action = function(V)
+			local oldBattleNet = C_BattleNet
+			local oldAddOns = C_AddOns
+			local oldEventRegistry = EventRegistry
+			local oldInviteFrame = BattleNetInviteFrame
+			local oldIsRetail = BFL.IsRetail
+			local eventName, eventTarget
+			local directCalls = 0
+
+			local ok, err = pcall(function()
+				BFL.IsRetail = true
+				C_BattleNet = {
+					AreTitleFriendsEnabled = function()
+						return true
+					end,
+					SendTitleFriendInviteByName = function()
+						directCalls = directCalls + 1
+					end,
+				}
+				C_AddOns = {
+					IsAddOnLoaded = function(addOnName)
+						return addOnName == "Blizzard_AddFriend"
+					end,
+				}
+				EventRegistry = {
+					TriggerEvent = function(_, name, target)
+						eventName = name
+						eventTarget = target
+					end,
+				}
+				BattleNetInviteFrame = {
+					OnTitleFriendInviteByNameRequested = function() end,
+				}
+
+				V:Assert(BFL.SendTitleFriendInviteByName("Jaina-Proudmoore"), "Confirmation request should succeed")
+				V:AssertEqual(
+					eventName,
+					"BattleNetInviteFrame.TitleFriendInviteByNameRequested",
+					"Retail 12.1 should route through Blizzard's confirmation event"
+				)
+				V:AssertEqual(eventTarget, "Jaina-Proudmoore", "Confirmation event should preserve the invite target")
+				V:AssertEqual(directCalls, 0, "Confirmation path must not send before the user accepts")
+
+				BattleNetInviteFrame = nil
+				V:Assert(BFL.SendTitleFriendInviteByName("Anduin-Stormwind"), "Direct fallback should succeed")
+				V:AssertEqual(directCalls, 1, "Older clients should retain exactly one direct API call")
+			end)
+
+			C_BattleNet = oldBattleNet
+			C_AddOns = oldAddOns
+			EventRegistry = oldEventRegistry
+			BattleNetInviteFrame = oldInviteFrame
+			BFL.IsRetail = oldIsRetail
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("integration", "OfflineTitleFriend_WhisperIsBlocked", {
+		description = "Only offline title friends are excluded from BFL menu and row-click whisper paths",
+		condition = function()
+			return BFL.IsRetail
+				and Enum
+				and Enum.BattleNetFriendLevel
+				and Enum.BattleNetFriendLevel.Title ~= nil
+		end,
+		action = function(V)
+			local titleLevel = Enum.BattleNetFriendLevel.Title
+			local battleTagLevel = Enum.BattleNetFriendLevel.BattleTag
+			V:Assert(BFL.IsOfflineTitleFriend({ friendLevel = titleLevel }, true), "Offline title friend should be blocked")
+			V:Assert(not BFL.IsOfflineTitleFriend({ friendLevel = titleLevel }, false), "Online title friend should remain reachable")
+			V:Assert(
+				not BFL.IsOfflineTitleFriend({ friendLevel = battleTagLevel }, true),
+				"Offline BattleTag friend should keep the existing behavior"
+			)
+
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList then
+				V:Skip("FriendsList module unavailable")
+				return
+			end
+			local oldSend = BFL.SecureSendBNetTell
+			local sends = 0
+			local ok, err = pcall(function()
+				BFL.SecureSendBNetTell = function()
+					sends = sends + 1
+				end
+				local offlineResult = FriendsList:WhisperFriend({
+					type = "bnet",
+					friendLevel = titleLevel,
+					connected = false,
+					accountName = "Offline Title Friend",
+				})
+				V:Assert(offlineResult == false, "Row-click whisper should reject an offline title friend")
+				V:AssertEqual(sends, 0, "Rejected title friend must not open Battle.net chat")
+
+				local onlineResult = FriendsList:WhisperFriend({
+					type = "bnet",
+					friendLevel = titleLevel,
+					connected = true,
+					accountName = "Online Title Friend",
+				})
+				V:Assert(onlineResult == true, "Online title friend should remain whisperable")
+				V:AssertEqual(sends, 1, "Online title friend should open Battle.net chat exactly once")
+			end)
+			BFL.SecureSendBNetTell = oldSend
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("integration", "RAF_ActiveFrameAndPreviewRewardsSafety", {
+		description = "RAF follows C_SocialUI active-frame selection and keeps preview claim controls inert",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local RAF = BFL:GetModule("RAF")
+			if not RAF or not RAF.GetNativeRecruitAFriendFrame or not RAF.EnforcePreviewRewardsSafety then
+				V:Skip("RAF compatibility helpers unavailable")
+				return
+			end
+
+			local oldSocialUIFrame = SocialUIFrame
+			local oldLegacyFrame = RecruitAFriendFrame
+			local oldSocialUI = C_SocialUI
+			local modernFrame = {}
+			local legacyFrame = {}
+			local systemEnabled = true
+			local ok, err = pcall(function()
+				SocialUIFrame = { RecruitAFriendFrame = modernFrame }
+				RecruitAFriendFrame = legacyFrame
+				C_SocialUI = {
+					IsSystemEnabled = function()
+						return systemEnabled
+					end,
+				}
+				V:AssertEqual(RAF:GetNativeRecruitAFriendFrame(), modernFrame, "Enabled SocialUI should own RAF")
+				systemEnabled = false
+				V:AssertEqual(RAF:GetNativeRecruitAFriendFrame(), legacyFrame, "Disabled SocialUI should use legacy RAF")
+
+				local claimButton = { enabled = true, shown = true, autoClaim = true }
+				function claimButton:SetAutoClaimRewardsEnabled(enabled)
+					self.autoClaim = enabled
+				end
+				function claimButton:SetEnabled(enabled)
+					self.enabled = enabled
+				end
+				function claimButton:Hide()
+					self.shown = false
+				end
+				local rewardsFrame = { ClaimLegacyRewardsButton = claimButton }
+				V:Assert(
+					RAF:EnforcePreviewRewardsSafety(rewardsFrame, { _isMock = true }),
+					"Mock rewards should activate the safety contract"
+				)
+				V:Assert(not claimButton.autoClaim, "Preview should cancel legacy auto-claim")
+				V:Assert(not claimButton.enabled and not claimButton.shown, "Preview claim control should stay hidden and disabled")
+			end)
+
+			SocialUIFrame = oldSocialUIFrame
+			RecruitAFriendFrame = oldLegacyFrame
+			C_SocialUI = oldSocialUI
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("integration", "RAF_PreviewFixture_IsLocalAndComplete", {
+		description = "RAF preview data covers recruit and activity states without native account lookups",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local RAF = BFL:GetModule("RAF")
+			if not RAF or not RAF.BuildPreviewData then
+				V:Skip("RAF preview fixture not available")
+				return
+			end
+
+			local systemInfo, rafInfo = RAF:BuildPreviewData()
+			V:AssertEqual(systemInfo.maxRecruits, 10, "Preview should expose a stable recruit capacity")
+			V:Assert(rafInfo._isMock == true, "Preview RAF info must be marked as synthetic")
+			V:AssertEqual(#rafInfo.recruits, 4, "Preview should cover four representative recruits")
+			V:Assert(rafInfo.versions[1].nextReward._isMock == true, "Next reward must remain local")
+			V:AssertEqual(
+				#rafInfo.versions[1].rewards,
+				7,
+				"Preview should populate Blizzard's complete two-column reward overview"
+			)
+			V:Assert(
+				rafInfo.versions[1].nextReward == rafInfo.versions[1].rewards[4],
+				"The preview header and rewards overview must share the same claimable reward"
+			)
+			V:Assert(
+				rafInfo.versions[1].rewards[1].claimed
+					and rafInfo.versions[1].rewards[7].repeatable,
+				"Preview rewards should cover claimed and repeatable visual states"
+			)
+
+			local online, offline = 0, 0
+			local activityStates = {}
+			for _, recruit in ipairs(rafInfo.recruits) do
+				V:Assert(recruit._isMock == true, "Every preview recruit must bypass Battle.net presence")
+				if recruit.isOnline then
+					online = online + 1
+				else
+					offline = offline + 1
+				end
+				for _, activity in ipairs(recruit.activities or {}) do
+					V:Assert(activity._isMock == true, "Every preview activity must be local")
+					activityStates[activity.state] = true
+				end
+			end
+			V:Assert(online > 0 and offline > 0, "Preview should exercise online and offline cards")
+			V:Assert(
+				activityStates[0] and activityStates[1] and activityStates[2],
+				"Preview should cover incomplete, complete, and claimed activity states"
+			)
+
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if PreviewMode and FriendsUI and FriendsUI.GetCapabilities then
+				local originalEnabled = PreviewMode.enabled
+				local originalProfile = PreviewMode.activeProfile
+				local originalComponents = PreviewMode.activeComponents
+				local ok, capabilities = pcall(function()
+					PreviewMode.enabled = true
+					PreviewMode.activeProfile = "recruit_a_friend"
+					PreviewMode.activeComponents = { raf = true }
+					return FriendsUI:GetCapabilities()
+				end)
+				PreviewMode.enabled = originalEnabled
+				PreviewMode.activeProfile = originalProfile
+				PreviewMode.activeComponents = originalComponents
+				if not ok then
+					error(capabilities, 0)
+				end
+				V:Assert(
+					capabilities.recruit_a_friend == true,
+					"RAF preview should bypass only the RAF account availability gate"
+				)
+			end
 		end,
 	})
 
@@ -6722,6 +9069,240 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("filter", "QuickFilter_TagFacetsUseNestedMenuAndORSelection", {
+		description = "Quick Filter menus should group filters and tags while selected tags use OR semantics beside the active filter",
+		action = function(V)
+			local QuickFilters = BFL:GetModule("QuickFilters")
+			local FriendTags = BFL:GetModule("FriendTags")
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not (QuickFilters and FriendTags and FriendsList and BetterFriendlistDB) then
+				V:Skip("QuickFilters, FriendTags, FriendsList, or DB not loaded")
+				return
+			end
+
+			local definitions = {
+				{
+					id = "custom:test_alpha",
+					name = "Alpha",
+					chipProfile = {
+						iconType = "texture",
+						texture = "Interface\\AddOns\\BetterFriendlist\\Icons\\tag",
+					},
+				},
+				{
+					id = "custom:test_beta",
+					name = "Beta",
+					chipProfile = {
+						iconType = "texture",
+						texture = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter",
+					},
+				},
+			}
+			local originalSelected = BetterFriendlistDB.quickFilterTags
+			local originalDBFilter = BetterFriendlistDB.quickFilter
+			local originalFilterMode = FriendsList.filterMode
+			local originalGetDefinitions = QuickFilters.GetTagFilterDefinitions
+			local originalGetTagsForFriend = FriendTags.GetTagsForFriend
+			local originalForceRefreshFriendsList = BFL.ForceRefreshFriendsList
+			local originalRefreshDropdown = QuickFilters.RefreshDropdown
+			local ok, err = pcall(function()
+				BetterFriendlistDB.quickFilterTags = {
+					["custom:test_alpha"] = true,
+					["custom:test_beta"] = true,
+				}
+				QuickFilters.GetTagFilterDefinitions = function()
+					return definitions
+				end
+				FriendTags.GetTagsForFriend = function(_, friend)
+					return friend.testTags or {}
+				end
+				BFL.ForceRefreshFriendsList = function() end
+				QuickFilters.RefreshDropdown = function() end
+
+				local alphaFriend = {
+					type = "wow",
+					connected = true,
+					testTags = { definitions[1] },
+				}
+				local betaFriend = {
+					type = "wow",
+					connected = true,
+					testTags = { definitions[2] },
+				}
+				local unmatchedFriend = { type = "wow", connected = true, testTags = {} }
+				V:Assert(QuickFilters:PassesTagFilters(alphaFriend), "The first selected tag should match")
+				V:Assert(QuickFilters:PassesTagFilters(betaFriend), "The second selected tag should match through OR")
+				V:Assert(not QuickFilters:PassesTagFilters(unmatchedFriend), "Friends without a selected tag should fail")
+
+				FriendsList.filterMode = "online"
+				V:Assert(FriendsList:PassesFilters(alphaFriend), "A matching online friend should pass both facets")
+				alphaFriend.connected = false
+				V:Assert(
+					not FriendsList:PassesFilters(alphaFriend),
+					"A matching tag must not bypass the active online filter"
+				)
+
+				local function CreateDescription(kind, text)
+					local description = { kind = kind, text = text, children = {} }
+					function description:SetTag(tag)
+						self.tag = tag
+					end
+					function description:SetCloseOnClick(closeOnClick)
+						self.closeOnClick = closeOnClick
+					end
+					function description:SetMinimumWidth(width)
+						self.minimumWidth = width
+					end
+					function description:SetMaximumWidth(width)
+						self.maximumWidth = width
+					end
+					function description:AddInitializer(initializer)
+						self.initializers = self.initializers or {}
+						self.initializers[#self.initializers + 1] = initializer
+					end
+					function description:AddResetter(resetter)
+						self.resetters = self.resetters or {}
+						self.resetters[#self.resetters + 1] = resetter
+					end
+					function description:CreateButton(label)
+						local child = CreateDescription("button", label)
+						self.children[#self.children + 1] = child
+						return child
+					end
+					function description:CreateRadio(label, _, _, value)
+						local child = CreateDescription("radio", label)
+						child.value = value
+						self.children[#self.children + 1] = child
+						return child
+					end
+					function description:CreateCheckbox(label, isSelected, onSelected)
+						local child = CreateDescription("checkbox", label)
+						child.isSelected = isSelected
+						child.onSelected = onSelected
+						self.children[#self.children + 1] = child
+						return child
+					end
+					function description:CreateTitle(label)
+						local child = CreateDescription("title", label)
+						self.children[#self.children + 1] = child
+						return child
+					end
+					return description
+				end
+
+				local rootDescription = CreateDescription("root")
+				QuickFilters:PopulateMenu(rootDescription)
+				V:AssertEqual(#rootDescription.children, 2, "Root menu should contain Filters and Tags only")
+				V:AssertEqual(rootDescription.children[1].kind, "button", "Filters should be a submenu")
+				V:AssertEqual(rootDescription.children[2].kind, "button", "Tags should be a submenu")
+				V:AssertEqual(rootDescription.minimumWidth, 120, "Root menu should reserve a compact stable width")
+				V:AssertEqual(rootDescription.maximumWidth, 120, "Root menu width should not change with icon count")
+				V:Assert(
+					rootDescription.children[1].text:find("|T", 1, true) ~= nil,
+					"Filters root item should show the active filter icon"
+				)
+				V:Assert(
+					rootDescription.children[2].text:find("|T", 1, true) ~= nil,
+					"Tags root item should show selected tag icons"
+				)
+				V:AssertEqual(rootDescription.children[2].children[1].kind, "checkbox", "Tags should be multi-select")
+
+				local filterRoot = rootDescription.children[1]
+				local originalFilterLabel = filterRoot.text
+				local alternateFilter
+				for _, child in ipairs(filterRoot.children) do
+					if child.value and child.value ~= QuickFilters:GetFilter() then
+						alternateFilter = child.value
+						break
+					end
+				end
+				V:AssertNotNil(alternateFilter, "Test requires a second visible Quick Filter")
+				BetterFriendlistDB.quickFilter = alternateFilter
+				local refreshedFilterLabel
+				filterRoot.initializers[1]({
+					fontString = {
+						SetTextToFit = function(_, text)
+							refreshedFilterLabel = text
+						end,
+					},
+				})
+				V:Assert(
+					refreshedFilterLabel ~= originalFilterLabel,
+					"The first-level filter icon should update when the active filter changes"
+				)
+
+				local tagRoot = rootDescription.children[2]
+				local originalTagLabel = tagRoot.text
+				local refreshedTagLabel
+				local visibleTagButton = {
+					fontString = {
+						SetTextToFit = function(_, text)
+							refreshedTagLabel = text
+						end,
+					},
+					SetText = function()
+						error("Menu labels must update Blizzard's visible fontString", 0)
+					end,
+				}
+				tagRoot.initializers[1](visibleTagButton)
+				tagRoot.children[2].onSelected()
+				V:Assert(
+					refreshedTagLabel ~= originalTagLabel,
+					"The visible first-level tag icons should update directly while the menu remains open"
+				)
+				tagRoot.resetters[1](visibleTagButton)
+
+			end)
+
+			BetterFriendlistDB.quickFilterTags = originalSelected
+			BetterFriendlistDB.quickFilter = originalDBFilter
+			FriendsList.filterMode = originalFilterMode
+			QuickFilters.GetTagFilterDefinitions = originalGetDefinitions
+			FriendTags.GetTagsForFriend = originalGetTagsForFriend
+			BFL.ForceRefreshFriendsList = originalForceRefreshFriendsList
+			QuickFilters.RefreshDropdown = originalRefreshDropdown
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("filter", "QuickFilter_HeaderSelectionRespectsInterfaceStyle", {
+		description = "Legacy uses BFL's generic filter icon while Modern keeps the readable Filter label",
+		action = function(V)
+			local QuickFilters = BFL:GetModule("QuickFilters")
+			if not (QuickFilters and QuickFilters.GetHeaderSelectionText) then
+				V:Skip("QuickFilters header selection helper not loaded")
+				return
+			end
+
+			local oldFriendsUI = BFL.FriendsUI
+			local legacyText, modernText
+			local ok, err = pcall(function()
+				BFL.FriendsUI = {
+					IsModernActive = function()
+						return false
+					end,
+				}
+				legacyText = QuickFilters:GetHeaderSelectionText(14)
+				BFL.FriendsUI.IsModernActive = function()
+					return true
+				end
+				modernText = QuickFilters:GetHeaderSelectionText(14)
+			end)
+			BFL.FriendsUI = oldFriendsUI
+			if not ok then
+				error(err, 0)
+			end
+
+			V:Assert(
+				legacyText:find("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 1, true) ~= nil,
+				"Legacy header should display the generic BFL filter texture"
+			)
+			V:AssertEqual(modernText, FILTER or "Filter", "Modern header should keep the Filter text label")
+		end,
+	})
+
 	TS:RegisterTest("filter", "WoWFilter_RequiresWoWClient", {
 		description = "Filter 'wow' must require WoW game client",
 		action = function(V)
@@ -6918,6 +9499,73 @@ local function RegisterBuiltInTests()
 
 			-- Restore
 			FriendsList.filterMode = originalFilter
+		end,
+	})
+
+	TS:RegisterTest("filter", "Registry_BFLMenuIcons_UseThemeAccent", {
+		description = "BFL-owned menu textures use the active Dark/Custom or EllesmereUI accent without tinting Blizzard assets",
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry then
+				V:Skip("FilterSortRegistry not loaded")
+				return
+			end
+
+			local oldUsesDarkSkinTheme = BFL.UsesDarkSkinTheme
+			local oldIsEllesmereUISkinActive = BFL.IsEllesmereUISkinActive
+			local oldGetThemeAccentColor = BFL.GetThemeAccentColor
+			local darkMarkup, ellesmereMarkup, blizzardMarkup
+			local ok, err = pcall(function()
+				BFL.UsesDarkSkinTheme = function()
+					return true
+				end
+				BFL.IsEllesmereUISkinActive = function()
+					return false
+				end
+				BFL.GetThemeAccentColor = function()
+					return 1, 0, 0, 1
+				end
+				darkMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
+
+				BFL.UsesDarkSkinTheme = function()
+					return false
+				end
+				BFL.IsEllesmereUISkinActive = function()
+					return true
+				end
+				BFL.GetThemeAccentColor = function()
+					return 0, 1, 0, 1
+				end
+				ellesmereMarkup = Registry:FormatIcon("Interface\\AddOns\\BetterFriendlist\\Icons\\filter", 16)
+				blizzardMarkup = Registry:FormatIcon("Interface\\Icons\\INV_Misc_Note_01", 16)
+			end)
+			BFL.UsesDarkSkinTheme = oldUsesDarkSkinTheme
+			BFL.IsEllesmereUISkinActive = oldIsEllesmereUISkinActive
+			BFL.GetThemeAccentColor = oldGetThemeAccentColor
+			if not ok then
+				error(err, 0)
+			end
+
+			V:Assert(
+				darkMarkup:find(":255:0:0|t", 1, true) ~= nil,
+				"BFL menu texture markup should contain the active Dark/Custom accent tint"
+			)
+			V:Assert(
+				darkMarkup:find("Textures\\ThemeIcons\\filter.tga", 1, true) ~= nil,
+				"Dark/Custom menu texture markup should use the neutral BFL icon mask"
+			)
+			V:Assert(
+				ellesmereMarkup:find(":0:255:0|t", 1, true) ~= nil,
+				"BFL menu texture markup should contain the active EllesmereUI accent tint"
+			)
+			V:Assert(
+				ellesmereMarkup:find("Textures\\ThemeIcons\\filter.tga", 1, true) ~= nil,
+				"EllesmereUI menu texture markup should use the neutral BFL icon mask"
+			)
+			V:Assert(
+				blizzardMarkup:find(":0:255:0|t", 1, true) == nil,
+				"Blizzard menu textures should retain their native color"
+			)
 		end,
 	})
 
@@ -7175,6 +9823,7 @@ local function RegisterBuiltInTests()
 
 			Registry:EnsureDB()
 			V:AssertType(BetterFriendlistDB.customQuickFilters, "table", "customQuickFilters should be a table")
+			V:AssertType(BetterFriendlistDB.quickFilterTags, "table", "quickFilterTags should be a table")
 			V:AssertType(BetterFriendlistDB.quickFilterVisibility, "table", "quickFilterVisibility should be a table")
 			V:AssertType(BetterFriendlistDB.quickFilterOrder, "table", "quickFilterOrder should be a table")
 			V:AssertType(BetterFriendlistDB.customSorters, "table", "customSorters should be a table")
@@ -9972,6 +12621,7 @@ function TestSuite:Initialize()
 	self:RegisterMobileOnlyAccountTest()
 	self:RegisterFriendUpdateDebounceTest()
 	self:RegisterEventCompatibilityTests()
+	self:RegisterLateUITests()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
 end
 
@@ -10913,6 +13563,90 @@ function TestSuite:RegisterEventCompatibilityTests()
 			V:AssertNil(callbacksAfterRegistration, "Unknown events should not create callback registry entries")
 		end,
 	})
+end
+
+function TestSuite:RegisterLateUITests()
+	self:RegisterTest("ui", "Core_RegionMouseOver", {
+		description = "The cross-flavor mouse-over helper uses the Region method and fails closed",
+		action = function(V)
+			local probe = { IsMouseOver = function() return true end }
+			V:Assert(BFL:IsRegionMouseOver(probe), "Region method result should be returned")
+			V:Assert(not BFL:IsRegionMouseOver(nil), "Nil regions should not be treated as hovered")
+			V:Assert(not BFL:IsRegionMouseOver({}), "Objects without IsMouseOver should fail closed")
+		end,
+	})
+
+	self:RegisterTest("ui", "FriendTags_RowChipsAreVisualOnly", {
+		description = "Friend tag row chips should provide nine tag slots plus overflow with mask-free clickthrough pills",
+		action = function(V)
+			local TagChips = BFL:GetModule("TagChips")
+			V:AssertNotNil(TagChips, "TagChips module should exist")
+			local owner = CreateFrame("Button", nil, UIParent)
+			owner:SetSize(220, 70)
+			local row = TagChips:EnsureRow(owner)
+			local chip = row and row.chips and row.chips[1]
+			V:AssertNotNil(chip, "Tag chip should be created")
+			V:AssertEqual(#row.chips, 10, "Tag rows should provide nine configured chips plus one overflow chip")
+			V:Assert(row:IsMouseEnabled() == false, "Tag row should be clickthrough")
+			V:Assert(chip:IsMouseEnabled() == false, "Tag chip should be clickthrough")
+			V:AssertNil(chip:GetScript("OnEnter"), "Tag chip should not install a tooltip OnEnter handler")
+			V:AssertNil(chip:GetScript("OnLeave"), "Tag chip should not install a tooltip OnLeave handler")
+			V:Assert(chip.pillBorder and chip.pillBorder.left and chip.pillBorder.right and chip.pillBorder.middle, "Tag chip should have rounded border regions")
+			V:Assert(chip.pillBackground and chip.pillBackground.left and chip.pillBackground.right and chip.pillBackground.middle, "Tag chip should have rounded background regions")
+			V:Assert(chip.pillBorder.left:GetNumMaskTextures() == 0, "Tag chip border should not attach async mask textures")
+			V:Assert(chip.pillBackground.left:GetNumMaskTextures() == 0, "Tag chip background should not attach async mask textures")
+
+			local bareWidth, hasBareIcon = TagChips:UpdateStandaloneChip(chip, {
+				iconType = "texture",
+				iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+				texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+			}, "", 180)
+			V:AssertEqual(bareWidth, 14, "Icon-only tags should occupy exactly the icon width")
+			V:Assert(hasBareIcon, "Icon-only tags should retain their icon")
+			V:Assert(chip.bareIcon == true, "An empty chip label should select bare-icon rendering")
+			V:Assert(not chip.pillBorder.left:IsShown(), "Bare icons should hide the chip border")
+			V:Assert(not chip.pillBackground.left:IsShown(), "Bare icons should hide the chip fill")
+			V:Assert(not chip.label:IsShown(), "Bare icons should hide the chip label")
+			V:Assert(chip.icon:IsShown(), "Bare icons should remain visible")
+
+			TagChips:UpdateStandaloneChip(chip, {
+				iconType = "texture",
+				iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+				texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+			}, "Normal", 180)
+			V:Assert(chip.bareIcon == false, "Labeled tags should restore normal chip rendering")
+			V:Assert(chip.pillBorder.left:IsShown(), "Normal chips should restore the border")
+			V:Assert(chip.pillBackground.left:IsShown(), "Normal chips should restore the fill")
+			V:Assert(chip.label:IsShown(), "Normal chips should restore the label")
+
+			owner.Info = owner:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+			local multiAccountRow = CreateFrame("Frame", nil, owner)
+			owner.multiAccountRow = multiAccountRow
+			multiAccountRow:Show()
+			V:AssertEqual(
+				TagChips:GetRowAnchor(owner),
+				multiAccountRow,
+				"tag chips should sit below visible multi-account details"
+			)
+			multiAccountRow:Hide()
+			V:AssertEqual(TagChips:GetRowAnchor(owner), owner.Info, "tag chips should otherwise sit below friend info")
+			owner:Hide()
+		end,
+	})
+end
+
+function TestSuite:RunSettingsGroupDragSmoke(item, onDragStart, onDragStop)
+	local originalIsRegionMouseOver = BFL.IsRegionMouseOver
+	BFL.IsRegionMouseOver = function()
+		return false
+	end
+	local ok, err = pcall(function()
+		onDragStart(item)
+		item:GetScript("OnUpdate")(item)
+		onDragStop(item)
+	end)
+	BFL.IsRegionMouseOver = originalIsRegionMouseOver
+	return ok, err
 end
 
 function TestSuite:GetTestCount()

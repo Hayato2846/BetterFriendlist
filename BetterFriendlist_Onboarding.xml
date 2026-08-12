@@ -1,0 +1,77 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- Match the portraitless ButtonFrameTemplate shell used by Legacy Settings. -->
+	<Frame name="BFLAppearanceOnboardingFrame" parent="UIParent" inherits="ButtonFrameTemplate" hidden="true" enableMouse="true" toplevel="true" frameStrata="DIALOG" clampedToScreen="true">
+		<Size x="560" y="590" />
+		<Frames>
+			<!-- The default template inset is hidden at runtime, exactly like Legacy Settings. -->
+			<Frame parentKey="MainInset" mixin="BackdropTemplateMixin">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent" relativePoint="TOPLEFT" x="10" y="-30" />
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent" relativePoint="BOTTOMRIGHT" x="-10" y="46" />
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="Background" file="Interface\FrameGeneral\UI-Background-Rock" setAllPoints="true" alpha="0.78" />
+						<Texture parentKey="HeaderSurface" alpha="0.42">
+							<Size y="84" />
+							<Anchors>
+								<Anchor point="TOPLEFT" x="6" y="-6" />
+								<Anchor point="TOPRIGHT" x="-6" y="-6" />
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString parentKey="StepText" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="19" y="-15" />
+								<Anchor point="TOPRIGHT" x="-150" y="-15" />
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Subtitle" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" maxLines="3" wordwrap="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="19" y="-40" />
+								<Anchor point="TOPRIGHT" x="-19" y="-40" />
+							</Anchors>
+						</FontString>
+						<Texture parentKey="HeaderDivider" file="Interface\Buttons\WHITE8X8">
+							<Size y="1" />
+							<Anchors>
+								<Anchor point="TOPLEFT" x="17" y="-88" />
+								<Anchor point="TOPRIGHT" x="-17" y="-88" />
+							</Anchors>
+							<Color r="0.5" g="0.5" b="0.5" a="0.35" />
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						self:SetBackdrop({
+							edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+							tile = true,
+							tileSize = 16,
+							edgeSize = 6,
+							insets = { left = 1, right = 1, top = 1, bottom = 1 }
+						});
+						self:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8);
+					</OnLoad>
+				</Scripts>
+			</Frame>
+			<Frame parentKey="Content">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="17" y="-100" />
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-17" y="16" />
+				</Anchors>
+			</Frame>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				local module = BFL and BFL:GetModule("AppearanceOnboarding");
+				if module and module.OnFrameLoad then module:OnFrameLoad(self); end
+			</OnLoad>
+			<OnHide>
+				local module = BFL and BFL:GetModule("AppearanceOnboarding");
+				if module and module.OnFrameHide then module:OnFrameHide(self); end
+			</OnHide>
+		</Scripts>
+	</Frame>
+</Ui>

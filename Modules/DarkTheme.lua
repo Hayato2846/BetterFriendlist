@@ -32,6 +32,7 @@ local SETTINGS_SCROLLBAR_BUTTON_TOP_OFFSET_Y = -4
 local SETTINGS_SCROLLBAR_BUTTON_BOTTOM_OFFSET_Y = 4
 local HELP_SCROLLBAR_TOP_OFFSET_Y = 3
 local HELP_SCROLLBAR_BOTTOM_OFFSET_Y = 1
+local MODERN_BUTTON_INSETS = { left = 0, right = 0, top = 0, bottom = 0 }
 
 local function GetEngine()
 	return BFL:GetModule("SkinEngine")
@@ -68,6 +69,11 @@ local function IsShown(frame)
 		return frame:IsShown() == true
 	end
 	return true
+end
+
+local function IsModernFriendsUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() == true
 end
 
 local IsModernDropdown = BFL.IsModernDropdown
@@ -558,6 +564,20 @@ local function RestorePortraitArtwork(engine, frame)
 	if not frame then
 		return
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	if modern then
+		local avatarAlpha = GetAvatarAlpha(1)
+		SetObjectShown(engine, frame, frame.PortraitIcon, false)
+		SetObjectShown(engine, frame, frame.PortraitMask, false)
+		SetObjectShown(engine, frame, frame.PortraitButton, false)
+		local modernPortrait = FriendsUI.root and FriendsUI.root.PortraitOverlay
+		if modernPortrait then
+			modernPortrait:SetAlpha(avatarAlpha)
+			SetObjectShown(engine, modernPortrait, modernPortrait, avatarAlpha > 0)
+		end
+		return
+	end
 
 	local portraitButton = frame.PortraitButton
 	local avatarAlpha = GetAvatarAlpha(1)
@@ -674,6 +694,52 @@ end
 local function SkinDropdownField(engine, parent, key)
 	if parent and parent[key] then
 		engine:SkinDropdown(parent[key])
+	end
+end
+
+local function SetWhoColumnDropdownArrowChrome(engine, dropdown, showChrome)
+	if not (engine and dropdown) then
+		return
+	end
+
+	local name = dropdown.GetName and dropdown:GetName()
+	local arrowButton = dropdown.Button
+		or dropdown.MenuArrowButton
+		or dropdown.ArrowButton
+		or (name and _G[name .. "Button"])
+	if arrowButton then
+		if not showChrome then
+			if not arrowButton.BFL_DarkWhoArrowChromeHidden then
+				arrowButton.BFL_DarkWhoArrowChromeHidden = true
+				arrowButton.BFL_DarkWhoArrowHadNoButtonChrome = arrowButton.BFL_DarkNoButtonChrome == true
+			end
+			arrowButton.BFL_DarkNoButtonChrome = true
+			if arrowButton.BFL_DarkBackdrop then
+				arrowButton.BFL_DarkBackdrop:Hide()
+			end
+		elseif arrowButton.BFL_DarkWhoArrowChromeHidden then
+			arrowButton.BFL_DarkWhoArrowChromeHidden = nil
+			arrowButton.BFL_DarkNoButtonChrome = arrowButton.BFL_DarkWhoArrowHadNoButtonChrome and true or nil
+			arrowButton.BFL_DarkWhoArrowHadNoButtonChrome = nil
+			arrowButton.BFL_DarkButtonStateKey = nil
+			if arrowButton.BFL_DarkBackdrop and not arrowButton.BFL_DarkNoButtonChrome then
+				arrowButton.BFL_DarkBackdrop:Show()
+			end
+			engine:ApplyButtonState(arrowButton)
+		end
+	end
+
+	local indicator = dropdown.BFL_DarkDropdownIndicator
+	if not indicator then
+		return
+	end
+	if showChrome then
+		engine:SkinDropdownIndicator(dropdown)
+	elseif indicator.SetBackdrop then
+		indicator:SetBackdrop(nil)
+	end
+	if indicator.Icon then
+		indicator.Icon:Show()
 	end
 end
 
@@ -971,6 +1037,10 @@ function DarkTheme:SkinVisibleMainContent(engine, frame)
 	if not engine or not engine:IsActive() or not frame then
 		return
 	end
+	if IsModernFriendsUIActive() then
+		self:SkinModernVisibleMainContent(engine, frame)
+		return
+	end
 
 	if IsShown(frame.ScrollFrame) or IsShown(frame.MinimalScrollBar) then
 		self:SkinFriendsListRows(engine)
@@ -1001,6 +1071,10 @@ end
 function DarkTheme:SkinMainContentForTabs(engine, frame, bottomTabIndex, topTabIndex)
 	frame = frame or _G.BetterFriendsFrame
 	if not engine or not engine:IsActive() or not frame then
+		return
+	end
+	if IsModernFriendsUIActive() then
+		self:SkinModernVisibleMainContent(engine, frame)
 		return
 	end
 
@@ -1409,6 +1483,10 @@ function DarkTheme:SkinMainFrame(engine)
 	if not frame then
 		return
 	end
+	if IsModernFriendsUIActive() then
+		self:SkinModernMainFrame(engine, frame)
+		return
+	end
 
 	local staticSkinKey = GetMainFrameStaticSkinKey(frame)
 	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
@@ -1460,6 +1538,357 @@ function DarkTheme:SkinMainFrame(engine)
 	self:SkinVisibleMainContent(engine, frame)
 	RestorePortraitArtwork(engine, frame)
 	ScheduleClassicPortraitHide(engine, frame)
+end
+
+local function SkinModernScrollBar(engine, scrollBar)
+	if not (engine and scrollBar) then
+		return
+	end
+	-- Modern keeps Blizzard's compact MinimalScrollBar construction and only
+	-- darkens its native track, thumb, and steppers. This mirrors the restrained
+	-- group-header treatment and avoids the fully rebuilt Legacy dark scrollbar.
+	local layoutPoints = {}
+	if scrollBar.GetNumPoints and scrollBar.GetPoint then
+		for index = 1, scrollBar:GetNumPoints() do
+			layoutPoints[index] = { scrollBar:GetPoint(index) }
+		end
+	end
+	local layoutWidth = scrollBar.GetWidth and scrollBar:GetWidth()
+	for _, frame in ipairs({
+		scrollBar,
+		scrollBar.Track,
+		scrollBar.Track and scrollBar.Track.Thumb,
+		scrollBar.Back,
+		scrollBar.Forward,
+		scrollBar.ScrollUpButton,
+		scrollBar.ScrollDownButton,
+	}) do
+		if frame then
+			engine:RestoreFrame(frame)
+		end
+	end
+	if #layoutPoints > 0 and scrollBar.ClearAllPoints and scrollBar.SetPoint then
+		scrollBar:ClearAllPoints()
+		for _, point in ipairs(layoutPoints) do
+			scrollBar:SetPoint(unpack(point))
+		end
+	end
+	if layoutWidth and layoutWidth > 0 and scrollBar.SetWidth then
+		scrollBar:SetWidth(layoutWidth)
+	end
+	scrollBar.BFL_DarkWideScrollbar = false
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local palette, themed = FriendsUI and FriendsUI.GetModernThemeColors and FriendsUI:GetModernThemeColors()
+	if themed and palette then
+		local surface = palette.surface or { 0.05, 0.05, 0.05, 1 }
+		local thumb = palette.scrollThumb or { 0.42, 0.42, 0.44, 0.78 }
+		-- Do not mix the native atlas toward white: that kept even a black
+		-- Custom surface above 52% luminance and made the scrollbar look almost
+		-- unchanged. Preserve Blizzard's pieces, but multiply them into the same
+		-- quiet dark range as the native group-header surface.
+		local trackTone = {
+			0.28 + (surface[1] or 0) * 0.25,
+			0.28 + (surface[2] or 0) * 0.25,
+			0.28 + (surface[3] or 0) * 0.25,
+			0.78,
+		}
+		local controlTone = {
+			(thumb[1] or 0.42) * 0.78,
+			(thumb[2] or 0.42) * 0.78,
+			(thumb[3] or 0.44) * 0.78,
+			math.min(thumb[4] or 0.78, 0.82),
+		}
+		local function ToneTexture(owner, texture, tone)
+			if not (owner and texture) then
+				return
+			end
+			engine:SetTextureDesaturated(owner, texture, true)
+			engine:SetTextureVertexColor(owner, texture, tone[1], tone[2], tone[3], tone[4])
+		end
+		local track = scrollBar.Track
+		ToneTexture(track, track and track.Begin, trackTone)
+		ToneTexture(track, track and track.Middle, trackTone)
+		ToneTexture(track, track and track.End, trackTone)
+		local thumb = track and track.Thumb
+		ToneTexture(thumb, thumb and thumb.Begin, controlTone)
+		ToneTexture(thumb, thumb and thumb.Middle, controlTone)
+		ToneTexture(thumb, thumb and thumb.End, controlTone)
+		ToneTexture(scrollBar.Back, scrollBar.Back and scrollBar.Back.Texture, controlTone)
+		ToneTexture(scrollBar.Forward, scrollBar.Forward and scrollBar.Forward.Texture, controlTone)
+		ToneTexture(scrollBar.ScrollUpButton, scrollBar.ScrollUpButton and scrollBar.ScrollUpButton.Texture, controlTone)
+		ToneTexture(scrollBar.ScrollDownButton, scrollBar.ScrollDownButton and scrollBar.ScrollDownButton.Texture, controlTone)
+		scrollBar.BFL_ModernDarkToneApplied = true
+	else
+		scrollBar.BFL_ModernDarkToneApplied = nil
+	end
+end
+
+local function SkinModernButton(engine, button)
+	if not (engine and button) then
+		return
+	end
+	-- Modern controls own their exact frame height.  The shared Legacy button
+	-- skin intentionally draws one pixel inside the top and bottom edges, which
+	-- makes a 29 px Refresh/header button look shorter than the adjacent 29 px
+	-- SearchBox or dropdown.  Use the full Modern control bounds instead.
+	engine:SkinButton(button, { insets = MODERN_BUTTON_INSETS })
+	-- Retail's SharedButtonTemplate is a ThreeSlice button with Left, Center
+	-- and Right textures. The shared Legacy skinner also supports the older
+	-- Left/Middle/Right shape, but must not leave the Modern Center artwork
+	-- visible underneath its flat themed backdrop.
+	if engine.DampenNamedTextures then
+		engine:DampenNamedTextures(button, 0, { "Left", "Center", "Middle", "Right" })
+	end
+end
+
+local function SkinModernButtonField(engine, parent, key)
+	if parent and parent[key] then
+		SkinModernButton(engine, parent[key])
+	end
+end
+
+local function SkinModernScrollBoxRows(engine, scrollBox)
+	if not (engine and scrollBox and scrollBox.ForEachFrame) then
+		return
+	end
+	scrollBox:ForEachFrame(function(row)
+		if row.BFL_ModernQuickJoinCard then
+			-- Quick Join now keeps Retail's native card silhouette, tinted by
+			-- FriendsUI. A generic opaque row backdrop would cover that artwork.
+			if row.BFL_DarkBackdrop then
+				row.BFL_DarkBackdrop:Hide()
+			end
+		elseif not row.CardBackground and not row.HeaderText then
+			engine:SkinRow(row)
+		end
+	end)
+end
+
+local function SkinModernWhoListInset(engine, FriendsUI, who)
+	if not (engine and FriendsUI and who and who.ListInset) then
+		return
+	end
+	local backdrop = who.ListInset.BFL_DarkBackdrop
+	if backdrop then
+		backdrop:Hide()
+	end
+end
+
+local function SkinModernWhoSearchBuilder(engine)
+	if not engine then
+		return
+	end
+	local WhoFrame = BFL:GetModule("WhoFrame")
+	local flyout = WhoFrame and WhoFrame.builderFlyout
+	local builder = WhoFrame and WhoFrame.builder
+	if not (flyout and builder and WhoFrame:IsModernSearchBuilderEmbedded()) then
+		return
+	end
+	if WhoFrame.ApplyModernSearchBuilderStyle then
+		WhoFrame:ApplyModernSearchBuilderStyle()
+	end
+	if flyout.BFL_DarkBackdrop then
+		flyout.BFL_DarkBackdrop:Hide()
+	end
+	for _, input in ipairs({
+		builder.nameInput,
+		builder.guildInput,
+		builder.zoneInput,
+		builder.levelMin,
+		builder.levelMax,
+	}) do
+		if input then
+			engine:SkinEditBox(input)
+		end
+	end
+	for _, dropdown in ipairs(builder.dropdowns or {}) do
+		engine:SkinDropdown(dropdown)
+	end
+	SkinModernButton(engine, builder.searchBtn)
+	SkinModernButton(engine, builder.resetBtn)
+	if WhoFrame.builderCloseBtn then
+		engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+	end
+end
+
+function DarkTheme:SkinModernVisibleMainContent(engine, frame)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local palette, themed
+	if FriendsUI and FriendsUI.GetModernThemeColors then
+		palette, themed = FriendsUI:GetModernThemeColors()
+	end
+	if FriendsUI and FriendsUI.RefreshModernThemeRows then
+		FriendsUI:RefreshModernThemeRows()
+	end
+
+	if IsShown(frame.ScrollFrame) or IsShown(frame.MinimalScrollBar) then
+		self:RefreshFriendsListRows(engine)
+		SkinModernScrollBar(engine, frame.MinimalScrollBar)
+	end
+
+	local root = FriendsUI and FriendsUI.root
+	local requests = root and root.RequestsFrame
+	if requests then
+		SkinModernScrollBar(engine, requests.ScrollBar)
+	end
+
+	local recent = frame.RecentAlliesFrame
+	if IsShown(recent) then
+		SkinModernScrollBar(engine, recent.ScrollBar or recent.ClassicScrollBar)
+		SkinModernScrollBoxRows(engine, recent.ScrollBox)
+	end
+
+	local raf = frame.RecruitAFriendFrame
+	if IsShown(raf) then
+		local reward = raf.RewardClaiming
+		local recruitList = raf.RecruitList
+		if reward then
+			engine:SkinFrame(reward, "panel", { stripTextures = true, textureAlpha = 0, decorAlpha = 0 })
+			-- RewardClaimingMixin can restore the native parchment/corner textures
+			-- when its reward state changes without rebuilding the frame. Reassert
+			-- the Modern flat-surface contract on every visible-theme pass.
+			engine:DampenRegions(reward, 0)
+			engine:DampenKnownArtwork(reward, 0)
+		end
+		if recruitList and recruitList.Header then
+			engine:SkinFrame(recruitList.Header, "control", { stripTextures = true, textureAlpha = 0, decorAlpha = 0 })
+			engine:DampenRegions(recruitList.Header, 0)
+		end
+		SkinModernButtonField(engine, reward, "ClaimOrViewRewardButton")
+		SkinModernButtonField(engine, raf.SplashFrame, "OKButton")
+		-- Recruitment is owned by the main frame rather than the RAF child. Keep
+		-- it on the same reversible ThreeSlice skin path as every other Modern
+		-- action button so switching back to Blizzard restores all three slices.
+		SkinModernButtonField(engine, frame, "RecruitmentButton")
+		SkinModernScrollBar(engine, recruitList and (recruitList.ScrollBar or recruitList.ClassicScrollBar))
+		SkinModernScrollBoxRows(engine, recruitList and recruitList.ScrollBox)
+	end
+
+	local who = frame.WhoFrame
+	if IsShown(who) then
+		SkinEditBoxField(engine, who, "EditBox")
+		SkinDropdownField(engine, who, "ColumnDropdown")
+		SetWhoColumnDropdownArrowChrome(engine, who.ColumnDropdown, false)
+		if FriendsUI and FriendsUI.ApplyModernDirectoryGeometry then
+			FriendsUI:ApplyModernDirectoryGeometry("who")
+		end
+		SkinModernWhoListInset(engine, FriendsUI, who)
+		SkinModernWhoSearchBuilder(engine)
+		for _, key in ipairs({ "WhoButton", "AddFriendButton", "GroupInviteButton" }) do
+			SkinModernButtonField(engine, who, key)
+		end
+		SkinModernScrollBar(engine, who.ScrollBar or who.ClassicScrollBar)
+		SkinModernScrollBoxRows(engine, who.ScrollBox)
+	end
+
+	local raid = frame.RaidFrame
+	if IsShown(raid) then
+		local control = raid.ControlPanel
+		if raid.GroupsInset then
+			engine:SkinFrame(raid.GroupsInset, "inset", { stripTextures = true, textureAlpha = 0 })
+		end
+		SkinModernButtonField(engine, control, "RaidInfoButton")
+		SkinModernButtonField(engine, control, "ReadyCheckButton")
+		SkinRaidAssistCheckButtonField(engine, control, "EveryoneAssistCheckbox")
+		SkinModernButtonField(engine, raid, "ConvertToRaidButton")
+		SkinModernButtonField(engine, raid, "RaidToolsButton")
+	end
+
+	local quickJoin = frame.QuickJoinFrame
+	if IsShown(quickJoin) then
+		local content = quickJoin.ContentInset
+		local listSurface = content and (content.ScrollBoxContainer or content.ScrollBox)
+		for _, surface in ipairs({ content, listSurface }) do
+			if surface and surface.BFL_DarkBackdrop then
+				surface.BFL_DarkBackdrop:Hide()
+			end
+		end
+		SkinModernButtonField(engine, content, "JoinQueueButton")
+		SkinModernScrollBar(engine, content and (content.ScrollBar or content.ClassicScrollBar))
+		SkinModernScrollBoxRows(engine, content and content.ScrollBox)
+	end
+
+	local guild = frame.GuildFrame
+	if IsShown(guild) then
+		SkinEditBoxField(engine, guild, "SearchBox")
+		SkinDropdownField(engine, guild, "FilterDropdown")
+		SkinDropdownField(engine, guild, "SortDropdown")
+		for _, key in ipairs({
+			"NameHeader",
+			"RankHeader",
+			"LevelHeader",
+			"ZoneHeader",
+			"ILvlHeader",
+			"FilterAll",
+			"FilterOnline",
+			"FilterOffline",
+			"ActionsButton",
+			"InvitePlayerButton",
+		}) do
+			SkinModernButtonField(engine, guild, key)
+		end
+		SkinModernScrollBar(engine, guild.ScrollBar)
+		SkinModernScrollBoxRows(engine, guild.ScrollBox)
+	end
+
+	-- A tab can create or replace its Modern controls after the global theme
+	-- pass. Apply the palette once more after those controls have received their
+	-- reversible SkinEngine backdrops so Custom text/control colors are current
+	-- immediately on the first tab visit.
+	if FriendsUI and FriendsUI.GetModernThemeColors and FriendsUI.ApplyModernVisibleControlTheme then
+		FriendsUI:ApplyModernVisibleControlTheme(palette, themed)
+	end
+end
+
+function DarkTheme:SkinModernMainFrame(engine, frame)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local root = FriendsUI and FriendsUI.root
+	if not root then
+		return
+	end
+
+	local header = frame.FriendsTabHeader
+	local staticSkinKey = BuildSkinKey(
+		"modern",
+		frame,
+		root,
+		header and header.BattlenetFrame,
+		header and header.StatusDropdown,
+		header and header.SearchBox,
+		root.FilterBar and root.FilterBar.FilterDropdown,
+		root.FilterBar and root.FilterBar.RecentFilterDropdown,
+		root.FilterBar and root.FilterBar.SortButton,
+		root.BottomActionBar and root.BottomActionBar.AddFriendButton,
+		root.BattleNetBar and root.BattleNetBar.MenuButton,
+		root.RequestsFrame and root.RequestsFrame.ScrollBar
+	)
+	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
+		frame.BFL_DarkMainFrameStaticSkinKey = staticSkinKey
+		-- Modern Dark/Custom uses the same flat shell contract as Legacy. Strip
+		-- only the native ButtonFrame artwork; the Modern hierarchy and all
+		-- control geometry remain untouched and RestoreAll can recover Blizzard.
+		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0, decorAlpha = 0 })
+		engine:StripButtonFrameArtwork(frame, 0)
+		-- Dark/Custom deliberately leaves the overall Battle.net bar transparent;
+		-- only the status, BattleTag display, and menu control own surfaces.
+		engine:SetTextureAlpha(root.BattleNetBar, root.BattleNetBar.Background, 0)
+		if root.BattleNetBar.BFL_DarkBackdrop then
+			root.BattleNetBar.BFL_DarkBackdrop:Hide()
+		end
+		if header and header.BattlenetFrame then
+			engine:SkinFrame(header.BattlenetFrame, "control", { stripTextures = true, textureAlpha = 0, decorAlpha = 0 })
+		end
+		SkinDropdownField(engine, header, "StatusDropdown")
+		SkinEditBoxField(engine, header, "SearchBox")
+		SkinDropdownField(engine, root.FilterBar, "FilterDropdown")
+		SkinDropdownField(engine, root.FilterBar, "RecentFilterDropdown")
+		SkinDropdownField(engine, root.FilterBar, "SortButton")
+		SkinModernButtonField(engine, root.BottomActionBar, "AddFriendButton")
+		SkinModernButtonField(engine, root.BattleNetBar, "MenuButton")
+		SkinModernButtonField(engine, root.RequestsFrame and root.RequestsFrame.RealIDWarning, "ContinueButton")
+	end
+
+	self:SkinModernVisibleMainContent(engine, frame)
 end
 
 function DarkTheme:SkinFriendsListRows(engine)
@@ -1632,6 +2061,17 @@ function DarkTheme:SkinWhoFrame(engine)
 	if not who then
 		return
 	end
+	if IsModernFriendsUIActive() then
+		-- WhoFrame update/layout hooks can fire while the Modern renderer is
+		-- already refreshing its rows. Never delegate back into the complete
+		-- Modern content pass here or UpdateResponsiveLayout recurses indefinitely.
+		local listBackdrop = who.ListInset and who.ListInset.BFL_DarkBackdrop
+		if listBackdrop then
+			listBackdrop:Hide()
+		end
+		return
+	end
+	SetWhoColumnDropdownArrowChrome(engine, who.ColumnDropdown, true)
 
 	local staticSkinKey = tostring(who.ScrollBox)
 		.. ":"
@@ -1689,6 +2129,9 @@ function DarkTheme:SkinWhoFrame(engine)
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
 		local builderContainer = WhoFrame.builderDockedContainer or WhoFrame.builderContainer or _G.BetterFriendlistSearchBuilderFrame
+		local modernBuilderEmbedded = WhoFrame.IsModernSearchBuilderEmbedded
+			and WhoFrame:IsModernSearchBuilderEmbedded()
+			or false
 		local builderSkinKey = tostring(WhoFrame.builderToggle)
 			.. ":"
 			.. tostring(WhoFrame.builderDockBtn)
@@ -1700,6 +2143,8 @@ function DarkTheme:SkinWhoFrame(engine)
 			.. tostring(builderContainer)
 			.. ":"
 			.. tostring(WhoFrame.builderCloseBtn)
+			.. ":"
+			.. tostring(modernBuilderEmbedded)
 			.. ":"
 			.. tostring(_G.BetterFriendlistSearchBuilderFrame)
 		if who.BFL_DarkWhoBuilderSkinKey ~= builderSkinKey then
@@ -1713,7 +2158,9 @@ function DarkTheme:SkinWhoFrame(engine)
 				engine:RestoreFrame(WhoFrame.builderDockBtn)
 			end
 			if WhoFrame.builderFlyout then
-				if WhoFrame.builderDocked then
+				if modernBuilderEmbedded then
+					engine:RestoreFrame(WhoFrame.builderFlyout)
+				elseif WhoFrame.builderDocked then
 					HideFrameChrome(engine, WhoFrame.builderFlyout)
 				else
 					engine:SkinFrame(WhoFrame.builderFlyout, "popup", { stripTextures = true, textureAlpha = 0 })
@@ -1722,6 +2169,9 @@ function DarkTheme:SkinWhoFrame(engine)
 				if WhoFrame.builderCloseBtn then
 					WhoFrame.builderCloseBtn.BFL_DarkNoButtonChrome = nil
 					engine:SkinCloseButton(WhoFrame.builderCloseBtn)
+				end
+				if modernBuilderEmbedded and WhoFrame.ApplyModernSearchBuilderStyle then
+					WhoFrame:ApplyModernSearchBuilderStyle()
 				end
 			end
 
@@ -1761,6 +2211,7 @@ function DarkTheme:SkinRaidFrame(engine)
 	end
 
 	local control = raid.ControlPanel
+	local modernRaidLayout = BFL.FriendsUI and BFL.FriendsUI:IsModernActive()
 	local staticSkinKey = BuildSkinKey(
 		raid,
 		control,
@@ -1770,7 +2221,8 @@ function DarkTheme:SkinRaidFrame(engine)
 		raid.GroupsInset,
 		raid.ConvertToRaidButton,
 		raid.RaidToolsButton,
-		control and control.CombatIcon
+		control and control.CombatIcon,
+		modernRaidLayout
 	)
 	if raid.BFL_DarkRaidSkinKey == staticSkinKey then
 		for _, button in ipairs({
@@ -1792,18 +2244,32 @@ function DarkTheme:SkinRaidFrame(engine)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
 	SkinButtonField(engine, raid.ControlPanel, "RaidInfoButton")
-	SkinIconButtonField(engine, control, "ReadyCheckButton", {
-		texture = control and control.ReadyCheckButton and control.ReadyCheckButton.Icon,
-		size = 14,
-	})
-	SkinField(engine, raid, "GroupsInset", "inset")
+	if modernRaidLayout then
+		-- Modern uses the same ThreeSlice/regular-button surface as Raid Info;
+		-- the centered action glyph remains an overlay inside that surface.
+		SkinButtonField(engine, control, "ReadyCheckButton")
+	else
+		SkinIconButtonField(engine, control, "ReadyCheckButton", {
+			texture = control and control.ReadyCheckButton and control.ReadyCheckButton.Icon,
+			size = 14,
+		})
+	end
+	if modernRaidLayout then
+		HideFieldChrome(engine, raid, "GroupsInset")
+	else
+		SkinField(engine, raid, "GroupsInset", "inset")
+	end
 	SkinButtonField(engine, raid, "ConvertToRaidButton")
 	SkinButtonField(engine, raid, "RaidToolsButton")
 	SkinButtonField(engine, raid.ControlPanel, "CombatIcon")
 	engine:SkinTree(raid, 5)
 	HideFrameChrome(engine, raid)
 	HideFieldChrome(engine, raid, "ControlPanel")
-	SkinField(engine, raid, "GroupsInset", "inset")
+	if modernRaidLayout then
+		HideFieldChrome(engine, raid, "GroupsInset")
+	else
+		SkinField(engine, raid, "GroupsInset", "inset")
+	end
 	SkinRaidAssistCheckButtonField(engine, raid.ControlPanel, "EveryoneAssistCheckbox")
 	RestoreClassicRaidRoleIcons(engine, raid)
 end
@@ -2311,7 +2777,6 @@ function DarkTheme:InstallHooks()
 
 	for _, methodName in ipairs({
 		"UpdateMemberButton",
-		"UpdateMemberButtonVisuals",
 		"UpdateMemberButtons",
 		"UpdateRoleSummary",
 	}) do
@@ -2419,6 +2884,7 @@ function DarkTheme:InstallHooks()
 	for _, methodName in ipairs({
 		"RefreshThemeTab",
 		"RefreshGeneralTab",
+		"RefreshFriendTabsTab",
 		"RefreshFontsTab",
 		"RefreshGroupsTab",
 		"RefreshAdvancedTab",

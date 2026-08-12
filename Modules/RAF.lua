@@ -26,6 +26,7 @@ end
 
 -- Local constants for RAF display
 local RECRUIT_HEIGHT = 34
+local MODERN_RECRUIT_HEIGHT = 70
 local DIVIDER_HEIGHT = 16
 
 -- RAF state variables (module-level)
@@ -34,6 +35,19 @@ local maxRecruitMonths = 0
 local maxRecruitLinkUses = 0
 local daysInCycle = 0
 local latestRAFVersion = 0
+
+local function IsModernSocialUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
+local function GetRecruitHeight()
+	return IsModernSocialUIActive() and MODERN_RECRUIT_HEIGHT or RECRUIT_HEIGHT
+end
+
+local function GetEnumValue(enumTable, key, fallback)
+	return enumTable and enumTable[key] or fallback
+end
 
 --------------------------------------------------------------------------
 -- RAFUtil-compatible helpers (uses Blizzard RAFUtil when available)
@@ -122,8 +136,30 @@ local function CallBlizzardMethod(owner, method, ...)
 	return CallBlizzardFunction(method, owner, ...)
 end
 
+local function GetNativeRecruitAFriendFrame()
+	-- Retail 12.1 can keep both RAF views alive. Match Blizzard's active-frame
+	-- selection instead of assuming that the presence of SocialUIFrame wins.
+	local socialFrame = SocialUIFrame and SocialUIFrame.RecruitAFriendFrame
+	if socialFrame then
+		if C_SocialUI and C_SocialUI.IsSystemEnabled then
+			local ok, enabled = pcall(CallBlizzardFunction, C_SocialUI.IsSystemEnabled)
+			if ok and enabled == true then
+				return socialFrame
+			end
+		else
+			-- Older Retail builds expose only one effective RAF frame.
+			return socialFrame
+		end
+	end
+	return RecruitAFriendFrame
+end
+
+function RAF:GetNativeRecruitAFriendFrame()
+	return GetNativeRecruitAFriendFrame()
+end
+
 local function LoadBlizzardRecruitAFriend()
-	if RecruitAFriendFrame and RecruitAFriendRewardsFrame and RecruitAFriendRecruitmentFrame then
+	if RecruitAFriendRewardsFrame and RecruitAFriendRecruitmentFrame then
 		return true
 	end
 
@@ -132,7 +168,41 @@ local function LoadBlizzardRecruitAFriend()
 		pcall(CallBlizzardFunction, loadAddOn, "Blizzard_RecruitAFriend")
 	end
 
-	return RecruitAFriendFrame and RecruitAFriendRewardsFrame and RecruitAFriendRecruitmentFrame
+	-- RecruitAFriendFrame is no longer a stable global on Retail 12.1. The
+	-- rewards and recruitment dialogs remain the actual dependencies BFL uses.
+	return RecruitAFriendRewardsFrame ~= nil and RecruitAFriendRecruitmentFrame ~= nil
+end
+
+local function GetNativeRecruitmentButton()
+	local nativeFrame = GetNativeRecruitAFriendFrame()
+	if not nativeFrame then
+		return nil
+	end
+	if nativeFrame.GetRecruitmentButton then
+		local ok, button = pcall(CallBlizzardMethod, nativeFrame, nativeFrame.GetRecruitmentButton)
+		if ok and button then
+			return button
+		end
+	end
+	return nativeFrame.RecruitmentButton or nativeFrame.ActionButton
+end
+
+local function GetNativeRAFInfo()
+	if C_RecruitAFriend and C_RecruitAFriend.GetRAFInfo then
+		local ok, rafInfo = pcall(CallBlizzardFunction, C_RecruitAFriend.GetRAFInfo)
+		if ok and rafInfo then
+			return rafInfo
+		end
+	end
+
+	local nativeFrame = GetNativeRecruitAFriendFrame()
+	if nativeFrame and nativeFrame.GetRAFInfo then
+		local ok, rafInfo = pcall(CallBlizzardMethod, nativeFrame, nativeFrame.GetRAFInfo)
+		if ok then
+			return rafInfo
+		end
+	end
+	return nativeFrame and nativeFrame.rafInfo
 end
 
 local function ClickNativeRAFButton(button, fallbackMixin)
@@ -152,6 +222,10 @@ end
 local nativeRewardsState = {
 	rafInfo = nil,
 	selectedRAFVersion = nil,
+	previewProxy = nil,
+	originalGetRecruitAFriendFrame = nil,
+	fullRefreshHookInstalled = false,
+	hideHookInstalled = false,
 }
 local nativeRewardTabHooks = setmetatable({}, { __mode = "k" })
 local SelectNativeRewardVersion
@@ -177,6 +251,44 @@ end
 
 local function IsNativeLegacyRewardVersion(rafInfo, rafVersion)
 	return rafVersion ~= GetNativeLatestRewardVersion(rafInfo)
+end
+
+local function EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+	if not (rewardsFrame and rafInfo and rafInfo._isMock) then
+		return false
+	end
+	local claimButton = rewardsFrame.ClaimLegacyRewardsButton
+	if claimButton then
+		if claimButton.SetAutoClaimRewardsEnabled then
+			CallBlizzardMethod(claimButton, claimButton.SetAutoClaimRewardsEnabled, false)
+		end
+		if claimButton.SetEnabled then
+			claimButton:SetEnabled(false)
+		end
+		if claimButton.Hide then
+			claimButton:Hide()
+		end
+	end
+	return true
+end
+
+function RAF:EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+	return EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+end
+
+local function CanUseNativeRewardsFullRefresh(rewardsFrame, rafInfo)
+	if not (rewardsFrame and rewardsFrame.FullRefresh) then
+		return false
+	end
+	if rafInfo and rafInfo._isMock then
+		return nativeRewardsState.previewProxy ~= nil
+	end
+	local nativeFrame = GetNativeRecruitAFriendFrame()
+	if not (nativeFrame and nativeFrame.GetSelectedRAFVersionInfo) then
+		return false
+	end
+	local ok, selectedInfo = pcall(CallBlizzardMethod, nativeFrame, nativeFrame.GetSelectedRAFVersionInfo)
+	return ok and selectedInfo ~= nil
 end
 
 local function RefreshNativeRewardTabs()
@@ -256,14 +368,20 @@ local function UpdateNativeRewardsList(rewardsFrame, rewards)
 		elseif index == rightColumnStartIndex then
 			rewardFrame:SetPoint("TOPLEFT", rewardsFrame.Background, "TOPLEFT", 209, -98)
 		elseif index == finalRewardIndex then
-			rewardFrame:SetPoint("BOTTOM", rewardsFrame.Background, "BOTTOM", 0, 44)
+			rewardFrame:SetPoint("BOTTOM", rewardsFrame.Background, "BOTTOM", -60, 44)
 		else
 			rewardFrame:SetPoint("TOPLEFT", lastRewardFrame, "BOTTOMLEFT", 0, -9)
 		end
 
 		local tooltipRightAligned = index >= rightColumnStartIndex and index < finalRewardIndex
 		if rewardFrame.Setup then
-			CallBlizzardMethod(rewardFrame, rewardFrame.Setup, rewardInfo, tooltipRightAligned)
+			CallBlizzardMethod(
+				rewardFrame,
+				rewardFrame.Setup,
+				rewardInfo,
+				tooltipRightAligned,
+				index == finalRewardIndex
+			)
 		end
 
 		lastRewardFrame = rewardFrame
@@ -283,18 +401,36 @@ local function RefreshNativeRewardsFrame()
 		CloseSideDressUpFrame(rewardsFrame)
 	end
 
+	if rewardsFrame.SetUpTabs then
+		CallBlizzardMethod(rewardsFrame, rewardsFrame.SetUpTabs, rafInfo)
+	end
+	if CanUseNativeRewardsFullRefresh(rewardsFrame, rafInfo) then
+		local ok = pcall(CallBlizzardMethod, rewardsFrame, rewardsFrame.FullRefresh)
+		if ok then
+			EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+			return true
+		end
+	end
+
+	-- Older clients and hidden native frames without a selected version retain
+	-- the pre-12.1 manual renderer as a compatibility fallback.
 	UpdateNativeRewardsBackground(rewardsFrame, selectedRAFVersion)
 
 	if rewardsFrame.Description then
 		local description = IsNativeLegacyRewardVersion(rafInfo, selectedRAFVersion)
 			and RAF_LEGACY_REWARDS_DESC
 			or RAF_REWARDS_DESC
-		rewardsFrame.Description:SetText(description or "")
+		local descriptionText = rewardsFrame.Description.Text or rewardsFrame.Description
+		if descriptionText.SetText then
+			descriptionText:SetText(description or "")
+		end
 	end
 
 	UpdateNativeRewardsList(rewardsFrame, selectedVersionInfo.rewards)
 
-	if rewardsFrame.ClaimLegacyRewardsButton and rewardsFrame.ClaimLegacyRewardsButton.Update then
+	if rafInfo._isMock and rewardsFrame.ClaimLegacyRewardsButton then
+		EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
+	elseif rewardsFrame.ClaimLegacyRewardsButton and rewardsFrame.ClaimLegacyRewardsButton.Update then
 		CallBlizzardMethod(
 			rewardsFrame.ClaimLegacyRewardsButton,
 			rewardsFrame.ClaimLegacyRewardsButton.Update,
@@ -352,7 +488,14 @@ local function HookNativeRewardTabs()
 		if not nativeRewardTabHooks[rewardTab] then
 			rewardTab:HookScript("OnClick", function(tab)
 				if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame:IsShown() and IsBetterFriendlistRewardsContext() then
-					SelectNativeRewardVersion(tab.rafVersion)
+					local nativeRefreshOwnsSelection = RecruitAFriendRewardsFrame.FullRefresh
+						and RecruitAFriendRewardsFrame.RefreshTabs
+						and not (nativeRewardsState.rafInfo and nativeRewardsState.rafInfo._isMock)
+					if nativeRefreshOwnsSelection then
+						nativeRewardsState.selectedRAFVersion = tab.rafVersion
+					else
+						SelectNativeRewardVersion(tab.rafVersion)
+					end
 				end
 			end)
 			nativeRewardTabHooks[rewardTab] = true
@@ -362,14 +505,97 @@ local function HookNativeRewardTabs()
 	return true
 end
 
-local function PrepareNativeRewardsFrame(resetToLatest)
-	if not LoadBlizzardRecruitAFriend() or not C_RecruitAFriend or not RecruitAFriendRewardsFrame then
+local function RestoreNativeRewardsFrameOwner()
+	local rewardsFrame = RecruitAFriendRewardsFrame
+	if rewardsFrame and nativeRewardsState.originalGetRecruitAFriendFrame then
+		rewardsFrame.GetRecruitAFriendFrame = nativeRewardsState.originalGetRecruitAFriendFrame
+	end
+	nativeRewardsState.previewProxy = nil
+end
+
+local function IsPreviewRewardsOwner(rewardsFrame)
+	local proxy = nativeRewardsState.previewProxy
+	if not (proxy and rewardsFrame and rewardsFrame.GetRecruitAFriendFrame) then
+		return false
+	end
+	local ok, owner = pcall(CallBlizzardMethod, rewardsFrame, rewardsFrame.GetRecruitAFriendFrame)
+	return ok and owner == proxy
+end
+
+local function InstallNativeRewardsLifecycleHooks(rewardsFrame)
+	if not rewardsFrame then
+		return
+	end
+	if not nativeRewardsState.fullRefreshHookInstalled and hooksecurefunc and rewardsFrame.FullRefresh then
+		local ok = pcall(hooksecurefunc, rewardsFrame, "FullRefresh", function()
+			if IsPreviewRewardsOwner(rewardsFrame) then
+				EnforcePreviewRewardsSafety(rewardsFrame, nativeRewardsState.rafInfo)
+			end
+		end)
+		nativeRewardsState.fullRefreshHookInstalled = ok == true
+	end
+	if not nativeRewardsState.hideHookInstalled and rewardsFrame.HookScript then
+		rewardsFrame:HookScript("OnHide", function()
+			if IsPreviewRewardsOwner(rewardsFrame) then
+				RestoreNativeRewardsFrameOwner()
+			end
+		end)
+		nativeRewardsState.hideHookInstalled = true
+	end
+end
+
+local function PrepareRewardsFrameForInfo(rafInfo, resetToLatest, preview)
+	if not LoadBlizzardRecruitAFriend() or not RecruitAFriendRewardsFrame then
 		return false
 	end
 
-	local rafInfo = C_RecruitAFriend.GetRAFInfo and C_RecruitAFriend.GetRAFInfo() or RecruitAFriendFrame and RecruitAFriendFrame.rafInfo
 	if not rafInfo or not rafInfo.versions or #rafInfo.versions == 0 then
 		return false
+	end
+
+	local rewardsFrame = RecruitAFriendRewardsFrame
+	if not nativeRewardsState.originalGetRecruitAFriendFrame then
+		nativeRewardsState.originalGetRecruitAFriendFrame = rewardsFrame.GetRecruitAFriendFrame
+	end
+	InstallNativeRewardsLifecycleHooks(rewardsFrame)
+
+	if preview then
+		local proxy = nativeRewardsState.previewProxy or {}
+		nativeRewardsState.previewProxy = proxy
+		function proxy:GetSelectedRAFVersion()
+			return nativeRewardsState.selectedRAFVersion
+		end
+		function proxy:GetLatestRAFVersion()
+			return GetNativeLatestRewardVersion(nativeRewardsState.rafInfo)
+		end
+		function proxy:GetSelectedRAFVersionInfo()
+			return GetNativeRewardVersionInfo(nativeRewardsState.rafInfo, nativeRewardsState.selectedRAFVersion)
+		end
+		function proxy:GetRAFVersionInfo(rafVersion)
+			return GetNativeRewardVersionInfo(nativeRewardsState.rafInfo, rafVersion)
+		end
+		function proxy:GetRAFInfo()
+			return nativeRewardsState.rafInfo
+		end
+		function proxy:IsLegacyRAFVersion(rafVersion)
+			return IsNativeLegacyRewardVersion(nativeRewardsState.rafInfo, rafVersion)
+		end
+		function proxy:GetRecruitAFriendRewardsFrame()
+			return RecruitAFriendRewardsFrame
+		end
+		function proxy:AreAnyRewardsAffordable()
+			local selectedInfo = self:GetSelectedRAFVersionInfo()
+			return selectedInfo and (selectedInfo.numAffordableRewards or 0) > 0 or false
+		end
+		function proxy:TriggerEvent()
+			-- Preview data is local; no native RAF event may escape into the live service.
+		end
+		proxy.claimInProgress = false
+		rewardsFrame.GetRecruitAFriendFrame = function()
+			return proxy
+		end
+	else
+		RestoreNativeRewardsFrameOwner()
 	end
 
 	nativeRewardsState.rafInfo = rafInfo
@@ -380,6 +606,17 @@ local function PrepareNativeRewardsFrame(resetToLatest)
 	local refreshed = RefreshNativeRewardsFrame()
 	HookNativeRewardTabs()
 	return refreshed
+end
+
+local function PrepareNativeRewardsFrame(resetToLatest)
+	if not C_RecruitAFriend then
+		return false
+	end
+	return PrepareRewardsFrameForInfo(GetNativeRAFInfo(), resetToLatest, false)
+end
+
+local function PreparePreviewRewardsFrame(rafInfo, resetToLatest)
+	return PrepareRewardsFrameForInfo(rafInfo, resetToLatest, true)
 end
 
 local function GetNextRewardDisplayName(nextReward, fallback)
@@ -487,6 +724,8 @@ local function CopyRecruitActivity(activityInfo)
 		activityID = SafeNumber(activityInfo.activityID, 0) or 0,
 		rewardQuestID = SafeNumber(activityInfo.rewardQuestID, 0) or 0,
 		state = SafeNumber(activityInfo.state, 0) or 0,
+		_isMock = activityInfo._isMock == true,
+		previewName = SafeString(activityInfo.previewName, nil),
 	}
 end
 
@@ -513,8 +752,14 @@ local function CreateRecruitDisplayRecord(recruitInfo)
 
 	local battleTag = SafeString(recruitInfo.battleTag, "") or ""
 	local nameText = SafeBattleTagName(battleTag)
+	local isMock = recruitInfo._isMock == true
+	if isMock then
+		nameText = SafeString(recruitInfo.nameText, nameText)
+	end
+	local isOnline = isMock and SafeBool(recruitInfo.isOnline, false) or false
 
 	return {
+		_isMock = isMock,
 		bnetAccountID = SafeNumber(recruitInfo.bnetAccountID, 0) or 0,
 		wowAccountGUID = SafeString(recruitInfo.wowAccountGUID, "") or "",
 		battleTag = battleTag,
@@ -523,51 +768,566 @@ local function CreateRecruitDisplayRecord(recruitInfo)
 		acceptanceID = SafeNumber(recruitInfo.acceptanceID, 0) or 0,
 		versionRecruited = SafeNumber(recruitInfo.versionRecruited, 0) or 0,
 		activities = CopyRecruitActivities(recruitInfo.activities),
-		isOnline = false,
+		isOnline = isOnline,
 		nameText = nameText,
-		plainName = nameText,
-		nameColor = FRIENDS_GRAY_COLOR,
-		lastOnlineText = L.RAF_OFFLINE,
-		contextGuid = nil,
+		plainName = isMock and SafeString(recruitInfo.plainName, nameText) or nameText,
+		nameColor = isOnline and FRIENDS_BNET_NAME_COLOR or FRIENDS_GRAY_COLOR,
+		lastOnlineText = isMock and SafeString(recruitInfo.lastOnlineText, L.RAF_OFFLINE) or L.RAF_OFFLINE,
+		characterName = isMock and SafeString(recruitInfo.characterName, nil) or nil,
+		contextGuid = isMock and SafeString(recruitInfo.contextGuid, nil) or nil,
 	}
 end
 
 -- Current search text for filtering
 RAF.searchText = ""
 
+function RAF:IsPreviewActive()
+	if self.previewEnabled then
+		return true
+	end
+	return BFL.IsRAFPreviewActive and BFL:IsRAFPreviewActive() or false
+end
+
+function RAF:BuildPreviewData()
+	local activityStates = Enum and Enum.RafRecruitActivityState
+	local recruitStatuses = Enum and Enum.RafRecruitSubStatus
+	local rewardTypes = Enum and Enum.RafRewardType
+	local rewardVersions = Enum and Enum.RecruitAFriendRewardsVersion
+	local incomplete = GetEnumValue(activityStates, "Incomplete", 0)
+	local complete = GetEnumValue(activityStates, "Complete", 1)
+	local claimed = GetEnumValue(activityStates, "RewardClaimed", 2)
+	local trial = GetEnumValue(recruitStatuses, "Trial", 0)
+	local active = GetEnumValue(recruitStatuses, "Active", 1)
+	local inactive = GetEnumValue(recruitStatuses, "Inactive", 2)
+	local gameTime = GetEnumValue(rewardTypes, "GameTime", 4)
+	local versionThree = GetEnumValue(rewardVersions, "VersionThree", 3)
+	local activityName = QUEST_REWARDS or RAF_NEXT_REWARD or L.RAF_NEXT_REWARD
+
+	local function Activity(activityID, state)
+		return {
+			_isMock = true,
+			activityID = activityID,
+			rewardQuestID = 0,
+			state = state,
+			previewName = activityName,
+		}
+	end
+
+	local recruits = {
+		{
+			_isMock = true,
+			bnetAccountID = 910001,
+			wowAccountGUID = "Player-Preview-RAF-1",
+			battleTag = "Anduin#1234",
+			nameText = "Anduin",
+			plainName = "Anduin",
+			characterName = "Anduin",
+			isOnline = true,
+			monthsRemaining = 9,
+			subStatus = active,
+			acceptanceID = 810001,
+			versionRecruited = versionThree,
+			activities = {
+				Activity(710001, incomplete),
+				Activity(710002, complete),
+				Activity(710003, claimed),
+			},
+		},
+		{
+			_isMock = true,
+			bnetAccountID = 910002,
+			wowAccountGUID = "Player-Preview-RAF-2",
+			battleTag = "Jaina#5678",
+			nameText = "Jaina",
+			plainName = "Jaina",
+			characterName = "Jaina",
+			isOnline = true,
+			monthsRemaining = 11,
+			subStatus = trial,
+			acceptanceID = 810002,
+			versionRecruited = versionThree,
+			activities = {
+				Activity(710004, incomplete),
+				Activity(710005, complete),
+			},
+		},
+		{
+			_isMock = true,
+			bnetAccountID = 910003,
+			wowAccountGUID = "Player-Preview-RAF-3",
+			battleTag = "Thrall#9012",
+			nameText = "Thrall",
+			plainName = "Thrall",
+			characterName = "Thrall",
+			isOnline = false,
+			lastOnlineText = FRIENDS_LIST_OFFLINE or L.RAF_OFFLINE,
+			monthsRemaining = 4,
+			subStatus = active,
+			acceptanceID = 810003,
+			versionRecruited = versionThree,
+			activities = {
+				Activity(710006, claimed),
+			},
+		},
+		{
+			_isMock = true,
+			bnetAccountID = 910004,
+			wowAccountGUID = "Player-Preview-RAF-4",
+			battleTag = "Sylvanas#3456",
+			nameText = "Sylvanas",
+			plainName = "Sylvanas",
+			characterName = "Sylvanas",
+			isOnline = false,
+			lastOnlineText = FRIENDS_LIST_OFFLINE or L.RAF_OFFLINE,
+			monthsRemaining = 0,
+			subStatus = inactive,
+			acceptanceID = 810004,
+			versionRecruited = versionThree,
+			activities = {},
+		},
+	}
+
+	local function Reward(rewardID, iconID, monthsRequired, claimed, canClaim, canAfford, repeatable)
+		return {
+			_isMock = true,
+			rewardID = rewardID,
+			rafVersion = versionThree,
+			itemID = 0,
+			rewardType = gameTime,
+			canClaim = canClaim or false,
+			claimed = claimed or false,
+			canAfford = canAfford or false,
+			repeatable = repeatable or false,
+			repeatableClaimCount = 1,
+			monthsRequired = monthsRequired,
+			monthCost = repeatable and 3 or 1,
+			availableInMonths = canClaim and 0 or math.max(monthsRequired - 8, 0),
+			iconID = iconID,
+		}
+	end
+
+	-- Keep an odd-sized reward track like Blizzard's real RAF data. This
+	-- exercises both reward columns and the final centered reward in Preview.
+	local rewards = {
+		Reward(1, 134400, 1, true, false, false, false),
+		Reward(2, 236330, 2, true, false, false, false),
+		Reward(3, 133784, 3, true, false, false, false),
+		Reward(4, 132599, 6, false, true, true, false),
+		Reward(5, 133743, 9, false, false, false, false),
+		Reward(6, 132261, 12, false, false, false, false),
+		Reward(7, 134400, 15, false, false, false, true),
+	}
+	local nextReward = rewards[4]
+
+	return {
+		maxRecruits = 10,
+		maxRecruitMonths = 12,
+		maxRecruitmentUses = 4,
+		daysInCycle = 30,
+	}, {
+		_isMock = true,
+		claimInProgress = false,
+		recruits = recruits,
+		versions = {
+			{
+				rafVersion = versionThree,
+				monthCount = {
+					lifetimeMonths = 8,
+					spentMonths = 5,
+					availableMonths = 3,
+				},
+				rewards = rewards,
+				nextReward = nextReward,
+				numAffordableRewards = 1,
+				numRecruits = #recruits,
+			},
+		},
+	}
+end
+
+function RAF:ApplyPreviewData(frame)
+	if not frame or not self:IsPreviewActive() then
+		return false
+	end
+	if not self.previewSystemInfo or not self.previewRAFInfo then
+		self.previewSystemInfo, self.previewRAFInfo = self:BuildPreviewData()
+	end
+
+	frame.previewRAF = true
+	frame.rafEnabled = true
+	frame.rafRecruitingEnabled = false
+	self:UpdateSystemInfo(self.previewSystemInfo)
+	self:UpdateRAFInfo(frame, self.previewRAFInfo)
+
+	local recruitmentButton = BetterFriendsFrame and BetterFriendsFrame.RecruitmentButton
+	if recruitmentButton then
+		recruitmentButton:SetEnabled(false)
+	end
+	return true
+end
+
+function RAF:EnablePreview(frame)
+	if BFL.IsClassic or not frame then
+		return false
+	end
+	if not self.previewFrameState then
+		local tab = BetterFriendsFrame
+			and BetterFriendsFrame.FriendsTabHeader
+			and BetterFriendsFrame.FriendsTabHeader.Tab3
+		local recruitmentButton = BetterFriendsFrame and BetterFriendsFrame.RecruitmentButton
+		self.previewFrameState = {
+			tabShown = tab and tab:IsShown() or false,
+			recruitmentButtonShown = recruitmentButton and recruitmentButton:IsShown() or false,
+			recruitmentButtonEnabled = recruitmentButton and recruitmentButton:IsEnabled() or false,
+		}
+	end
+
+	self.previewEnabled = true
+	self.previewSystemInfo, self.previewRAFInfo = self:BuildPreviewData()
+
+	local tab = BetterFriendsFrame
+		and BetterFriendsFrame.FriendsTabHeader
+		and BetterFriendsFrame.FriendsTabHeader.Tab3
+	if tab then
+		tab:Show()
+	end
+	self:OnLoad(frame)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI then
+		if FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+			FriendsUI:RefreshNavigation()
+		elseif FriendsUI.RestoreLegacyTabs then
+			FriendsUI:RestoreLegacyTabs(false)
+		end
+	end
+	return frame.previewRAF == true
+end
+
+function RAF:DisablePreview(frame)
+	local state = self.previewFrameState
+	self.previewEnabled = false
+	self.previewSystemInfo = nil
+	self.previewRAFInfo = nil
+
+	if frame then
+		frame.previewRAF = nil
+		frame.rafInfo = nil
+		frame:UnregisterAllEvents()
+		if frame.RecruitList and frame.RecruitList.ScrollBox and CreateDataProvider then
+			frame.RecruitList.ScrollBox:SetDataProvider(
+				CreateDataProvider(),
+				ScrollBoxConstants and ScrollBoxConstants.DiscardScrollPosition
+			)
+		end
+	end
+
+	local tab = BetterFriendsFrame
+		and BetterFriendsFrame.FriendsTabHeader
+		and BetterFriendsFrame.FriendsTabHeader.Tab3
+	if tab and state then
+		tab:SetShown(state.tabShown)
+	end
+	local recruitmentButton = BetterFriendsFrame and BetterFriendsFrame.RecruitmentButton
+	if recruitmentButton and state then
+		recruitmentButton:SetEnabled(state.recruitmentButtonEnabled)
+		recruitmentButton:SetShown(state.recruitmentButtonShown)
+	end
+	self.previewFrameState = nil
+
+	local nativeAvailable = BFL.HasRAF and C_RecruitAFriend
+	if frame and nativeAvailable then
+		self:OnLoad(frame)
+	elseif frame then
+		frame.rafEnabled = false
+		frame.rafRecruitingEnabled = false
+		frame:Hide()
+	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI then
+		if FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+			FriendsUI:RefreshNavigation()
+		elseif FriendsUI.RestoreLegacyTabs then
+			FriendsUI:RestoreLegacyTabs(false)
+		end
+	end
+end
+
 --------------------------------------------------------------------------
 -- RAF Frame Initialization and Event Handling
 --------------------------------------------------------------------------
 
-function RAF:OnLoad(frame)
-	-- Classic Guard: RAF is Retail-only
-	if BFL.IsClassic or not BFL.HasRAF then
-		-- BFL:DebugPrint("|cffffcc00BFL RAF:|r Not available in Classic - module disabled")
-		if frame then
-			frame:Hide()
+local function EnsureModernActionButton(owner, key, parent, width, onClick, template, maxWidth)
+	local legacyKey = "bflLegacy" .. key
+	local modernKey = "bflModern" .. key
+	if not owner[legacyKey] then
+		owner[legacyKey] = owner[key]
+	end
+
+	local modernButton = owner[modernKey]
+	if not modernButton then
+		local ok, created = pcall(
+			CreateFrame,
+			"Button",
+			nil,
+			parent,
+			template or "SocialUIActionButtonTemplate"
+		)
+		if not ok or not created then
+			return owner[key]
+		end
+		modernButton = created
+		modernButton:SetScript("OnClick", onClick)
+		owner[modernKey] = modernButton
+	end
+
+	-- SocialUIActionButtonTemplate is only the 70 px base template. Blizzard's
+	-- actual Social UI action button overrides these values in XML before its
+	-- UserScaledButtonFitToTextMixin registers with TextSizeManager. BFL creates
+	-- the proxy dynamically, so SetText() otherwise recalculates it back to the
+	-- 70 px base after our SetSize(), collapsing the disabled three-slice art.
+	modernButton.baseWidth = width
+	modernButton.maxWidth = maxWidth or modernButton.maxWidth
+	modernButton:SetSize(width, 30)
+	if modernButton.UpdateWidth then
+		modernButton:UpdateWidth()
+	end
+
+	local previous = owner[key]
+	local wasShown = previous and previous:IsShown()
+	local wasEnabled = previous and previous:IsEnabled()
+	if owner[legacyKey] then
+		owner[legacyKey]:Hide()
+	end
+	owner[key] = modernButton
+	modernButton:SetEnabled(wasEnabled ~= false)
+	modernButton:SetShown(wasShown ~= false)
+	return modernButton
+end
+
+local function RestoreLegacyActionButton(owner, key)
+	local legacyButton = owner["bflLegacy" .. key]
+	local modernButton = owner["bflModern" .. key]
+	if not legacyButton then
+		return owner[key]
+	end
+	local wasShown = modernButton and modernButton:IsShown()
+	local wasEnabled = modernButton and modernButton:IsEnabled()
+	if modernButton then
+		modernButton:Hide()
+	end
+	owner[key] = legacyButton
+	legacyButton:SetEnabled(wasEnabled ~= false)
+	legacyButton:SetShown(wasShown ~= false)
+	return legacyButton
+end
+
+function RAF:ApplyFrameStyle(frame)
+	local rewardPanel = frame and frame.RewardClaiming
+	if not rewardPanel then
+		return
+	end
+
+	-- RecruitAFriendFrame is temporarily reparented under the Modern content
+	-- hierarchy. Its action button, however, always belongs to the actual BFL
+	-- window; using GetParent() here leaked the Modern replacement into Legacy.
+	local mainFrame = BetterFriendsFrame or frame:GetParent()
+	if not IsModernSocialUIActive() then
+		local claimButton = RestoreLegacyActionButton(rewardPanel, "ClaimOrViewRewardButton")
+		local recruitmentButton = mainFrame and RestoreLegacyActionButton(mainFrame, "RecruitmentButton")
+
+		rewardPanel:SetHeight(100)
+		rewardPanel:ClearAllPoints()
+		rewardPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
+		rewardPanel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+		rewardPanel.Background:ClearAllPoints()
+		rewardPanel.Background:SetPoint("TOPLEFT", 0, -3)
+		rewardPanel.Background:SetPoint("BOTTOMRIGHT", 0, 3)
+		BFL.SetTextureOrAtlas(rewardPanel.Background, "RecruitAFriend_ClaimPane_Parchment")
+		for _, key in ipairs({
+			"Bracket_TopLeft",
+			"Bracket_TopRight",
+			"Bracket_BottomRight",
+			"Bracket_BottomLeft",
+		}) do
+			if rewardPanel[key] then
+				rewardPanel[key]:Show()
+			end
+		end
+		if rewardPanel.Watermark then
+			rewardPanel.Watermark:ClearAllPoints()
+			rewardPanel.Watermark:SetPoint("RIGHT", rewardPanel.Background, "RIGHT", -7, -7)
+			BFL.SetTextureOrAtlas(rewardPanel.Watermark, "recruitafriend_v3_watermark_medium", nil, true)
+			rewardPanel.Watermark:SetScale(1)
+			rewardPanel.Watermark:SetAlpha(1)
+		end
+		rewardPanel.MonthCount:ClearAllPoints()
+		rewardPanel.MonthCount:SetPoint("TOPLEFT", rewardPanel.Background, "TOPLEFT", 90, -15)
+		rewardPanel.MonthCount:SetSize(230, 14)
+		if BetterFriendlistFontLarge then
+			rewardPanel.MonthCount.Text:SetFontObject(BetterFriendlistFontLarge)
+		end
+		rewardPanel.EarnInfo:ClearAllPoints()
+		rewardPanel.EarnInfo:SetPoint("TOPLEFT", rewardPanel.Background, "TOPLEFT", 90, -33)
+		rewardPanel.EarnInfo:SetSize(230, 12)
+		if BetterFriendlistFontNormal then
+			rewardPanel.EarnInfo:SetFontObject(BetterFriendlistFontNormal)
+		end
+		rewardPanel.NextRewardName:ClearAllPoints()
+		rewardPanel.NextRewardName:SetPoint("TOPLEFT", rewardPanel.Background, "TOPLEFT", 90, -48)
+		rewardPanel.NextRewardName:SetSize(230, 12)
+		if BetterFriendlistFontNormal then
+			rewardPanel.NextRewardName.Text:SetFontObject(BetterFriendlistFontNormal)
+		end
+		rewardPanel.NextRewardButton:ClearAllPoints()
+		rewardPanel.NextRewardButton:SetPoint("CENTER", rewardPanel.Background, "LEFT", 46, 0)
+		rewardPanel.NextRewardButton:SetSize(49, 49)
+		if rewardPanel.NextRewardInfoButton then
+			rewardPanel.NextRewardInfoButton:Show()
+		end
+		if claimButton then
+			claimButton:SetScale(1)
+			claimButton:ClearAllPoints()
+			claimButton:SetPoint("BOTTOM", rewardPanel, "BOTTOM", 7, 10)
+			claimButton:SetSize(155, 21)
+		end
+		if recruitmentButton then
+			recruitmentButton:ClearAllPoints()
+			recruitmentButton:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", 12, 4)
+			recruitmentButton:SetSize(134, 21)
 		end
 		return
 	end
 
-	if not C_RecruitAFriend then
-		-- BFL:DebugPrint("BetterFriendlist: RAF system not available")
+	if C_AddOns and C_AddOns.LoadAddOn then
+		pcall(C_AddOns.LoadAddOn, "Blizzard_SocialUIShared")
+	end
+	LoadBlizzardRecruitAFriend()
+
+	rewardPanel:SetHeight(120)
+	rewardPanel:ClearAllPoints()
+	rewardPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, 5)
+	rewardPanel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 2, 5)
+	rewardPanel.Background:ClearAllPoints()
+	rewardPanel.Background:SetAllPoints(rewardPanel)
+	BFL.SetTextureOrAtlas(rewardPanel.Background, "friends-RAF-headerBG")
+	for _, key in ipairs({
+		"Bracket_TopLeft",
+		"Bracket_TopRight",
+		"Bracket_BottomRight",
+		"Bracket_BottomLeft",
+	}) do
+		if rewardPanel[key] then
+			rewardPanel[key]:Hide()
+		end
+	end
+	if rewardPanel.Watermark then
+		rewardPanel.Watermark:ClearAllPoints()
+		rewardPanel.Watermark:SetPoint("BOTTOMRIGHT", rewardPanel.Background, "BOTTOMRIGHT", -11, 11)
+		BFL.SetTextureOrAtlas(rewardPanel.Watermark, "recruitafriend_v3_iwatermark_big", nil, true)
+		rewardPanel.Watermark:SetScale(1.15)
+		rewardPanel.Watermark:SetAlpha(0.2)
+	end
+	rewardPanel.MonthCount:ClearAllPoints()
+	rewardPanel.MonthCount:SetPoint("TOPLEFT", rewardPanel.Background, "TOPLEFT", 115, -18)
+	rewardPanel.MonthCount:SetSize(285, 18)
+	if UserScaledFontGameNormalLarge then
+		rewardPanel.MonthCount.Text:SetFontObject(UserScaledFontGameNormalLarge)
+	end
+	rewardPanel.EarnInfo:ClearAllPoints()
+	rewardPanel.EarnInfo:SetPoint("TOPLEFT", rewardPanel.MonthCount, "BOTTOMLEFT", 0, -6)
+	rewardPanel.EarnInfo:SetSize(285, 14)
+	if UserScaledFontGameHighlight then
+		rewardPanel.EarnInfo:SetFontObject(UserScaledFontGameHighlight)
+	end
+	rewardPanel.NextRewardName:ClearAllPoints()
+	rewardPanel.NextRewardName:SetPoint("TOPLEFT", rewardPanel.EarnInfo, "BOTTOMLEFT", 0, -4)
+	rewardPanel.NextRewardName:SetSize(285, 18)
+	if UserScaledFontGameNormalLarge then
+		rewardPanel.NextRewardName.Text:SetFontObject(UserScaledFontGameNormalLarge)
+	end
+	rewardPanel.NextRewardButton:ClearAllPoints()
+	rewardPanel.NextRewardButton:SetPoint("LEFT", rewardPanel.Background, "LEFT", 30, 0)
+	rewardPanel.NextRewardButton:SetSize(66, 66)
+	if rewardPanel.NextRewardButton.IconBorder then
+		rewardPanel.NextRewardButton.IconBorder:SetSize(86, 86)
+		BFL.SetTextureOrAtlas(rewardPanel.NextRewardButton.IconBorder, "friends-RAF-circFrame")
+	end
+	if rewardPanel.NextRewardInfoButton then
+		rewardPanel.NextRewardInfoButton:Hide()
+	end
+
+	local claimButton = EnsureModernActionButton(
+		rewardPanel,
+		"ClaimOrViewRewardButton",
+		rewardPanel,
+		170,
+		function(button)
+			RAF:ClaimOrViewRewardButton_OnClick(button)
+		end,
+		"SocialUIActionButtonTemplate, RAFClaimRewardButtonSocialViewBaseTemplate",
+		230
+	)
+	if claimButton then
+		claimButton:SetScale(0.9)
+		claimButton:ClearAllPoints()
+		claimButton:SetPoint("BOTTOM", rewardPanel, "BOTTOM", 0, 16)
+	end
+
+	if mainFrame then
+		local recruitmentButton = EnsureModernActionButton(
+			mainFrame,
+			"RecruitmentButton",
+			mainFrame,
+			160,
+			function(button)
+				RAF:RecruitmentButton_OnClick(button)
+			end,
+			nil,
+			400
+		)
+		if recruitmentButton then
+			recruitmentButton:SetText(RAF_RECRUITMENT)
+			recruitmentButton:ClearAllPoints()
+			recruitmentButton:SetPoint("BOTTOM", mainFrame, "BOTTOM", 0, 12)
+		end
+	end
+end
+
+function RAF:OnLoad(frame)
+	if not frame then
+		return
+	end
+	local previewActive = self:IsPreviewActive()
+	local nativeAvailable = BFL.HasRAF and C_RecruitAFriend
+
+	-- Classic Guard: RAF is Retail-only
+	if BFL.IsClassic or (not nativeAvailable and not previewActive) then
+		-- BFL:DebugPrint("|cffffcc00BFL RAF:|r Not available in Classic - module disabled")
+		frame:Hide()
 		return
 	end
 
+	self:ApplyFrameStyle(frame)
+
 	-- Check if RAF is enabled. 12.1 replaced IsEnabled() with system status APIs.
-	frame.rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled() or false
-	frame.rafRecruitingEnabled = C_RecruitAFriend.IsRecruitingEnabled and C_RecruitAFriend.IsRecruitingEnabled()
+	frame.rafEnabled = previewActive or (BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled() or false)
+	frame.rafRecruitingEnabled = not previewActive
+		and C_RecruitAFriend
+		and C_RecruitAFriend.IsRecruitingEnabled
+		and C_RecruitAFriend.IsRecruitingEnabled()
 		or false
 
 	-- Unregister existing events to prevent duplicates
 	frame:UnregisterAllEvents()
 
-	-- Register events
-	frame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
-	frame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
-	frame:RegisterEvent("RAF_SYSTEM_INFO_UPDATED")
-	frame:RegisterEvent("RAF_INFO_UPDATED")
-	frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
+	-- Native events must not replace the deterministic local fixture while previewing.
+	if nativeAvailable and not previewActive then
+		frame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
+		frame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
+		frame:RegisterEvent("RAF_SYSTEM_INFO_UPDATED")
+		frame:RegisterEvent("RAF_INFO_UPDATED")
+		frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
+	end
 
 	-- Set up no recruits text (use Blizzard global)
 	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
@@ -575,7 +1335,12 @@ function RAF:OnLoad(frame)
 	end
 
 	-- Set up ScrollBox (Retail) or FauxScrollFrame (Classic)
-	if frame.RecruitList and frame.RecruitList.ScrollBox and frame.RecruitList.ScrollBar then
+	if
+		not frame.rafListInitialized
+		and frame.RecruitList
+		and frame.RecruitList.ScrollBox
+		and frame.RecruitList.ScrollBar
+	then
 		-- Classic: Use FauxScrollFrame approach
 		if not BFL.HasModernScrollBox then
 			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Classic FauxScrollFrame mode")
@@ -585,23 +1350,29 @@ function RAF:OnLoad(frame)
 			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Retail ScrollBox mode")
 			local view = CreateScrollBoxListLinearView()
 			view:SetElementExtentCalculator(function(dataIndex, elementData)
-				return elementData.isDivider and DIVIDER_HEIGHT or RECRUIT_HEIGHT
+				return elementData.isDivider and DIVIDER_HEIGHT or GetRecruitHeight()
 			end)
 			view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData)
 				BetterRecruitListButton_Init(button, elementData)
 			end)
 			BFL.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
 		end
+		frame.rafListInitialized = true
+	end
+
+	if previewActive then
+		self:ApplyPreviewData(frame)
+		return
 	end
 
 	-- Get RAF system info
-	if C_RecruitAFriend.GetRAFSystemInfo then
+	if C_RecruitAFriend and C_RecruitAFriend.GetRAFSystemInfo then
 		local rafSystemInfo = C_RecruitAFriend.GetRAFSystemInfo()
 		self:UpdateSystemInfo(rafSystemInfo)
 	end
 
 	-- Get RAF info
-	if C_RecruitAFriend.GetRAFInfo then
+	if C_RecruitAFriend and C_RecruitAFriend.GetRAFInfo then
 		local rafInfo = C_RecruitAFriend.GetRAFInfo()
 		self:UpdateRAFInfo(frame, rafInfo)
 	end
@@ -680,6 +1451,9 @@ function RAF:RenderClassicRAFButtons()
 end
 
 function RAF:OnEvent(frame, event, ...)
+	if self:IsPreviewActive() or (frame and frame.previewRAF) then
+		return
+	end
 	if event == "RAF_SYSTEM_ENABLED_STATUS" then
 		local rafEnabled = ...
 		frame.rafEnabled = rafEnabled
@@ -774,7 +1548,7 @@ local function ProcessAndSortRecruits(recruits)
 
 	-- Get account info for all recruits
 	for _, recruitInfo in ipairs(displayRecruits) do
-		if C_BattleNet and C_BattleNet.GetAccountInfoByID then
+		if not recruitInfo._isMock and C_BattleNet and C_BattleNet.GetAccountInfoByID then
 			local accountInfo = C_BattleNet.GetAccountInfoByID(recruitInfo.bnetAccountID, recruitInfo.wowAccountGUID)
 			local gameAccountInfo
 			if accountInfo and not IsSecret(accountInfo) then
@@ -940,6 +1714,11 @@ function RAF:UpdateRecruitList(frame, recruits)
 
 	-- Build data list with divider
 	local dataList = {}
+	if IsModernSocialUIActive() then
+		-- Blizzard's SocialView uses one homogeneous card list without the
+		-- legacy online/offline divider.
+		needDivider = false
+	end
 	for index = 1, #displayRecruits do
 		local recruit = displayRecruits[index]
 		if needDivider and not recruit.isOnline then
@@ -1031,10 +1810,15 @@ function RAF:UpdateNextReward(frame, nextReward)
 		rewardPanel.NextRewardButton.Icon:SetDesaturated(shouldDesaturate)
 		rewardPanel.NextRewardButton.IconOverlay:SetShown(shouldDesaturate)
 		if rewardPanel.NextRewardButton.IconBorder and rewardPanel.NextRewardButton.IconBorder.SetAtlas then
-			local borderAtlas = (not nextReward.claimed and not nextReward.canClaim)
-				and "RecruitAFriend_ClaimPane_SepiaRing"
-				or "RecruitAFriend_ClaimPane_GoldRing"
-			BFL.SetTextureOrAtlas(rewardPanel.NextRewardButton.IconBorder, borderAtlas, nil, true)
+			if IsModernSocialUIActive() then
+				BFL.SetTextureOrAtlas(rewardPanel.NextRewardButton.IconBorder, "friends-RAF-circFrame")
+				rewardPanel.NextRewardButton.IconBorder:SetSize(86, 86)
+			else
+				local borderAtlas = (not nextReward.claimed and not nextReward.canClaim)
+					and "RecruitAFriend_ClaimPane_SepiaRing"
+					or "RecruitAFriend_ClaimPane_GoldRing"
+				BFL.SetTextureOrAtlas(rewardPanel.NextRewardButton.IconBorder, borderAtlas, nil, true)
+			end
 		end
 		rewardPanel.NextRewardButton:Show()
 	end
@@ -1158,8 +1942,16 @@ function RAF:UpdateRAFInfo(frame, rafInfo)
 	if frame.RewardClaiming and frame.RewardClaiming.ClaimOrViewRewardButton then
 		local nextReward = latestVersionInfo and latestVersionInfo.nextReward
 		local haveUnclaimedReward = nextReward and nextReward.canClaim
+		local isPreview = rafInfo._isMock == true
 
-		if haveUnclaimedReward then
+		if isPreview then
+			-- Preview must expose the complete rewards overview but must never
+			-- arm a live claim operation on an account without RAF.
+			frame.RewardClaiming.ClaimOrViewRewardButton:SetEnabled(true)
+			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(
+				RAF_VIEW_ALL_REWARDS or L.RAF_VIEW_ALL_REWARDS
+			)
+		elseif haveUnclaimedReward then
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetEnabled(true)
 			frame.RewardClaiming.ClaimOrViewRewardButton:SetText(CLAIM_REWARD or L.RAF_CLAIM_REWARD)
 		else
@@ -1247,6 +2039,116 @@ function RAF:RecruitListButton_SetupDivider(button)
 	button:Show()
 end
 
+function RAF:ApplyRecruitButtonStyle(button, recruitInfo)
+	if not IsModernSocialUIActive() then
+		button:SetHeight(RECRUIT_HEIGHT)
+		if button.ModernPresenceIcon then
+			button.ModernPresenceIcon:Hide()
+		end
+		if button.CharacterName then
+			button.CharacterName:Hide()
+		end
+		if BetterFriendlistFriendsFontNormal then
+			button.Name:SetFontObject(BetterFriendlistFriendsFontNormal)
+		end
+		if BetterFriendlistFriendsFontSmall then
+			button.InfoText:SetFontObject(BetterFriendlistFriendsFontSmall)
+		end
+		button.Name:ClearAllPoints()
+		button.Name:SetPoint("TOPLEFT", 5, -4)
+		button.Name:SetSize(190, 12)
+		button.InfoText:ClearAllPoints()
+		button.InfoText:SetPoint("TOPLEFT", button.Name, "BOTTOMLEFT", 0, -3)
+		button.InfoText:SetSize(190, 10)
+		if button.Activities then
+			local offsets = { -70, -35, 0 }
+			for index, activityButton in ipairs(button.Activities) do
+				activityButton:ClearAllPoints()
+				activityButton:SetPoint("RIGHT", button, "RIGHT", offsets[index], 0)
+			end
+		end
+		local highlight = button:GetHighlightTexture()
+		if highlight then
+			highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+			highlight:SetTexCoord(0, 1, 0, 1)
+		end
+		return
+	end
+
+	button:SetHeight(MODERN_RECRUIT_HEIGHT)
+	button.Icon:Hide()
+	BFL.SetTextureOrAtlas(
+		button.Background,
+		recruitInfo.isOnline and "friends-card-default" or "friends-card-disabled"
+	)
+	button.Background:SetVertexColor(1, 1, 1, 1)
+	button.Background:SetAlpha(1)
+
+	if not button.ModernPresenceIcon then
+		button.ModernPresenceIcon = button:CreateTexture(nil, "OVERLAY")
+		button.ModernPresenceIcon:SetSize(19, 19)
+	end
+	button.ModernPresenceIcon:ClearAllPoints()
+	button.ModernPresenceIcon:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -5)
+	BFL.SetTextureOrAtlas(
+		button.ModernPresenceIcon,
+		recruitInfo.isOnline and "friends-status-online" or "friends-status-offline"
+	)
+	button.ModernPresenceIcon:Show()
+
+	if not button.CharacterName then
+		button.CharacterName = button:CreateFontString(nil, "ARTWORK", "BetterFriendlistFriendsFontSmall")
+	end
+	if UserScaledFontHeader then
+		button.Name:SetFontObject(UserScaledFontHeader)
+	end
+	if UserScaledFontBody then
+		button.CharacterName:SetFontObject(UserScaledFontBody)
+		button.InfoText:SetFontObject(UserScaledFontBody)
+	end
+
+	local firstActivity = button.Activities and button.Activities[1]
+	button.Name:ClearAllPoints()
+	button.Name:SetPoint("TOPLEFT", button, "TOPLEFT", 22, -9)
+	button.Name:SetPoint("RIGHT", firstActivity or button, firstActivity and "LEFT" or "RIGHT", -8, 0)
+	button.Name:SetHeight(16)
+
+	local characterName = recruitInfo.characterName or ""
+	button.CharacterName:SetText(characterName)
+	button.CharacterName:SetTextColor(
+		(recruitInfo.isOnline and NORMAL_FONT_COLOR or DARKGRAY_COLOR):GetRGB()
+	)
+	button.CharacterName:ClearAllPoints()
+	button.CharacterName:SetPoint("TOPLEFT", button.Name, "BOTTOMLEFT", 0, -4)
+	button.CharacterName:SetPoint("RIGHT", firstActivity or button, firstActivity and "LEFT" or "RIGHT", -8, 0)
+	button.CharacterName:SetHeight(14)
+	button.CharacterName:SetShown(characterName ~= "")
+
+	button.InfoText:ClearAllPoints()
+	button.InfoText:SetPoint(
+		"TOPLEFT",
+		characterName ~= "" and button.CharacterName or button.Name,
+		"BOTTOMLEFT",
+		0,
+		-4
+	)
+	button.InfoText:SetPoint("RIGHT", firstActivity or button, firstActivity and "LEFT" or "RIGHT", -8, 0)
+	button.InfoText:SetHeight(14)
+
+	if button.Activities then
+		local offsets = { -112, -63, -14 }
+		for index, activityButton in ipairs(button.Activities) do
+			activityButton:ClearAllPoints()
+			activityButton:SetPoint("RIGHT", button, "RIGHT", offsets[index], 0)
+			activityButton:SetSize(35, 34)
+		end
+	end
+	local highlight = button:GetHighlightTexture()
+	if highlight then
+		BFL.SetTextureOrAtlas(highlight, "friends-card-selected")
+	end
+end
+
 function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 	button.DividerTexture:Hide()
 	button.Background:Show()
@@ -1266,7 +2168,7 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		button.Icon:Hide()
 	end
 
-	button:SetHeight(RECRUIT_HEIGHT)
+	button:SetHeight(GetRecruitHeight())
 	button:Enable()
 	button.recruitInfo = recruitInfo
 
@@ -1317,6 +2219,7 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 		end
 	end
 
+	self:ApplyRecruitButtonStyle(button, recruitInfo)
 	button:Show()
 end
 
@@ -1359,6 +2262,9 @@ end
 function RAF:RecruitListButton_OnClick(button, mouseButton)
 	if mouseButton == "RightButton" and button.recruitInfo then
 		local recruitInfo = button.recruitInfo
+		if recruitInfo._isMock then
+			return
+		end
 		local contextData = {
 			name = recruitInfo.plainName,
 			bnetIDAccount = recruitInfo.bnetAccountID,
@@ -1384,6 +2290,10 @@ function RAF:RecruitActivityButton_Setup(button, activityInfo, recruitInfo)
 
 	button.activityInfo = activityInfo
 	button.recruitInfo = recruitInfo
+	button.isTrialAccount = recruitInfo
+		and Enum
+		and Enum.RafRecruitSubStatus
+		and recruitInfo.subStatus == Enum.RafRecruitSubStatus.Trial
 
 	self:RecruitActivityButton_UpdateIcon(button)
 	button:Show()
@@ -1398,20 +2308,28 @@ function RAF:RecruitActivityButton_UpdateIcon(button)
 	local function SetActivityAtlas(atlas)
 		BFL.SetTextureOrAtlas(button.Icon, atlas, nil, useAtlasSize)
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local useModernAtlases = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	if useModernAtlases and button.isTrialAccount then
+		SetActivityAtlas("friends-RAF-chest-locked")
+		return
+	end
 
 	if button:IsMouseOver() then
 		if button.activityInfo.state == Enum.RafRecruitActivityState.RewardClaimed then
-			SetActivityAtlas("RecruitAFriend_RecruitedFriends_CursorOverChecked")
+			SetActivityAtlas(useModernAtlases and "friends-RAF-chest-claimed-hover" or "RecruitAFriend_RecruitedFriends_CursorOverChecked")
+		elseif button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
+			SetActivityAtlas(useModernAtlases and "friends-RAF-chest-ready-hover" or "RecruitAFriend_RecruitedFriends_CursorOver")
 		else
-			SetActivityAtlas("RecruitAFriend_RecruitedFriends_CursorOver")
+			SetActivityAtlas(useModernAtlases and "friends-RAF-chest-default-hover" or "RecruitAFriend_RecruitedFriends_CursorOver")
 		end
 	else
 		if button.activityInfo.state == Enum.RafRecruitActivityState.Incomplete then
-			SetActivityAtlas("RecruitAFriend_RecruitedFriends_ActiveChest")
+			SetActivityAtlas(useModernAtlases and "friends-raf-chest-default" or "RecruitAFriend_RecruitedFriends_ActiveChest")
 		elseif button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
-			SetActivityAtlas("RecruitAFriend_RecruitedFriends_OpenChest")
+			SetActivityAtlas(useModernAtlases and "friends-raf-chest-ready" or "RecruitAFriend_RecruitedFriends_OpenChest")
 		else
-			SetActivityAtlas("RecruitAFriend_RecruitedFriends_ClaimedChest")
+			SetActivityAtlas(useModernAtlases and "friends-RAF-chest-claimed" or "RecruitAFriend_RecruitedFriends_ClaimedChest")
 		end
 	end
 end
@@ -1421,6 +2339,9 @@ function RAF:RecruitActivityButton_OnClick(button)
 		return
 	end
 
+	if button.isTrialAccount or button.recruitInfo._isMock then
+		return
+	end
 	if button.activityInfo.state == Enum.RafRecruitActivityState.Complete then
 		if C_RecruitAFriend.ClaimActivityReward then
 			if
@@ -1454,7 +2375,9 @@ function RAF:RecruitActivityButton_OnEnter(button)
 	local wrap = true
 
 	-- Update quest name (cache it like Blizzard does)
-	if not button.questName and button.activityInfo.rewardQuestID then
+	if button.recruitInfo._isMock then
+		button.questName = button.activityInfo.previewName or QUEST_REWARDS or RAF_NEXT_REWARD
+	elseif not button.questName and button.activityInfo.rewardQuestID then
 		button.questName = C_QuestLog.GetTitleForQuestID
 			and C_QuestLog.GetTitleForQuestID(button.activityInfo.rewardQuestID)
 	end
@@ -1481,7 +2404,7 @@ function RAF:RecruitActivityButton_OnEnter(button)
 		end
 
 		-- Requirements text
-		if C_RecruitAFriend.GetRecruitActivityRequirementsText then
+		if not button.recruitInfo._isMock and C_RecruitAFriend.GetRecruitActivityRequirementsText then
 			local reqTextLines = C_RecruitAFriend.GetRecruitActivityRequirementsText(
 				button.activityInfo.activityID,
 				button.recruitInfo.acceptanceID
@@ -1504,7 +2427,7 @@ function RAF:RecruitActivityButton_OnEnter(button)
 			GameTooltip_AddNormalLine(tooltip, YOU_EARNED_LABEL or L.RAF_YOU_EARNED_LABEL, wrap)
 		end
 
-		if GameTooltip_AddQuestRewardsToTooltip then
+		if not button.recruitInfo._isMock and GameTooltip_AddQuestRewardsToTooltip then
 			GameTooltip_AddQuestRewardsToTooltip(
 				tooltip,
 				button.activityInfo.rewardQuestID,
@@ -1551,6 +2474,26 @@ end
 function RAF:NextRewardButton_OnClick(button, mouseButton)
 	local frame = button:GetParent():GetParent()
 	if not frame or not frame.rafInfo then
+		return
+	end
+	if frame.rafInfo._isMock then
+		local nativeHasPreviewInfo = PreparePreviewRewardsFrame(
+			frame.rafInfo,
+			not RecruitAFriendRewardsFrame or not RecruitAFriendRewardsFrame:IsShown()
+		)
+		if RecruitAFriendRewardsFrame and nativeHasPreviewInfo then
+			if RecruitAFriendRewardsFrame:IsShown() then
+				CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Hide)
+			else
+				CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Show)
+				PreparePreviewRewardsFrame(frame.rafInfo, true)
+				if RecruitAFriendRecruitmentFrame and StaticPopupSpecial_Hide then
+					CallBlizzardFunction(StaticPopupSpecial_Hide, RecruitAFriendRecruitmentFrame)
+				end
+			end
+		else
+			self:DisplayRewardsInChat(frame.rafInfo)
+		end
 		return
 	end
 
@@ -1648,6 +2591,26 @@ end
 function RAF:ClaimOrViewRewardButton_OnClick(button)
 	local frame = button:GetParent():GetParent()
 	if not frame or not frame.rafInfo then
+		return
+	end
+	if frame.rafInfo._isMock then
+		local nativeHasPreviewInfo = PreparePreviewRewardsFrame(
+			frame.rafInfo,
+			not RecruitAFriendRewardsFrame or not RecruitAFriendRewardsFrame:IsShown()
+		)
+		if RecruitAFriendRewardsFrame and nativeHasPreviewInfo then
+			if RecruitAFriendRewardsFrame:IsShown() then
+				CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Hide)
+			else
+				CallBlizzardMethod(RecruitAFriendRewardsFrame, RecruitAFriendRewardsFrame.Show)
+				PreparePreviewRewardsFrame(frame.rafInfo, true)
+				if RecruitAFriendRecruitmentFrame and StaticPopupSpecial_Hide then
+					CallBlizzardFunction(StaticPopupSpecial_Hide, RecruitAFriendRecruitmentFrame)
+				end
+			end
+		else
+			self:DisplayRewardsInChat(frame.rafInfo)
+		end
 		return
 	end
 
@@ -1753,11 +2716,14 @@ function RAF:DisplayRewardsInChat(rafInfo)
 end
 
 function RAF:RecruitmentButton_OnClick(button)
+	if self:IsPreviewActive() then
+		return
+	end
 	if not LoadBlizzardRecruitAFriend() then
 		return
 	end
 
-	local nativeButton = RecruitAFriendFrame and RecruitAFriendFrame.RecruitmentButton
+	local nativeButton = GetNativeRecruitmentButton()
 	if ClickNativeRAFButton(nativeButton, RecruitAFriendRecruitmentButtonMixin) then
 		return
 	end

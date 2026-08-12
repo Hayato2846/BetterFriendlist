@@ -54,6 +54,11 @@ local function RefreshQuickJoinAvailability()
 	return BFL.HasQuickJoin
 end
 
+local function IsModernSocialUIActive()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
 BFL.HasQuickJoin = RefreshQuickJoinAvailability()
 
 -- Constants
@@ -69,6 +74,7 @@ QuickJoin.lastUpdate = 0 -- Timestamp of last update
 QuickJoin.updateQueued = false -- Pending update flag
 QuickJoin.config = nil -- Social Queue Config (from C_SocialQueue.GetConfig)
 QuickJoin.mockGroups = {} -- Mock groups for testing (added to real groups)
+QuickJoin.mockGroupsVersion = 0
 QuickJoin.selectedGUID = nil -- Currently selected group GUID
 QuickJoin.selectedButtons = {} -- Track button selection states
 QuickJoin.relationshipCache = {} -- Short-lived cache for relationship lookups
@@ -450,6 +456,32 @@ local function BetterFriendlist_HasRelationshipWithLeader(partyGuid)
 	return false
 end
 
+local function IsMockGroup(groupGUID, groupInfo)
+	return (groupInfo and groupInfo._isMock == true)
+		or (groupGUID ~= nil and QuickJoin.mockGroups[groupGUID] ~= nil)
+end
+
+function QuickJoin:IsCombinedPreviewActive()
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if not PreviewMode then
+		return false
+	end
+	if PreviewMode.IsComponentEnabled then
+		return PreviewMode:IsComponentEnabled("quick_join")
+	end
+	return PreviewMode.enabled == true
+end
+
+function QuickJoin:MarkMockGroupsChanged()
+	self.mockGroupsVersion = self.mockGroupsVersion + 1
+	self.previewPreparedMockVersion = nil
+	self.previewRenderedMockVersion = nil
+end
+
+function QuickJoin:IsMockGroup(groupGUID, groupInfo)
+	return IsMockGroup(groupGUID, groupInfo)
+end
+
 local function GetLeaderGUIDFromMembers(members)
 	if not members or #members == 0 then
 		return nil
@@ -571,7 +603,22 @@ local QuickJoinEntry = {}
 QuickJoinEntry.__index = QuickJoinEntry
 local MAX_NUM_DISPLAYED_QUEUES = 6
 local QUICK_JOIN_ENTRY_NAME_SEPARATION = QUICK_JOIN_NAME_SEPARATION or 5
-local QUICK_JOIN_ENTRY_FONT_HEIGHT = 12
+local QUICK_JOIN_ENTRY_DEFAULT_LINE_HEIGHT = 16
+local QUICK_JOIN_ENTRY_VERTICAL_PADDING = 10
+local QUICK_JOIN_CARD_BASE_HEIGHT = 65
+
+local function GetScaledQuickJoinValue(value)
+	if TextSizeManager and TextSizeManager.GetScaledValue then
+		local ok, scaled = pcall(TextSizeManager.GetScaledValue, TextSizeManager, value)
+		if not ok then
+			ok, scaled = pcall(TextSizeManager.GetScaledValue, value)
+		end
+		if ok and type(scaled) == "number" then
+			return scaled
+		end
+	end
+	return value
+end
 
 -- PERF: Object pool to avoid per-update table allocations
 -- Entries are recycled via wipe() instead of creating new tables each frame
@@ -636,10 +683,14 @@ local function TruncateArray(array, newCount)
 end
 
 local function CalculateQuickJoinEntryHeight(memberCount, queueCount)
-	local lineHeight = QUICK_JOIN_ENTRY_FONT_HEIGHT + QUICK_JOIN_ENTRY_NAME_SEPARATION
-	local namesHeight = lineHeight * memberCount
-	local queuesHeight = lineHeight * math.min(queueCount, MAX_NUM_DISPLAYED_QUEUES)
-	return 13 + math.max(namesHeight, queuesHeight)
+	local numLines = math.max(memberCount, math.min(queueCount, MAX_NUM_DISPLAYED_QUEUES))
+	if not IsModernSocialUIActive() then
+		local legacyLineHeight = 12 + QUICK_JOIN_ENTRY_NAME_SEPARATION
+		return 13 + legacyLineHeight * numLines
+	end
+	local textHeight = numLines * GetScaledQuickJoinValue(QUICK_JOIN_ENTRY_DEFAULT_LINE_HEIGHT)
+		+ math.max(numLines - 1, 0) * QUICK_JOIN_ENTRY_NAME_SEPARATION
+	return textHeight + GetScaledQuickJoinValue(QUICK_JOIN_ENTRY_VERTICAL_PADDING) * 2
 end
 
 local function GetActiveLFGListInfo(queues)
@@ -665,7 +716,9 @@ function QuickJoinEntry:New(guid, groupInfo)
 
 	-- Track relationship with leader (Blizzard's hasRelationshipWithLeader)
 	-- Used for auto-accept logic in tooltips
-	entry.hasRelationshipWithLeader = BetterFriendlist_HasRelationshipWithLeader(guid)
+	entry.hasRelationshipWithLeader = not IsMockGroup(guid, entry.groupInfo)
+		and BetterFriendlist_HasRelationshipWithLeader(guid)
+		or false
 
 	-- Extract member data - use actual member info from groupInfo
 	-- CRITICAL: Sort members by relationship priority first! (like Blizzard's SocialQueueUtil_SortGroupMembers)
@@ -813,6 +866,12 @@ function QuickJoinEntry:ApplyToFrame(frame)
 	local members = EnsureQuickJoinFontArray(frame, "Members", "MemberName")
 	local queues = EnsureQuickJoinFontArray(frame, "Queues", "QueueName")
 	local canJoin = self:CanJoin()
+	local modern = IsModernSocialUIActive()
+	local verticalPadding = GetScaledQuickJoinValue(QUICK_JOIN_ENTRY_VERTICAL_PADDING)
+	if frame.MemberName then
+		frame.MemberName:ClearAllPoints()
+		frame.MemberName:SetPoint("TOPLEFT", frame, "TOPLEFT", 3, modern and -verticalPadding or -8)
+	end
 
 	for i = 1, #self.displayedMembers do
 		local member = self.displayedMembers[i]
@@ -820,8 +879,14 @@ function QuickJoinEntry:ApplyToFrame(frame)
 		local nameObj = members[i]
 		if not nameObj then
 			nameObj = frame:CreateFontString(nil, "ARTWORK", "BetterQuickJoinButtonMemberTemplate")
-			nameObj:SetPoint("TOPLEFT", members[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
 			members[i] = nameObj
+		end
+		if i > 1 then
+			nameObj:ClearAllPoints()
+			nameObj:SetPoint("TOPLEFT", members[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			if modern then
+				nameObj:SetPoint("TOPRIGHT", members[i - 1], "BOTTOMRIGHT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			end
 		end
 
 		local displayName = name or member.name or playerLink or ""
@@ -852,9 +917,15 @@ function QuickJoinEntry:ApplyToFrame(frame)
 	local queueData = firstQueue and firstQueue.queueData
 	local useGroupIcon = queueData and queueData.queueType == "lfglist"
 	if frame.Icon then
-		local atlas = useGroupIcon and "socialqueuing-icon-group" or "socialqueuing-icon-eye"
+		local atlas = useGroupIcon and "socialqueuing-icon-group"
+			or (modern and "friends-icon-eye" or "socialqueuing-icon-eye")
 		BFL.SetTextureOrAtlas(frame.Icon, atlas)
-		if frame.MemberName then
+		if modern then
+			frame.Icon:SetSize(
+				GetScaledQuickJoinValue(20),
+				GetScaledQuickJoinValue(useGroupIcon and 18 or 20)
+			)
+		elseif frame.MemberName then
 			frame.Icon:SetHeight(math.max(17, frame.MemberName:GetHeight()))
 			frame.Icon:SetWidth(math.max(16, frame.Icon:GetHeight() * 0.95))
 		end
@@ -864,7 +935,10 @@ function QuickJoinEntry:ApplyToFrame(frame)
 
 	if frame.QueueName and frame.MemberName and frame.Icon then
 		frame.QueueName:ClearAllPoints()
-		frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + 4, 0)
+		frame.QueueName:SetPoint("TOPLEFT", frame.MemberName, "TOPRIGHT", frame.Icon:GetWidth() + (modern and 6 or 4), 0)
+		if modern then
+			frame.QueueName:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
+		end
 	end
 
 	for i = 1, #self.displayedQueues do
@@ -872,8 +946,14 @@ function QuickJoinEntry:ApplyToFrame(frame)
 		local queueObj = queues[i]
 		if not queueObj then
 			queueObj = frame:CreateFontString(nil, "ARTWORK", "BetterQuickJoinButtonQueueTemplate")
-			queueObj:SetPoint("TOPLEFT", queues[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
 			queues[i] = queueObj
+		end
+		if i > 1 then
+			queueObj:ClearAllPoints()
+			queueObj:SetPoint("TOPLEFT", queues[i - 1], "BOTTOMLEFT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			if modern then
+				queueObj:SetPoint("TOPRIGHT", queues[i - 1], "BOTTOMRIGHT", 0, -QUICK_JOIN_ENTRY_NAME_SEPARATION)
+			end
 		end
 
 		if i == MAX_NUM_DISPLAYED_QUEUES and i ~= #self.displayedQueues then
@@ -938,6 +1018,9 @@ local function GetQuickJoinEntryLFGListID(entry)
 	end
 
 	local groupInfo = entry.groupInfo
+	if groupInfo and groupInfo._isMock then
+		return nil
+	end
 	if groupInfo and (groupInfo._hasSecretValues or groupInfo.lfgListCensored) then
 		return nil
 	end
@@ -1020,6 +1103,9 @@ local function GetQuickJoinActivityDisplayType(entry, searchResultInfo)
 	local groupInfo = entry and entry.groupInfo
 	if groupInfo and type(groupInfo.activityDisplayType) == "number" then
 		return groupInfo.activityDisplayType
+	end
+	if groupInfo and groupInfo._isMock then
+		return nil
 	end
 
 	local queueData = GetQuickJoinEntryQueueData(entry)
@@ -1174,14 +1260,14 @@ local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
 		return nil
 	end
 
-	local lfgListID = GetQuickJoinEntryLFGListID(entry)
-	if not lfgListID then
-		return nil
-	end
-
 	local mockEntries = BuildQuickJoinMockMemberClassEntries(entry, memberCount)
 	if mockEntries then
 		return mockEntries
+	end
+
+	local lfgListID = GetQuickJoinEntryLFGListID(entry)
+	if not lfgListID then
+		return nil
 	end
 
 	if C_LFGList and C_LFGList.HasSearchResultInfo then
@@ -1317,6 +1403,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local isBNetFriend = false
 	if
 		self.groupInfo
+		and not self.groupInfo._isMock
 		and self.groupInfo.leaderGUID
 		and C_BattleNet
 		and C_BattleNet.GetAccountInfoByGUID
@@ -1326,7 +1413,13 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	end
 
 	-- First, try to get fresh searchResultInfo.leaderName for lfglist queues (ONLY if not BNet friend)
-	if not isBNetFriend and self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
+	if
+		not isBNetFriend
+		and not (self.groupInfo and self.groupInfo._isMock)
+		and self.displayedQueues
+		and #self.displayedQueues > 0
+		and self.displayedQueues[1]
+	then
 		local firstQueue = self.displayedQueues[1]
 		if
 			firstQueue.queueData
@@ -1548,10 +1641,34 @@ function QuickJoin:UpdateRetailScrollBoxWidth()
 
 	scrollBoxContainer:ClearAllPoints()
 	scrollBoxContainer:SetPoint("TOPLEFT", 4, -4)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		local rightInset = FriendsUI.GetModernScrollBoxRightInset and FriendsUI:GetModernScrollBoxRightInset() or 20
+		scrollBoxContainer:SetPoint("BOTTOMRIGHT", -rightInset, 4)
+		return
+	end
 	if scrollBar:IsShown() then
 		scrollBoxContainer:SetPoint("BOTTOMRIGHT", -24, 4)
 	else
 		scrollBoxContainer:SetPoint("BOTTOMRIGHT", -4, 4)
+	end
+end
+
+function QuickJoin:ApplyFriendsUIStyle()
+	local modern = IsModernSocialUIActive()
+	if self.retailScrollBoxView then
+		if modern then
+			self.retailScrollBoxView:SetPadding(10, 10, 6, 6, 3)
+		else
+			self.retailScrollBoxView:SetPadding(5, 5, 5, 5, 2)
+		end
+	end
+	for _, entry in ipairs(self.entriesCache or {}) do
+		entry.cachedHeight = nil
+	end
+	self:UpdateRetailScrollBoxWidth()
+	if self.retailScrollBox and self.retailScrollBox.FullUpdate then
+		pcall(self.retailScrollBox.FullUpdate, self.retailScrollBox, ScrollBoxConstants and ScrollBoxConstants.UpdateImmediately)
 	end
 end
 
@@ -1587,7 +1704,18 @@ function QuickJoin:InitializeRetailScrollBox(frame)
 		end
 		self:OnScrollBoxInitialize(button, elementData)
 	end)
-	view:SetPadding(5, 5, 5, 5, 2)
+	view:SetElementExtentCalculator(function()
+		-- Modern follows the 12.1 text scale. Legacy deliberately retains the
+		-- fixed 65 px card contract from v2.7.0.
+		return IsModernSocialUIActive()
+			and GetScaledQuickJoinValue(QUICK_JOIN_CARD_BASE_HEIGHT)
+			or QUICK_JOIN_CARD_BASE_HEIGHT
+	end)
+	if IsModernSocialUIActive() then
+		view:SetPadding(10, 10, 6, 6, 3)
+	else
+		view:SetPadding(5, 5, 5, 5, 2)
+	end
 
 	if not BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view) then
 		return false
@@ -1640,6 +1768,11 @@ function QuickJoin:Initialize()
 
 	-- Register Events
 	self:RegisterEvents()
+	self:InstallToastSelectionBridge()
+	if EventRegistry and EventRegistry.RegisterCallback and not self.textScaleCallbackRegistered then
+		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", self.OnTextScaleUpdated, self)
+		self.textScaleCallbackRegistered = true
+	end
 
 	-- Initialize ScrollBox (Phase 1: Activity Cards)
 	if BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame then
@@ -1994,6 +2127,10 @@ function QuickJoin:OnScrollBoxInitialize(button, elementData)
 			button.Selected:Hide()
 		end
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.StyleQuickJoinCard then
+		FriendsUI:StyleQuickJoinCard(button)
+	end
 
 	-- 9. Tooltip
 	button:SetScript("OnEnter", function()
@@ -2026,6 +2163,26 @@ end
 
 -- Update available groups list
 function QuickJoin:Update(forceUpdate)
+	local previewOnly = self:IsCombinedPreviewActive()
+	local previewVersion = self.mockGroupsVersion
+	local quickJoinVisible = BetterFriendsFrame
+		and BetterFriendsFrame:IsShown()
+		and BetterFriendsFrame.QuickJoinFrame
+		and BetterFriendsFrame.QuickJoinFrame:IsShown()
+	if previewOnly and self.previewPreparedMockVersion == previewVersion then
+		if not quickJoinVisible then
+			needsRenderOnShow = true
+			return
+		end
+		if
+			self.previewRenderedMockVersion == previewVersion
+			and self.previewRenderedSettingsVersion == (BFL.SettingsVersion or 0)
+		then
+			needsRenderOnShow = false
+			return
+		end
+	end
+
 	-- Event Coalescing (Micro-Throttling)
 	if not forceUpdate and updateTimer then
 		return
@@ -2047,11 +2204,24 @@ function QuickJoin:Update(forceUpdate)
 	self.entriesCache = nil
 	self.entriesCacheVersion = nil
 
-	RefreshQuickJoinAvailability()
+	if not previewOnly then
+		RefreshQuickJoinAvailability()
+	end
 	local hasMockGroups = next(self.mockGroups) ~= nil
-	local canReadLiveGroups = IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetAllGroups
+	local canReadLiveGroups = not previewOnly
+		and IsSocialQueueEnabled()
+		and C_SocialQueue
+		and C_SocialQueue.GetAllGroups
 	if not canReadLiveGroups and not hasMockGroups then
 		self:ClearLiveState()
+		if previewOnly then
+			self.previewPreparedMockVersion = previewVersion
+			if quickJoinVisible then
+				self.previewRenderedMockVersion = previewVersion
+				self.previewRenderedSettingsVersion = BFL.SettingsVersion or 0
+				needsRenderOnShow = false
+			end
+		end
 		return
 	end
 
@@ -2079,7 +2249,15 @@ function QuickJoin:Update(forceUpdate)
 		-- FIX: Explicitly exclude player's own group (defense in depth)
 		-- API should return canJoin=false for own group, but this ensures it
 		local leaderGUID = groupInfo and groupInfo.leaderGUID
-		local isOwnGroup = leaderGUID and C_AccountInfo.IsGUIDRelatedToLocalAccount(leaderGUID)
+		local isOwnGroup = false
+		if
+			leaderGUID
+			and not IsMockGroup(groupGUID, groupInfo)
+			and C_AccountInfo
+			and C_AccountInfo.IsGUIDRelatedToLocalAccount
+		then
+			isOwnGroup = C_AccountInfo.IsGUIDRelatedToLocalAccount(leaderGUID)
+		end
 
 		if groupInfo and groupInfo.canJoin and groupInfo.numQueues > 0 and not isOwnGroup then
 			local sortIndex = #self.availableGroups + 1
@@ -2098,6 +2276,9 @@ function QuickJoin:Update(forceUpdate)
 		end
 		return leftPriority > rightPriority
 	end)
+	if previewOnly then
+		self.previewPreparedMockVersion = previewVersion
+	end
 
 	-- Update tab counter (ALWAYS update this, even if frame is hidden)
 	if BetterFriendsFrame and BetterFriendsFrame_UpdateQuickJoinTab then
@@ -2153,6 +2334,11 @@ function QuickJoin:Update(forceUpdate)
 				)
 			end
 		end
+	end
+	if previewOnly then
+		self.previewRenderedMockVersion = previewVersion
+		self.previewRenderedSettingsVersion = BFL.SettingsVersion or 0
+		needsRenderOnShow = false
 	end
 
 	-- Fire callback for UI update (Legacy support)
@@ -2950,6 +3136,7 @@ function QuickJoin:RevealCensoredGroup(groupGUID)
 		end
 		self.entriesCache = nil
 		self.entriesCacheVersion = nil
+		self:MarkMockGroupsChanged()
 		self:Update(true)
 		return true
 	end
@@ -3027,6 +3214,9 @@ end
 function QuickJoin:GetGroupPriority(groupGUID, groupInfo)
 	local cached = groupGUID and self.groupCache[groupGUID]
 	groupInfo = groupInfo or (cached and cached.info) or (groupGUID and self.mockGroups[groupGUID])
+	if IsMockGroup(groupGUID, groupInfo) then
+		return (groupInfo and groupInfo.leaderPriority) or 0
+	end
 	if groupInfo and groupInfo.leaderPriority then
 		return groupInfo.leaderPriority
 	end
@@ -3150,9 +3340,51 @@ function QuickJoin:RegisterEvents()
 		-- Friend went offline, remove their groups
 		self:Update()
 	end, 10)
+
+	BFL:RegisterEventCallback("ADDON_LOADED", function(loadedAddOn)
+		if loadedAddOn == "Blizzard_QuickJoin" then
+			self:InstallToastSelectionBridge()
+		end
+	end, 80)
+end
+
+function QuickJoin:OnTextScaleUpdated()
+	self.previewRenderedSettingsVersion = nil
+	self:Update(true)
+end
+
+function QuickJoin:InstallToastSelectionBridge()
+	if self.toastSelectionBridgeInstalled or not (hooksecurefunc and QuickJoinToastMixin and QuickJoinToastMixin.OnClick) then
+		return false
+	end
+	hooksecurefunc(QuickJoinToastMixin, "OnClick", function(toast)
+		local displayedToast = toast and toast.displayedToast
+		local guid = displayedToast and displayedToast.guid
+		if not guid then
+			return
+		end
+		-- ToggleQuickJoinPanel is redirected to BetterFriendlist. Blizzard 12.1
+		-- subsequently selects its hidden SocialUI frame, so mirror that selection
+		-- into BFL after the protected click handler has completed.
+		self:SelectGroup(guid)
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0, function()
+				self:ScrollToGroup(guid)
+			end)
+		else
+			self:ScrollToGroup(guid)
+		end
+	end)
+	self.toastSelectionBridgeInstalled = true
+	return true
 end
 
 function QuickJoin:OnSocialQueueUpdate(groupGUID, numAddedItems)
+	if self:IsCombinedPreviewActive() then
+		self:Update()
+		return
+	end
+
 	-- Specific group updated
 	if groupGUID then
 		-- Invalidate cache for this group
@@ -3181,6 +3413,10 @@ function QuickJoin:OnSocialQueueUpdate(groupGUID, numAddedItems)
 end
 
 function QuickJoin:OnConfigUpdated()
+	if self:IsCombinedPreviewActive() then
+		return
+	end
+
 	-- Reload configuration
 	if IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetConfig then
 		self.config = C_SocialQueue.GetConfig()
@@ -3188,6 +3424,11 @@ function QuickJoin:OnConfigUpdated()
 end
 
 function QuickJoin:OnSystemStatusUpdated()
+	if self:IsCombinedPreviewActive() then
+		self:Update(true)
+		return
+	end
+
 	RefreshQuickJoinAvailability()
 	if IsSocialQueueEnabled() and C_SocialQueue and C_SocialQueue.GetConfig then
 		self.config = C_SocialQueue.GetConfig()
@@ -3199,6 +3440,10 @@ function QuickJoin:OnSystemStatusUpdated()
 end
 
 function QuickJoin:OnLFGListSearchResultUpdated(searchResultID)
+	if self:IsCombinedPreviewActive() then
+		return
+	end
+
 	if not searchResultID then
 		return
 	end
@@ -3718,6 +3963,7 @@ function QuickJoin:CreateMockGroup(params)
 		-- Calculated fields (for display)
 		numMembers = numMembers,
 		leaderName = params.leaderName,
+		_mockLeaderName = params.leaderName,
 		groupTitle = groupTitle,
 		activityName = activityName, -- Prioritize specific name
 		activityType = params.activityType, -- Store type for fallback logic
@@ -3747,6 +3993,7 @@ function QuickJoin:CreateMockGroup(params)
 	-- Store mock group
 	self.mockGroups[guid] = mockGroup
 	self:RebuildMockMemberIndex()
+	self:MarkMockGroupsChanged()
 
 	-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Created '%s' (%s, %d members)",
 	-- 	params.activityName, queueType, numMembers))
@@ -3764,6 +4011,7 @@ function QuickJoin:RemoveMockGroup(guid)
 		local name = self.mockGroups[guid].groupTitle or ""
 		self.mockGroups[guid] = nil
 		self:RebuildMockMemberIndex()
+		self:MarkMockGroupsChanged()
 		-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Removed '%s'", name))
 		self:Update(true)
 		return true
@@ -3789,6 +4037,7 @@ function QuickJoin:ClearMockGroups()
 
 	wipe(self.mockGroups)
 	wipe(self.mockMemberByGuid)
+	self:MarkMockGroupsChanged()
 
 	-- BFL:DebugPrint(string.format("|cff00ff00QuickJoin Mock:|r Cleared %d mock groups", count))
 	AddChatMessage(string.format("|cff00ff00BFL QuickJoin:|r Cleared %d mock groups", count))
@@ -4419,6 +4668,7 @@ function QuickJoin:ProcessMockDynamicUpdate()
 	end
 
 	if updated then
+		self:MarkMockGroupsChanged()
 		self:Update(true)
 	end
 end
@@ -4468,6 +4718,7 @@ function QuickJoin:SimulateMockEvent(eventType)
 			local group = self.mockGroups[guid]
 			group.numMembers = math.random(1, 5)
 			group.members = CreateMockMembers(group.numMembers, group.leaderName)
+			self:MarkMockGroupsChanged()
 			AddChatMessage(
 				"|cff00ff00BFL QuickJoin:|r "
 					.. string.format(BFL.L.QJ_SIM_UPDATED_FMT, group.leaderName, group.numMembers)
@@ -4655,6 +4906,20 @@ function QuickJoin:GetSelectedGroup()
 	return self.selectedGUID
 end
 
+function QuickJoin:ScrollToGroup(guid)
+	if not guid then
+		return false
+	end
+	local scrollBox = self.retailScrollBox
+	if scrollBox and scrollBox.ScrollToElementDataByPredicate then
+		scrollBox:ScrollToElementDataByPredicate(function(elementData)
+			return elementData and elementData.guid == guid
+		end, ScrollBoxConstants and ScrollBoxConstants.AlignNearest, 0, true)
+		return true
+	end
+	return false
+end
+
 --[[
 	UpdateButtonSelection - Update a button's selection visual
 	@param guid - Group GUID
@@ -4675,11 +4940,25 @@ end
 ]]
 function QuickJoin:UpdateJoinButtonState()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.QuickJoinFrame
-	if not frame or not frame.ContentInset or not frame.ContentInset.JoinQueueButton then
+	if not frame then
 		return
 	end
 
-	local button = frame.ContentInset.JoinQueueButton
+	local button = frame.ContentInset and frame.ContentInset.JoinQueueButton
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI:GetSelectedSection() == "quick_join" then
+		button = FriendsUI.root and FriendsUI.root.BottomActionBar and FriendsUI.root.BottomActionBar.AddFriendButton or button
+	end
+	if not button then
+		return
+	end
+	button:SetText(JOIN_QUEUE or "Join Queue")
+
+	if FriendsUI and FriendsUI.AreFriendsDisabled and FriendsUI:AreFriendsDisabled() then
+		button:Disable()
+		button.tooltip = ADDING_FRIENDS_DISABLED
+		return
+	end
 
 	-- Check if in group
 	if IsInGroup(LE_PARTY_CATEGORY_HOME) then

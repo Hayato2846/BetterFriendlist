@@ -8,6 +8,10 @@ local QuickFilters = BFL:RegisterModule("QuickFilters", {})
 local L = BFL.L
 
 local filterMode = "all"
+local FILTER_ROOT_MENU_WIDTH = 120
+local FILTER_ROOT_MAX_TAG_ICONS = 2
+local FRIENDS_FILTER_ICON = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter"
+local visibleMenuLabels = setmetatable({}, { __mode = "k" })
 
 local function GetFriendsList()
 	return BFL:GetModule("FriendsList")
@@ -15,6 +19,10 @@ end
 
 local function GetRegistry()
 	return BFL:GetModule("FilterSortRegistry")
+end
+
+local function GetFriendTags()
+	return BFL:GetModule("FriendTags")
 end
 
 local function IsModernDropdown(dropdown)
@@ -63,6 +71,99 @@ local function ResolveFilter(mode)
 	return mode or "all"
 end
 
+local function UsesModernFriendsFilterLabel()
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+end
+
+local function GetFriendsFilterSelectionText(size)
+	if UsesModernFriendsFilterLabel() then
+		return FILTER or "Filter"
+	end
+	return FormatIcon(FRIENDS_FILTER_ICON, size or 14)
+end
+
+local function GetGuildFilterSelectionText(icon, size)
+	if UsesModernFriendsFilterLabel() then
+		return string.format("%s (%s)", FILTER or "Filter", FormatIcon(icon, math.max(10, (size or 16) - 1)))
+	end
+	return GetFriendsFilterSelectionText(size)
+end
+
+local function AlignLegacyHeaderSelection(dropdown)
+	local initializer = BFL.FrameInitializer
+	if initializer and initializer.AlignLegacyHeaderDropdownSelection then
+		initializer:AlignLegacyHeaderDropdownSelection(dropdown)
+	end
+end
+
+local function GetTagIconMarkup(tag, size)
+	local FriendTags = GetFriendTags()
+	local profile = type(tag) == "table" and (tag.chipProfile or (FriendTags and FriendTags:GetChipProfile(tag))) or nil
+	if type(profile) ~= "table" or profile.iconType == "none" then
+		return ""
+	end
+
+	size = tonumber(size) or 16
+	if profile.iconType == "atlas" then
+		local atlas = profile.iconValue or profile.atlas
+		if not (atlas and BFL.HasAtlas and BFL.HasAtlas(atlas)) then
+			atlas = profile.fallbackAtlas
+		end
+		if atlas and BFL.GetAtlasOrTextureMarkup then
+			return BFL.GetAtlasOrTextureMarkup(atlas, profile.texture, size, size)
+		end
+	end
+
+	local texture = profile.texture or profile.icon or profile.iconValue
+	if texture then
+		return FormatIcon(texture, size)
+	end
+	return ""
+end
+
+local function JoinMenuLabel(label, icons)
+	if #icons == 0 then
+		return label
+	end
+	return label .. "  " .. table.concat(icons, " ")
+end
+
+local function SetMenuButtonText(button, text)
+	if not button then
+		return
+	end
+	local fontString = button.fontString or button.Text
+	if fontString and fontString.SetTextToFit then
+		fontString:SetTextToFit(text)
+	elseif fontString and fontString.SetText then
+		fontString:SetText(text)
+	elseif button.SetText then
+		button:SetText(text)
+	end
+end
+
+local function RefreshVisibleMenuLabels()
+	for button, getText in pairs(visibleMenuLabels) do
+		SetMenuButtonText(button, getText())
+	end
+end
+
+local function AddDynamicMenuLabel(element, getText)
+	if not (element and element.AddInitializer and type(getText) == "function") then
+		return
+	end
+	element:AddInitializer(function(button)
+		visibleMenuLabels[button] = getText
+		SetMenuButtonText(button, getText())
+	end)
+	if element.AddResetter then
+		element:AddResetter(function(button)
+			visibleMenuLabels[button] = nil
+		end)
+	end
+end
+
 function QuickFilters:Initialize()
 	local Registry = GetRegistry()
 	if Registry and Registry.NormalizeCurrentSelections then
@@ -72,6 +173,94 @@ function QuickFilters:Initialize()
 		filterMode = ResolveFilter(BetterFriendlistDB.quickFilter)
 		BetterFriendlistDB.quickFilter = filterMode
 	end
+	if BetterFriendlistDB and type(BetterFriendlistDB.quickFilterTags) ~= "table" then
+		BetterFriendlistDB.quickFilterTags = {}
+	end
+end
+
+function QuickFilters:GetTagFilterDefinitions()
+	local FriendTags = GetFriendTags()
+	if not (FriendTags and FriendTags.CanDisplayTags and FriendTags:CanDisplayTags("filter")) then
+		return {}
+	end
+
+	local definitions = {}
+	for _, tag in ipairs(FriendTags:GetAllTagDefinitions()) do
+		if FriendTags:ShouldIncludeTagOnSurface(tag, "filter") then
+			definitions[#definitions + 1] = tag
+		end
+	end
+	return definitions
+end
+
+function QuickFilters:GetSelectedTagFilters()
+	if not BetterFriendlistDB then
+		return {}
+	end
+	if type(BetterFriendlistDB.quickFilterTags) ~= "table" then
+		BetterFriendlistDB.quickFilterTags = {}
+	end
+	return BetterFriendlistDB.quickFilterTags
+end
+
+function QuickFilters:IsTagFilterSelected(tagId)
+	return self:GetSelectedTagFilters()[tagId] == true
+end
+
+function QuickFilters:GetActiveTagFilterDefinitions()
+	local selected = self:GetSelectedTagFilters()
+	local active = {}
+	for _, tag in ipairs(self:GetTagFilterDefinitions()) do
+		if selected[tag.id] == true then
+			active[#active + 1] = tag
+		end
+	end
+	return active
+end
+
+function QuickFilters:SetTagFilter(tagId, selected)
+	if type(tagId) ~= "string" or tagId == "" then
+		return false
+	end
+	local selectedTags = self:GetSelectedTagFilters()
+	local newValue = selected == true or nil
+	if selectedTags[tagId] == newValue then
+		return false
+	end
+	selectedTags[tagId] = newValue
+	BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+	RefreshVisibleMenuLabels()
+
+	if BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
+	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+	self:RefreshDropdown(header and header.QuickFilterDropdown)
+	return true
+end
+
+function QuickFilters:PassesTagFilters(friend)
+	local activeTags = self:GetActiveTagFilterDefinitions()
+	if #activeTags == 0 then
+		return true
+	end
+
+	local selected = self:GetSelectedTagFilters()
+	local FriendTags = GetFriendTags()
+	for _, tag in ipairs(FriendTags and FriendTags:GetTagsForFriend(friend, "filter") or {}) do
+		if selected[tag.id] == true then
+			return true
+		end
+	end
+	return false
+end
+
+function QuickFilters:GetTagFilterText()
+	local names = {}
+	for _, tag in ipairs(self:GetActiveTagFilterDefinitions()) do
+		names[#names + 1] = tag.name
+	end
+	return table.concat(names, ", ")
 end
 
 function QuickFilters:InitDropdown(dropdown)
@@ -84,32 +273,25 @@ function QuickFilters:InitDropdown(dropdown)
 		if not isElvUIActive then
 			BFL.SetDropdownWidth(dropdown, 70)
 		end
-		local labels = {}
-		local values = {}
-		for _, filter in ipairs(GetVisibleFilters()) do
-			table.insert(labels, FormatIcon(filter.icon, 14) .. " " .. filter.name)
-			table.insert(values, filter.id)
-		end
 		BFL.InitializeDropdown(dropdown, {
-			labels = labels,
-			values = values,
-			getSelectionText = function(value)
-				return FormatIcon(self:GetIcon(ResolveFilter(value)), 14)
+			getSelectionText = function()
+				return GetFriendsFilterSelectionText(14)
 			end,
-		}, function(value)
-			local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all")
-			return currentFilter == value
-		end, function(value)
-			QuickFilters:SetFilter(value)
-		end)
+			populateRootDescription = function(rootDescription)
+				self:PopulateMenu(rootDescription)
+			end,
+		}, function()
+			return false
+		end, function() end)
+		BFL.SetDropdownText(dropdown, GetFriendsFilterSelectionText(14))
+		AlignLegacyHeaderSelection(dropdown)
 
 		local dropdownName = dropdown:GetName()
 		local buttonName = dropdownName and (dropdownName .. "Button")
 		local button = buttonName and _G[buttonName]
 		local function ShowTooltip()
-			local filterText = QuickFilters:GetFilterText()
 			BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-			BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
+			BFL_Tooltip:SetText(QuickFilters:GetTooltipText())
 			BFL_Tooltip:Show()
 		end
 
@@ -144,16 +326,14 @@ function QuickFilters:InitDropdown(dropdown)
 		end
 	end
 
-	dropdown:SetWidth(51)
+	dropdown:SetWidth(UsesModernFriendsFilterLabel() and 92 or 51)
 	BFL.InitializeDropdown(dropdown, {
-		getSelectionText = function(mode)
+		getSelectionText = function()
 			local GuildFrame = GetActiveGuildFrame()
 			if GuildFrame and GuildFrame.GetHeaderFilterIcon then
-				return FormatIcon(GuildFrame:GetHeaderFilterIcon(), 16)
+				return GetGuildFilterSelectionText(GuildFrame:GetHeaderFilterIcon(), 16)
 			end
-			local Registry = GetRegistry()
-			local icon = Registry and Registry:GetQuickFilterIcon(mode) or self:GetIcon(mode)
-			return FormatIcon(icon, 16)
+			return GetFriendsFilterSelectionText(14)
 		end,
 		populateRootDescription = function(rootDescription)
 			local GuildFrame = GetActiveGuildFrame()
@@ -163,14 +343,12 @@ function QuickFilters:InitDropdown(dropdown)
 				return
 			end
 
-			rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
-			for _, filter in ipairs(GetVisibleFilters()) do
-				rootDescription:CreateRadio(FormatIcon(filter.icon, 16) .. " " .. filter.name, IsSelected, SetSelected, filter.id)
-			end
+			self:PopulateMenu(rootDescription)
 		end,
 	}, IsSelected, SetSelected)
+	AlignLegacyHeaderSelection(dropdown)
 
-	dropdown:SetScript("OnEnter", function()
+	local function OnEnter()
 		local GuildFrame = GetActiveGuildFrame()
 		if GuildFrame and GuildFrame.GetHeaderFilterText then
 			BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
@@ -179,12 +357,30 @@ function QuickFilters:InitDropdown(dropdown)
 			return
 		end
 
-		local filterText = self:GetFilterText()
 		BFL_Tooltip:SetOwner(dropdown, "ANCHOR_RIGHT", -18, 0)
-		BFL_Tooltip:SetText(string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", filterText))
+		BFL_Tooltip:SetText(self:GetTooltipText())
 		BFL_Tooltip:Show()
-	end)
-	dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+	end
+	if dropdown.HookScript then
+		dropdown:HookScript("OnEnter", OnEnter)
+		dropdown:HookScript("OnLeave", BFL_Tooltip_Hide)
+	else
+		dropdown:SetScript("OnEnter", OnEnter)
+		dropdown:SetScript("OnLeave", BFL_Tooltip_Hide)
+	end
+end
+
+function QuickFilters:GetHeaderSelectionText(size)
+	return GetFriendsFilterSelectionText(size)
+end
+
+function QuickFilters:GetTooltipText()
+	local text = string.format(L.TOOLTIP_QUICK_FILTER or "Quick Filter: %s", self:GetFilterText())
+	local tagText = self:GetTagFilterText()
+	if tagText ~= "" then
+		text = text .. "\n" .. (L.FRIEND_TAGS_SETTINGS_TAG_LIST or "Tags") .. ": " .. tagText
+	end
+	return text
 end
 
 function QuickFilters:SetFilter(mode)
@@ -194,6 +390,7 @@ function QuickFilters:SetFilter(mode)
 		BetterFriendlistDB.quickFilter = mode
 	end
 	filterMode = mode
+	RefreshVisibleMenuLabels()
 
 	local FriendsList = GetFriendsList()
 	if FriendsList then
@@ -247,6 +444,11 @@ function QuickFilters:GetIcons()
 end
 
 function QuickFilters:RefreshDropdown(dropdown)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		local modernDropdown = FriendsUI.root and FriendsUI.root.FilterBar and FriendsUI.root.FilterBar.FilterDropdown
+		dropdown = modernDropdown or dropdown
+	end
 	if not dropdown then
 		return
 	end
@@ -254,21 +456,25 @@ function QuickFilters:RefreshDropdown(dropdown)
 	local GuildFrame = GetActiveGuildFrame()
 	if GuildFrame and GuildFrame.GetHeaderFilterIcon then
 		local modernDropdown = IsModernDropdown(dropdown)
-		local text = FormatIcon(GuildFrame:GetHeaderFilterIcon(), modernDropdown and 16 or 14)
+		local size = modernDropdown and 16 or 14
+		local text = GetGuildFilterSelectionText(GuildFrame:GetHeaderFilterIcon(), size)
 		BFL.SetDropdownText(dropdown, text)
+		AlignLegacyHeaderSelection(dropdown)
 		return
 	end
 
-	local currentFilter = self:GetFilter()
-	local icon = self:GetIcon(currentFilter)
-	local modernDropdown = IsModernDropdown(dropdown)
-	local size = modernDropdown and 16 or 14
-	local text = FormatIcon(icon, size)
-
-	BFL.SetDropdownText(dropdown, text)
+	BFL.SetDropdownText(dropdown, GetFriendsFilterSelectionText(14))
+	AlignLegacyHeaderSelection(dropdown)
 end
 
 function QuickFilters:PopulateMenu(rootDescription)
+	rootDescription:SetTag("MENU_FRIENDS_QUICKFILTER")
+	if rootDescription.SetMinimumWidth then
+		rootDescription:SetMinimumWidth(FILTER_ROOT_MENU_WIDTH)
+	end
+	if rootDescription.SetMaximumWidth then
+		rootDescription:SetMaximumWidth(FILTER_ROOT_MENU_WIDTH)
+	end
 	local function IsSelected(mode)
 		return self:GetFilter() == mode
 	end
@@ -277,7 +483,53 @@ function QuickFilters:PopulateMenu(rootDescription)
 		self:SetFilter(mode)
 	end
 
+	local function GetFilterLabel()
+		local filterIcons = { FormatIcon(self:GetIcon(self:GetFilter()), 16) }
+		return JoinMenuLabel(FILTERS or FILTER or "Filters", filterIcons)
+	end
+	local filterSubmenu = rootDescription:CreateButton(GetFilterLabel())
+	AddDynamicMenuLabel(filterSubmenu, GetFilterLabel)
 	for _, filter in ipairs(GetVisibleFilters()) do
-		rootDescription:CreateRadio(FormatIcon(filter.icon, 16) .. " " .. filter.name, IsSelected, SetSelected, filter.id)
+		filterSubmenu:CreateRadio(FormatIcon(filter.icon, 16) .. " " .. filter.name, IsSelected, SetSelected, filter.id)
+	end
+
+	local function GetTagLabel()
+		local activeTags = self:GetActiveTagFilterDefinitions()
+		local tagIcons = {}
+	for _, tag in ipairs(activeTags) do
+		if #tagIcons >= FILTER_ROOT_MAX_TAG_ICONS then
+			break
+		end
+		local icon = GetTagIconMarkup(tag, 16)
+		if icon ~= "" then
+			tagIcons[#tagIcons + 1] = icon
+		end
+	end
+	if #activeTags > #tagIcons then
+		tagIcons[#tagIcons + 1] = "+" .. (#activeTags - #tagIcons)
+	end
+		return JoinMenuLabel(L.FRIEND_TAGS_SETTINGS_TAG_LIST or "Tags", tagIcons)
+	end
+
+	local tagSubmenu = rootDescription:CreateButton(GetTagLabel())
+	AddDynamicMenuLabel(tagSubmenu, GetTagLabel)
+	local tagDefinitions = self:GetTagFilterDefinitions()
+	if #tagDefinitions == 0 then
+		tagSubmenu:CreateTitle(L.FRIEND_TAGS_SETTINGS_TAG_LIST_EMPTY or "No tags available.")
+		return
+	end
+	for _, tag in ipairs(tagDefinitions) do
+		local tagId = tag.id
+		local icon = GetTagIconMarkup(tag, 16)
+		local label = icon ~= "" and (icon .. " " .. tag.name) or tag.name
+		local checkbox = tagSubmenu:CreateCheckbox(label, function()
+			return self:IsTagFilterSelected(tagId)
+		end, function()
+			self:SetTagFilter(tagId, not self:IsTagFilterSelected(tagId))
+			return MenuResponse and MenuResponse.Refresh
+		end)
+		if checkbox and checkbox.SetCloseOnClick then
+			checkbox:SetCloseOnClick(false)
+		end
 	end
 end

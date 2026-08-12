@@ -28,6 +28,7 @@ local SPACING_OPTION = -10
 -- We no longer use percentage based labels to avoid clipping on narrow items
 local CONTROL_GAP = 10 -- Gap between Label and Control
 local FIXED_CONTROL_WIDTH = 170 -- Standard width for Dropdowns and Sliders to ensure alignment
+local DROPDOWN_MAX_HEIGHT = 300 -- Keep long value lists on-screen and scrollable
 local CHECKBOX_X_OFFSET = 4 -- Push checkboxes slightly right to align visual box with Dropdown/Slider edges
 local SLIDER_HEIGHT = 22
 local SLIDER_TRACK_HEIGHT = 18
@@ -397,6 +398,8 @@ local function AttachDarkDropdownData(dropdown, entries, isSelectedCallback, onS
 		useCheckboxes = entries.useCheckboxes,
 		isSelected = isSelectedCallback,
 		onSelect = onSelectionCallback,
+		isOptionEnabled = entries.isOptionEnabled,
+		getOptionTooltip = entries.getOptionTooltip,
 		applyFont = applySelectionFont,
 		getFontObject = function(index)
 			local fontPath = entryFontPaths and entryFontPaths[index]
@@ -542,11 +545,13 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 			onSelectionCallback(selectionValue)
 			UpdateDropdownText(selectionValue)
 			RefreshCheckboxDropdown()
-		end, GetCurrentDropdownText)
+		end, GetCurrentDropdownText, DROPDOWN_MAX_HEIGHT)
 	else
 		BFL.InitializeDropdown(dropdown, {
 			labels = entryLabels,
 			values = entryValues,
+			isOptionEnabled = entries.isOptionEnabled,
+			getOptionTooltip = entries.getOptionTooltip,
 			getSelectionText = function(selectionValue)
 				if getSelectionText then
 					return getSelectionText()
@@ -563,7 +568,7 @@ local function CreateClassicDropdown(parent, entries, isSelectedCallback, onSele
 		}, isSelectedCallback, function(selectionValue)
 			onSelectionCallback(selectionValue)
 			UpdateDropdownText(selectionValue)
-		end)
+		end, DROPDOWN_MAX_HEIGHT)
 	end
 
 	if getSelectionText then
@@ -680,11 +685,13 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 				}, isSelectedCallback, function(selectionValue)
 					onSelectionCallback(selectionValue)
 					UpdateDropdownText(selectionValue)
-				end, GetCurrentDropdownText)
+				end, GetCurrentDropdownText, DROPDOWN_MAX_HEIGHT)
 			else
 				BFL.InitializeDropdown(dropdown, {
 					labels = entryLabels,
 					values = entryValues,
+					isOptionEnabled = entries.isOptionEnabled,
+					getOptionTooltip = entries.getOptionTooltip,
 					getSelectionText = function(selectionValue)
 						if getSelectionText then
 							return getSelectionText()
@@ -701,7 +708,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 				}, isSelectedCallback, function(selectionValue)
 					onSelectionCallback(selectionValue)
 					UpdateDropdownText(selectionValue)
-				end, 300)
+				end, DROPDOWN_MAX_HEIGHT)
 			end
 
 			if getSelectionText then
@@ -1929,7 +1936,7 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 					}, dropdownData.isSelectedCallback, function(selectionValue)
 						dropdownData.onSelectionCallback(selectionValue)
 						UpdateDropdownText(selectionValue)
-					end, GetCurrentDropdownText)
+					end, GetCurrentDropdownText, DROPDOWN_MAX_HEIGHT)
 				else
 					BFL.InitializeDropdown(dropdown, {
 						labels = entryLabels,
@@ -1939,7 +1946,7 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 					}, dropdownData.isSelectedCallback, function(selectionValue)
 						dropdownData.onSelectionCallback(selectionValue)
 						UpdateDropdownText(selectionValue)
-					end, 300)
+					end, DROPDOWN_MAX_HEIGHT)
 				end
 
 				for i = 1, #entryValues do

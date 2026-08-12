@@ -128,6 +128,25 @@ local ZEBRA_EVEN_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.3 }
 local ZEBRA_ODD_COLOR = { r = 0, g = 0, b = 0, a = 0 }
 local GUILD_SCROLLBAR_RESERVE = 22
 
+function GuildFrame:GetRetailScrollBarGeometry()
+	local reserve = GUILD_SCROLLBAR_RESERVE
+	local gap = 0
+	local width = GUILD_SCROLLBAR_RESERVE
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		if FriendsUI.GetModernScrollBoxRightInset then
+			reserve = FriendsUI:GetModernScrollBoxRightInset()
+		end
+		if FriendsUI.GetModernScrollBarGap then
+			gap = FriendsUI:GetModernScrollBarGap()
+		end
+		local reference = BetterFriendsFrame and BetterFriendsFrame.MinimalScrollBar
+		local referenceWidth = reference and reference:GetWidth()
+		width = referenceWidth and referenceWidth > 0 and referenceWidth or 8
+	end
+	return reserve, gap, width
+end
+
 -- ========================================
 -- Module Dependencies
 -- ========================================
@@ -938,8 +957,13 @@ function GuildFrame:ApplyV1Visibility(frame)
 		frame.InvitePlayerButton:Hide()
 		frame.InvitePlayerButton:Disable()
 	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modernDirectory = BFL.IsRetail
+		and FriendsUI
+		and FriendsUI.IsModernActive
+		and FriendsUI:IsModernActive()
 	if frame.SearchBox then
-		if BFL.IsClassic then
+		if BFL.IsClassic or modernDirectory then
 			frame.SearchBox:Show()
 		else
 			frame.SearchBox:SetText("")
@@ -947,14 +971,14 @@ function GuildFrame:ApplyV1Visibility(frame)
 		end
 	end
 	if frame.SortDropdown then
-		if BFL.IsClassic then
+		if BFL.IsClassic or modernDirectory then
 			frame.SortDropdown:Show()
 		else
 			frame.SortDropdown:Hide()
 		end
 	end
 	if frame.FilterDropdown then
-		if BFL.IsClassic then
+		if BFL.IsClassic or modernDirectory then
 			frame.FilterDropdown:Show()
 		else
 			frame.FilterDropdown:Hide()
@@ -1226,14 +1250,15 @@ function GuildFrame:OnLoad(frame)
 	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
 
 	-- ScrollBox: flush inside ListInset (WhoFrame pattern)
+	local scrollBarReserve, scrollBarGap, scrollBarWidth = self:GetRetailScrollBarGeometry()
 	frame.ScrollBox:ClearAllPoints()
 	frame.ScrollBox:SetPoint("TOPLEFT", frame.ListInset, "TOPLEFT", 4, -4)
-	frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.ListInset, "BOTTOMRIGHT", -GUILD_SCROLLBAR_RESERVE, 2)
+	frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.ListInset, "BOTTOMRIGHT", -scrollBarReserve, 2)
 
 	frame.ScrollBar:ClearAllPoints()
-	frame.ScrollBar:SetWidth(GUILD_SCROLLBAR_RESERVE)
-	frame.ScrollBar:SetPoint("TOPLEFT", frame.ScrollBox, "TOPRIGHT", 0, 0)
-	frame.ScrollBar:SetPoint("BOTTOMLEFT", frame.ScrollBox, "BOTTOMRIGHT", 0, 0)
+	frame.ScrollBar:SetWidth(scrollBarWidth)
+	frame.ScrollBar:SetPoint("TOPLEFT", frame.ScrollBox, "TOPRIGHT", scrollBarGap, 0)
+	frame.ScrollBar:SetPoint("BOTTOMLEFT", frame.ScrollBox, "BOTTOMRIGHT", scrollBarGap, 0)
 
 	-- Create DataProvider
 	guildDataProvider = CreateDataProvider()
@@ -1521,10 +1546,11 @@ function GuildFrame:UpdateHeaderInfo()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame then return end
 	local provider = GetGuildRosterData()
+	local inGuild = provider and provider.IsInGuild and provider:IsInGuild() or false
 
 	-- Guild name
 	if guildFrame.GuildName then
-		if provider and provider.IsInGuild and provider:IsInGuild() then
+		if inGuild then
 			local guildName = provider.GetGuildName and provider:GetGuildName() or ""
 			guildFrame.GuildName:SetText(guildName or "")
 		else
@@ -1534,10 +1560,27 @@ function GuildFrame:UpdateHeaderInfo()
 
 	-- Member count -- unified "N / M online" format
 	if guildFrame.MemberCount then
-		local online = self.onlineMembers or 0
-		local total = self.totalMembers or 0
-		local fmt = (L and L.GUILD_HEADER_ONLINE_FORMAT) or "%d / %d online"
-		guildFrame.MemberCount:SetText(format(fmt, online, total))
+		guildFrame.MemberCount:SetShown(inGuild)
+		if inGuild then
+			local online = self.onlineMembers or 0
+			local total = self.totalMembers or 0
+			local fmt = (L and L.GUILD_HEADER_ONLINE_FORMAT) or "%d / %d online"
+			guildFrame.MemberCount:SetText(format(fmt, online, total))
+		else
+			guildFrame.MemberCount:SetText("")
+		end
+	end
+	if guildFrame.ActionsButton then
+		guildFrame.ActionsButton:SetEnabled(inGuild)
+	end
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	local modernAction = FriendsUI
+		and FriendsUI.selectedSection == "guild"
+		and FriendsUI.root
+		and FriendsUI.root.BottomActionBar
+		and FriendsUI.root.BottomActionBar.AddFriendButton
+	if modernAction then
+		modernAction:SetEnabled(inGuild)
 	end
 
 	self:UpdateTabard()
@@ -1550,7 +1593,14 @@ function GuildFrame:UpdateMOTD()
 	if not guildFrame or not guildFrame.MOTDText then return end
 
 	local motd = ""
-	if BFL.GetGuildMOTD then
+	local provider = GetGuildRosterData()
+	local getGuildMOTD = provider and provider.GetGuildMOTD
+	if getGuildMOTD then
+		local ok, result = pcall(getGuildMOTD, provider)
+		if ok and result then
+			motd = tostring(result):gsub("|n", " "):gsub("\\n", " "):gsub("\n", " ")
+		end
+	elseif BFL.GetGuildMOTD then
 		local ok, result = pcall(BFL.GetGuildMOTD)
 		if ok and result then
 			motd = tostring(result):gsub("|n", " "):gsub("\\n", " "):gsub("\n", " ")
@@ -2001,6 +2051,11 @@ function GuildFrame:GetMemberCount()
 	return self.onlineMembers, self.totalMembers
 end
 
+function GuildFrame:IsInGuild()
+	local provider = GetGuildRosterData()
+	return provider and provider.IsInGuild and provider:IsInGuild() == true or false
+end
+
 -- ========================================
 -- Row Layout Management (Responsive)
 -- ========================================
@@ -2022,7 +2077,8 @@ function GuildFrame:UpdateResponsiveLayout()
 	if self._lastLayoutWidth == roundedWidth then return end
 	self._lastLayoutWidth = roundedWidth
 
-	local scrollbarAndPadding = GUILD_SCROLLBAR_RESERVE + 10
+	local scrollBarReserve = self:GetRetailScrollBarGeometry()
+	local scrollbarAndPadding = scrollBarReserve + 10
 	local effectiveWidth = math.max((frameWidth or 360) - scrollbarAndPadding, 220)
 
 	self.rowContentWidth = effectiveWidth

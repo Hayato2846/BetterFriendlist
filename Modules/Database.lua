@@ -53,7 +53,7 @@ local defaults = {
 	preferredGameAccounts = {}, -- {friendUID: gameAccountID} - user-selected preferred game account per friend
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
-	theme = "blizzard", -- UI theme: "blizzard", "dark", "custom", "elvui"
+	theme = "blizzard", -- Registered UI theme ID; built-ins and addon-backed themes are declared by ThemeManager
 	darkThemeSettings = ThemePalette and ThemePalette:GetDefaultDarkSettings() or {},
 	customThemeSettings = ThemePalette and ThemePalette:GetDefaultCustomSettings() or {},
 	customTheme = {},
@@ -105,7 +105,7 @@ local defaults = {
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	treatMobileAsOffline = false, -- Treat mobile friends as offline (display in Offline group) (default: OFF)
 	nameDisplayFormat = "%name%", -- LEGACY: Migrated to nameFormatPreset/nameFormatCustom
-	nameFormatPreset = "default", -- Preset: "default", "battletag", "nickname", "name_nickname", "name_note", "name_battletag", "custom"
+	nameFormatPreset = "default", -- Preset: "default", "battletag", "battletag_only", "nickname", "character", "name_only", "custom"
 	nameFormatCustom = "%name%", -- Custom format string (used when nameFormatPreset == "custom")
 	infoFormatPreset = "default", -- Preset: "default", "zone", "level", "class_zone", "level_class_zone", "game", "disabled", "custom"
 	infoFormatCustom = "%level%, %zone%", -- Custom info format string (used when infoFormatPreset == "custom")
@@ -114,7 +114,7 @@ local defaults = {
 	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
 	hideMaxLevel = false, -- Hide level display for max level characters (default: OFF)
 	colorLevelByDifficulty = true, -- Color level text by difficulty (grey/green/yellow/orange/red) (default: ON)
-	showNoteIcon = false, -- Show a note icon if the friend has a note (default: OFF)
+	showNoteIcon = false, -- Deprecated compatibility value; no note icon is rendered
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
 	enableFavoriteIcon = true, -- Show the Favorite icon on the friend button (default: ON)
@@ -127,6 +127,7 @@ local defaults = {
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
 	-- Filter Settings
 	quickFilter = "all", -- Quick filter mode: all, online, offline, wowonline, wow, bnet, hideafk, retail, ingame (default: all)
+	quickFilterTags = {}, -- Selected Friend Tag facets: { [tagId] = true }
 	customQuickFilters = {}, -- User-created QuickFilter definitions (account-wide)
 	quickFilterVisibility = {}, -- {filterId: boolean}; nil means visible
 	quickFilterOrder = {}, -- Ordered list of built-in and custom QuickFilter IDs
@@ -190,8 +191,15 @@ local defaults = {
 	enableGlobalSyncDeletion = false, -- Enable deletion of friends during sync (default: OFF)
 
 	-- Main Frame Edit Mode (Phase EditMode)
+	friendsFrameStyle = BFL.IsRetail and "modern" or "legacy", -- Requested UI style; capability fallback never overwrites this value
+	forceModernFriendsUI = false, -- Developer override for testing Modern while Blizzard disables C_SocialUI
+	appearanceOnboardingVersion = 0, -- One-time Retail style/theme onboarding schema; installation-local and not imported
+	appearanceOnboardingResume = false, -- Temporary reload-resume state; installation-local and not imported
+	modernFriendTabOrder = {}, -- Modern SocialUI side-tab order; missing IDs are appended in their default order
+	modernFriendTabVisibility = {}, -- Per-tab visibility; missing IDs remain visible
+	modernFriendTabPopulatedOnly = { quick_join = false, friend_requests = false }, -- Optional empty-state hiding for count-driven tabs
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
-	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
+	mainFramePosition = {}, -- {Shared = {point, x, y}}; legacy per-layout keys migrate on FrameSettings initialization
 	settingsCenterWindow = { width = 1080, height = 700, locked = false, density = "compact" }, -- LibSettingsDesigner window state
 	settingsCenterSeenNewTags = {}, -- Host-owned seen state for LibSettingsDesigner new badges
 	mainFramePositionMigrated = false, -- Track if old position has been migrated (one-time)
@@ -205,6 +213,9 @@ local defaults = {
 	brokerShowLabel = true, -- Show label text (default: ON)
 	brokerShowTotal = true, -- Show total count (default: ON)
 	brokerShowGroups = false, -- Split counts by WoW/BNet (default: OFF, shows combined)
+	brokerShowWoWIcon = true, -- Show the WoW count icon when counts are split (default: ON)
+	brokerShowBNetIcon = true, -- Show the Battle.net count icon when counts are split (default: ON)
+	brokerShowClassIcons = false, -- Show class icons in the broker tooltip (default: OFF)
 	brokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
 	brokerClickAction = "toggle", -- Left click action: "toggle", "friends", "settings" (default: toggle)
 	brokerShowHints = true, -- Show hint text in LDB tooltip footer (default: ON)
@@ -218,6 +229,7 @@ local defaults = {
 		dark = {},
 		custom = {},
 		elvui = {},
+		ellesmereui = {},
 	}, -- Per-theme broker tooltip background overrides; nil values inherit theme defaults
 	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
 	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
@@ -226,7 +238,7 @@ local defaults = {
 	guildBrokerShowIcon = true, -- Show guild icon on display addons (default: ON)
 	guildBrokerShowLabel = true, -- Show label text (default: ON)
 	guildBrokerShowTotal = true, -- Show total member count (default: ON)
-	guildBrokerTooltipMode = "advanced", -- Tooltip detail level: "basic" or "advanced" (default: advanced)
+	guildBrokerTooltipMode = "advanced", -- Deprecated compatibility value; Guild Broker uses its single supported tooltip layout
 	guildBrokerClickAction = "guild_tab", -- Left click action: "guild_tab", "settings" (default: guild_tab)
 	guildBrokerShowHints = true, -- Show hint text in tooltip footer (default: ON)
 	guildBrokerShowApplicants = true, -- Show pending Guild Finder applicant count when available
@@ -287,9 +299,10 @@ local defaults = {
 	whoShowClassIcons = true, -- Show class icon in WHO result rows (default: ON)
 	whoLevelColors = true, -- Color level text by difficulty (default: ON)
 	whoZebraStripes = true, -- Alternating row backgrounds in WHO (default: ON)
+	whoZebraStripeStrength = 0.3, -- Opacity for alternating WHO row backgrounds
 	whoSearchHistoryEnabled = true, -- Enable WHO search history (default: ON)
 	whoSearchHistoryMax = 8, -- Maximum search history entries (default: 8)
-	whoDoubleClickAction = "whisper", -- Double-click action: whisper, invite, inspect (default: whisper)
+	whoDoubleClickAction = "whisper", -- Double-click action: whisper or invite (default: whisper)
 	whoSearchHistory = {}, -- Stored search history entries
 	whoSearchBuilderDocked = false, -- Search Builder docked mode (default: OFF, flyout overlay)
 
@@ -346,6 +359,7 @@ local VALID_THEMES = {
 	dark = true,
 	custom = true,
 	elvui = true,
+	ellesmereui = true,
 }
 
 local THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION = 1
@@ -415,7 +429,11 @@ function DB:NormalizeThemeSetting()
 		BetterFriendlistDB.theme = BetterFriendlistDB.enableElvUISkin == true and "elvui" or "blizzard"
 	end
 
-	if not VALID_THEMES[BetterFriendlistDB.theme] then
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	local validTheme = ThemeManager and ThemeManager.IsValidTheme
+		and ThemeManager:IsValidTheme(BetterFriendlistDB.theme)
+		or VALID_THEMES[BetterFriendlistDB.theme] == true
+	if not validTheme then
 		BetterFriendlistDB.theme = "blizzard"
 	end
 
@@ -427,7 +445,11 @@ function DB:NormalizeThemeSetting()
 	-- Per-theme palette data is normalized separately below.
 	if BetterFriendlistDB.theme == "elvui" then
 		BetterFriendlistDB.enableElvUISkin = true
-	elseif BetterFriendlistDB.theme == "dark" or BetterFriendlistDB.theme == "custom" then
+	elseif
+		BetterFriendlistDB.theme == "dark"
+		or BetterFriendlistDB.theme == "custom"
+		or BetterFriendlistDB.theme == "ellesmereui"
+	then
 		BetterFriendlistDB.enableElvUISkin = false
 	elseif BetterFriendlistDB.enableElvUISkin == nil then
 		BetterFriendlistDB.enableElvUISkin = false
@@ -457,13 +479,19 @@ function DB:NormalizeThemeSettings()
 	if type(BetterFriendlistDB.brokerTooltipThemeSettings) ~= "table" then
 		BetterFriendlistDB.brokerTooltipThemeSettings = self:InternalDeepCopy(defaults.brokerTooltipThemeSettings)
 	else
-		for _, theme in ipairs({ "blizzard", "dark", "custom", "elvui" }) do
+		for _, theme in ipairs({ "blizzard", "dark", "custom", "elvui", "ellesmereui" }) do
 			if type(BetterFriendlistDB.brokerTooltipThemeSettings[theme]) ~= "table" then
 				BetterFriendlistDB.brokerTooltipThemeSettings[theme] = {}
 			end
 		end
 		for theme in pairs(BetterFriendlistDB.brokerTooltipThemeSettings) do
-			if theme ~= "blizzard" and theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" then
+			if
+				theme ~= "blizzard"
+				and theme ~= "dark"
+				and theme ~= "custom"
+				and theme ~= "elvui"
+				and theme ~= "ellesmereui"
+			then
 				BetterFriendlistDB.brokerTooltipThemeSettings[theme] = nil
 			end
 		end
@@ -914,6 +942,14 @@ function DB:Set(key, value)
 			NoteSync:OnGroupOrderChanged()
 		end
 	end
+
+	-- Keep every active Preview surface in sync with Settings Center and legacy
+	-- controls. PreviewMode coalesces a whole change burst into one bounded
+	-- refresh, so sliders and color pickers cannot create refresh storms.
+	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.OnSettingChanged then
+		PreviewMode:OnSettingChanged(key)
+	end
 end
 
 function DB:GetLastInvitedAccount(friendUID)
@@ -1154,6 +1190,13 @@ function DB:GetNickname(friendUID)
 	if not friendUID then
 		return nil
 	end
+	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockFriendNickname then
+		local previewNickname = PreviewMode:GetMockFriendNickname(friendUID)
+		if previewNickname then
+			return previewNickname
+		end
+	end
 
 	local libKey = self:GetLibKey(friendUID)
 
@@ -1224,6 +1267,13 @@ end
 function DB:GetGuildNickname(fullName)
 	if not fullName then
 		return nil
+	end
+	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockGuildNickname then
+		local previewNickname = PreviewMode:GetMockGuildNickname(fullName)
+		if previewNickname then
+			return previewNickname
+		end
 	end
 
 	-- 1. Try CustomNames Lib first

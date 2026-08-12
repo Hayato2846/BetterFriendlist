@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.6.9 - July 2026
+-- Version 2.8.0 - August 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace
@@ -443,12 +443,19 @@ function BFL:GetThemeAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 		end
 	end
 
+	if self.IsThemeActive and self:IsThemeActive("ellesmereui") then
+		local EllesmereUISkin = self.GetModule and self:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.GetAccentColor then
+			return EllesmereUISkin:GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
+		end
+	end
+
 	return fallbackR, fallbackG, fallbackB, fallbackA
 end
 
 function BFL:GetThemeAccentHex(fallbackHex)
 	local theme = self.GetEffectiveTheme and self:GetEffectiveTheme() or "blizzard"
-	if theme == "dark" or theme == "custom" then
+	if theme == "dark" or theme == "custom" or theme == "ellesmereui" then
 		local r, g, b = self:GetThemeAccentColor()
 		return string.format("%02x%02x%02x", ColorComponentToHex(r), ColorComponentToHex(g), ColorComponentToHex(b))
 	end
@@ -1155,16 +1162,20 @@ function BFL:InstallFriendsFrameRedirects()
 			_G.HideBetterFriendsFrame()
 		end
 
-		if BFL.OriginalFriendsFrameUIPanelSettings and UIPanelWindows then
-			UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
-		end
-
-		if BFL.OriginalOpenFriendsFrame then
-			BFL.OriginalOpenFriendsFrame(1)
-		elseif BFL.OriginalToggleFriendsFrame then
-			BFL.OriginalToggleFriendsFrame(1)
-		elseif FriendsFrame then
-			FriendsFrame:Show()
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.IsSocialUIEnabled and FriendsUI:IsSocialUIEnabled() then
+			FriendsUI:OpenBlizzardSocialUI()
+		else
+			if BFL.OriginalFriendsFrameUIPanelSettings and UIPanelWindows then
+				UIPanelWindows["FriendsFrame"] = BFL.OriginalFriendsFrameUIPanelSettings
+			end
+			if BFL.OriginalOpenFriendsFrame then
+				BFL.OriginalOpenFriendsFrame(1)
+			elseif BFL.OriginalToggleFriendsFrame then
+				BFL.OriginalToggleFriendsFrame(1)
+			elseif FriendsFrame then
+				FriendsFrame:Show()
+			end
 		end
 
 		C_Timer.After(0.1, function()
@@ -1210,7 +1221,9 @@ function BFL:UpdatePortraitVisibility(reason)
 		return
 	end
 
-	local simpleMode = DB:Get("simpleMode", false)
+	local FriendsUI = self.FriendsUI or self:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	local simpleMode = not modern and DB:Get("simpleMode", false)
 	local shouldShow = not simpleMode
 	local shouldShowPortrait = shouldShow
 	local isClassicElvUISkinActive = CoreIsClassicElvUISkinActive()
@@ -1234,16 +1247,16 @@ function BFL:UpdatePortraitVisibility(reason)
 			frame.PortraitContainer:SetShown(shouldShowPortrait)
 		end
 		if frame.portrait then
-			frame.portrait:SetShown(shouldShowPortrait)
+			frame.portrait:SetShown(shouldShowPortrait and not modern)
 		end
 		if frame.PortraitButton then
 			frame.PortraitButton:SetShown(shouldShowPortrait)
 		end
 		if frame.PortraitIcon then
-			frame.PortraitIcon:SetShown(shouldShowPortrait)
+			frame.PortraitIcon:SetShown(shouldShowPortrait and not modern)
 		end
 		if frame.PortraitMask then
-			frame.PortraitMask:SetShown(shouldShowPortrait)
+			frame.PortraitMask:SetShown(shouldShowPortrait and not modern)
 		end
 		if frame.SetPortraitShown then
 			frame:SetPortraitShown(shouldShowPortrait)
@@ -1253,7 +1266,27 @@ function BFL:UpdatePortraitVisibility(reason)
 		local globalPortraitName = frame:GetName() .. "Portrait"
 		local globalPortrait = _G[globalPortraitName]
 		if globalPortrait then
-			globalPortrait:SetShown(shouldShowPortrait)
+			globalPortrait:SetShown(shouldShowPortrait and not modern)
+		end
+		if modern then
+			-- Modern keeps its portrait in the Modern root so the Battle.net bar
+			-- cannot cover the lower half of the parent-layer texture.
+			if frame.portrait then
+				frame.portrait:Hide()
+			end
+			if globalPortrait then
+				globalPortrait:Hide()
+			end
+			if frame.PortraitIcon then
+				frame.PortraitIcon:Hide()
+			end
+			if frame.PortraitMask then
+				frame.PortraitMask:Hide()
+			end
+			local modernPortrait = FriendsUI and FriendsUI.root and FriendsUI.root.PortraitOverlay
+			if modernPortrait then
+				modernPortrait:Show()
+			end
 		end
 
 		local classicButtonFrameLayoutApplied = false
@@ -2758,6 +2791,39 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end
+	elseif msg:match("^forcemodern") then
+		local argument = msg:match("^forcemodern%s*(%S*)") or ""
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		local function Reply(text)
+			if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+				DEFAULT_CHAT_FRAME:AddMessage(text)
+			end
+		end
+		if not BFL.IsRetail then
+			Reply("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_RETAIL_ONLY)
+		elseif not FriendsUI then
+			Reply("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
+		elseif argument == "on" then
+			FriendsUI:SetModernForceEnabled(true)
+			Reply("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_ENABLED)
+		elseif argument == "off" then
+			FriendsUI:SetModernForceEnabled(false)
+			Reply("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_DISABLED)
+		elseif argument == "status" then
+			local enabledText = BFL.L.STATUS_ENABLED or "Enabled"
+			local disabledText = BFL.L.STATUS_DISABLED or "Disabled"
+			local effectiveStyle = FriendsUI:GetEffectiveStyle() == "modern"
+				and BFL.L.SETTINGS_FRIENDS_UI_STYLE_MODERN
+				or BFL.L.SETTINGS_FRIENDS_UI_STYLE_LEGACY
+			Reply(string.format(
+				BFL.L.CORE_FORCE_MODERN_STATUS,
+				FriendsUI:IsModernForceEnabled() and enabledText or disabledText,
+				FriendsUI:IsSocialUIEnabled() and enabledText or disabledText,
+				effectiveStyle
+			))
+		else
+			Reply("|cffffcc00BetterFriendlist:|r " .. BFL.L.CORE_FORCE_MODERN_USAGE)
+		end
 
 	-- ==========================================
 	-- Preview Mode Commands (for screenshots)
@@ -3223,7 +3289,14 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print(BFL.L.CORE_HELP_CMD_HELP)
 		print(BFL.L.CORE_HELP_CMD_CHANGELOG)
 		print(BFL.L.CORE_HELP_CMD_RESET)
+		if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage(BFL.L.CORE_HELP_CMD_FORCE_MODERN)
+		end
 		print("")
 		print(BFL.L.CORE_HELP_LINK)
 	end
+end
+
+function BFL:IsRegionMouseOver(region)
+	return region ~= nil and type(region.IsMouseOver) == "function" and region:IsMouseOver() or false
 end

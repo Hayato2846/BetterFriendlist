@@ -108,6 +108,10 @@ local function NotifySettingsChanged(refreshCallback)
 		if FriendsList and FriendsList.InvalidateSettingsCache then
 			FriendsList:InvalidateSettingsCache()
 		end
+		local PreviewMode = BFL.GetModule and BFL:GetModule("PreviewMode")
+		if PreviewMode and PreviewMode.OnSettingChanged then
+			PreviewMode:OnSettingChanged("contactMemory")
+		end
 	end
 	RefreshSurfaces(refreshCallback)
 end
@@ -535,8 +539,18 @@ function ContactMemory:ResolveContactKeyFromIgnore(squelchType, index)
 end
 
 function ContactMemory:GetContact(contactKey, create)
+	if type(contactKey) ~= "string" or contactKey == "" then
+		return nil
+	end
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.GetMockContact then
+		local mockContact, handled = PreviewMode:GetMockContact(contactKey)
+		if handled then
+			return mockContact
+		end
+	end
 	local db = self:NormalizeDB()
-	if not db or type(contactKey) ~= "string" or contactKey == "" then
+	if not db then
 		return nil
 	end
 
@@ -1039,7 +1053,7 @@ function ContactMemory:GetMenuItems(contactKey, displayName, refreshCallback, in
 	if includeTitle then
 		items[#items + 1] = {
 			type = "title",
-			text = L.CONTACT_MEMORY_MENU_TITLE or "Notes & Tags",
+			text = L.CONTACT_MEMORY_TITLE or "Private Notes",
 		}
 	end
 
@@ -1063,45 +1077,23 @@ function ContactMemory:GetMenuItems(contactKey, displayName, refreshCallback, in
 	return items
 end
 
-function ContactMemory:PopulateMenu(rootDescription, contactKey, displayName, refreshCallback, options)
+function ContactMemory:PopulateMenu(rootDescription, contactKey, displayName, refreshCallback)
 	if not rootDescription or not rootDescription.CreateButton or not self:IsEnabled() or not contactKey then
 		return false
 	end
-	options = options or {}
-
 	self:UpsertContact("context-menu", { key = contactKey, displayName = displayName })
 
 	local L = BFL.L or {}
 	local contact = self:GetContact(contactKey, false)
-	local submenu = rootDescription:CreateButton(L.CONTACT_MEMORY_MENU_TITLE or "Notes & Tags")
-	if submenu.SetScrollMode then
-		submenu:SetScrollMode(options.friendData and 340 or 260)
-	end
+	rootDescription:CreateButton(L.CONTACT_MEMORY_EDIT_NOTE or "Edit Private Note", function()
+		self:ShowNoteDialog(contactKey, displayName, refreshCallback)
+	end)
 
-	if BFL.PopulateSimpleMenu then
-		BFL.PopulateSimpleMenu(submenu, function()
-			return self:GetMenuItems(contactKey, displayName, refreshCallback, false)
+	if contact and contact.privateNote then
+		rootDescription:CreateButton(L.CONTACT_MEMORY_CLEAR_NOTE or "Clear Private Note", function()
+			self:SetPrivateNote(contactKey, nil)
+			RefreshSurfaces(refreshCallback)
 		end)
-	else
-		submenu:CreateButton(L.CONTACT_MEMORY_EDIT_NOTE or "Edit Private Note", function()
-			self:ShowNoteDialog(contactKey, displayName, refreshCallback)
-		end)
-
-		if contact and contact.privateNote then
-			submenu:CreateButton(L.CONTACT_MEMORY_CLEAR_NOTE or "Clear Private Note", function()
-				self:SetPrivateNote(contactKey, nil)
-				RefreshSurfaces(refreshCallback)
-			end)
-		end
-	end
-
-	local FriendTags = BFL:GetModule("FriendTags")
-	local friendForTags = options.friendData or options.friendUID
-	if FriendTags and FriendTags.PopulateMenuContent and FriendTags:IsEnabled() and friendForTags then
-		submenu:CreateDivider()
-		FriendTags:PopulateMenuContent(submenu, friendForTags, options.friendUID, displayName, refreshCallback, {
-			showHeader = true,
-		})
 	end
 
 	return true

@@ -4,19 +4,76 @@
 local ADDON_NAME, BFL = ...
 local ThemeManager = BFL:RegisterModule("ThemeManager", {})
 
-local VALID_THEMES = {
-	blizzard = true,
-	dark = true,
-	custom = true,
-	elvui = true,
-}
+local VALID_THEMES = {}
+local THEME_DEFINITIONS = {}
 
 BFL.THEMES = {
 	BLIZZARD = "blizzard",
 	DARK = "dark",
 	CUSTOM = "custom",
 	ELVUI = "elvui",
+	ELLESMEREUI = "ellesmereui",
 }
+
+local function IsElvUIAvailable()
+	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
+end
+
+local function IsEllesmereUIAvailable()
+	return BFL.IsEllesmereUIAvailable and BFL:IsEllesmereUIAvailable()
+end
+
+local function RegisterThemeDefinition(theme, options)
+	if type(theme) ~= "string" or theme == "" then
+		return false
+	end
+
+	options = type(options) == "table" and options or {}
+	VALID_THEMES[theme] = true
+	THEME_DEFINITIONS[theme] = {
+		id = theme,
+		order = tonumber(options.order) or 1000,
+		labelKey = options.labelKey,
+		label = options.label,
+		onboardingDescriptionKey = options.onboardingDescriptionKey,
+		isAvailable = options.isAvailable,
+		requiresReload = options.requiresReload == true,
+		previewable = options.previewable ~= false,
+	}
+	return true
+end
+
+RegisterThemeDefinition("blizzard", {
+	order = 100,
+	labelKey = "SETTINGS_THEME_BLIZZARD",
+	onboardingDescriptionKey = "ONBOARDING_THEME_BLIZZARD_DESC",
+})
+RegisterThemeDefinition("dark", {
+	order = 200,
+	labelKey = "SETTINGS_THEME_DARK",
+	onboardingDescriptionKey = "ONBOARDING_THEME_DARK_DESC",
+})
+RegisterThemeDefinition("custom", {
+	order = 300,
+	labelKey = "SETTINGS_THEME_CUSTOM",
+	onboardingDescriptionKey = "ONBOARDING_THEME_CUSTOM_DESC",
+})
+RegisterThemeDefinition("elvui", {
+	order = 900,
+	labelKey = "SETTINGS_THEME_ELVUI",
+	onboardingDescriptionKey = "ONBOARDING_THEME_ELVUI_DESC",
+	isAvailable = IsElvUIAvailable,
+	requiresReload = true,
+	previewable = false,
+})
+RegisterThemeDefinition("ellesmereui", {
+	order = 910,
+	labelKey = "SETTINGS_THEME_ELLESMEREUI",
+	onboardingDescriptionKey = "ONBOARDING_THEME_ELLESMEREUI_DESC",
+	isAvailable = IsEllesmereUIAvailable,
+	requiresReload = true,
+	previewable = false,
+})
 
 local function NormalizeTheme(theme)
 	if VALID_THEMES[theme] then
@@ -31,10 +88,6 @@ end
 
 local function ShouldUseLegacyElvUISkinSetting()
 	return not AreThemeFeaturesEnabled()
-end
-
-local function IsElvUIAvailable()
-	return BFL.IsElvUIAvailable and BFL:IsElvUIAvailable()
 end
 
 local function ShouldShowLegacyElvUISkinSetting()
@@ -104,6 +157,9 @@ function BFL:GetEffectiveTheme()
 	if theme == "elvui" and not IsElvUIAvailable() then
 		return "blizzard"
 	end
+	if theme == "ellesmereui" and not IsEllesmereUIAvailable() then
+		return "blizzard"
+	end
 	return theme
 end
 
@@ -120,9 +176,17 @@ function BFL:IsElvUISkinActive()
 	return self:IsThemeActive("elvui") or IsLegacyElvUISkinEnabled()
 end
 
+function BFL:IsEllesmereUISkinActive()
+	local EllesmereUISkin = self.GetModule and self:GetModule("EllesmereUISkin")
+	return EllesmereUISkin
+		and EllesmereUISkin.IsSkinEnabled
+		and EllesmereUISkin:IsSkinEnabled() == true
+		or false
+end
+
 function BFL:UsesFlatTheme()
 	local theme = self:GetEffectiveTheme()
-	return theme == "dark" or theme == "custom"
+	return theme == "dark" or theme == "custom" or theme == "ellesmereui"
 end
 
 function BFL:UsesDarkSkinTheme()
@@ -148,6 +212,107 @@ end
 
 function ThemeManager:IsValidTheme(theme)
 	return VALID_THEMES[theme] == true
+end
+
+function ThemeManager:RegisterTheme(theme, options)
+	-- Theme modules register at file load so database normalization, Settings,
+	-- and the one-time appearance onboarding all consume the same catalog.
+	return RegisterThemeDefinition(theme, options)
+end
+
+function ThemeManager:GetThemeDefinition(theme)
+	return THEME_DEFINITIONS[theme]
+end
+
+function ThemeManager:IsThemeAvailable(theme)
+	local definition = THEME_DEFINITIONS[theme]
+	if not definition or not VALID_THEMES[theme] then
+		return false
+	end
+	if type(definition.isAvailable) ~= "function" then
+		return true
+	end
+	local ok, available = pcall(definition.isAvailable)
+	return ok and available == true
+end
+
+function ThemeManager:GetAvailableThemeIDs()
+	local themes = {}
+	for theme in pairs(THEME_DEFINITIONS) do
+		if self:IsThemeAvailable(theme) then
+			themes[#themes + 1] = theme
+		end
+	end
+	table.sort(themes, function(left, right)
+		local leftDefinition = THEME_DEFINITIONS[left] or {}
+		local rightDefinition = THEME_DEFINITIONS[right] or {}
+		local leftOrder = tonumber(leftDefinition.order) or 1000
+		local rightOrder = tonumber(rightDefinition.order) or 1000
+		if leftOrder ~= rightOrder then
+			return leftOrder < rightOrder
+		end
+		return left < right
+	end)
+	return themes
+end
+
+local function GetThemeLocalizationToken(theme)
+	return tostring(theme or ""):gsub("[^%w]", "_"):upper()
+end
+
+local function ResolveLocalizedText(locale, key)
+	local value = locale and locale[key]
+	-- BFL's locale table returns the requested key when a translation is
+	-- missing. Do not mistake that diagnostic fallback for user-facing copy.
+	if type(value) == "string" and value ~= "" and value ~= key then
+		return value
+	end
+	return nil
+end
+
+function ThemeManager:GetThemeLabel(theme)
+	local definition = THEME_DEFINITIONS[theme] or {}
+	local locale = BFL.L or _G.BFL_L or {}
+	local labelKey = definition.labelKey or ("SETTINGS_THEME_" .. GetThemeLocalizationToken(theme))
+	return ResolveLocalizedText(locale, labelKey) or definition.label or tostring(theme or "")
+end
+
+function ThemeManager:GetThemeOnboardingDescription(theme)
+	local definition = THEME_DEFINITIONS[theme] or {}
+	local locale = BFL.L or _G.BFL_L or {}
+	local descriptionKey = definition.onboardingDescriptionKey
+		or ("ONBOARDING_THEME_" .. GetThemeLocalizationToken(theme) .. "_DESC")
+	local description = ResolveLocalizedText(locale, descriptionKey)
+	if description then
+		return description
+	end
+	local fallback = ResolveLocalizedText(locale, "ONBOARDING_THEME_GENERIC_DESC")
+		or "Preview the %s theme on your BetterFriendlist."
+	local ok, text = pcall(string.format, fallback, self:GetThemeLabel(theme))
+	return ok and text or fallback
+end
+
+function ThemeManager:GetThemeOptions()
+	local options = {}
+	local order = self:GetAvailableThemeIDs()
+	for _, theme in ipairs(order) do
+		options[theme] = self:GetThemeLabel(theme)
+	end
+	return options, order
+end
+
+function ThemeManager:ThemeSelectionRequiresReload(previousTheme, nextTheme)
+	local previous = THEME_DEFINITIONS[previousTheme]
+	local nextDefinition = THEME_DEFINITIONS[nextTheme]
+	return (previous and previous.requiresReload == true)
+		or (nextDefinition and nextDefinition.requiresReload == true)
+end
+
+function ThemeManager:CanPreviewTheme(theme, previousTheme)
+	local definition = THEME_DEFINITIONS[theme]
+	return definition ~= nil
+		and definition.previewable ~= false
+		and not self:ThemeSelectionRequiresReload(previousTheme, theme)
 end
 
 function ThemeManager:GetStoredTheme()
@@ -205,6 +370,12 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if theme == "blizzard" and BFL.RefreshMainTabVisualState then
 		BFL:RefreshMainTabVisualState()
 	end
+	if theme == "blizzard" then
+		local Settings = BFL:GetModule("Settings")
+		if Settings and Settings.RefreshCategoryVisualState then
+			Settings:RefreshCategoryVisualState()
+		end
+	end
 
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
@@ -236,12 +407,37 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	end
 
 	local ElvUISkin = BFL:GetModule("ElvUISkin")
+	local friendsUITheme = theme
 	if ElvUISkin then
 		local useElvUISkin = (ElvUISkin.IsSkinEnabled and ElvUISkin:IsSkinEnabled()) or theme == "elvui"
 		if useElvUISkin and ElvUISkin.RegisterSkin then
+			friendsUITheme = "elvui"
 			ElvUISkin:RegisterSkin()
 		elseif ElvUISkin.HideClassicMainFrameShell then
 			ElvUISkin:HideClassicMainFrameShell()
+		end
+	end
+
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.ApplyTheme then
+		FriendsUI:ApplyTheme(friendsUITheme)
+	end
+	local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+	if theme == "ellesmereui" and EllesmereUISkin and EllesmereUISkin.Apply then
+		EllesmereUISkin:Apply(reason or "theme-manager")
+	end
+	local AppearanceOnboarding = BFL:GetModule("AppearanceOnboarding")
+	if AppearanceOnboarding and AppearanceOnboarding.ApplySkin then
+		AppearanceOnboarding:ApplySkin(reason or "theme-manager")
+	end
+	self:SkinVisibleStaticPopups()
+	if theme == "blizzard" then
+		-- DarkTheme restores registered controls before module-specific theme and
+		-- layout refreshes run. Finalize native button atlases afterwards so no
+		-- later owner/state update can leave a partial ThreeSlice or stale font.
+		local SkinEngine = BFL:GetModule("SkinEngine")
+		if SkinEngine and SkinEngine.FinalizeNativeButtonRestore then
+			SkinEngine:FinalizeNativeButtonRestore()
 		end
 	end
 
@@ -255,20 +451,32 @@ function ThemeManager:ApplyPendingTheme()
 	self:ApplyCurrentTheme(self.pendingThemeReason or "combat-ended")
 end
 
-function ThemeManager:ShowReloadDialog()
+function ThemeManager:ShowReloadDialog(options)
+	options = type(options) == "table" and options or nil
+	local onReloadAccepted = options and options.onReloadAccepted
+	local onReloadCancelled = options and options.onReloadCancelled
 	local L = BFL.L or _G.BFL_L
-	StaticPopupDialogs["BFL_ELVUI_RELOAD"] = {
-		text = (L and L.DIALOG_ELVUI_RELOAD_TEXT) or "Changing ElvUI Skin settings requires a UI Reload.\nReload now?",
-		button1 = (L and L.DIALOG_ELVUI_RELOAD_BTN1) or "Yes",
-		button2 = (L and L.DIALOG_ELVUI_RELOAD_BTN2) or "No",
+	StaticPopupDialogs["BFL_EXTERNAL_THEME_RELOAD"] = {
+		text = (L and L.SETTINGS_CENTER_RELOAD_REQUIRED)
+			or "This change requires a UI reload.\n\nReload now?",
+		button1 = (L and L.DIALOG_UI_PANEL_RELOAD_BTN1) or "Reload",
+		button2 = (L and L.DIALOG_UI_PANEL_RELOAD_BTN2) or "Cancel",
 		OnAccept = function()
+			if onReloadAccepted then
+				onReloadAccepted()
+			end
 			ReloadUI()
+		end,
+		OnCancel = function()
+			if onReloadCancelled then
+				onReloadCancelled()
+			end
 		end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
 	}
-	StaticPopup_Show("BFL_ELVUI_RELOAD")
+	return StaticPopup_Show("BFL_EXTERNAL_THEME_RELOAD")
 end
 
 local function IsBetterFriendlistPopup(which)
@@ -313,6 +521,64 @@ local function SkinStaticPopupButtons(engine, popup)
 	end
 end
 
+local function GetStaticPopupEditBox(popup)
+	if not popup then
+		return nil
+	end
+	if popup.GetEditBox then
+		local ok, editBox = pcall(popup.GetEditBox, popup)
+		if ok and editBox then
+			return editBox
+		end
+	end
+	return popup.EditBox or popup.editBox
+end
+
+local function SkinStaticPopupFrame(engine, popup)
+	engine:SkinFrame(popup, "popup", { stripTextures = true, textureAlpha = 0 })
+	-- StaticPopup slots are reused, and GameDialogMixin can restore the native
+	-- BG atlases while preparing a new dialog. Reassert the single themed popup
+	-- surface every time so its alpha is exactly the configured popupOpacity.
+	engine:DampenRegions(popup, 0)
+	engine:DampenKnownArtwork(popup, 0)
+	engine:DampenNineSlice(popup, 0)
+	if popup.BG then
+		engine:DampenFrameTextures(popup.BG, 0, 2)
+	end
+	if popup.AlertIcon then
+		engine:SetTextureAlpha(popup, popup.AlertIcon, 0)
+	end
+
+	engine:SkinTree(popup, 4)
+	local editBox = GetStaticPopupEditBox(popup)
+	if editBox and (not editBox.IsShown or editBox:IsShown()) then
+		engine:SkinEditBox(editBox)
+	end
+	SkinStaticPopupButtons(engine, popup)
+
+	local colors = engine.colors
+	if colors then
+		engine:StyleBackdrop(popup, colors.popup, colors.border)
+	end
+end
+
+function ThemeManager:SkinVisibleStaticPopups()
+	if not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
+		return
+	end
+	local Engine = BFL:GetModule("SkinEngine")
+	if not Engine or not Engine.IsActive or not Engine:IsActive() then
+		return
+	end
+
+	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
+		local popup = _G["StaticPopup" .. i]
+		if popup and popup:IsShown() and IsBetterFriendlistPopup(popup.which) then
+			SkinStaticPopupFrame(Engine, popup)
+		end
+	end
+end
+
 function ThemeManager:SkinStaticPopup(which)
 	if not IsBetterFriendlistPopup(which) or not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
 		return
@@ -326,13 +592,7 @@ function ThemeManager:SkinStaticPopup(which)
 	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
 		local popup = _G["StaticPopup" .. i]
 		if popup and popup:IsShown() and popup.which == which then
-			Engine:SkinFrame(popup, "popup", { stripTextures = true, textureAlpha = 0 })
-			Engine:DampenNineSlice(popup, 0)
-			if popup.AlertIcon then
-				Engine:SetTextureAlpha(popup, popup.AlertIcon, 0)
-			end
-			Engine:SkinTree(popup, 4)
-			SkinStaticPopupButtons(Engine, popup)
+			SkinStaticPopupFrame(Engine, popup)
 		end
 	end
 end

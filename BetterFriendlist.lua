@@ -637,7 +637,8 @@ function BFL:ApplyTabFonts()
 		selectedTabId,
 		selectedOffset,
 		unselectedOffset,
-		fixedHeight
+		fixedHeight,
+		fillTrailingSpace
 	)
 		-- Collect all tabs
 		local tabList = {}
@@ -882,7 +883,7 @@ function BFL:ApplyTabFonts()
 			if right and left then
 				local rightEdge = right - left
 				local slack = maxRightEdge - rightEdge
-				if slack > 0 then
+				if fillTrailingSpace ~= false and slack > 0 then
 					local targetInfo = nil
 					for i = #tabList, 1, -1 do
 						local info = tabList[i]
@@ -1054,6 +1055,12 @@ function BFL:ApplyTabFonts()
 	local topBaseOffset = shouldCenterTopTabs and 0 or -5
 	local topSelectedOffset = shouldCenterTopTabs and 0 or -5
 	local topUnselectedOffset = shouldCenterTopTabs and 0 or -8
+	local fillTopTrailingSpace = not (
+		BFL.IsRetail
+		and BFL.FriendsUI
+		and BFL.FriendsUI.IsModernActive
+		and not BFL.FriendsUI:IsModernActive()
+	)
 	ProcessTabGroup(
 		topTabs,
 		20,
@@ -1068,7 +1075,8 @@ function BFL:ApplyTabFonts()
 		selectedTopTabId,
 		topSelectedOffset,
 		topUnselectedOffset,
-		32
+		32,
+		fillTopTrailingSpace
 	)
 
 	-- Reposition first top tab to align with Inset
@@ -1440,6 +1448,24 @@ end
 UpdateFriendsDisplay = function()
 	local FriendsList = GetFriendsList()
 	if FriendsList then
+		local PreviewMode = BFL:GetModule("PreviewMode")
+		if
+			PreviewMode
+			and (
+				(PreviewMode.IsComponentEnabled and PreviewMode:IsComponentEnabled("friends"))
+				or (not PreviewMode.IsComponentEnabled and PreviewMode.enabled)
+			)
+			and PreviewMode.mockData
+			and #PreviewMode.mockData.friends > 0
+		then
+			-- PreviewMode owns both model injection and rendering. Calling
+			-- RenderDisplay() directly here would consume its render-state check
+			-- while the model still contains the real friends list, causing the
+			-- following isolated refresh to be skipped as "unchanged".
+			if PreviewMode.RenderMockFriendsNow and PreviewMode:RenderMockFriendsNow(FriendsList) then
+				return
+			end
+		end
 		FriendsList:RenderDisplay()
 	end
 end
@@ -1832,12 +1858,20 @@ end
 function HideBetterFriendsFrame() -- Clear friend selection (like Blizzard's FriendsFrame)
 	local FriendsList = GetFriendsList()
 	if FriendsList then
-		if FriendsList.selectedButton and FriendsList.selectedButton.selectionHighlight then
-			FriendsList.selectedButton.selectionHighlight:Hide()
+		if FriendsList.ClearSelection then
+			FriendsList:ClearSelection()
+		else
+			if FriendsList.selectedButton then
+				if FriendsList.SetButtonSelectionVisual then
+					FriendsList:SetButtonSelectionVisual(FriendsList.selectedButton, false)
+				elseif FriendsList.selectedButton.selectionHighlight then
+					FriendsList.selectedButton.selectionHighlight:Hide()
+				end
+			end
+			FriendsList.selectedFriend = nil
+			FriendsList.selectedFriendUID = nil
+			FriendsList.selectedButton = nil
 		end
-		FriendsList.selectedFriend = nil
-		FriendsList.selectedFriendUID = nil
-		FriendsList.selectedButton = nil
 	end
 
 	-- Use UI Panel system if enabled
@@ -2367,6 +2401,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if not contextData then
 					return
 				end
+				if BFL.IsOfflineTitleFriend and BFL.IsOfflineTitleFriend(contextData, contextData.isOffline) then
+					return
+				end
 
 				pcall(function()
 					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
@@ -2849,7 +2886,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				local FriendTags = BFL:GetModule("FriendTags")
 				local tagFriendData
-				if FriendTags and FriendTags.IsEnabled and FriendTags:IsEnabled() then
+				if isOwnMenu and FriendTags then
 					if not friendData and bnetIDAccount and FriendsList and FriendsList.friendsList then
 						for _, f in ipairs(FriendsList.friendsList) do
 							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
@@ -2873,7 +2910,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local ContactMemory = BFL:GetModule("ContactMemory")
-				if ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
+				if isOwnMenu and ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
 					local contactKey = friendData and ContactMemory:ResolveContactKeyFromFriend(friendData)
 						or ContactMemory:ResolveContactKeyFromContext(contextData)
 						or ContactMemory:ResolveContactKeyFromFriend(friendUID)
@@ -2886,11 +2923,20 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						})
 						ContactMemory:PopulateMenu(rootDescription, contactKey, menuDisplayName or contextName or battleTag, function()
 							BFL:ForceRefreshFriendsList()
-						end, {
-							friendData = tagFriendData,
-							friendUID = friendUID,
-						})
+						end)
 					end
+				end
+
+				if isOwnMenu and FriendTags and tagFriendData then
+					FriendTags:PopulateMenu(
+						rootDescription,
+						tagFriendData,
+						friendUID,
+						menuDisplayName or contextName or battleTag,
+						function()
+							BFL:ForceRefreshFriendsList()
+						end
+					)
 				end
 
 				-- Keep richer game-account controls on BFL-owned menus only. Native Blizzard
@@ -3075,15 +3121,33 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 
+				local PreviewMode = BFL:GetModule("PreviewMode")
+				if
+					PreviewMode
+					and PreviewMode.IsComponentEnabled
+					and PreviewMode:IsComponentEnabled("recent_allies")
+				then
+					-- Preview data is synthetic and must never expose a live invite action.
+					return
+				end
+
+				local inviteName = contextData.recentAllyData
+					and contextData.recentAllyData.characterData
+					and contextData.recentAllyData.characterData.fullName
+					or contextData.name
+				local function SendCharacterInvite()
+					if BFL.AreTitleFriendsEnabled and BFL.AreTitleFriendsEnabled() and BFL.SendTitleFriendInviteByName then
+						BFL.SendTitleFriendInviteByName(inviteName)
+					else
+						BFL.AddFriend(inviteName)
+					end
+				end
+
 				if BNFeaturesEnabledAndConnected() then
 					local button = rootDescription:CreateButton(ADD_FRIEND)
-					button:CreateButton(CHARACTER_FRIEND or "Character Friend", function()
-						BFL.AddFriend(contextData.name)
-					end)
+					button:CreateButton(CHARACTER_FRIEND or "Character Friend", SendCharacterInvite)
 				else
-					rootDescription:CreateButton(ADD_FRIEND, function()
-						BFL.AddFriend(contextData.name)
-					end)
+					rootDescription:CreateButton(ADD_FRIEND, SendCharacterInvite)
 				end
 			end
 
@@ -3809,6 +3873,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					or menuType == "BN_FRIEND_OFFLINE"
 					or menuType == "FRIEND"
 					or menuType == "FRIEND_OFFLINE"
+				local isOfflineTitleFriend = isBNet
+					and BFL.IsOfflineTitleFriend
+					and BFL.IsOfflineTitleFriend(contextData, isOffline)
 				local menuTypeWrapper = contextData.bflWhoPlayerMenu and "WHO" or nil
 
 				createContextMenu(owner, function(ownerRegion, rootDescription)
@@ -3835,7 +3902,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
 
-					if (not isOffline) or isBNet then
+					if ((not isOffline) or isBNet) and not isOfflineTitleFriend then
 						rootDescription:CreateButton(WHISPER or "Whisper", function()
 							if isBNet then
 								BFL:SecureSendBNetTell(contextData.name, contextData.bnetIDAccount)
@@ -4261,7 +4328,13 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	-- Update FriendsTabHeader.selectedTab to match displayed content
 	-- Without this, PanelTemplates_GetSelectedTab returns stale values after reopen
 	if frame.FriendsTabHeader then
-		PanelTemplates_SetTab(frame.FriendsTabHeader, tabIndex)
+		local header = frame.FriendsTabHeader
+		if type(header.numTabs) ~= "number" or header.numTabs < 1 then
+			header.Tabs = header.Tabs or { header.Tab1, header.Tab2, header.Tab3, header.Tab4 }
+			local numTabs = header.Tab4 and header.Tab4:IsShown() and 4 or 3
+			PanelTemplates_SetNumTabs(header, numTabs)
+		end
+		PanelTemplates_SetTab(header, tabIndex)
 	end
 
 	-- Clear search and update placeholder when switching tabs. Programmatic clearing is
@@ -4347,14 +4420,23 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 		-- Retail: Recruit A Friend
 		local rafSupported = BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported()
 		local rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled()
-		if frame.RecruitAFriendFrame and rafSupported and rafEnabled then
+		local rafPreviewEnabled = BFL.IsRAFPreviewActive and BFL:IsRAFPreviewActive()
+		if frame.RecruitAFriendFrame and ((rafSupported and rafEnabled) or rafPreviewEnabled) then
 			ShowChildFrame(frame.RecruitAFriendFrame)
 			ShowChildFrame(frame.RecruitmentButton)
 
 			-- Initialize RAF data (match Blizzard's OnLoad behavior)
-			if C_RecruitAFriend then
-				if not RecruitAFriendFrame then
-					local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+			if rafPreviewEnabled then
+				local RAF = BFL:GetModule("RAF")
+				if RAF and RAF.ApplyPreviewData then
+					RAF:ApplyPreviewData(frame.RecruitAFriendFrame)
+				end
+			elseif C_RecruitAFriend then
+					-- Retail 12.1 creates its RAF SocialView dynamically under
+					-- SocialUIFrame, so the old RecruitAFriendFrame global is no
+					-- longer a reliable signal that the RAF addon is loaded.
+					if not (RecruitAFriendRewardsFrame and RecruitAFriendRecruitmentFrame) then
+						local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
 					if loadAddOn then
 						if securecallfunction then
 							pcall(securecallfunction, loadAddOn, "Blizzard_RecruitAFriend")
@@ -4495,6 +4577,10 @@ function BetterFriendsFrame_UpdateQuickJoinTab() -- Quick Join is Retail only
 	-- Re-apply tab fonts only when the label actually changes or the tab layout has not been initialized yet.
 	if textChanged or not (BFL._tabFontCache and BFL._tabFontCache.signature) then
 		BFL:ApplyTabFonts()
+	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.RefreshNavigation then
+		FriendsUI:RefreshNavigation()
 	end
 end
 
@@ -4637,7 +4723,15 @@ BFL.ShowMultiAccountInvitePicker = ShowMultiAccountInvitePicker
 -- TravelPass Button Handlers
 function BetterFriendsList_TravelPassButton_OnClick(self)
 	local friendData = self.friendData
-	if not friendData or friendData.type ~= "bnet" then
+	if not friendData then
+		return
+	end
+	if friendData.type == "wow" then
+		if friendData.connected and friendData.name and BFL.InviteUnit then
+			BFL.InviteUnit(friendData.name)
+		end
+		return
+	elseif friendData.type ~= "bnet" then
 		return
 	end
 
@@ -4863,6 +4957,15 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	end
 
 	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+	if friendData.type == "wow" then
+		if friendData.connected then
+			BFL_Tooltip:SetText(GROUP_INVITE or TRAVEL_PASS_INVITE or "Invite to Group")
+		else
+			BFL_Tooltip:SetText(FRIEND_OFFLINE or PLAYER_OFFLINE or "Offline", 0.6, 0.6, 0.6)
+		end
+		BFL_Tooltip:Show()
+		return
+	end
 
 	-- Get the actual Battle.net friend index
 	if BFL.IsBattleNetFriendsListEnabled and not BFL.IsBattleNetFriendsListEnabled() then
@@ -5081,20 +5184,57 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 		-- Left click: Select friend (for Send Message button) with visual highlight
 		if FriendsListModule and button.friendData then
-			-- Clear previous selection highlight
-			if FriendsListModule.selectedButton and FriendsListModule.selectedButton.selectionHighlight then
-				FriendsListModule.selectedButton.selectionHighlight:Hide()
+			local friendUID = button.friendData.uid
+				or (FriendsListModule.GetFriendUID and FriendsListModule:GetFriendUID(button.friendData))
+			local alreadySelected = FriendsListModule.selectedButton == button
+				or (
+					friendUID ~= nil
+					and FriendsListModule.selectedFriendUID ~= nil
+					and FriendsListModule.selectedFriendUID == friendUID
+				)
+
+			-- A second left click toggles the active row off. Preview fixtures
+			-- therefore never require closing the whole BFL frame to deselect.
+			if alreadySelected then
+				if FriendsListModule.ClearSelection then
+					FriendsListModule:ClearSelection()
+				else
+					if FriendsListModule.SetButtonSelectionVisual then
+						FriendsListModule:SetButtonSelectionVisual(button, false)
+					elseif button.selectionHighlight then
+						button.selectionHighlight:Hide()
+					end
+					FriendsListModule.selectedFriend = nil
+					FriendsListModule.selectedFriendUID = nil
+					FriendsListModule.selectedButton = nil
+					if FriendsListModule.UpdateSendMessageButton then
+						FriendsListModule:UpdateSendMessageButton()
+					end
+				end
+				return
+			end
+
+			-- Clear any previous row before selecting the new stable UID.
+			if FriendsListModule.ClearSelection then
+				FriendsListModule:ClearSelection()
+			elseif FriendsListModule.selectedButton then
+				if FriendsListModule.SetButtonSelectionVisual then
+					FriendsListModule:SetButtonSelectionVisual(FriendsListModule.selectedButton, false)
+				elseif FriendsListModule.selectedButton.selectionHighlight then
+					FriendsListModule.selectedButton.selectionHighlight:Hide()
+				end
 			end
 
 			-- Set new selection (store UID to avoid stale pooled objects)
-			local friendUID = button.friendData.uid
-				or (FriendsListModule.GetFriendUID and FriendsListModule:GetFriendUID(button.friendData))
 			FriendsListModule.selectedFriendUID = friendUID
 			FriendsListModule.selectedFriend = nil
 			FriendsListModule.selectedButton = button
 
-			-- Show selection highlight (blue, like Blizzard)
-			if button.selectionHighlight then
+			-- Use the native friends-card-selected highlight in Modern UI and
+			-- the legacy selection texture everywhere else.
+			if FriendsListModule.SetButtonSelectionVisual then
+				FriendsListModule:SetButtonSelectionVisual(button, true)
+			elseif button.selectionHighlight then
 				button.selectionHighlight:Show()
 			end
 
@@ -5135,7 +5275,8 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 					nil, -- communityEpoch
 					nil, -- communityPosition
 					accountInfo.battleTag,
-					resolvedIndex
+					resolvedIndex,
+					accountInfo.friendLevel
 				)
 			end
 		else
@@ -5237,7 +5378,8 @@ function BetterFriendsList_ShowBNDropdown(
 	communityEpoch,
 	communityPosition,
 	battleTag,
-	index
+	index,
+	friendLevel
 ) -- Ensure friendsList is a number (index) if possible
 	local actualIndex = index
 	if not actualIndex and type(showMenuFlag) == "number" then
@@ -5258,6 +5400,8 @@ function BetterFriendsList_ShowBNDropdown(
 			chatFrame = chatFrame,
 			bnetIDAccount = bnetIDAccount,
 			battleTag = battleTag,
+			friendLevel = friendLevel,
+			isOffline = connected == false,
 			uid = (battleTag and battleTag ~= "") and ("bnet_" .. battleTag) or ("bnet_" .. tostring(bnetIDAccount)), -- For Nickname (consistent with FriendsList UID)
 			index = actualIndex, -- Required for some addons
 			friendsIndex = actualIndex, -- Alternative name
@@ -5316,9 +5460,12 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		-- Simple Mode ONLY: Include "Quick Filter" and "Sort" menus here
 		local DB = GetDB()
 		local simpleMode = DB and DB:Get("simpleMode", false) or false
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 		if simpleMode then
-			-- Search Toggle
-			local searchToggle = rootDescription:CreateCheckbox(L.MENU_SHOW_SEARCH or "Show Search", function()
+			-- Both layouts expose the same option. Modern renders it as a single
+			-- full-width search row while filter/sort actions remain in this menu.
+			rootDescription:CreateCheckbox(L.MENU_SHOW_SEARCH or "Show Search", function()
 				return DB and DB:Get("simpleModeShowSearch", true)
 			end, function()
 				if DB then
@@ -5387,7 +5534,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 
 		-- Show Blizzard's Friendlist option (conditional based on setting)
 		local DB = GetDB()
-		if DB and DB:Get("showBlizzardOption", false) then
+		if modern or (DB and DB:Get("showBlizzardOption", false)) then
 			-- Check combat state
 			local inCombat = InCombatLockdown()
 
@@ -5882,7 +6029,8 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 				-- Top Tab 3: Recruit A Friend
 				local rafSupported = BFL.IsRAFSystemSupported and BFL.IsRAFSystemSupported()
 				local rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled()
-				if frame.RecruitAFriendFrame and rafSupported and rafEnabled then
+				local rafPreviewEnabled = BFL.IsRAFPreviewActive and BFL:IsRAFPreviewActive()
+				if frame.RecruitAFriendFrame and ((rafSupported and rafEnabled) or rafPreviewEnabled) then
 					ShowChildFrame(frame.RecruitAFriendFrame)
 					ShowChildFrame(frame.RecruitmentButton)
 				end

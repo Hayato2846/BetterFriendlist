@@ -8,6 +8,20 @@ local ShowSafeRetailBNetTooltip
 local AddContactMemoryTooltipLines
 local ResizeFriendsTooltipForMeasuredLines
 
+local function RaiseNativeFriendsTooltipLayer()
+	if BFL.RaiseFriendTooltipLayer and FriendsTooltip then
+		BFL.RaiseFriendTooltipLayer(FriendsTooltip)
+	end
+end
+
+local function AnchorNativeFriendsTooltip(anchorButton)
+	if not (FriendsTooltip and anchorButton) then
+		return
+	end
+	FriendsTooltip:ClearAllPoints()
+	FriendsTooltip:SetPoint("TOPLEFT", anchorButton, "TOPRIGHT", 0, 0)
+end
+
 -- Proxy button for Retail: a real Frame object avoids taint on FriendsTooltip.button
 -- Blizzard's FriendsTooltip OnUpdate calls: if self.hasBroadcast then self.button:OnEnter() end
 -- so the proxy needs a real :OnEnter() method that re-triggers tooltip population
@@ -28,8 +42,7 @@ if not BFL.IsClassic then
 
 			-- Re-anchor tooltip to the actual visible button (Blizzard anchored to proxyButton)
 			if self.anchorButton then
-				FriendsTooltip:ClearAllPoints()
-				FriendsTooltip:SetPoint("TOPLEFT", self.anchorButton, "TOPRIGHT", 36, 0)
+				AnchorNativeFriendsTooltip(self.anchorButton)
 			end
 
 			-- [STREAMER MODE] Override Real ID in header after Blizzard re-populates
@@ -48,6 +61,7 @@ if not BFL.IsClassic then
 				and ResizeFriendsTooltipForMeasuredLines then
 				ResizeFriendsTooltipForMeasuredLines(FriendsTooltip)
 			end
+			RaiseNativeFriendsTooltipLayer()
 		end
 	end
 
@@ -609,11 +623,11 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 
 	anchor = AddContactMemoryTooltipLines(tooltip, friendData) or anchor
 	tooltip.button = button
-	tooltip:ClearAllPoints()
-	tooltip:SetPoint("TOPLEFT", anchorButton or button, "TOPRIGHT", 36, 0)
+	AnchorNativeFriendsTooltip(anchorButton or button)
 	tooltip:SetHeight((tooltip.height or 0) + (FRIENDS_TOOLTIP_MARGIN_WIDTH or 16))
 	tooltip:SetWidth(math.min(FRIENDS_TOOLTIP_MAX_WIDTH or 320, (tooltip.maxWidth or 0) + (FRIENDS_TOOLTIP_MARGIN_WIDTH or 16)))
 	tooltip:Show()
+	RaiseNativeFriendsTooltipLayer()
 end
 
 -- Helper: Apply StreamerMode header override
@@ -815,8 +829,7 @@ function BetterFriendsList_Button_OnEnter(self)
 
 			-- Reposition tooltip to our actual visible button
 			-- (Blizzard anchored to proxyButton which has no visible position)
-			tooltip:ClearAllPoints()
-			tooltip:SetPoint("TOPLEFT", self, "TOPRIGHT", 36, 0)
+			AnchorNativeFriendsTooltip(self)
 		end
 
 		ApplyStreamerModeOverride(friendData)
@@ -825,6 +838,7 @@ function BetterFriendsList_Button_OnEnter(self)
 				ResizeFriendsTooltipForMeasuredLines(tooltip)
 			end
 		end
+		RaiseNativeFriendsTooltipLayer()
 	end
 end
 

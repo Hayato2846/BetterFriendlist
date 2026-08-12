@@ -406,9 +406,14 @@ local function L(key)
 	return key
 end
 
-local function GetClientEmbeddedIcon(clientProgram, size)
+local function GetClientEmbeddedIcon(clientProgram, size, previewTexture)
 	if not clientProgram or clientProgram == "" then
 		return ""
+	end
+
+	if previewTexture then
+		size = size or 14
+		return string.format("|T%s:%d:%d:0:0|t ", previewTexture, size, size)
 	end
 
 	if BFL.GetClientEmbeddedIcon then
@@ -467,7 +472,11 @@ local function GetFriendGameDisplay(friend, iconSize)
 	local gameName = GetFriendGameName(friend)
 	local gameInfo = friend and (friend.gameAccountInfo or (friend.accountInfo and friend.accountInfo.gameAccountInfo))
 	local client = friend and (friend.client or (gameInfo and gameInfo.clientProgram))
-	local icon = GetClientEmbeddedIcon(client, iconSize or 14)
+	local previewTexture = friend
+		and friend._isMock
+		and (friend._previewTitleIcon or (gameInfo and gameInfo._previewTitleIcon))
+		or nil
+	local icon = GetClientEmbeddedIcon(client, iconSize or 14, previewTexture)
 
 	if icon ~= "" and gameName ~= "" then
 		return icon .. gameName

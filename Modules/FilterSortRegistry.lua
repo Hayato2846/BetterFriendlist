@@ -15,6 +15,29 @@ Registry.MAX_SORT_STEPS = 8
 
 local BFL_ICON_PREFIX = "Interface\\AddOns\\BetterFriendlist\\Icons\\"
 local BLIZZARD_ICON_PREFIX = "Interface\\Icons\\"
+local THEME_ICON_PREFIX = "Interface\\AddOns\\BetterFriendlist\\Textures\\ThemeIcons\\"
+local THEME_NEUTRAL_ICON_NAMES = {
+	["check-circle"] = true,
+	["class"] = true,
+	["faction"] = true,
+	["filter"] = true,
+	["filter-all"] = true,
+	["filter-bnet"] = true,
+	["filter-hide-afk"] = true,
+	["filter-offline"] = true,
+	["filter-online"] = true,
+	["filter-retail"] = true,
+	["filter-wow"] = true,
+	["game"] = true,
+	["guild"] = true,
+	["level"] = true,
+	["name"] = true,
+	["realm"] = true,
+	["sliders"] = true,
+	["star"] = true,
+	["status"] = true,
+	["zone"] = true,
+}
 
 local function GetDB()
 	return BFL:GetModule("DB")
@@ -341,6 +364,7 @@ local GAME_PRIORITY = {
 	S1 = 2,
 	D3 = 3,
 	D4 = 3,
+	ANBS = 3,
 	OSI = 4,
 	Pro = 5,
 	Hero = 6,
@@ -1979,6 +2003,36 @@ end
 function Registry:FormatIcon(iconRef, size)
 	size = size or 16
 	iconRef = NormalizeIconRef(iconRef) or BFL_ICON_PREFIX .. "filter-all"
+	local usesThemeAccent = (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
+		or (BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive())
+	if type(iconRef) == "string"
+		and iconRef:find(BFL_ICON_PREFIX, 1, true) == 1
+		and usesThemeAccent
+		and BFL.GetThemeAccentColor then
+		local iconName = iconRef:sub(#BFL_ICON_PREFIX + 1):gsub("%.[^%.\\]+$", "")
+		if THEME_NEUTRAL_ICON_NAMES[iconName] then
+			-- Inline texture markup has no desaturation flag. Use a white RGB mask
+			-- with the original asset's alpha before multiplying in the theme color;
+			-- tinting the baked-gold BLP directly cannot produce a pure EUI accent.
+			iconRef = THEME_ICON_PREFIX .. iconName .. ".tga"
+		end
+		local r, g, b = BFL:GetThemeAccentColor(1, 0.82, 0, 1)
+		local function ToColorByte(value)
+			value = math.max(0, math.min(1, tonumber(value) or 1))
+			return math.floor((value * 255) + 0.5)
+		end
+		-- Texture markup accepts RGB tint bytes after its file/crop fields. Known
+		-- BFL assets use neutral masks; Blizzard and user icons retain their colors.
+		return string.format(
+			"|T%s:%d:%d:0:0:32:32:0:32:0:32:%d:%d:%d|t",
+			tostring(iconRef),
+			size,
+			size,
+			ToColorByte(r),
+			ToColorByte(g),
+			ToColorByte(b)
+		)
+	end
 	return string.format("|T%s:%d:%d:0:0|t", tostring(iconRef), size, size)
 end
 

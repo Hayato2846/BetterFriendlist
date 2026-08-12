@@ -82,14 +82,29 @@ function StreamerMode:ApplyToggleButtonVisualState()
 	end
 
 	local active = self:IsActive()
-	button.BFL_DarkIconColor = active and { 0.64, 0.33, 1.0, 1 } or { 0.62, 0.62, 0.64, 0.82 }
-	button.BFL_DarkIconHoverColor = active and { 0.78, 0.52, 1.0, 1 } or { 0.86, 0.86, 0.88, 1 }
-	button.BFL_DarkIconDownColor = active and { 0.54, 0.24, 0.88, 1 } or { 0.48, 0.48, 0.50, 1 }
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local palette, themed
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.GetModernThemeColors then
+		palette, themed = FriendsUI:GetModernThemeColors()
+	end
+	if themed and palette and palette.accent then
+		local accent = palette.accent
+		button.BFL_DarkIconColor = { accent[1], accent[2], accent[3], active and 1 or 0.82 }
+		button.BFL_DarkIconHoverColor = { accent[1], accent[2], accent[3], 1 }
+		button.BFL_DarkIconDownColor = { accent[1], accent[2], accent[3], 0.88 }
+	else
+		button.BFL_DarkIconColor = active and { 0.64, 0.33, 1.0, 1 } or { 0.62, 0.62, 0.64, 0.82 }
+		button.BFL_DarkIconHoverColor = active and { 0.78, 0.52, 1.0, 1 } or { 0.86, 0.86, 0.88, 1 }
+		button.BFL_DarkIconDownColor = active and { 0.54, 0.24, 0.88, 1 } or { 0.48, 0.48, 0.50, 1 }
+	end
 	button.BFL_DarkButtonStateKey = nil
 
 	icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\twitch")
 	icon:SetDesaturated(true)
-	if active then
+	if themed and palette and palette.accent then
+		icon:SetVertexColor(palette.accent[1], palette.accent[2], palette.accent[3])
+		icon:SetAlpha(active and 1 or 0.82)
+	elseif active then
 		icon:SetVertexColor(0.64, 0.33, 1.0)
 		icon:SetAlpha(1.0)
 	else
@@ -106,6 +121,14 @@ end
 function StreamerMode:UpdateAdjacentButtonAnchors()
 	-- Re-anchor HelpButton when StreamerModeButton is hidden/shown
 	if not BetterFriendsFrame then
+		return
+	end
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
+		-- Modern places Streamer Mode at the right edge of the Battle.net bar
+		-- and Raid Help in the raid control row. FriendsUI owns both anchors.
+		FriendsUI:LayoutBattleTagActions()
+		FriendsUI:ApplyModernRaidGeometry()
 		return
 	end
 
@@ -127,6 +150,11 @@ function StreamerMode:UpdateAdjacentButtonAnchors()
 				helpButton:SetPoint("TOPRIGHT", self.toggleButton, "TOPLEFT", 0, 0)
 			end
 		end
+	end
+
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.LayoutBattleTagActions then
+		FriendsUI:LayoutBattleTagActions()
 	end
 end
 

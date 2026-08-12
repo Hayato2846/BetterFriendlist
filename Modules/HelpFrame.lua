@@ -126,7 +126,12 @@ function HelpFrame:CreateFrame()
 	-- Use ButtonFrameTemplate to match Settings window
 	local frame = CreateFrame("Frame", "BetterFriendlistHelpFrame", BetterFriendsFrame, "ButtonFrameTemplate")
 	frame:SetSize(380, 500)
-	frame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 5, 0)
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+	else
+		frame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 5, 0)
+	end
 	frame:SetFrameStrata("HIGH")
 	frame:EnableMouse(true)
 	frame:SetMovable(false)
@@ -346,6 +351,10 @@ function HelpFrame:CreateFrame()
 
 	-- Sound effects
 	frame:SetScript("OnShow", function()
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+			FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+		end
 		HelpFrame:UpdateAccentColors(frame)
 		HelpFrame:UpdateText(frame) -- Update text on show
 		-- Close RaidTools when opening Help

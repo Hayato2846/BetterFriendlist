@@ -63,12 +63,12 @@ local DEFAULT_SETTINGS = {
 local ICON_OPTIONS = {
 	{ id = "tag", labelKey = "FRIEND_TAGS_ICON_TAG", fallback = "Tag", texture = TAG_ICON },
 	{ id = "professions", labelKey = "FRIEND_TAGS_ICON_PROFESSIONS", fallback = "Professions", atlas = "Professions-Icon-Crafter", texture = "Interface\\Icons\\INV_Misc_Gear_08" },
-	{ id = "pvp", labelKey = "FRIEND_TAGS_ICON_PVP", fallback = "PvP", atlas = "groupfinder-button-battlegrounds", texture = "Interface\\Icons\\Achievement_BG_winWSG" },
-	{ id = "raid", labelKey = "FRIEND_TAGS_ICON_RAID", fallback = "Raid", atlas = "groupfinder-button-raids-war-within", fallbackAtlas = "groupfinder-button-raids", texture = "Interface\\EncounterJournal\\UI-EJ-PortraitIcon" },
-	{ id = "dungeon", labelKey = "FRIEND_TAGS_ICON_DUNGEON", fallback = "Dungeon", atlas = "groupfinder-button-dungeons", texture = "Interface\\Icons\\Achievement_Dungeon_Heroic_GloryoftheHero" },
-	{ id = "delves", labelKey = "FRIEND_TAGS_ICON_DELVES", fallback = "Delves", atlas = "delves-regular", fallbackAtlas = "groupfinder-button-delves", texture = "Interface\\Icons\\INV_Misc_Map_01" },
-	{ id = "questing", labelKey = "FRIEND_TAGS_ICON_QUESTING", fallback = "Questing", atlas = "FXAM-QuestBang", fallbackAtlas = "groupfinder-button-questing", texture = "Interface\\GossipFrame\\AvailableQuestIcon" },
-	{ id = "roleplaying", labelKey = "FRIEND_TAGS_ICON_ROLEPLAYING", fallback = "Roleplaying", texture = "Interface\\Icons\\INV_Misc_Book_09" },
+	{ id = "pvp", labelKey = "FRIEND_TAGS_ICON_PVP", fallback = "PvP", atlas = "honorsystem-icon-prestige-9", fallbackAtlas = "groupfinder-button-battlegrounds", texture = "Interface\\Icons\\Achievement_BG_winWSG", iconZoom = 0.15 },
+	{ id = "raid", labelKey = "FRIEND_TAGS_ICON_RAID", fallback = "Raid", atlas = "Raid", fallbackAtlas = "groupfinder-button-raids", texture = "Interface\\EncounterJournal\\UI-EJ-PortraitIcon", iconZoom = 0.25 },
+	{ id = "dungeon", labelKey = "FRIEND_TAGS_ICON_DUNGEON", fallback = "Dungeon", atlas = "Dungeon", fallbackAtlas = "groupfinder-button-dungeons", texture = "Interface\\Icons\\Achievement_Dungeon_Heroic_GloryoftheHero", iconZoom = 0.25 },
+	{ id = "delves", labelKey = "FRIEND_TAGS_ICON_DELVES", fallback = "Delves", atlas = "delves-regular", fallbackAtlas = "groupfinder-button-delves", texture = "Interface\\Icons\\INV_Misc_Map_01", iconZoom = 0.20 },
+	{ id = "questing", labelKey = "FRIEND_TAGS_ICON_QUESTING", fallback = "Questing", atlas = "Crosshair_Questturnin_32", fallbackAtlas = "FXAM-QuestBang", texture = "Interface\\GossipFrame\\AvailableQuestIcon", iconZoom = 0.10 },
+	{ id = "roleplaying", labelKey = "FRIEND_TAGS_ICON_ROLEPLAYING", fallback = "Roleplaying", atlas = "plunderstorm-nameplates-icon-1", texture = "Interface\\Icons\\INV_Misc_Book_09", iconZoom = 0.30 },
 	{ id = "damager", labelKey = "FRIEND_TAGS_ICON_DAMAGER", fallback = "Damage", atlas = ROLE_ICONS.damager.atlas, fallbackAtlas = ROLE_ICONS.damager.fallbackAtlas, texture = ROLE_ICONS.damager.texture, texCoord = ROLE_ICONS.damager.texCoord },
 	{ id = "healer", labelKey = "FRIEND_TAGS_ICON_HEALER", fallback = "Healing", atlas = ROLE_ICONS.healer.atlas, fallbackAtlas = ROLE_ICONS.healer.fallbackAtlas, texture = ROLE_ICONS.healer.texture, texCoord = ROLE_ICONS.healer.texCoord },
 	{ id = "tank", labelKey = "FRIEND_TAGS_ICON_TANK", fallback = "Tank", atlas = ROLE_ICONS.tank.atlas, fallbackAtlas = ROLE_ICONS.tank.fallbackAtlas, texture = ROLE_ICONS.tank.texture, texCoord = ROLE_ICONS.tank.texCoord },
@@ -422,6 +422,19 @@ local function NormalizeRoleTagIconOverrides(db)
 	end
 end
 
+local function NormalizeIconZoom(value)
+	if value == true then
+		return true
+	elseif value == nil or value == false then
+		return false
+	end
+	local zoom = tonumber(value)
+	if not zoom or zoom <= 0 then
+		return false
+	end
+	return math.max(0, math.min(0.45, zoom))
+end
+
 local function CopyIconInfo(source, fallback)
 	source = type(source) == "table" and source or {}
 	fallback = type(fallback) == "table" and fallback or {}
@@ -456,6 +469,11 @@ local function CopyIconInfo(source, fallback)
 	if not icon then
 		icon = iconType == "atlas" and iconValue or texture or iconValue or fallback.icon
 	end
+	local iconZoomValue = fallback.iconZoom
+	if source.iconZoom ~= nil then
+		iconZoomValue = source.iconZoom
+	end
+	local iconZoom = NormalizeIconZoom(iconZoomValue)
 
 	return {
 		iconType = iconType,
@@ -465,6 +483,7 @@ local function CopyIconInfo(source, fallback)
 		fallbackAtlas = fallbackAtlas,
 		texture = texture,
 		texCoord = CopyTexCoord(source.texCoord) or CopyTexCoord(fallback.texCoord),
+		iconZoom = iconZoom,
 	}
 end
 
@@ -495,6 +514,16 @@ local function NormalizeBoolean(value, defaultValue)
 		return defaultValue
 	end
 	return value == true
+end
+
+local function NormalizeIconReference(value)
+	if value == nil or value == false then
+		return value
+	end
+	if type(value) == "number" then
+		return value
+	end
+	return tostring(value)
 end
 
 local function CalculateTagSortOrder(tag)
@@ -604,7 +633,6 @@ local function RefreshRuntimeCacheMetadata(self)
 	end
 	cache.definitionVersion = GetDefinitionVersion()
 	cache.settingsVersion = BFL.SettingsVersion or 0
-	cache.betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 end
 
 local function ClearRuntimeFriendCaches(cache)
@@ -629,6 +657,10 @@ local function RefreshSurfaces(refreshCallback, options)
 		RefreshRuntimeCacheMetadata(FriendTags)
 	else
 		ClearRuntimeCaches()
+	end
+	local PreviewMode = BFL:GetModule("PreviewMode")
+	if PreviewMode and PreviewMode.OnSettingChanged then
+		PreviewMode:OnSettingChanged("friendTags")
 	end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
@@ -790,14 +822,12 @@ local function GetRuntimeCache(self)
 	local cache = self.runtimeCache
 	local definitionVersion = GetDefinitionVersion()
 	local settingsVersion = BFL.SettingsVersion or 0
-	local betaEnabled = db and db.enableBetaFeatures == true
 
 	if
 		cache
 		and cache.db == db
 		and cache.definitionVersion == definitionVersion
 		and cache.settingsVersion == settingsVersion
-		and cache.betaEnabled == betaEnabled
 	then
 		return cache
 	end
@@ -806,7 +836,6 @@ local function GetRuntimeCache(self)
 		db = db,
 		definitionVersion = definitionVersion,
 		settingsVersion = settingsVersion,
-		betaEnabled = betaEnabled,
 		blizzardTagDefinitions = nil,
 		customTagDefinitions = nil,
 		allTagDefinitions = nil,
@@ -1199,15 +1228,11 @@ function FriendTags:IsEnabled()
 	if cache.isEnabled ~= nil then
 		return cache.isEnabled
 	end
-	local enabled = false
-	if not BetterFriendlistDB or BetterFriendlistDB.enableBetaFeatures ~= true then
+	if not BetterFriendlistDB then
 		cache.isEnabled = false
 		return false
 	end
-	local ContactMemory = BFL:GetModule("ContactMemory")
-	if not (ContactMemory and ContactMemory.GetEnabledSetting and ContactMemory:GetEnabledSetting() ~= true) then
-		enabled = self:GetSetting("enabled", true) ~= false
-	end
+	local enabled = self:GetSetting("enabled", true) ~= false
 	cache.isEnabled = enabled
 	return enabled
 end
@@ -1218,15 +1243,17 @@ function FriendTags:CanDisplayTags(surface)
 	if cache.displayBySurface[surface] ~= nil then
 		return cache.displayBySurface[surface]
 	end
-	local canDisplay = true
-	if not self:IsEnabled() then
-		canDisplay = false
-	elseif
+	local featureEnabled = self:IsEnabled()
+	local canDisplay = featureEnabled
+	if
 		BetterFriendlistDB
 		and BetterFriendlistDB.streamerModeActive
 		and self:GetSetting("showTagsInStreamerMode", false) ~= true
 	then
 		canDisplay = false
+	elseif not featureEnabled then
+		canDisplay = (surface == "search" or surface == "menu" or surface == "filter")
+			and self:AreBlizzardTagsEnabled()
 	elseif surface == "row" and self:GetSetting("showRowChips", true) ~= true then
 		canDisplay = false
 	elseif surface == "tooltip" and self:GetSetting("showTooltipChips", true) ~= true then
@@ -1387,6 +1414,7 @@ function FriendTags:GetBlizzardTagDefinitions()
 			fallbackAtlas = icon.fallbackAtlas,
 			texture = icon.texture,
 			texCoord = CopyTexCoord(icon.texCoord),
+			iconZoom = NormalizeIconZoom(icon.iconZoom),
 			order = tonumber(def.order) or 0,
 		}
 	end
@@ -1418,6 +1446,7 @@ function FriendTags:GetIconOptions()
 			fallbackAtlas = iconInfo.fallbackAtlas,
 			texture = iconInfo.texture,
 			texCoord = CopyTexCoord(iconInfo.texCoord),
+			iconZoom = NormalizeIconZoom(iconInfo.iconZoom),
 		}
 	end
 	cache.iconOptions = options
@@ -1434,6 +1463,7 @@ function FriendTags:GetIconInfo(iconID)
 		fallbackAtlas = icon.fallbackAtlas,
 		texture = icon.texture,
 		texCoord = CopyTexCoord(icon.texCoord),
+		iconZoom = NormalizeIconZoom(icon.iconZoom),
 	}
 end
 
@@ -1463,6 +1493,7 @@ function FriendTags:GetCustomTagDefinitions()
 					fallbackAtlas = icon.fallbackAtlas,
 					texture = icon.texture,
 					texCoord = CopyTexCoord(icon.texCoord),
+					iconZoom = NormalizeIconZoom(icon.iconZoom),
 					createdAt = def.createdAt,
 					updatedAt = def.updatedAt,
 				})
@@ -1540,6 +1571,7 @@ function FriendTags:GetDefaultChipProfile(tag)
 		fallbackAtlas = defaultIcon.fallbackAtlas,
 		texture = defaultIcon.texture,
 		texCoord = CopyTexCoord(defaultIcon.texCoord),
+		iconZoom = NormalizeIconZoom(defaultIcon.iconZoom),
 		color = CopyColor(tag.color, tag.source == SOURCE_BLIZZARD and { r = 0.50, g = 0.78, b = 1.00, a = 1 } or { r = 0.64, g = 0.86, b = 0.56, a = 1 }),
 		textColor = { r = 1, g = 1, b = 1, a = 1 },
 		visible = true,
@@ -1582,6 +1614,11 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 	end
 	if type(profile.texCoord) == "table" and not SameTexCoord(profile.texCoord, defaultProfile.texCoord) then
 		pruned.texCoord = CopyTexCoord(profile.texCoord)
+	end
+	local profileIconZoom = NormalizeIconZoom(profile.iconZoom)
+	local defaultIconZoom = NormalizeIconZoom(defaultProfile.iconZoom)
+	if profileIconZoom ~= defaultIconZoom then
+		pruned.iconZoom = profileIconZoom
 	end
 	if profile.visible == false then
 		pruned.visible = false
@@ -1633,6 +1670,10 @@ function FriendTags:GetChipProfile(tag)
 	local fallbackAtlas = override.fallbackAtlas ~= nil and override.fallbackAtlas or defaultProfile.fallbackAtlas
 	local texture = override.texture ~= nil and override.texture or defaultProfile.texture
 	local texCoord = override.texCoord ~= nil and CopyTexCoord(override.texCoord) or CopyTexCoord(defaultProfile.texCoord)
+	local iconZoom = NormalizeIconZoom(defaultProfile.iconZoom)
+	if override.iconZoom ~= nil then
+		iconZoom = NormalizeIconZoom(override.iconZoom)
+	end
 	if iconType == "none" or iconType == false or iconValue == false or legacyIcon == false then
 		iconValue = nil
 		legacyIcon = nil
@@ -1651,6 +1692,7 @@ function FriendTags:GetChipProfile(tag)
 		fallbackAtlas = fallbackAtlas,
 		texture = texture,
 		texCoord = texCoord,
+		iconZoom = iconZoom,
 		visible = NormalizeBoolean(override.visible, defaultProfile.visible),
 		rowVisible = NormalizeBoolean(override.rowVisible, defaultProfile.rowVisible),
 		tooltipVisible = NormalizeBoolean(override.tooltipVisible, defaultProfile.tooltipVisible),
@@ -1689,11 +1731,11 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 		profile.iconType = profilePatch.iconType == false and "none" or tostring(profilePatch.iconType)
 	end
 	if profilePatch.iconValue ~= nil then
-		profile.iconValue = profilePatch.iconValue == false and false or tostring(profilePatch.iconValue)
+		profile.iconValue = NormalizeIconReference(profilePatch.iconValue)
 		profile.icon = profile.iconValue
 	end
 	if profilePatch.icon ~= nil then
-		profile.icon = profilePatch.icon == false and false or tostring(profilePatch.icon)
+		profile.icon = NormalizeIconReference(profilePatch.icon)
 		if profilePatch.icon ~= false and profilePatch.iconValue == nil then
 			profile.iconValue = profile.icon
 			profile.iconType = profile.iconType or "texture"
@@ -1706,10 +1748,13 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 		profile.fallbackAtlas = profilePatch.fallbackAtlas == false and nil or tostring(profilePatch.fallbackAtlas)
 	end
 	if profilePatch.texture ~= nil then
-		profile.texture = profilePatch.texture == false and nil or tostring(profilePatch.texture)
+		profile.texture = profilePatch.texture == false and nil or NormalizeIconReference(profilePatch.texture)
 	end
 	if profilePatch.texCoord ~= nil then
 		profile.texCoord = profilePatch.texCoord == false and nil or CopyTexCoord(profilePatch.texCoord)
+	end
+	if profilePatch.iconZoom ~= nil then
+		profile.iconZoom = NormalizeIconZoom(profilePatch.iconZoom)
 	end
 	if profilePatch.visible ~= nil then
 		profile.visible = profilePatch.visible == true
@@ -1734,6 +1779,30 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 	end
 
 	db.friendTagProfiles[tagId] = self:PruneChipProfileOverride(tagId, profile)
+	RefreshSurfaces(refreshCallback)
+	return true
+end
+
+function FriendTags:SetTagOrder(tagIds, refreshCallback)
+	if type(tagIds) ~= "table" or #tagIds == 0 then
+		return false
+	end
+
+	local seen = {}
+	for _, tagId in ipairs(tagIds) do
+		if type(tagId) ~= "string" or seen[tagId] or not self:GetTagDefinition(tagId) then
+			return false
+		end
+		seen[tagId] = true
+	end
+
+	local db = self:NormalizeDB()
+	for index, tagId in ipairs(tagIds) do
+		local profile = CopyProfile(db.friendTagProfiles[tagId])
+		profile.order = index * 10
+		db.friendTagProfiles[tagId] = self:PruneChipProfileOverride(tagId, profile)
+	end
+
 	RefreshSurfaces(refreshCallback)
 	return true
 end
@@ -2138,6 +2207,9 @@ function FriendTags:ShouldIncludeTagOnSurface(tag, surface)
 	if type(tag) ~= "table" then
 		return false
 	end
+	if not self:IsEnabled() and tag.source ~= SOURCE_BLIZZARD then
+		return false
+	end
 	local profile = tag.chipProfile or self:GetChipProfile(tag)
 	if type(profile) ~= "table" or profile.visible == false then
 		return false
@@ -2177,7 +2249,7 @@ function FriendTags:GetTagsForFriend(friend, surface)
 
 	local blizzardSet = type(friend) == "table" and friend.type == "bnet" and self:GetBlizzardTagIdSetForFriend(friend)
 		or nil
-	local customSet = self:GetCustomTagIdSetForFriend(friend)
+	local customSet = self:IsEnabled() and self:GetCustomTagIdSetForFriend(friend) or nil
 	AddTagsFromSet(self, tags, blizzardSet, surface)
 	AddTagsFromSet(self, tags, customSet, surface)
 	if #tags == 2 then
@@ -2367,12 +2439,13 @@ function FriendTags:OpenSettings(tagId)
 end
 
 function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallback, options)
-	if not self:IsEnabled() then
-		return {}
-	end
-
 	options = options or {}
 	friend = self:NormalizeFriendContext(friend, explicitUID)
+	local featureEnabled = self:IsEnabled()
+	local nativeBlizzardTagsEnabled = friend.type == "bnet" and self:AreBlizzardTagsEnabled()
+	if not featureEnabled and not nativeBlizzardTagsEnabled then
+		return {}
+	end
 	local items = {}
 
 	if options.showHeader then
@@ -2382,7 +2455,7 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 		}
 	end
 
-	if friend.type == "bnet" then
+	if friend.type == "bnet" and (featureEnabled or nativeBlizzardTagsEnabled) then
 		local sectionTitle = self:AreBlizzardTagsEnabled()
 			and T("FRIEND_TAGS_BLIZZARD_SECTION", "Blizzard Tags")
 			or T("FRIEND_TAGS_BLIZZARD_COMPAT_SECTION", "Blizzard-compatible Tags")
@@ -2433,78 +2506,89 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 				end,
 			}
 		end
-		items[#items + 1] = { type = "divider" }
+		if featureEnabled then
+			items[#items + 1] = { type = "divider" }
+		end
 	end
 
-	items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags") }
-	items[#items + 1] = {
-		text = T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"),
-		func = function()
-			self:ShowCustomTagDialog(friend, displayName, refreshCallback)
-		end,
-	}
+	if featureEnabled then
+		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags") }
+		items[#items + 1] = {
+			text = T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"),
+			func = function()
+				self:ShowCustomTagDialog(friend, displayName, refreshCallback)
+			end,
+		}
 
-	local customTags = self:GetCustomTagDefinitions()
-	if #customTags > 0 then
-		for _, def in ipairs(customTags) do
-			local tagId = def.id
+		local customTags = self:GetCustomTagDefinitions()
+		if #customTags > 0 then
+			for _, def in ipairs(customTags) do
+				local tagId = def.id
+				items[#items + 1] = {
+					type = "checkbox",
+					text = def.name,
+					checked = function()
+						return self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
+					end,
+					func = function()
+						local selected = self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
+						self:SetCustomTagForFriend(friend, tagId, not selected, refreshCallback)
+						return MenuResponse and MenuResponse.Refresh
+					end,
+				}
+			end
+		else
 			items[#items + 1] = {
-				type = "checkbox",
-				text = def.name,
-				checked = function()
-					return self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
-				end,
-				func = function()
-					local selected = self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
-					self:SetCustomTagForFriend(friend, tagId, not selected, refreshCallback)
-					return MenuResponse and MenuResponse.Refresh
-				end,
+				type = "title",
+				text = T("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"),
 			}
 		end
-	else
+
+		items[#items + 1] = { type = "divider" }
 		items[#items + 1] = {
-			type = "title",
-			text = T("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"),
+			text = T("FRIEND_TAGS_MANAGE", "Manage Tags"),
+			func = function()
+				local Editor = BFL:GetModule("FriendTagEditor")
+				if Editor and Editor.Show then
+					Editor:Show()
+				else
+					self:OpenSettings()
+				end
+			end,
 		}
 	end
-
-	items[#items + 1] = { type = "divider" }
-	items[#items + 1] = {
-		text = T("FRIEND_TAGS_MANAGE", "Manage Tags"),
-		func = function()
-			local Editor = BFL:GetModule("FriendTagEditor")
-			if Editor and Editor.Show then
-				Editor:Show()
-			else
-				self:OpenSettings()
-			end
-		end,
-	}
 
 	return items
 end
 
 function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayName, refreshCallback, options)
-	if not submenu or not submenu.CreateTitle or not self:IsEnabled() then
+	if not submenu or not submenu.CreateTitle then
 		return false
 	end
 	options = options or {}
 	friend = self:NormalizeFriendContext(friend, explicitUID)
+	local items = self:GetMenuItems(friend, explicitUID, displayName, refreshCallback, options)
+	if #items == 0 then
+		return false
+	end
 
 	if BFL.PopulateSimpleMenu then
-		BFL.PopulateSimpleMenu(submenu, function()
-			return self:GetMenuItems(friend, explicitUID, displayName, refreshCallback, options)
-		end)
+		BFL.PopulateSimpleMenu(submenu, items)
 	end
 
 	return true
 end
 
-function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayName, refreshCallback)
-	if not rootDescription or not rootDescription.CreateButton or not self:IsEnabled() then
+function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayName, refreshCallback, options)
+	if not rootDescription or not rootDescription.CreateButton then
 		return false
 	end
+	options = options or {}
 	friend = self:NormalizeFriendContext(friend, explicitUID)
+	local featureEnabled = self:IsEnabled()
+	if not featureEnabled and not (friend.type == "bnet" and self:AreBlizzardTagsEnabled()) then
+		return false
+	end
 
 	local tags = self:GetTagsForFriend(friend, "menu")
 	local title = T("FRIEND_TAGS_MENU_TITLE", "Friend Tags")
@@ -2517,7 +2601,7 @@ function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayNa
 		submenu:SetScrollMode(320)
 	end
 
-	return self:PopulateMenuContent(submenu, friend, explicitUID, displayName, refreshCallback)
+	return self:PopulateMenuContent(submenu, friend, explicitUID, displayName, refreshCallback, options)
 end
 
 function FriendTags:Initialize()

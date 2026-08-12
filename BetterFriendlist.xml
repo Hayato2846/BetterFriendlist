@@ -1085,8 +1085,7 @@
 					</Anchors>
 				</Texture>
 				<!-- Main Tank Icon (left of rank icon) -->
-				<Texture parentKey="MainTankIcon" hidden="true"
-					file="Interface\GroupFrame\UI-Group-MainTankIcon">
+				<Texture parentKey="MainTankIcon" hidden="true">
 					<Size x="12" y="12" />
 					<Anchors>
 						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT"
@@ -1095,8 +1094,7 @@
 				</Texture>
 				<!-- Main Assist Icon (left of rank icon, same position as MainTank - only one
 				shows) -->
-				<Texture parentKey="MainAssistIcon" hidden="true"
-					file="Interface\GroupFrame\UI-Group-MainAssistIcon">
+				<Texture parentKey="MainAssistIcon" hidden="true">
 					<Size x="12" y="12" />
 					<Anchors>
 						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT"
@@ -1237,12 +1235,33 @@
 		</HighlightTexture>
 	</Button>
 
+	<!-- Retail 12.1 Social Raid role count: count followed by the 24 px role icon. -->
+	<Frame name="BFLModernRaidRoleCountTemplate" virtual="true">
+		<Size x="48" y="24" />
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Count" inherits="GameFontHighlight" text="0">
+					<Size y="24" />
+					<Anchors>
+						<Anchor point="LEFT" />
+					</Anchors>
+				</FontString>
+				<Texture parentKey="Icon">
+					<Size x="24" y="24" />
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.Count" relativePoint="RIGHT" x="4" />
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
 	<!-- Raid Group Template -->
 	<Frame name="BetterRaidGroupTemplate" virtual="true">
 		<Size x="180" y="115" />
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture setAllPoints="true">
+				<Texture parentKey="Background" setAllPoints="true">
 					<Color r="0" g="0" b="0" a="0" />
 				</Texture>
 			</Layer>
@@ -1725,8 +1744,8 @@
 						inherits="PanelTopTabButtonTemplate" text="CONTACTS_RECENT_ALLIES_TAB_NAME"
 						id="2">
 						<Anchors>
-							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab1"
-								relativePoint="RIGHT" x="-16" y="0" />
+							<Anchor point="TOPLEFT" relativeTo="BetterFriendsFrameTab1"
+								relativePoint="TOPRIGHT" x="3" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1738,8 +1757,8 @@
 					<Button name="BetterFriendsFrameTab3" parentKey="Tab3"
 						inherits="PanelTopTabButtonTemplate" text="RECRUIT_A_FRIEND" id="3">
 						<Anchors>
-							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab2"
-								relativePoint="RIGHT" x="-16" y="0" />
+							<Anchor point="TOPLEFT" relativeTo="BetterFriendsFrameTab2"
+								relativePoint="TOPRIGHT" x="3" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -1751,8 +1770,8 @@
 					<Button name="BetterFriendsFrameTab4" parentKey="Tab4"
 						inherits="PanelTopTabButtonTemplate" text="GUILD" id="4" hidden="true">
 						<Anchors>
-							<Anchor point="LEFT" relativeTo="BetterFriendsFrameTab3"
-								relativePoint="RIGHT" x="-16" y="0" />
+							<Anchor point="TOPLEFT" relativeTo="BetterFriendsFrameTab3"
+								relativePoint="TOPRIGHT" x="3" y="0" />
 						</Anchors>
 						<Scripts>
 							<OnClick>
@@ -2133,9 +2152,9 @@
 						</KeyValues>
 						<Size y="20" />
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="40" />
+							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="15" />
 							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.ListInset" x="-20"
-								y="40" />
+								y="15" />
 						</Anchors>
 						<Layers>
 							<Layer level="BACKGROUND">
@@ -2875,7 +2894,7 @@
 						<Frames>
 							<!-- Raid Info Button (top right) -->
 							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate"
-								text="Raid Info">
+								text="RAID_INFO">
 								<NormalFont style="BetterFriendlistFontNormal" />
 								<HighlightFont style="BetterFriendlistFontHighlight" />
 								<DisabledFont style="BetterFriendlistFontDisable" />
@@ -2947,6 +2966,13 @@
 						</Frames>
 						<Layers>
 							<Layer level="OVERLAY">
+								<Texture parentKey="EveryoneAssistIcon" hidden="true">
+									<Anchors>
+										<Anchor point="LEFT"
+											relativeKey="$parent.EveryoneAssistCheckbox"
+											relativePoint="RIGHT" x="2" />
+									</Anchors>
+								</Texture>
 								<!-- Member Count Display - Right next to Role Summary -->
 								<FontString parentKey="MemberCount"
 									inherits="BetterFriendlistFontHighlight" justifyH="LEFT">
@@ -2974,6 +3000,12 @@
 										relativePoint="LEFT" x="-85" y="0" />
 								</Anchors>
 							</Frame>
+							<Frame parentKey="TankFrame" inherits="BFLModernRaidRoleCountTemplate"
+								hidden="true" />
+							<Frame parentKey="HealerFrame" inherits="BFLModernRaidRoleCountTemplate"
+								hidden="true" />
+							<Frame parentKey="DamagerFrame" inherits="BFLModernRaidRoleCountTemplate"
+								hidden="true" />
 							<!-- Combat Icon - Shows between MemberCount and RaidInfo button during
 							combat -->
 							<Button parentKey="CombatIcon" hidden="true">

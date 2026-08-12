@@ -74,9 +74,15 @@ local function GetTRP3Locale(key)
 end
 
 local function IsForbidden(frame)
+	if frame and type(frame.CanBeAccessedInContext) == "function" then
+		local ok, canAccess = pcall(frame.CanBeAccessedInContext, frame)
+		if not ok or not canAccess then
+			return true
+		end
+	end
 	if frame and type(frame.IsForbidden) == "function" then
 		local ok, forbidden = pcall(frame.IsForbidden, frame)
-		return ok and forbidden
+		return not ok or forbidden == true
 	end
 	return false
 end
