@@ -759,15 +759,18 @@ function AppearanceOnboarding:OnFrameLoad(frame)
 		ApplyAtlasTexture(frame.MainInset.HeaderSurface, "friends-card-default", "Interface\\Buttons\\WHITE8X8")
 	end
 	self.palette = self:GetPalette()
+	self.progressHolder = CreateFrame("Frame", nil, frame.MainInset)
+	self.progressHolder:SetSize((TOTAL_STEPS * 24) + ((TOTAL_STEPS - 1) * 4), 3)
+	self.progressHolder:SetPoint("TOPRIGHT", frame.MainInset, "TOPRIGHT", -19, -19)
 	self.progressSegments = {}
 	for index = 1, TOTAL_STEPS do
-		local segment = frame.MainInset:CreateTexture(nil, "OVERLAY")
+		local segment = self.progressHolder:CreateTexture(nil, "OVERLAY")
 		segment:SetTexture("Interface\\Buttons\\WHITE8X8")
 		segment:SetSize(24, 3)
 		if index == 1 then
-			segment:SetPoint("TOPRIGHT", frame.MainInset, "TOPRIGHT", -19, -19)
+			segment:SetPoint("LEFT", self.progressHolder, "LEFT", 0, 0)
 		else
-			segment:SetPoint("RIGHT", self.progressSegments[index - 1], "LEFT", -4, 0)
+			segment:SetPoint("LEFT", self.progressSegments[index - 1], "RIGHT", 4, 0)
 		end
 		self.progressSegments[index] = segment
 	end
@@ -1486,6 +1489,11 @@ function AppearanceOnboarding:RegisterTests()
 				self.frame.StepText and self.frame.StepText:GetParent() == self.frame.MainInset
 					and self.frame.Subtitle and self.frame.Subtitle:GetParent() == self.frame.MainInset,
 				"Onboarding header text renders above the inset background"
+			)
+			local point, relativeTo, relativePoint = self.progressSegments[2]:GetPoint(1)
+			V:Assert(
+				point == "LEFT" and relativeTo == self.progressSegments[1] and relativePoint == "RIGHT",
+				"Onboarding progress advances from left to right"
 			)
 			V:Assert(self.stylePanel and self.themePanel and self.layoutPanel and self.summaryPanel, "All onboarding steps exist")
 			V:Assert(self.primaryButton and self.laterButton and self.backButton, "Onboarding exposes bounded navigation")
