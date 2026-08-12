@@ -5213,9 +5213,15 @@ local function RegisterBuiltInTests()
 				editBoxes = {},
 				tabs = {},
 				scrollbar = false,
+				shells = 0,
 			}
 			local facade = {
 				apiVersion = 1,
+				Shell = function()
+					calls.shells = calls.shells + 1
+				end,
+				Inset = function() end,
+				CloseButton = function() end,
 				Button = function(button)
 					if button then
 						calls.buttons[button] = true
@@ -5404,6 +5410,8 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(frame.PortraitButton.point[2], frame, "Legacy EUI logo button should anchor to the main frame")
 				V:AssertEqual(frame.PortraitButton.point[4], 15, "Legacy EUI logo should align with the search field")
 				V:AssertEqual(frame.PortraitButton.point[5], -21, "Legacy EUI logo should meet the top header edge")
+				V:Assert(skin:RefreshMainFrame("test-reopen", frame), "EUI should expose a focused main-frame reopen pass")
+				V:AssertEqual(calls.shells, 1, "Focused EUI reopen should touch only the main frame shell once")
 
 				local invite = {
 					AcceptButton = MakeButton(),

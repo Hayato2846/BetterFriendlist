@@ -3320,12 +3320,14 @@ function FriendsUI:ApplyModernPortrait()
 	local db = GetDB()
 	local simpleMode = db and db.simpleMode == true
 	local palette, themed = self:GetModernThemeColors()
-	frame._bflModernPortraitChromeShown = not simpleMode
+	local flatTheme = BFL.UsesFlatTheme and BFL:UsesFlatTheme() == true
+	local showNativePortraitChrome = not simpleMode and not flatTheme
+	frame._bflModernPortraitChromeShown = showNativePortraitChrome
 	-- PortraitFrame can restore its native portrait and corner artwork whenever
 	-- the panel is shown. Reapply this state on every Modern layout pass rather
 	-- than caching only the setting transition.
 	if frame.SetPortraitShown then
-		frame:SetPortraitShown(not simpleMode)
+		frame:SetPortraitShown(showNativePortraitChrome)
 	end
 
 	-- ButtonFrameTemplate_HidePortrait also moves Bg, Inset and
@@ -3337,7 +3339,7 @@ function FriendsUI:ApplyModernPortrait()
 		pcall(
 			topLeftCorner.SetAtlas,
 			topLeftCorner,
-			simpleMode and "UI-Frame-Metal-CornerTopLeft" or "UI-Frame-PortraitMetal-CornerTopLeft",
+			showNativePortraitChrome and "UI-Frame-PortraitMetal-CornerTopLeft" or "UI-Frame-Metal-CornerTopLeft",
 			true
 		)
 	end
@@ -3358,6 +3360,14 @@ function FriendsUI:ApplyModernPortrait()
 	SafeShow(frame.portrait, false)
 	SafeShow(frame.PortraitIcon, false)
 	SafeShow(frame.PortraitMask, false)
+	-- External flat skins own a compact BFL logo and must not inherit the
+	-- high-level PortraitFrame container restored by Blizzard's OnShow path.
+	if frame.PortraitContainer then
+		SafeShow(frame.PortraitContainer, showNativePortraitChrome)
+		if frame.PortraitContainer.SetAlpha then
+			frame.PortraitContainer:SetAlpha(showNativePortraitChrome and 1 or 0)
+		end
+	end
 	local portrait = self.root and self.root.PortraitOverlay
 	if portrait then
 		portrait:ClearAllPoints()
@@ -3866,6 +3876,38 @@ function FriendsUI:SetModernForceEnabled(enabled)
 	local AppearanceOnboarding = BFL:GetModule("AppearanceOnboarding")
 	if AppearanceOnboarding and AppearanceOnboarding.OnModernAvailabilityChanged then
 		AppearanceOnboarding:OnModernAvailabilityChanged("force-modern")
+	end
+	return true
+end
+
+function FriendsUI:RefreshEffectiveStyleOnShow()
+	local effective = self:GetEffectiveStyle()
+	if self.appliedStyle ~= effective then
+		return self:ApplyEffectiveStyle("show-style-change")
+	end
+
+	-- The frame hierarchy and selected section survive Hide/Show. Reapplying the
+	-- complete style here needlessly rebuilds controls, refreshes the friend
+	-- provider, and asks every theme integration to reskin all of its windows.
+	-- Refresh only the visual state which Blizzard's frame templates can restore.
+	if effective == STYLE_MODERN then
+		self:ApplyModernPortrait()
+		-- ElvUI does not use BFL's flat-theme palette and therefore owns its own
+		-- portrait suppression. EUI schedules its focused facade pass from the
+		-- frame's OnShow hook; Dark and Custom need no work beyond the portrait.
+		local theme = (BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()) or self.currentTheme
+		if theme == "elvui" then
+			local ElvUISkin = BFL:GetModule("ElvUISkin")
+			if ElvUISkin and ElvUISkin.RefreshModernSkin then
+				ElvUISkin:RefreshModernSkin()
+			end
+		end
+	else
+		self:RestoreLegacyTabs(false)
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.RefreshMainFrame then
+			EllesmereUISkin:RefreshMainFrame("friends-ui-show")
+		end
 	end
 	return true
 end
@@ -5423,6 +5465,11 @@ function FriendsUI:RegisterTests()
 							and not self.root.PortraitOverlay.Mask:IsShown(),
 						"Modern flat-theme portrait is square and contained by the main frame"
 					)
+					V:Assert(
+						frame._bflModernPortraitChromeShown == false
+							and (not frame.PortraitContainer or not frame.PortraitContainer:IsShown()),
+						"Modern flat themes keep Blizzard's native portrait ring suppressed"
+					)
 				end
 			end)
 			db.simpleMode = originalSimpleMode
@@ -6420,7 +6467,7 @@ function FriendsUI:Initialize()
 		self:EnsureSocialUIRedirects()
 		if BetterFriendsFrame then
 			BetterFriendsFrame:HookScript("OnShow", function()
-				self:ApplyEffectiveStyle("show")
+				self:RefreshEffectiveStyleOnShow()
 			end)
 		end
 		self:ApplyEffectiveStyle("initialize")

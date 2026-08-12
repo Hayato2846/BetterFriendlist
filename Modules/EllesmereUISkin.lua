@@ -612,6 +612,15 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	self:SkinRequestedActionControls(frame)
 end
 
+function EllesmereUISkin:RefreshMainFrame(reason, frame)
+	if not self:IsSkinEnabled() then
+		return false
+	end
+	self.lastApplyReason = reason
+	self:SkinMainFrame(frame)
+	return true
+end
+
 function EllesmereUISkin:SkinSettingsCenter(frame)
 	local api = self.facade
 	if not self:IsSkinEnabled() or not frame then
@@ -745,8 +754,8 @@ function EllesmereUISkin:SkinAppearanceOnboarding(frame, onboarding)
 	return true
 end
 
-function EllesmereUISkin:SkinMainFrame()
-	local frame = _G.BetterFriendsFrame
+function EllesmereUISkin:SkinMainFrame(frame)
+	frame = frame or _G.BetterFriendsFrame
 	if not self:IsSkinEnabled() or not frame then
 		return
 	end
@@ -756,8 +765,14 @@ function EllesmereUISkin:SkinMainFrame()
 	SafeCall(api, "CloseButton", frame.CloseButton)
 
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() == true
+	local modern = self:IsModernInterfaceActive()
 	if modern then
+		-- PortraitFrameMixin can restore the native portrait ring late in its
+		-- OnShow chain. Keep the focused EUI refresh responsible for restoring
+		-- BFL's compact logo as well as the main-frame shell.
+		if FriendsUI.ApplyModernPortrait then
+			FriendsUI:ApplyModernPortrait()
+		end
 		self:SetLegacyPortraitShown(frame, false)
 	else
 		self:SkinLegacyPortrait(frame)
@@ -811,6 +826,22 @@ function EllesmereUISkin:ScheduleApply(reason)
 		C_Timer.After(0, ApplyScheduled)
 	else
 		ApplyScheduled()
+	end
+end
+
+function EllesmereUISkin:ScheduleMainFrameRefresh(reason)
+	if not self:IsSkinEnabled() or self.mainFrameRefreshScheduled then
+		return
+	end
+	self.mainFrameRefreshScheduled = true
+	local function RefreshScheduled()
+		self.mainFrameRefreshScheduled = nil
+		self:RefreshMainFrame(reason or "deferred-main-frame")
+	end
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, RefreshScheduled)
+	else
+		RefreshScheduled()
 	end
 end
 
@@ -894,9 +925,16 @@ function EllesmereUISkin:InstallHooks()
 			end)
 		end
 	end
+	local function HookMainFrameObject(object, label, methodName)
+		if object and type(object[methodName]) == "function" then
+			hooksecurefunc(object, methodName, function()
+				self:ScheduleMainFrameRefresh(label .. ":" .. methodName)
+			end)
+		end
+	end
 
-	HookObject(BFL:GetModule("FriendsUI"), "FriendsUI", "ApplyModernContentLayout")
-	HookObject(BFL:GetModule("FriendsUI"), "FriendsUI", "RefreshModernSideTabSelection")
+	HookMainFrameObject(BFL:GetModule("FriendsUI"), "FriendsUI", "ApplyModernContentLayout")
+	HookMainFrameObject(BFL:GetModule("FriendsUI"), "FriendsUI", "RefreshModernSideTabSelection")
 	HookObject(BFL:GetModule("Changelog"), "Changelog", "CreateChangelogWindow")
 	HookObject(BFL.HelpFrame, "HelpFrame", "CreateFrame")
 	HookObject(BFL:GetModule("Settings"), "Settings", "CreateExportFrame")
@@ -937,7 +975,11 @@ function EllesmereUISkin:InstallHooks()
 
 	if _G.BetterFriendsFrame and _G.BetterFriendsFrame.HookScript then
 		_G.BetterFriendsFrame:HookScript("OnShow", function()
-			self:ScheduleApply("main-frame-show")
+			-- The full Apply pass also traverses Settings, auxiliary windows, and
+			-- popups. OnShow needs only the main frame. Defer this small pass so it
+			-- runs after Blizzard's PortraitFrame hooks and coalesces with any layout
+			-- refresh scheduled during the same frame.
+			self:ScheduleMainFrameRefresh("main-frame-show")
 		end)
 	end
 	if _G.BetterFriendlistSettingsFrame and _G.BetterFriendlistSettingsFrame.HookScript then
