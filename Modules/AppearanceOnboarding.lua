@@ -138,6 +138,20 @@ local function IsValidStyle(style)
 	return style == STYLE_MODERN or style == STYLE_LEGACY
 end
 
+local function CopySnapshot(snapshot)
+	if type(snapshot) ~= "table" then
+		return nil
+	end
+	return {
+		style = snapshot.style,
+		theme = snapshot.theme,
+		enableElvUISkin = snapshot.enableElvUISkin == true,
+		simpleMode = snapshot.simpleMode == true,
+		compactMode = snapshot.compactMode == true,
+		completedVersion = snapshot.completedVersion,
+	}
+end
+
 function AppearanceOnboarding:EvaluateEligibility(context)
 	context = context or {}
 	if context.isRetail ~= true then
@@ -836,14 +850,98 @@ function AppearanceOnboarding:GetThemeLabel(theme)
 end
 
 function AppearanceOnboarding:NeedsReload()
-	if not self.snapshot or not self.selectedTheme or self.selectedTheme == self.snapshot.theme then
+	local loadedTheme = self.sessionLoadedTheme or self.snapshot and self.snapshot.theme
+	if not loadedTheme or not self.selectedTheme or self.selectedTheme == loadedTheme then
 		return false
 	end
 	local ThemeManager = BFL:GetModule("ThemeManager")
 	return ThemeManager
 		and ThemeManager.ThemeSelectionRequiresReload
-		and ThemeManager:ThemeSelectionRequiresReload(self.snapshot.theme, self.selectedTheme)
+		and ThemeManager:ThemeSelectionRequiresReload(loadedTheme, self.selectedTheme)
 		or false
+end
+
+function AppearanceOnboarding:GetResumeState()
+	local state = BetterFriendlistDB and BetterFriendlistDB.appearanceOnboardingResume
+	if type(state) ~= "table" or tonumber(state.version) ~= ONBOARDING_VERSION then
+		return nil
+	end
+	if
+		type(state.snapshot) ~= "table"
+		or not IsValidStyle(state.selectedStyle)
+		or type(state.selectedTheme) ~= "string"
+		or state.selectedTheme == ""
+	then
+		return nil
+	end
+	return state
+end
+
+function AppearanceOnboarding:ClearResumeState()
+	self.resumePending = nil
+	if BetterFriendlistDB then
+		BetterFriendlistDB.appearanceOnboardingResume = nil
+	end
+end
+
+function AppearanceOnboarding:SaveResumeState(force)
+	if not BetterFriendlistDB or not self.active or not self.snapshot then
+		return false
+	end
+	if force then
+		self.resumePending = true
+	elseif not self.resumePending then
+		return false
+	end
+	local state = {
+		version = ONBOARDING_VERSION,
+		currentStep = math.max(1, math.min(TOTAL_STEPS, tonumber(self.currentStep) or 1)),
+		selectedStyle = self.selectedStyle,
+		selectedTheme = self.selectedTheme,
+		selectedSimpleMode = self.selectedSimpleMode == true,
+		selectedCompactMode = self.selectedCompactMode == true,
+		snapshot = CopySnapshot(self.snapshot),
+	}
+	BetterFriendlistDB.appearanceOnboardingResume = state
+	return true
+end
+
+function AppearanceOnboarding:StoreThemeSelection(theme)
+	if BetterFriendlistDB then
+		BetterFriendlistDB.theme = theme
+		BetterFriendlistDB.enableElvUISkin = theme == "elvui"
+	end
+end
+
+function AppearanceOnboarding:ShowImmediateThemeReloadDialog(theme, previousTheme)
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if not (ThemeManager and ThemeManager.ShowReloadDialog) then
+		return false
+	end
+	local popup = ThemeManager:ShowReloadDialog({
+		onReloadAccepted = function()
+			self:StoreThemeSelection(theme)
+			self:SaveResumeState(true)
+		end,
+		onReloadCancelled = function()
+			if self.active and self.selectedTheme == theme then
+				self.selectedTheme = previousTheme
+				self:RefreshStep()
+				self:SaveResumeState(false)
+			end
+		end,
+	})
+	if not popup and self.active and self.selectedTheme == theme then
+		self.selectedTheme = previousTheme
+		self:RefreshStep()
+	end
+	return popup ~= nil
+end
+
+function AppearanceOnboarding:HideImmediateThemeReloadDialog()
+	if StaticPopup_Hide then
+		StaticPopup_Hide("BFL_EXTERNAL_THEME_RELOAD")
+	end
 end
 
 function AppearanceOnboarding:RefreshSummary()
@@ -1146,21 +1244,38 @@ function AppearanceOnboarding:Begin()
 	if not (ThemeManager and ThemeManager.IsValidTheme and ThemeManager:IsValidTheme(storedTheme)) then
 		storedTheme = ThemeManager and ThemeManager.GetStoredTheme and ThemeManager:GetStoredTheme() or "blizzard"
 	end
-	self.snapshot = {
-		style = BetterFriendlistDB.friendsFrameStyle,
-		theme = storedTheme,
-		enableElvUISkin = BetterFriendlistDB.enableElvUISkin == true,
-		simpleMode = BetterFriendlistDB.simpleMode == true,
-		compactMode = BetterFriendlistDB.compactMode == true,
-		completedVersion = BetterFriendlistDB.appearanceOnboardingVersion,
-	}
-	self.selectedStyle = IsValidStyle(self.snapshot.style) and self.snapshot.style or nil
-	self.selectedTheme = ThemeManager and ThemeManager.IsThemeAvailable and ThemeManager:IsThemeAvailable(storedTheme)
-		and storedTheme
-		or nil
-	self.selectedSimpleMode = self.snapshot.simpleMode
-	self.selectedCompactMode = self.snapshot.compactMode
-	self.currentStep = 1
+	local resumeState = self:GetResumeState()
+	if resumeState then
+		self.snapshot = CopySnapshot(resumeState.snapshot)
+		self.selectedStyle = resumeState.selectedStyle == STYLE_MODERN and not self:IsModernStyleAvailable()
+			and STYLE_LEGACY
+			or resumeState.selectedStyle
+		self.selectedTheme = ThemeManager and ThemeManager.IsThemeAvailable
+			and ThemeManager:IsThemeAvailable(resumeState.selectedTheme)
+			and resumeState.selectedTheme
+			or nil
+		self.selectedSimpleMode = resumeState.selectedSimpleMode == true
+		self.selectedCompactMode = resumeState.selectedCompactMode == true
+		self.currentStep = math.max(1, math.min(TOTAL_STEPS, tonumber(resumeState.currentStep) or 1))
+		self.resumePending = true
+	else
+		self.snapshot = {
+			style = BetterFriendlistDB.friendsFrameStyle,
+			theme = storedTheme,
+			enableElvUISkin = BetterFriendlistDB.enableElvUISkin == true,
+			simpleMode = BetterFriendlistDB.simpleMode == true,
+			compactMode = BetterFriendlistDB.compactMode == true,
+			completedVersion = BetterFriendlistDB.appearanceOnboardingVersion,
+		}
+		self.selectedStyle = IsValidStyle(self.snapshot.style) and self.snapshot.style or nil
+		self.selectedTheme = ThemeManager and ThemeManager.IsThemeAvailable and ThemeManager:IsThemeAvailable(storedTheme)
+			and storedTheme
+			or nil
+		self.selectedSimpleMode = self.snapshot.simpleMode
+		self.selectedCompactMode = self.snapshot.compactMode
+		self.currentStep = 1
+		self.resumePending = nil
+	end
 	self.active = true
 	self.confirmed = false
 	self:RebuildThemeCards()
@@ -1192,6 +1307,7 @@ function AppearanceOnboarding:SelectStyle(style)
 	end
 	self:AnchorFrame()
 	self:RefreshStep()
+	self:SaveResumeState(false)
 	return true
 end
 
@@ -1203,11 +1319,21 @@ function AppearanceOnboarding:SelectTheme(theme)
 	if not (ThemeManager and ThemeManager.IsThemeAvailable and ThemeManager:IsThemeAvailable(theme)) then
 		return false
 	end
+	local previousTheme = self.selectedTheme
 	self.selectedTheme = theme
-	if ThemeManager.CanPreviewTheme and ThemeManager:CanPreviewTheme(theme, self.snapshot and self.snapshot.theme) then
+	if self:NeedsReload() then
+		-- External skin modules are loaded during addon startup. Persist the choice
+		-- only once the player accepts the reload, then resume this exact step with
+		-- the original rollback snapshot intact in the next session.
+		self:RefreshStep()
+		self:ShowImmediateThemeReloadDialog(theme, previousTheme)
+		return true
+	end
+	if ThemeManager.CanPreviewTheme and ThemeManager:CanPreviewTheme(theme, self.sessionLoadedTheme) then
 		ThemeManager:SetTheme(theme, "appearance-onboarding-preview")
 	end
 	self:RefreshStep()
+	self:SaveResumeState(false)
 	return true
 end
 
@@ -1230,6 +1356,7 @@ function AppearanceOnboarding:SelectLayoutMode(key, enabled)
 	end
 	self:AnchorFrame()
 	self:RefreshStep()
+	self:SaveResumeState(false)
 	return true
 end
 
@@ -1254,12 +1381,14 @@ function AppearanceOnboarding:ActivatePrimaryAction()
 		return
 	end
 	self:RefreshStep()
+	self:SaveResumeState(false)
 end
 
 function AppearanceOnboarding:PreviousStep()
 	if self.currentStep and self.currentStep > 1 then
 		self.currentStep = self.currentStep - 1
 		self:RefreshStep()
+		self:SaveResumeState(false)
 	end
 end
 
@@ -1314,11 +1443,24 @@ function AppearanceOnboarding:Defer()
 		self:HideFrame()
 		return
 	end
+	self:HideImmediateThemeReloadDialog()
+	local restoreTheme = self.snapshot and self.snapshot.theme
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	local needsRestoreReload = restoreTheme
+		and restoreTheme ~= self.sessionLoadedTheme
+		and ThemeManager
+		and ThemeManager.ThemeSelectionRequiresReload
+		and ThemeManager:ThemeSelectionRequiresReload(self.sessionLoadedTheme, restoreTheme)
+		or false
 	self.sessionDeferred = true
 	self.active = false
 	self:RestoreSnapshot(false)
 	self.snapshot = nil
+	self:ClearResumeState()
 	self:HideFrame()
+	if needsRestoreReload and ThemeManager and ThemeManager.ShowReloadDialog then
+		ThemeManager:ShowReloadDialog()
+	end
 end
 
 function AppearanceOnboarding:Commit()
@@ -1328,6 +1470,7 @@ function AppearanceOnboarding:Commit()
 	if self.selectedStyle == STYLE_MODERN and not self:IsModernStyleAvailable() then
 		return false
 	end
+	self:HideImmediateThemeReloadDialog()
 	local needsReload = self:NeedsReload()
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.SetStyle then
@@ -1357,6 +1500,7 @@ function AppearanceOnboarding:Commit()
 	self.confirmed = true
 	self.active = false
 	self.snapshot = nil
+	self:ClearResumeState()
 	self:HideFrame()
 	if needsReload and ThemeManager and ThemeManager.ShowReloadDialog then
 		if C_Timer and C_Timer.After then
@@ -1514,12 +1658,42 @@ function AppearanceOnboarding:RegisterTests()
 			end
 		end,
 	})
+	TestSuite:RegisterTest("settings", "AppearanceOnboarding_ReloadResume", {
+		action = function(V)
+			local previousState = BetterFriendlistDB.appearanceOnboardingResume
+			local state = {
+				version = ONBOARDING_VERSION,
+				currentStep = 2,
+				selectedStyle = STYLE_MODERN,
+				selectedTheme = "elvui",
+				selectedSimpleMode = false,
+				selectedCompactMode = true,
+				snapshot = {
+					style = STYLE_LEGACY,
+					theme = "blizzard",
+					enableElvUISkin = false,
+					simpleMode = false,
+					compactMode = false,
+					completedVersion = 0,
+				},
+			}
+			BetterFriendlistDB.appearanceOnboardingResume = state
+			V:Assert(self:GetResumeState() == state, "A matching reload state resumes the selected onboarding step")
+			state.version = ONBOARDING_VERSION - 1
+			V:Assert(self:GetResumeState() == nil, "Stale onboarding reload state is ignored")
+			BetterFriendlistDB.appearanceOnboardingResume = previousState
+		end,
+	})
 end
 
 function AppearanceOnboarding:Initialize()
 	if not BFL.IsRetail then
 		return
 	end
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	self.sessionLoadedTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()
+		or ThemeManager and ThemeManager.GetStoredTheme and ThemeManager:GetStoredTheme()
+		or "blizzard"
 	self:HookMainFrame()
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		self:RefreshStep()
@@ -1542,7 +1716,9 @@ function AppearanceOnboarding:Initialize()
 	BFL:RegisterEventCallback("ADDONS_UNLOADING", function()
 		if self.active and self.snapshot then
 			self.active = false
-			self:RestoreSnapshot(true)
+			if not self.resumePending then
+				self:RestoreSnapshot(true)
+			end
 			self.snapshot = nil
 		end
 	end, 5)
@@ -1555,7 +1731,23 @@ function AppearanceOnboarding:OnPlayerLogin()
 	self.playerLoggedIn = true
 	self:HookMainFrame()
 	self:RegisterTests()
-	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+	if self:GetResumeState() and BetterFriendsFrame then
+		local function ResumeAfterReload()
+			if not BetterFriendsFrame:IsShown() then
+				if _G.ShowBetterFriendsFrame then
+					_G.ShowBetterFriendsFrame(1)
+				else
+					BetterFriendsFrame:Show()
+				end
+			end
+			self:ScheduleTryShow("reload-resume")
+		end
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0, ResumeAfterReload)
+		else
+			ResumeAfterReload()
+		end
+	elseif BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 		self:ScheduleTryShow("player-login")
 	end
 end

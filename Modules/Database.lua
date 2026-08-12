@@ -194,6 +194,7 @@ local defaults = {
 	friendsFrameStyle = BFL.IsRetail and "modern" or "legacy", -- Requested UI style; capability fallback never overwrites this value
 	forceModernFriendsUI = false, -- Developer override for testing Modern while Blizzard disables C_SocialUI
 	appearanceOnboardingVersion = 0, -- One-time Retail style/theme onboarding schema; installation-local and not imported
+	appearanceOnboardingResume = false, -- Temporary reload-resume state; installation-local and not imported
 	modernFriendTabOrder = {}, -- Modern SocialUI side-tab order; missing IDs are appended in their default order
 	modernFriendTabVisibility = {}, -- Per-tab visibility; missing IDs remain visible
 	modernFriendTabPopulatedOnly = { quick_join = false, friend_requests = false }, -- Optional empty-state hiding for count-driven tabs

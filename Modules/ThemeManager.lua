@@ -451,7 +451,10 @@ function ThemeManager:ApplyPendingTheme()
 	self:ApplyCurrentTheme(self.pendingThemeReason or "combat-ended")
 end
 
-function ThemeManager:ShowReloadDialog()
+function ThemeManager:ShowReloadDialog(options)
+	options = type(options) == "table" and options or nil
+	local onReloadAccepted = options and options.onReloadAccepted
+	local onReloadCancelled = options and options.onReloadCancelled
 	local L = BFL.L or _G.BFL_L
 	StaticPopupDialogs["BFL_EXTERNAL_THEME_RELOAD"] = {
 		text = (L and L.SETTINGS_CENTER_RELOAD_REQUIRED)
@@ -459,13 +462,21 @@ function ThemeManager:ShowReloadDialog()
 		button1 = (L and L.DIALOG_UI_PANEL_RELOAD_BTN1) or "Reload",
 		button2 = (L and L.DIALOG_UI_PANEL_RELOAD_BTN2) or "Cancel",
 		OnAccept = function()
+			if onReloadAccepted then
+				onReloadAccepted()
+			end
 			ReloadUI()
+		end,
+		OnCancel = function()
+			if onReloadCancelled then
+				onReloadCancelled()
+			end
 		end,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
 	}
-	StaticPopup_Show("BFL_EXTERNAL_THEME_RELOAD")
+	return StaticPopup_Show("BFL_EXTERNAL_THEME_RELOAD")
 end
 
 local function IsBetterFriendlistPopup(which)

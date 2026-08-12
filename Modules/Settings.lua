@@ -2456,9 +2456,10 @@ function Settings:ExportSettings()
 	-- This fulfills the requirement to export future settings automatically
 	local DB = GetDB()
 	local exportData = DB:InternalDeepCopy(BetterFriendlistDB)
-	-- The one-time onboarding acknowledgement belongs to this installation and
-	-- must not suppress (or re-open) onboarding on another imported profile.
+	-- Onboarding acknowledgement and reload-resume state belong to this installation
+	-- and must not suppress, resume, or re-open onboarding on an imported profile.
 	exportData.appearanceOnboardingVersion = nil
+	exportData.appearanceOnboardingResume = nil
 
 	-- Tag with export version 3 (Base64 + Full DB)
 	exportData.exportVersion = 3
@@ -2507,6 +2508,7 @@ function Settings:ImportSettings(importString)
 	if importData.exportVersion and importData.exportVersion >= 3 then
 		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V3 (Full) backup...")
 		local appearanceOnboardingVersion = BetterFriendlistDB.appearanceOnboardingVersion
+		local appearanceOnboardingResume = BetterFriendlistDB.appearanceOnboardingResume
 
 		-- Wipe the entire DB first, then apply import data.
 		-- This ensures keys that existed in the live DB but NOT in the export
@@ -2516,11 +2518,17 @@ function Settings:ImportSettings(importString)
 		-- Import ALL keys from the export
 		for key, value in pairs(importData) do
 			-- Skip metadata
-			if key ~= "exportVersion" and key ~= "version" and key ~= "appearanceOnboardingVersion" then
+			if
+				key ~= "exportVersion"
+				and key ~= "version"
+				and key ~= "appearanceOnboardingVersion"
+				and key ~= "appearanceOnboardingResume"
+			then
 				BetterFriendlistDB[key] = value
 			end
 		end
 		BetterFriendlistDB.appearanceOnboardingVersion = appearanceOnboardingVersion
+		BetterFriendlistDB.appearanceOnboardingResume = appearanceOnboardingResume
 
 		-- Explicitly handle version to prevent mismatches
 		-- We keep the current addon version in DB, not the one from export,
