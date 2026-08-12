@@ -3863,6 +3863,10 @@ function FriendsUI:SetModernForceEnabled(enabled)
 	if SettingsDesigner and SettingsDesigner.RefreshFriendsUIAvailability then
 		SettingsDesigner:RefreshFriendsUIAvailability()
 	end
+	local AppearanceOnboarding = BFL:GetModule("AppearanceOnboarding")
+	if AppearanceOnboarding and AppearanceOnboarding.OnModernAvailabilityChanged then
+		AppearanceOnboarding:OnModernAvailabilityChanged("force-modern")
+	end
 	return true
 end
 

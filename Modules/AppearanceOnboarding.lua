@@ -97,7 +97,7 @@ function AppearanceOnboarding:EvaluateEligibility(context)
 	if context.frameShown ~= true then
 		return false, "frame"
 	end
-	if context.socialUIEnabled ~= true then
+	if context.socialUIEnabled ~= true and context.forceModern ~= true then
 		return false, "social-ui"
 	end
 	if context.inCombat == true then
@@ -117,6 +117,15 @@ end
 function AppearanceOnboarding:IsSocialUIEnabled()
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	return FriendsUI and FriendsUI.IsSocialUIEnabled and FriendsUI:IsSocialUIEnabled() == true
+end
+
+function AppearanceOnboarding:IsModernForceEnabled()
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	return FriendsUI and FriendsUI.IsModernForceEnabled and FriendsUI:IsModernForceEnabled() == true
+end
+
+function AppearanceOnboarding:IsModernStyleAvailable()
+	return self:IsSocialUIEnabled() or self:IsModernForceEnabled()
 end
 
 function AppearanceOnboarding:IsInCombat()
@@ -599,15 +608,17 @@ function AppearanceOnboarding:RefreshStep()
 	self.summaryPanel:SetShown(step == 3)
 	self.backButton:SetShown(step > 1)
 	self.primaryButton.Label:SetText(step == 3 and (locale.ONBOARDING_CONFIRM or "Use this setup") or (locale.ONBOARDING_NEXT or "Next"))
+	local modernStyleAvailable = self:IsModernStyleAvailable()
+	local selectedStyleAvailable = self.selectedStyle ~= STYLE_MODERN or modernStyleAvailable
 	local canContinue = step == 1 and IsValidStyle(self.selectedStyle)
 		or step == 2 and self.selectedTheme ~= nil
 		or step == 3 and IsValidStyle(self.selectedStyle) and self.selectedTheme ~= nil
-	canContinue = canContinue and not self:IsInCombat()
+	canContinue = canContinue and selectedStyleAvailable and not self:IsInCombat()
 	self:SetFlatButtonEnabled(self.primaryButton, canContinue)
 	self.combatNotice:SetShown(self:IsInCombat())
 	self:RefreshSummary()
 	for _, card in ipairs(self.styleCards or {}) do
-		card.BFL_Available = card.BFL_Value ~= STYLE_MODERN or self:IsSocialUIEnabled()
+		card.BFL_Available = card.BFL_Value ~= STYLE_MODERN or modernStyleAvailable
 		self:RefreshChoiceCard(card)
 	end
 	for _, card in ipairs(self.themeCards or {}) do
@@ -704,6 +715,7 @@ function AppearanceOnboarding:TryShow(reason)
 		playerLoggedIn = self.playerLoggedIn,
 		frameShown = BetterFriendsFrame:IsShown() == true,
 		socialUIEnabled = self:IsSocialUIEnabled(),
+		forceModern = self:IsModernForceEnabled(),
 		inCombat = self:IsInCombat(),
 	})
 	if not eligible then
@@ -755,7 +767,7 @@ function AppearanceOnboarding:SelectStyle(style)
 	if not IsValidStyle(style) or self:IsInCombat() then
 		return false
 	end
-	if style == STYLE_MODERN and not self:IsSocialUIEnabled() then
+	if style == STYLE_MODERN and not self:IsModernStyleAvailable() then
 		return false
 	end
 	self.selectedStyle = style
@@ -865,6 +877,9 @@ function AppearanceOnboarding:Commit()
 	if not self.active or self:IsInCombat() or not IsValidStyle(self.selectedStyle) or not self.selectedTheme then
 		return false
 	end
+	if self.selectedStyle == STYLE_MODERN and not self:IsModernStyleAvailable() then
+		return false
+	end
 	local needsReload = self:NeedsReload()
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.SetStyle then
@@ -918,6 +933,14 @@ function AppearanceOnboarding:HookMainFrame()
 	end)
 end
 
+function AppearanceOnboarding:OnModernAvailabilityChanged(reason)
+	if self.active then
+		self:RefreshStep()
+	elseif self:IsModernStyleAvailable() then
+		self:ScheduleTryShow(reason or "modern-availability")
+	end
+end
+
 function AppearanceOnboarding:RegisterTests()
 	if self.testsRegistered then
 		return
@@ -937,6 +960,7 @@ function AppearanceOnboarding:RegisterTests()
 				playerLoggedIn = true,
 				frameShown = true,
 				socialUIEnabled = true,
+				forceModern = false,
 				inCombat = false,
 			}
 			local eligible = self:EvaluateEligibility(base)
@@ -955,6 +979,10 @@ function AppearanceOnboarding:RegisterTests()
 			base.sessionDeferred = false
 			base.socialUIEnabled = false
 			V:Assert(not self:EvaluateEligibility(base), "Unavailable SocialUI keeps Retail on the safe Legacy fallback")
+			base.forceModern = true
+			V:Assert(self:EvaluateEligibility(base), "Developer override makes onboarding available while SocialUI is disabled")
+			base.isRetail = false
+			V:Assert(not self:EvaluateEligibility(base), "Developer override never enables onboarding on Classic")
 		end,
 	})
 	TestSuite:RegisterTest("settings", "AppearanceOnboarding_DynamicThemes", {
