@@ -13,6 +13,12 @@ local function HasFrameMethod(frame, methodName)
 	return frame ~= nil and type(frame[methodName]) == "function"
 end
 
+-- The old global MouseIsOver helper is not available on every client.
+-- IsMouseOver is provided by SimpleScriptRegion on supported frame types.
+function Compat.IsMouseOver(region)
+	return HasFrameMethod(region, "IsMouseOver") and region:IsMouseOver() or false
+end
+
 ------------------------------------------------------------
 -- C_AddOns Compatibility
 ------------------------------------------------------------

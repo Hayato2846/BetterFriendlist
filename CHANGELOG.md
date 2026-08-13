@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.7.1]        - 2026-08-13
 
 ### Fixed
-- **Drag-and-Drop in Settings** - Friend groups can be reordered again on Retail 12.1 without Lua errors. The same compatibility fix also keeps filter, sorter, and Broker column reordering working.
+- **Drag-and-Drop** - Friends can be moved between custom groups again on Retail 12.1 without Lua errors. Reordering friend groups, filters, sorters, and Broker columns in the settings also works normally again.
 
 ---
 

@@ -46,6 +46,28 @@ if ($compatViolations.Count -gt 0) {
 Write-Host '[OK] Menu and dropdown compatibility APIs are centralized.'
 
 Write-Host ''
+Write-Host '[BFL] Drag-and-drop hover compatibility guard'
+
+$dragDropHoverViolations = @()
+foreach ($file in @('Modules/FriendsList.lua', 'Modules/SettingsDesigner.lua', 'Libs/LibSettingsDesigner/LibSettingsDesignerUI.lua')) {
+    $matches = Select-String -LiteralPath $file -Pattern '(?<![:.\w])MouseIsOver\s*\(' -CaseSensitive
+    foreach ($match in $matches) {
+        $dragDropHoverViolations += "${file}:$($match.LineNumber): $($match.Line.Trim())"
+    }
+}
+
+$invalidRegionMethodMatches = Select-String -LiteralPath 'Libs/LibSettingsDesigner/LibSettingsDesignerUI.lua' -Pattern '[:.]MouseIsOver\s*\(' -CaseSensitive
+foreach ($match in $invalidRegionMethodMatches) {
+    $dragDropHoverViolations += "Libs/LibSettingsDesigner/LibSettingsDesignerUI.lua:$($match.LineNumber): $($match.Line.Trim())"
+}
+
+if ($dragDropHoverViolations.Count -gt 0) {
+    throw "Drag-and-drop hover checks must use BFL.Compat.IsMouseOver. Violations:`n$($dragDropHoverViolations -join "`n")"
+}
+
+Write-Host '[OK] Drag-and-drop hover checks use the compatibility wrapper.'
+
+Write-Host ''
 Write-Host '[BFL] Atlas compatibility guard'
 
 $atlasApiPattern = 'SetAtlas\s*\(|C_Texture\.GetAtlasInfo|CreateAtlasMarkup|\|A:'

@@ -5073,7 +5073,7 @@ function lib.AddReorderListWidget(row, app, control, opts)
 				row._eqolDragIndex = nil
 				if not fromIndex then return end
 				for targetIndex, target in ipairs(row.reorderRows or {}) do
-					if target:IsShown() and target.MouseIsOver and target:MouseIsOver() then
+					if target:IsShown() and target.IsMouseOver and target:IsMouseOver() then
 						if targetIndex ~= fromIndex then lib.ReorderList.CallControl(control, "moveEntry", fromIndex, targetIndex) end
 						break
 					end

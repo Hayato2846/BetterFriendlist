@@ -1237,11 +1237,8 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 	end
 
 	local function GetDropTargetIndex(activeRow)
-		if not MouseIsOver then
-			return nil
-		end
 		for _, row in ipairs(entryRows) do
-			if row ~= activeRow and row:IsVisible() and MouseIsOver(row) then
+			if row ~= activeRow and row:IsVisible() and BFL.Compat.IsMouseOver(row) then
 				return row.orderIndex
 			end
 		end
@@ -1251,7 +1248,7 @@ local function RenderGroupOrderCustomPage(parent, _, _, state)
 	local function UpdateDropTargetHighlights(activeRow)
 		for _, row in ipairs(entryRows) do
 			if row ~= activeRow and row:IsVisible() then
-				SetGroupOrderRowBackdrop(row, MouseIsOver and MouseIsOver(row) and "target" or nil)
+				SetGroupOrderRowBackdrop(row, BFL.Compat.IsMouseOver(row) and "target" or nil)
 			end
 		end
 	end

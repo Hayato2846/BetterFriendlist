@@ -6974,8 +6974,7 @@ Button_OnDragUpdate = function(self)
 			if frame:IsShown() and frame.groupId and frame.dropHighlight then
 				local groupData = friendGroups[frame.groupId]
 				if groupData and not groupData.builtin then
-					-- Check if cursor is over this header using MouseIsOver for robustness
-					local isOver = MouseIsOver(frame)
+					local isOver = BFL.Compat.IsMouseOver(frame)
 
 					if isOver and BetterFriendsList_DraggedFriend then
 						-- Show highlight and update text
@@ -7039,7 +7038,7 @@ Button_OnDragUpdate = function(self)
 			if frame:IsShown() and frame.groupId and frame.dropHighlight then
 				local groupData = friendGroups[frame.groupId]
 				if groupData and not groupData.builtin then
-					local isOver = MouseIsOver(frame)
+					local isOver = BFL.Compat.IsMouseOver(frame)
 					if isOver and BetterFriendsList_DraggedFriend then
 						frame.dropHighlight:Show()
 						-- Note: LibQTip lines use custom cell setting, so SetText might not work directly/cleanly
@@ -7225,12 +7224,12 @@ Button_OnDragStop = function(self)
 		end
 	end
 
-	-- Detect Drop Target using MouseIsOver for robustness
+	-- Detect the visible group header under the cursor.
 	local droppedOnGroup = nil
 	if framesToCheck then
 		for _, frame in pairs(framesToCheck) do
 			if frame:IsShown() and frame.groupId then
-				if MouseIsOver(frame) then
+				if BFL.Compat.IsMouseOver(frame) then
 					droppedOnGroup = frame.groupId
 					break
 				end
@@ -7245,7 +7244,7 @@ Button_OnDragStop = function(self)
 		if brokerTargets then
 			for _, frame in pairs(brokerTargets) do
 				if frame:IsShown() and frame.groupId then
-					if MouseIsOver(frame) then
+					if BFL.Compat.IsMouseOver(frame) then
 						droppedOnGroup = frame.groupId
 						break
 					end

@@ -1530,7 +1530,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("ui", "Settings_GroupsTab_Drag_Smoke", {
-		description = "Groups tab drag update and stop handlers should run without the removed global MouseIsOver helper",
+		description = "Groups tab drag update and stop handlers should use the compatible region hover check",
 		setup = function()
 			if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
 				ToggleBetterFriendsFrame()
@@ -1574,6 +1574,18 @@ local function RegisterBuiltInTests()
 			if Settings then
 				Settings:Hide()
 			end
+		end,
+	})
+
+	TS:RegisterTest("ui", "Region_MouseOver_Compatibility", {
+		description = "Drop-target detection should work without the removed global MouseIsOver helper",
+		action = function(V)
+			local region = CreateFrame("Frame", nil, UIParent)
+			region:SetSize(1, 1)
+			local success, isMouseOver = pcall(BFL.Compat.IsMouseOver, region)
+			V:Assert(success, "Compatible hover detection should not raise an error")
+			V:Assert(type(isMouseOver) == "boolean", "Compatible hover detection should return a boolean")
+			region:Hide()
 		end,
 	})
 
