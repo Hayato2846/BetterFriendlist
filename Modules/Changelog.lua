@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Drag-and-Drop** - Friends can be moved between custom groups again on Retail 12.1 without Lua errors. Reordering friend groups, filters, sorters, and Broker columns in the settings also works normally again.
+- **Window Position** - Switching between BetterFriendlist 2.7.1 and 2.8 now keeps the Friendlist in the same place instead of falling back to another saved position.
 
 ---
 

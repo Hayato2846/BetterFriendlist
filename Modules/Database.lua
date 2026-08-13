@@ -191,7 +191,7 @@ local defaults = {
 
 	-- Main Frame Edit Mode (Phase EditMode)
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout
-	mainFramePosition = {}, -- {[layoutName] = {point, x, y}} - Main frame position per layout
+	mainFramePosition = {}, -- Default plus forward-compatible Shared position used by 2.8+
 	settingsCenterWindow = { width = 1080, height = 700, locked = false, density = "compact" }, -- LibSettingsDesigner window state
 	settingsCenterSeenNewTags = {}, -- Host-owned seen state for LibSettingsDesigner new badges
 	mainFramePositionMigrated = false, -- Track if old position has been migrated (one-time)

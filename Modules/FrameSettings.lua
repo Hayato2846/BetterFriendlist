@@ -11,6 +11,44 @@ local MAX_SCALE = 2.0
 
 -- Layout key for storage (removing complexity of multiple layouts)
 local LAYOUT_KEY = "Default"
+local FORWARD_COMPAT_POSITION_KEY = "Shared"
+
+local function IsStoredPosition(position)
+	return type(position) == "table" and type(position.point) == "string"
+end
+
+local function CopyPosition(position)
+	return {
+		point = position.point,
+		relativePoint = position.relativePoint,
+		x = position.x,
+		y = position.y,
+	}
+end
+
+function FrameSettings:SetStoredPosition(position)
+	if not IsStoredPosition(position) then
+		return
+	end
+
+	-- 2.7.x reads Default while 2.8+ reads Shared. Keep independent copies
+	-- with identical values so moving the frame survives upgrades and downgrades.
+	self.db.mainFramePosition[LAYOUT_KEY] = CopyPosition(position)
+	self.db.mainFramePosition[FORWARD_COMPAT_POSITION_KEY] = CopyPosition(position)
+end
+
+function FrameSettings:SynchronizePositionStorage()
+	local positions = self.db.mainFramePosition
+	-- Shared is authoritative when present: an older 2.7.1 may already have
+	-- created a stale Default fallback after a downgrade from 2.8.
+	local position = IsStoredPosition(positions[FORWARD_COMPAT_POSITION_KEY])
+		and positions[FORWARD_COMPAT_POSITION_KEY]
+		or (IsStoredPosition(positions[LAYOUT_KEY]) and positions[LAYOUT_KEY])
+
+	if position then
+		self:SetStoredPosition(position)
+	end
+end
 
 function FrameSettings:Initialize()
 	self.db = BetterFriendlistDB
@@ -22,6 +60,7 @@ function FrameSettings:Initialize()
 	if not self.db.mainFramePosition then
 		self.db.mainFramePosition = {}
 	end
+	self:SynchronizePositionStorage()
 	if not self.db.windowScale then
 		self.db.windowScale = 1.0
 	end
@@ -212,12 +251,12 @@ function FrameSettings:SavePosition()
 	local point, _, relativePoint, x, y = frame:GetPoint()
 
 	if point then
-		self.db.mainFramePosition[LAYOUT_KEY] = {
+		self:SetStoredPosition({
 			point = point,
 			relativePoint = relativePoint,
 			x = x,
 			y = y,
-		}
+		})
 		-- BFL:DebugPrint("FrameSettings: Position saved")
 	end
 end
@@ -231,12 +270,12 @@ function FrameSettings:ResetDefaults()
 	}
 
 	-- Reset position to center
-	self.db.mainFramePosition[LAYOUT_KEY] = {
+	self:SetStoredPosition({
 		point = "CENTER",
 		relativePoint = "CENTER",
 		x = 0,
 		y = 0,
-	}
+	})
 
 	self:ApplySettings()
 	print("|cff00ff00BetterFriendlist:|r Frame settings reset to defaults.")

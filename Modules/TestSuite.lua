@@ -5397,6 +5397,59 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "FrameSettings_Position_DowngradeCompatibility", {
+		description = "2.7.1 should preserve the shared frame position written by 2.8 and keep both versions synchronized",
+		action = function(V)
+			local FrameSettings = BFL:GetModule("FrameSettings")
+			V:AssertNotNil(FrameSettings, "FrameSettings module should exist")
+
+			local originalDB = FrameSettings.db
+			local ok, err = pcall(function()
+				FrameSettings.db = {
+					mainFramePosition = {
+						Shared = { point = "TOPLEFT", relativePoint = "TOPLEFT", x = 120, y = -80 },
+					},
+				}
+				FrameSettings:SynchronizePositionStorage()
+
+				local positions = FrameSettings.db.mainFramePosition
+				V:AssertEqual(positions.Default.point, "TOPLEFT", "2.7.1 should import the 2.8 shared anchor")
+				V:AssertEqual(positions.Default.x, 120, "2.7.1 should import the 2.8 shared X coordinate")
+				V:AssertEqual(positions.Default.y, -80, "2.7.1 should import the 2.8 shared Y coordinate")
+				V:Assert(positions.Default ~= positions.Shared, "Position buckets should not alias the same table")
+
+				positions.Default = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 }
+				FrameSettings:SynchronizePositionStorage()
+				V:AssertEqual(positions.Default.point, "TOPLEFT", "The 2.8 shared position should replace a stale 2.7 fallback")
+				V:AssertEqual(positions.Default.x, 120, "A stale 2.7 fallback should not replace the 2.8 position")
+
+				FrameSettings:SetStoredPosition({
+					point = "BOTTOMRIGHT",
+					relativePoint = "BOTTOMRIGHT",
+					x = -45,
+					y = 60,
+				})
+				V:AssertEqual(positions.Default.x, -45, "2.7.1 should update its legacy position")
+				V:AssertEqual(positions.Shared.x, -45, "2.7.1 should update the position read by 2.8")
+				V:AssertEqual(positions.Shared.y, 60, "Both versions should retain the same Y coordinate")
+
+				FrameSettings.db.mainFramePosition = {
+					Default = { point = "RIGHT", relativePoint = "RIGHT", x = -20, y = 35 },
+				}
+				FrameSettings:SynchronizePositionStorage()
+				V:AssertEqual(
+					FrameSettings.db.mainFramePosition.Shared.x,
+					-20,
+					"A legacy-only position should be exported for a later 2.8 upgrade"
+				)
+			end)
+			FrameSettings.db = originalDB
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "Database_Migration_ColorTables", {
 		description = "Color table migrations should repair invalid values",
 		action = function(V)
