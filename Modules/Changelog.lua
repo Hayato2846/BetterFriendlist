@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.1]        - 2026-08-13
+
+### Fixed
+- **Drag-and-Drop in Settings** - Friend groups can be reordered again on Retail 12.1 without Lua errors. The same compatibility fix also keeps filter, sorter, and Broker column reordering working.
+
+---
+
 ## [2.7.0]        - 2026-07-29
 
 ### Fixed
@@ -146,32 +153,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Battle.net Favorites** - World of Warcraft currently reports no Battle.net Favorites for some accounts even when Favorites are set in the Battle.net Desktop App. This Blizzard API issue has been reported; BetterFriendlist cannot restore Favorite data while the client APIs return none.
 
 ---
-
-## [2.6.1]        - 2026-05-31
-
-### Added
-- **Guild Tab Beta** - Added a default-off Retail-only beta Guild tab with BetterFriendlist-owned roster search, online/offline filtering, sorting, guild counts, member details, notes, class and status indicators, and safe member actions where permissions and Blizzard APIs allow them. Enable Beta Features under Settings > Advanced > Beta Features, then turn on the Guild roster tab under Settings > Guild. Classic support for this beta feature will follow in a later version.
-- **External AddOn Menu Bridge Beta** - Added a default-off beta bridge and official companion AddOn for showing compatible AddOn actions in supported BetterFriendlist context menus. Enable it under Settings > Advanced > Beta Features.
-- **Theme Customization** - Added Retail-only beta theme customization with a Custom theme based on Dark, expanded Dark and Custom settings for colors, opacity, hover and selection states, borders, scrollbars, icons, and BFL Avatar visibility. Enable Beta Features under Settings > Advanced > Beta Features, then configure themes under Settings > Theme. Classic support for these beta theme features will follow in a later version.
-- **Raid Tab** - Added an optional compact Ready Check button next to Raid Info. Enable it under Settings > Raid.
-
-### Improved
-- **Guild Broker Tooltips** - Added a subtle separator between Friends Broker groups and Guild Broker rank groups.
-
-### Changed
-- **Client Compatibility** - Prepared friend invites and raid controls for upcoming Retail client changes while preserving current Retail and Classic support.
-- **Raid Tools** - Improved handling for temporarily uncached raid roster names.
-- **Font Rendering** - Made custom font handling more defensive on newer clients.
-
-### Fixed
-- **Friend Menus** - Restored Blizzard's invite versus request-to-join labels and actions for Battle.net friends.
-- **Recruit A Friend** - Shortened the search placeholder and kept it on one line in the header search field.
-- **Tabs** - Fixed truncated top and bottom tab labels showing duplicate hover tooltips.
-
-### Performance
-- **Top Tabs** - Reduced hitches when switching between Friends, Recent Allies, Recruit A Friend, and Guild tabs.
-- **Guild Roster** - Reduced memory churn when reopening or switching to the Guild roster tab.
-- **Quick Join** - Reduced repeated row-height work while showing available groups.
 
 ---
 

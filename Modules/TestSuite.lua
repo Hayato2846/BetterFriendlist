@@ -1530,7 +1530,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("ui", "Settings_GroupsTab_Drag_Smoke", {
-		description = "Groups tab drag handlers should run without error",
+		description = "Groups tab drag update and stop handlers should run without the removed global MouseIsOver helper",
 		setup = function()
 			if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
 				ToggleBetterFriendsFrame()
@@ -1562,8 +1562,8 @@ local function RegisterBuiltInTests()
 					local onDragStop = item:GetScript("OnDragStop")
 					if onDragStart and onDragStop then
 						onDragStart(item)
-						onDragStop(item)
-						break
+						item:GetScript("OnUpdate")(item)
+						onDragStop(item); break
 					end
 				end
 			end

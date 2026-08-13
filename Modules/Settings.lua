@@ -5988,7 +5988,7 @@ function Settings:RefreshGroupsTab()
 			btn:SetScript("OnUpdate", function(self)
 				for _, otherItem in ipairs(listItems) do
 					if otherItem ~= self and otherItem:IsVisible() then
-						if MouseIsOver(otherItem) then
+						if otherItem:IsMouseOver() then
 							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 						else
 							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -6006,7 +6006,7 @@ function Settings:RefreshGroupsTab()
 			for _, otherItem in ipairs(listItems) do
 				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
 				if otherItem ~= btn and otherItem:IsVisible() then
-					if MouseIsOver(otherItem) then
+					if otherItem:IsMouseOver() then
 						targetIndex = otherItem.orderIndex
 					end
 				end
@@ -7546,7 +7546,7 @@ function Settings:RefreshFilterSortTab()
 			SelectEntry(selectedKind, entry.id)
 		end)
 		row:SetScript("OnMouseUp", function(selfRow, button)
-			if button ~= "LeftButton" or not MouseIsOver(selfRow) then
+			if button ~= "LeftButton" or not selfRow:IsMouseOver() then
 				return
 			end
 			if selfRow.bflLastDragStop and GetTime() - selfRow.bflLastDragStop < 0.15 then
@@ -7661,10 +7661,10 @@ function Settings:RefreshFilterSortTab()
 			selfRow:SetScript("OnUpdate", function(updateSelf)
 				for _, otherItem in ipairs(entryListItems) do
 					if otherItem ~= updateSelf and otherItem:IsVisible() then
-						if isSettingsCenterInline and MouseIsOver(otherItem) then
+						if isSettingsCenterInline and otherItem:IsMouseOver() then
 							BFL_Settings_ApplyBuilderRowStyle(otherItem, "target")
 						else
-							SetEntryRowBackground(otherItem, MouseIsOver(otherItem))
+							SetEntryRowBackground(otherItem, otherItem:IsMouseOver())
 						end
 					end
 				end
@@ -7683,7 +7683,7 @@ function Settings:RefreshFilterSortTab()
 
 			local targetIndex = nil
 			for _, otherItem in ipairs(entryListItems) do
-				if otherItem ~= selfRow and otherItem:IsVisible() and MouseIsOver(otherItem) then
+				if otherItem ~= selfRow and otherItem:IsVisible() and otherItem:IsMouseOver() then
 					targetIndex = otherItem.orderIndex
 				end
 				SetEntryRowBackground(otherItem, false)
@@ -8799,7 +8799,7 @@ function Settings:RefreshBrokerTab()
 				btn:SetScript("OnUpdate", function(self)
 					for _, otherItem in ipairs(listItems) do
 						if otherItem ~= self and otherItem:IsVisible() then
-							if MouseIsOver(otherItem) then
+							if otherItem:IsMouseOver() then
 								otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 							else
 								otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -8817,7 +8817,7 @@ function Settings:RefreshBrokerTab()
 				for _, otherItem in ipairs(listItems) do
 					otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 					if otherItem ~= btn and otherItem:IsVisible() then
-						if MouseIsOver(otherItem) then
+						if otherItem:IsMouseOver() then
 							targetIndex = otherItem.orderIndex
 						end
 					end
@@ -9364,7 +9364,7 @@ function Settings:RefreshBrokerTab()
 				btn:SetScript("OnUpdate", function(self)
 					for _, otherItem in ipairs(guildListItems) do
 						if otherItem ~= self and otherItem:IsVisible() then
-							if MouseIsOver(otherItem) then
+							if otherItem:IsMouseOver() then
 								otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 							else
 								otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
@@ -9381,7 +9381,7 @@ function Settings:RefreshBrokerTab()
 				for _, otherItem in ipairs(guildListItems) do
 					otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 					if otherItem ~= btn and otherItem:IsVisible() then
-						if MouseIsOver(otherItem) then
+						if otherItem:IsMouseOver() then
 							targetIndex = otherItem.orderIndex
 						end
 					end
