@@ -46,6 +46,73 @@ end
 -- Internal dropdown counter for unique naming
 local dropdownCounter = 1
 
+local function ApplyIconProfileToClassicMenuItem(item, profile)
+	if not (item and type(profile) == "table") or profile.iconType == "none" then
+		return false
+	end
+
+	local texture = profile.texture
+	if not texture and profile.iconType ~= "atlas" then
+		texture = profile.iconValue or profile.icon
+	end
+	if not texture or texture == "" then
+		return false
+	end
+
+	item.icon = texture
+	local texCoord = profile.texCoord
+	if type(texCoord) == "table" and #texCoord >= 4 then
+		item.tCoordLeft = texCoord[1]
+		item.tCoordRight = texCoord[2]
+		item.tCoordTop = texCoord[3]
+		item.tCoordBottom = texCoord[4]
+	else
+		local zoom = tonumber(profile.iconZoom) or 0
+		zoom = math.max(0, math.min(0.45, zoom))
+		item.tCoordLeft = zoom
+		item.tCoordRight = 1 - zoom
+		item.tCoordTop = zoom
+		item.tCoordBottom = 1 - zoom
+	end
+	return true
+end
+
+local SIMPLE_MENU_CHECKED_ATLASES = {
+	"common-dropdown-icon-checkmark-yellow-classic",
+	"common-dropdown-icon-checkmark-yellow-classic-2",
+	"common-dropdown-icon-checkmark-yellow",
+}
+local SIMPLE_MENU_UNCHECKED_ATLASES = {
+	"common-dropdown-ticksquare-classic",
+	"common-dropdown-ticksquare",
+}
+
+local function GetFirstAvailableMenuAtlas(candidates)
+	local getAtlasInfo = (C_Texture and C_Texture.GetAtlasInfo) or GetAtlasInfo
+	if type(getAtlasInfo) ~= "function" then
+		return nil
+	end
+	for _, atlas in ipairs(candidates) do
+		local ok, info = pcall(getAtlasInfo, atlas)
+		if ok and info then
+			return atlas
+		end
+	end
+	return nil
+end
+
+local function ApplyClassicCheckboxMenuItemStyle(item)
+	if not (BFL.IsClassic and item) then
+		return
+	end
+	local checkedAtlas = GetFirstAvailableMenuAtlas(SIMPLE_MENU_CHECKED_ATLASES)
+	local uncheckedAtlas = GetFirstAvailableMenuAtlas(SIMPLE_MENU_UNCHECKED_ATLASES)
+	if checkedAtlas and uncheckedAtlas then
+		item.customCheckIconAtlas = checkedAtlas
+		item.customUncheckIconAtlas = uncheckedAtlas
+	end
+end
+
 local function CreateClassicMenuDescription(parentItem, rootItems)
 	rootItems = rootItems or {}
 
@@ -79,6 +146,12 @@ local function CreateClassicMenuDescription(parentItem, rootItems)
 
 	function rootDescription:SetScrollMode()
 		-- UIDropDownMenu has no equivalent scroll-mode description API.
+	end
+
+	function rootDescription:SetIconProfile(profile)
+		if parentItem then
+			ApplyIconProfileToClassicMenuItem(parentItem, profile)
+		end
 	end
 
 	function rootDescription:SetCloseOnClick(closeOnClick)
@@ -121,6 +194,7 @@ local function CreateClassicMenuDescription(parentItem, rootItems)
 			isNotRadio = true,
 			keepShownOnClick = true,
 		}
+		ApplyClassicCheckboxMenuItemStyle(item)
 		if type(isSelected) == "function" then
 			item.checked = function()
 				return isSelected() == true
@@ -314,6 +388,70 @@ local function SetSimpleMenuElementEnabled(element, enabled)
 	end
 end
 
+function Compat.StyleSimpleMenuCheckbox(element)
+	if not (BFL.IsClassic and element and element.AddInitializer) then
+		return
+	end
+
+	element:AddInitializer(function(button, description)
+		local marker = button and button.leftTexture1
+		if not (marker and marker.GetTexture and marker.SetTexture) then
+			return
+		end
+		local selected = false
+		if description and description.IsSelected then
+			local ok, value = pcall(description.IsSelected, description)
+			selected = ok and value == true
+		end
+		local atlas = GetFirstAvailableMenuAtlas(selected and SIMPLE_MENU_CHECKED_ATLASES or SIMPLE_MENU_UNCHECKED_ATLASES)
+		if atlas and marker.SetAtlas then
+			local ok = pcall(marker.SetAtlas, marker, atlas, true)
+			if ok then
+				return
+			end
+		end
+		local ok, assignedTexture = pcall(marker.GetTexture, marker)
+		if not selected and ok and assignedTexture == nil then
+			marker:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+			marker:SetTexCoord(0, 1, 0, 1)
+			marker:SetSize(20, 20)
+		end
+	end)
+end
+
+local function ApplySimpleMenuItemIcon(element, item)
+	local profile = item and item.iconProfile
+	if not (element and type(profile) == "table") then
+		return
+	end
+	if element.SetIconProfile then
+		element:SetIconProfile(profile)
+		return
+	end
+	if not element.AddInitializer then
+		return
+	end
+
+	element:AddInitializer(function(button)
+		if not (button and button.AttachTexture) then
+			return
+		end
+		local texture = button:AttachTexture()
+		texture:SetSize(16, 16)
+		if button.leftTexture1 then
+			texture:SetPoint("LEFT", button.leftTexture1, "RIGHT", 2, 0)
+		else
+			texture:SetPoint("LEFT", button, "LEFT", 4, 0)
+		end
+		if button.fontString then
+			button.fontString:SetPoint("LEFT", texture, "RIGHT", 3, 0)
+		end
+		if Compat.ApplyIconProfile then
+			Compat.ApplyIconProfile(texture, profile)
+		end
+	end)
+end
+
 local function IsSimpleMenuItemChecked(item, value)
 	if type(item.checked) == "function" then
 		return item.checked(value)
@@ -351,6 +489,7 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 				end
 			elseif GetSimpleMenuChildren(item) then
 				local element = rootDescription:CreateButton(item.text or "")
+				ApplySimpleMenuItemIcon(element, item)
 				Compat.PopulateSimpleMenu(element, GetSimpleMenuChildren(item))
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
@@ -365,6 +504,7 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 				end, function(value)
 					return RunSimpleMenuItem(item, value)
 				end, item.value)
+				ApplySimpleMenuItemIcon(element, item)
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
 					if enabled == nil then
@@ -378,6 +518,8 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 				end, function()
 					return RunSimpleMenuItem(item, item.value)
 				end)
+				Compat.StyleSimpleMenuCheckbox(element)
+				ApplySimpleMenuItemIcon(element, item)
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
 					if enabled == nil then
@@ -389,6 +531,7 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 				local element = rootDescription:CreateButton(item.text or "", function()
 					return RunSimpleMenuItem(item, item.value)
 				end)
+				ApplySimpleMenuItemIcon(element, item)
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
 					if enabled == nil then
@@ -447,12 +590,16 @@ function Compat.OpenSimpleContextMenu(owner, name, itemsOrFactory)
 					info.notCheckable = false
 					info.isNotRadio = itemType == "checkbox"
 					info.keepShownOnClick = item.keepShownOnClick == true
+					if itemType == "checkbox" then
+						ApplyClassicCheckboxMenuItemStyle(info)
+					end
 					info.checked = function()
 						return IsSimpleMenuItemChecked(item, item.value)
 					end
 				else
 					info.notCheckable = true
 				end
+				ApplyIconProfileToClassicMenuItem(info, item.iconProfile)
 				if itemType ~= "title" and not children then
 					info.func = function()
 						RunSimpleMenuItem(item, item.value)
@@ -2779,6 +2926,7 @@ BFL.ShowMenuTooltip = Compat.ShowMenuTooltip
 BFL.HideMenuTooltip = Compat.HideMenuTooltip
 BFL.PopulateSimpleMenu = Compat.PopulateSimpleMenu
 BFL.OpenSimpleContextMenu = Compat.OpenSimpleContextMenu
+BFL.StyleSimpleMenuCheckbox = Compat.StyleSimpleMenuCheckbox
 
 -- ColorPicker
 BFL.ShowColorPicker = Compat.ShowColorPicker

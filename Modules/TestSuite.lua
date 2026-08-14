@@ -3137,9 +3137,11 @@ local function RegisterBuiltInTests()
 				}
 				local items = FriendTags:GetMenuItems(friend, "bnet_Player#1234", "Player")
 				local seen = {}
+				local iconProfiles = {}
 				for _, item in ipairs(items) do
 					if item.text then
 						seen[item.text] = true
+						iconProfiles[item.text] = item.iconProfile
 					end
 				end
 
@@ -3150,6 +3152,8 @@ local function RegisterBuiltInTests()
 				V:Assert(seen[L.FRIEND_TAGS_ROLES_SECTION or "Roles"], "BFL's own menu should group Blizzard-backed roles")
 				V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_DAMAGER or "DPS"], "BFL's own menu should expose Blizzard-backed tag checkboxes")
 				V:Assert(seen[L.FRIEND_TAGS_CUSTOM_SECTION or "Custom Tags"], "BFL's own menu should retain custom tags")
+				V:AssertType(iconProfiles[L.FRIEND_TAGS_BLIZZARD_DAMAGER or "DPS"], "table", "Built-in tag menu entries should retain their chip icon profile")
+				V:AssertType(iconProfiles["Test Custom Tag"], "table", "Custom tag menu entries should retain their chip icon profile")
 
 				local createIndex
 				local manageIndex
@@ -3531,6 +3535,54 @@ local function RegisterBuiltInTests()
 			V:AssertEqual(created.radio.value, "radioValue", "Radio item value should be passed to the menu API")
 			V:AssertEqual(created.radio.isSelected("radioValue"), true, "Radio checked state should use callback value")
 			V:AssertEqual(created.radio.onSelected("radioValue"), radioResponse, "Radio callbacks should return their response")
+		end,
+	})
+
+	TS:RegisterTest("data", "Compat_ClassicSimpleMenuCheckboxHasVisibleEmptyState", {
+		description = "BFL checkbox menus should retain a visible empty marker on Classic menu variants",
+		action = function(V)
+			V:AssertType(BFL.StyleSimpleMenuCheckbox, "function", "BFL.StyleSimpleMenuCheckbox should exist")
+
+			local oldIsClassic = BFL.IsClassic
+			local initializer
+			local appliedTexture
+			local appliedAtlas
+			local element = {
+				AddInitializer = function(_, callback)
+					initializer = callback
+				end,
+			}
+
+			local ok, err = pcall(function()
+				BFL.IsClassic = true
+				BFL.StyleSimpleMenuCheckbox(element)
+				V:AssertType(initializer, "function", "Classic checkbox styling should install a menu initializer")
+				initializer({
+					leftTexture1 = {
+						GetTexture = function()
+							return nil
+						end,
+						SetTexture = function(_, texture)
+							appliedTexture = texture
+						end,
+						SetAtlas = function(_, atlas)
+							appliedAtlas = atlas
+						end,
+						SetTexCoord = function() end,
+						SetSize = function() end,
+					},
+				}, {
+					IsSelected = function()
+						return false
+					end,
+				})
+				V:Assert(appliedAtlas ~= nil or appliedTexture ~= nil, "Unchecked Classic menu entries should receive visible checkbox art")
+			end)
+
+			BFL.IsClassic = oldIsClassic
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 

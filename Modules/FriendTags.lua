@@ -2607,6 +2607,7 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 			items[#items + 1] = {
 				type = "checkbox",
 				text = GetLocalizedTagName(def),
+				iconProfile = self:GetChipProfile(def),
 				checked = function()
 					return workingBlizzardSet[tagId] == true
 				end,
@@ -2631,6 +2632,7 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 				items[#items + 1] = {
 					type = "checkbox",
 					text = def.name,
+					iconProfile = self:GetChipProfile(def),
 					checked = function()
 						return self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
 					end,

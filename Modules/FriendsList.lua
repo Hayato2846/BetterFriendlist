@@ -79,15 +79,39 @@ local INVITE_BUTTON_ATLAS_SETS = {
 	},
 }
 
+local INVITE_BUTTON_FALLBACK = "Interface\\FriendsFrame\\TravelPass-Invite"
+local INVITE_BUTTON_FALLBACK_TEX_COORDS = {
+	normal = { 0.01562500, 0.39062500, 0.27343750, 0.52343750 },
+	pushed = { 0.42187500, 0.79687500, 0.27343750, 0.52343750 },
+	disabled = { 0.01562500, 0.39062500, 0.00781250, 0.25781250 },
+	highlight = { 0.42187500, 0.79687500, 0.00781250, 0.25781250 },
+}
+
+local function SetTravelPassButtonTexture(texture, atlasName, fallbackState)
+	local usedAtlas = false
+	if BFL.IsClassic then
+		if texture then
+			texture:SetTexture(INVITE_BUTTON_FALLBACK)
+		end
+	else
+		usedAtlas = SetTextureOrAtlas(texture, atlasName, INVITE_BUTTON_FALLBACK)
+	end
+	if not usedAtlas and texture and texture.SetTexCoord then
+		local texCoord = INVITE_BUTTON_FALLBACK_TEX_COORDS[fallbackState]
+		texture:SetTexCoord(texCoord[1], texCoord[2], texCoord[3], texCoord[4])
+	end
+end
+
 local function SetTravelPassButtonTextures(travelPassButton, atlasSetKey)
 	if not travelPassButton then
 		return
 	end
 
 	local atlasSet = INVITE_BUTTON_ATLAS_SETS[atlasSetKey] or INVITE_BUTTON_ATLAS_SETS.default
-	SetTextureOrAtlas(travelPassButton.NormalTexture, atlasSet.normal, "Interface\\FriendsFrame\\TravelPass-Invite")
-	SetTextureOrAtlas(travelPassButton.PushedTexture, atlasSet.pushed, "Interface\\FriendsFrame\\TravelPass-Invite")
-	SetTextureOrAtlas(travelPassButton.DisabledTexture, atlasSet.disabled, "Interface\\FriendsFrame\\TravelPass-Invite")
+	SetTravelPassButtonTexture(travelPassButton:GetNormalTexture(), atlasSet.normal, "normal")
+	SetTravelPassButtonTexture(travelPassButton:GetPushedTexture(), atlasSet.pushed, "pushed")
+	SetTravelPassButtonTexture(travelPassButton:GetDisabledTexture(), atlasSet.disabled, "disabled")
+	SetTravelPassButtonTexture(travelPassButton:GetHighlightTexture(), "friendslist-invitebutton-highlight", "highlight")
 end
 
 local function GetDefaultUIFontFlags(flags)
@@ -8897,10 +8921,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			button.travelPassButton:SetPoint("TOPRIGHT", 0, tpYOffset)
 
 			-- Scale textures
-			button.travelPassButton.NormalTexture:SetSize(tpWidth, tpHeight)
-			button.travelPassButton.PushedTexture:SetSize(tpWidth, tpHeight)
-			button.travelPassButton.DisabledTexture:SetSize(tpWidth, tpHeight)
-			button.travelPassButton.HighlightTexture:SetSize(tpWidth, tpHeight)
+			button.travelPassButton:GetNormalTexture():SetSize(tpWidth, tpHeight)
+			button.travelPassButton:GetPushedTexture():SetSize(tpWidth, tpHeight)
+			button.travelPassButton:GetDisabledTexture():SetSize(tpWidth, tpHeight)
+			button.travelPassButton:GetHighlightTexture():SetSize(tpWidth, tpHeight)
 		end
 	end
 

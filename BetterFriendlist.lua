@@ -3082,7 +3082,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						-- Capture group.id in local variable for closure
 						local groupId = group.id
 
-						groupsButton:CreateCheckbox(
+						local checkbox = groupsButton:CreateCheckbox(
 							group.data.name,
 							function() -- Read state dynamically from DB each time checkbox is rendered
 								if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
@@ -3103,6 +3103,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								end
 							end
 						)
+						if BFL.StyleSimpleMenuCheckbox then
+							BFL.StyleSimpleMenuCheckbox(checkbox)
+						end
 					end -- End of group checkboxes
 				end
 			end
