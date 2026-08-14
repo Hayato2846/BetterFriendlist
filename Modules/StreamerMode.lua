@@ -185,10 +185,16 @@ function StreamerMode:UpdateState()
 					header:SetText(self.originalHeaderText)
 				end
 			end
-			-- Update friends list to remove privacy filtering
-			local FriendsList = BFL:GetModule("FriendsList")
-			if FriendsList and FriendsList.Update then
-				FriendsList:Update()
+			-- Refresh every surface that may still contain the privacy-filtered
+			-- display list or tag-chip cache. FriendsList has no generic Update()
+			-- entry point, so the old call silently left stale rows behind.
+			if BFL.ForceRefreshFriendsList then
+				BFL:ForceRefreshFriendsList()
+			else
+				local FriendsList = BFL:GetModule("FriendsList")
+				if FriendsList and FriendsList.UpdateFriendsList then
+					FriendsList:UpdateFriendsList()
+				end
 			end
 		end
 		self.toggleButton:Hide()

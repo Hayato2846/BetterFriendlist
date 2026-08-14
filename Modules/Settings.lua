@@ -2713,6 +2713,18 @@ function Settings:ImportSettings(importString)
 		Registry:NormalizeDB()
 		Registry:NormalizeCurrentSelections()
 	end
+	local FriendTags = BFL:GetModule("FriendTags")
+	if FriendTags and FriendTags.OnDatabaseImported then
+		FriendTags:OnDatabaseImported()
+	end
+	local QuickFilters = BFL:GetModule("QuickFilters")
+	if QuickFilters and QuickFilters.InvalidateTagFilterCache then
+		QuickFilters:InvalidateTagFilterCache()
+	end
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.InvalidateEffectiveTheme then
+		ThemeManager:InvalidateEffectiveTheme()
+	end
 
 	-- Reload Groups module (this will apply imported colors)
 	Groups:Initialize()
@@ -2727,6 +2739,13 @@ function Settings:ImportSettings(importString)
 			FriendsList:InvalidateSettingsCache()
 		end
 		FriendsList.lastBuildInputs = nil
+	end
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.RefreshModernConfigurationLayout then
+		-- Import writes Simple Mode and its search option directly. Reassert the
+		-- Modern layout before rendering so controls from the previous profile do
+		-- not remain visible merely because the friend data itself was unchanged.
+		FriendsUI:RefreshModernConfigurationLayout("settings-import")
 	end
 
 	-- Sync Streamer Mode visual state (button icon, header text) with imported DB
@@ -3273,8 +3292,8 @@ function Settings:OnSimpleModeChanged(checked)
 	DB:Set("simpleMode", checked)
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
-		if FriendsUI.ApplyModernPortrait then
-			FriendsUI:ApplyModernPortrait()
+		if FriendsUI.RefreshModernConfigurationLayout then
+			FriendsUI:RefreshModernConfigurationLayout("simple-mode")
 		end
 		if BFL.ForceRefreshFriendsList then
 			BFL:ForceRefreshFriendsList()
@@ -3322,6 +3341,27 @@ function Settings:OnSimpleModeChanged(checked)
 		BFL:UpdatePortraitVisibility("SettingsToggle")
 	end
 	self:RefreshThemeTab()
+end
+
+function Settings:OnSimpleModeShowSearchChanged(checked)
+	local DB = GetDB()
+	if not DB then
+		return
+	end
+
+	DB:Set("simpleModeShowSearch", checked and true or false)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if
+		FriendsUI
+		and FriendsUI.IsModernActive
+		and FriendsUI:IsModernActive()
+		and FriendsUI.RefreshModernConfigurationLayout
+	then
+		FriendsUI:RefreshModernConfigurationLayout("simple-mode-search")
+	end
+	if BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
 end
 
 -- Legacy code (no longer used for Simple Mode)
@@ -4897,8 +4937,7 @@ function Settings:RefreshGeneralTab()
 			label = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
 			initialValue = DB:Get("simpleModeShowSearch", true),
 			callback = function(val)
-				DB:Set("simpleModeShowSearch", val)
-				BFL:ForceRefreshFriendsList()
+				self:OnSimpleModeShowSearchChanged(val)
 			end,
 			tooltipTitle = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
 			tooltipDesc = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC

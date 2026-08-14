@@ -1223,7 +1223,7 @@ function BFL:UpdatePortraitVisibility(reason)
 
 	local FriendsUI = self.FriendsUI or self:GetModule("FriendsUI")
 	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
-	local simpleMode = not modern and DB:Get("simpleMode", false)
+	local simpleMode = DB:Get("simpleMode", false)
 	local shouldShow = not simpleMode
 	local shouldShowPortrait = shouldShow
 	local isClassicElvUISkinActive = CoreIsClassicElvUISkinActive()
@@ -1271,6 +1271,9 @@ function BFL:UpdatePortraitVisibility(reason)
 		if modern then
 			-- Modern keeps its portrait in the Modern root so the Battle.net bar
 			-- cannot cover the lower half of the parent-layer texture.
+			if frame.PortraitButton then
+				frame.PortraitButton:Hide()
+			end
 			if frame.portrait then
 				frame.portrait:Hide()
 			end
@@ -1285,7 +1288,7 @@ function BFL:UpdatePortraitVisibility(reason)
 			end
 			local modernPortrait = FriendsUI and FriendsUI.root and FriendsUI.root.PortraitOverlay
 			if modernPortrait then
-				modernPortrait:Show()
+				modernPortrait:SetShown(shouldShowPortrait)
 			end
 		end
 
@@ -3289,9 +3292,9 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print(BFL.L.CORE_HELP_CMD_HELP)
 		print(BFL.L.CORE_HELP_CMD_CHANGELOG)
 		print(BFL.L.CORE_HELP_CMD_RESET)
-		if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
-			DEFAULT_CHAT_FRAME:AddMessage(BFL.L.CORE_HELP_CMD_FORCE_MODERN)
-		end
+		-- The internal forceModern command intentionally remains undiscoverable.
+		-- It is retained only for targeted development diagnostics and must not
+		-- appear in the supported user-command list.
 		print("")
 		print(BFL.L.CORE_HELP_LINK)
 	end

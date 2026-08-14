@@ -857,11 +857,15 @@ function SkinEngine:SetTextureDesaturated(frame, texture, desaturated)
 	if not texture or not texture.SetDesaturated then
 		return
 	end
+	local desired = desaturated == true
+	if texture.IsDesaturated and texture:IsDesaturated() == desired then
+		return
+	end
 	local state = self:GetState(frame)
 	if state and state.textureDesaturated[texture] == nil then
 		state.textureDesaturated[texture] = texture.IsDesaturated and texture:IsDesaturated() == true or false
 	end
-	texture:SetDesaturated(desaturated == true)
+	texture:SetDesaturated(desired)
 end
 
 function SkinEngine:RememberTextureVertexColor(frame, texture)
@@ -1177,6 +1181,33 @@ local function ResolveBackdropColors(variant)
 	return bg, border
 end
 
+local function ColorValuesMatch(r, g, b, a, color)
+	return color
+		and r == color[1]
+		and g == color[2]
+		and b == color[3]
+		and (a or 1) == (color[4] or 1)
+end
+
+local function BackdropColorsMatch(backdrop, bg, border)
+	if backdrop.GetBackdropColor then
+		local r, g, b, a = backdrop:GetBackdropColor()
+		if not ColorValuesMatch(r, g, b, a, bg) then
+			return false
+		end
+		if backdrop.GetBackdropBorderColor then
+			r, g, b, a = backdrop:GetBackdropBorderColor()
+			return ColorValuesMatch(r, g, b, a, border)
+		end
+		return SameColor(backdrop.BFL_DarkAppliedBorderColor, border)
+	end
+	if backdrop.bg and backdrop.bg.GetVertexColor then
+		local r, g, b, a = backdrop.bg:GetVertexColor()
+		return ColorValuesMatch(r, g, b, a, bg) and SameColor(backdrop.BFL_DarkBorderColor, border)
+	end
+	return SameColor(backdrop.BFL_DarkAppliedBgColor, bg) and SameColor(backdrop.BFL_DarkAppliedBorderColor, border)
+end
+
 function SkinEngine:CreateBackdrop(frame, variant, insets)
 	if not frame or IsForbidden(frame) or not CreateFrame then
 		return nil
@@ -1184,9 +1215,9 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 
 	variant = variant or "panel"
 	insets = insets or ZERO_INSETS
-	local state = self:GetState(frame)
 	local backdrop = frame.BFL_DarkBackdrop
 	if not backdrop then
+		local state = self:GetState(frame)
 		local template = BackdropTemplateMixin and "BackdropTemplate" or nil
 		backdrop = CreateFrame("Frame", nil, frame, template)
 		backdrop:SetFrameLevel(math.max((frame:GetFrameLevel() or 1) - 1, 0))
@@ -1204,12 +1235,40 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 	local right = insets.right or 0
 	local top = insets.top or 0
 	local bottom = insets.bottom or 0
+	local insetsMatch = backdrop.BFL_DarkInsetLeft == left
+		and backdrop.BFL_DarkInsetRight == right
+		and backdrop.BFL_DarkInsetTop == top
+		and backdrop.BFL_DarkInsetBottom == bottom
+	local bg, border = ResolveBackdropColors(variant)
+	local colorVersion = self.themeColorVersion or 0
 	if
-		backdrop.BFL_DarkInsetLeft ~= left
-		or backdrop.BFL_DarkInsetRight ~= right
-		or backdrop.BFL_DarkInsetTop ~= top
-		or backdrop.BFL_DarkInsetBottom ~= bottom
+		insetsMatch
+		and backdrop.BFL_DarkVariant == variant
+		and backdrop.BFL_DarkColorVersion == colorVersion
 	then
+		-- A button/row state may intentionally replace the variant's base colors.
+		-- Preserve that managed state, while still detecting and repairing a
+		-- Blizzard/native reset of the actual backdrop colors.
+		local appliedBg = backdrop.BFL_DarkAppliedBgColor or backdrop.BFL_DarkBaseColor or bg
+		local appliedBorder = backdrop.BFL_DarkAppliedBorderColor or backdrop.BFL_DarkBorderColor or border
+		if not BackdropColorsMatch(backdrop, appliedBg, appliedBorder) then
+			if backdrop.SetBackdropColor then
+				backdrop.BFL_DarkAppliedBgColor = nil
+				backdrop.BFL_DarkAppliedBorderColor = nil
+				SetBackdropColors(backdrop, appliedBg, appliedBorder)
+			elseif backdrop.bg then
+				backdrop.bg:SetColorTexture(UnpackColor(appliedBg))
+				backdrop.BFL_DarkAppliedBgColor = appliedBg
+				SetBackdropStoredColors(backdrop, appliedBg, appliedBorder)
+			end
+		end
+		if not backdrop.IsShown or not backdrop:IsShown() then
+			backdrop:Show()
+		end
+		return backdrop
+	end
+
+	if not insetsMatch then
 		backdrop.BFL_DarkInsetLeft = left
 		backdrop.BFL_DarkInsetRight = right
 		backdrop.BFL_DarkInsetTop = top
@@ -1218,8 +1277,6 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 		backdrop:SetPoint("TOPLEFT", frame, "TOPLEFT", left, top)
 		backdrop:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -right, -bottom)
 	end
-
-	local bg, border = ResolveBackdropColors(variant)
 
 	if backdrop.SetBackdropColor then
 		SetBackdropColors(backdrop, bg, border)
@@ -1230,10 +1287,11 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 		end
 		SetBackdropStoredColors(backdrop, bg, border)
 	end
-	if backdrop.BFL_DarkVariant ~= variant then
+	if backdrop.BFL_DarkVariant ~= variant or backdrop.BFL_DarkColorVersion ~= colorVersion then
 		backdrop.BFL_DarkVariant = variant
 		ApplyBackdropLines(backdrop, variant)
 	end
+	backdrop.BFL_DarkColorVersion = colorVersion
 	if not backdrop.IsShown or not backdrop:IsShown() then
 		backdrop:Show()
 	end
@@ -3363,6 +3421,25 @@ local function IsShownForRowRefresh(button)
 	return true
 end
 
+local function GetOpaqueAccentColor(engine)
+	local accent = (engine.colors and engine.colors.accent) or COLORS.accent
+	local color = engine.BFL_DarkOpaqueAccentColor
+	if not color then
+		color = {}
+		engine.BFL_DarkOpaqueAccentColor = color
+	end
+	if
+		engine.BFL_DarkOpaqueAccentColorVersion ~= (engine.themeColorVersion or 0)
+		or color[1] ~= accent[1]
+		or color[2] ~= accent[2]
+		or color[3] ~= accent[3]
+	then
+		color[1], color[2], color[3], color[4] = accent[1], accent[2], accent[3], 1
+		engine.BFL_DarkOpaqueAccentColorVersion = engine.themeColorVersion or 0
+	end
+	return color
+end
+
 local function RefreshRowTravelPassButton(engine, row, button, buttonKey, shownKey, enabledKey)
 	if not button then
 		row[buttonKey] = nil
@@ -3376,27 +3453,55 @@ local function RefreshRowTravelPassButton(engine, row, button, buttonKey, shownK
 	if button.BFL_DarkForceFlatButton then
 		button.BFL_DarkTravelPassButton = nil
 		button.BFL_DarkTravelPassSkinned = nil
+		local actionIcon = button.ActionIcon
 		local iconSize = 24
-		if button.ActionIcon and button.ActionIcon.GetWidth then
-			local width = button.ActionIcon:GetWidth()
+		if actionIcon and actionIcon.GetWidth then
+			local width = actionIcon:GetWidth()
 			if width and width > 0 then
 				iconSize = width
 			end
 		end
-		if button.ActionIcon then
-			engine:SetTextureDesaturated(button, button.ActionIcon, true)
+		local iconAtlas = actionIcon and actionIcon.GetAtlas and actionIcon:GetAtlas() or nil
+		local iconTexture = not iconAtlas and actionIcon and actionIcon.GetTexture and actionIcon:GetTexture() or nil
+		local colorVersion = engine.themeColorVersion or 0
+		local needsFullSkin = not button.BFL_DarkIconButtonSkinned
+			or button.BFL_DarkFlatActionIcon ~= actionIcon
+			or button.BFL_DarkFlatIconSize ~= iconSize
+			or button.BFL_DarkFlatIconAtlas ~= iconAtlas
+			or button.BFL_DarkFlatIconTexture ~= iconTexture
+			or button.BFL_DarkFlatColorVersion ~= colorVersion
+
+		local accentColor = GetOpaqueAccentColor(engine)
+		if needsFullSkin then
+			local opts = button.BFL_DarkFlatIconOptions
+			if not opts then
+				opts = { insets = ZERO_INSETS }
+				button.BFL_DarkFlatIconOptions = opts
+			end
+			opts.texture = actionIcon
+			opts.size = iconSize
+			opts.color = accentColor
+			engine:SkinIconButton(button, nil, opts)
+			button.BFL_DarkFlatActionIcon = actionIcon
+			button.BFL_DarkFlatIconSize = iconSize
+			button.BFL_DarkFlatIconAtlas = iconAtlas
+			button.BFL_DarkFlatIconTexture = iconTexture
+			button.BFL_DarkFlatColorVersion = colorVersion
+		else
+			-- FriendsUI deliberately reapplies Blizzard's native card assets before
+			-- the Dark pass. Verify the externally mutable icon state on a cache hit
+			-- instead of suppressing the refresh completely.
+			if actionIcon then
+				engine:SetTextureDesaturated(button, actionIcon, true)
+				engine:SetTextureVertexColor(button, actionIcon, UnpackColor(accentColor))
+				engine:SetTextureAlpha(button, actionIcon, enabled and 1 or 0.35)
+				actionIcon:Show()
+			end
+			if row[buttonKey] ~= button or row[shownKey] ~= shown or row[enabledKey] ~= enabled then
+				button.BFL_DarkButtonStateKey = nil
+			end
+			engine:ApplyButtonState(button)
 		end
-		engine:SkinIconButton(button, nil, {
-			texture = button.ActionIcon,
-			size = iconSize,
-			insets = ZERO_INSETS,
-			color = engine.colors and engine.colors.accent and {
-				engine.colors.accent[1],
-				engine.colors.accent[2],
-				engine.colors.accent[3],
-				1,
-			},
-		})
 		if button.BFL_DarkHoverIcon then
 			engine:SetTextureDesaturated(button, button.BFL_DarkHoverIcon, true)
 		end

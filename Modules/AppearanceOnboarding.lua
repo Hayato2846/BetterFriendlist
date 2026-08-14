@@ -915,6 +915,13 @@ function AppearanceOnboarding:StoreThemeSelection(theme)
 		BetterFriendlistDB.theme = theme
 		BetterFriendlistDB.enableElvUISkin = theme == "elvui"
 	end
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.InvalidateEffectiveTheme then
+		-- Reload acceptance persists the selection without applying it in the old
+		-- session. Keep any callers that inspect the effective theme before ReloadUI
+		-- from observing the previous cached theme.
+		ThemeManager:InvalidateEffectiveTheme()
+	end
 end
 
 function AppearanceOnboarding:CheckpointReloadTheme(theme)
@@ -1445,6 +1452,10 @@ function AppearanceOnboarding:RestoreSnapshot(skipVisualRefresh)
 	BetterFriendlistDB.simpleMode = snapshot.simpleMode
 	BetterFriendlistDB.compactMode = snapshot.compactMode
 	BetterFriendlistDB.appearanceOnboardingVersion = snapshot.completedVersion
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.InvalidateEffectiveTheme then
+		ThemeManager:InvalidateEffectiveTheme()
+	end
 	if skipVisualRefresh then
 		return
 	end
@@ -1466,7 +1477,6 @@ function AppearanceOnboarding:RestoreSnapshot(skipVisualRefresh)
 	if Settings and Settings.OnCompactModeChanged then
 		Settings:OnCompactModeChanged(snapshot.compactMode == true)
 	end
-	local ThemeManager = BFL:GetModule("ThemeManager")
 	if ThemeManager and ThemeManager.ApplyCurrentTheme then
 		ThemeManager:ApplyCurrentTheme("appearance-onboarding-rollback")
 	end

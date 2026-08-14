@@ -2291,6 +2291,109 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "FriendTags_ReplacedTablesInvalidateRuntimeCache", {
+		description = "Friend Tags should notice full settings-import table replacement without a reload",
+		action = function(V)
+			WithTemporaryDatabase({
+				friendTagSettings = { enabled = true },
+				customFriendTags = {},
+				friendCustomTags = {},
+				friendBlizzardTags = {},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				FriendTags:NormalizeDB()
+				V:Assert(FriendTags:IsEnabled(), "Initial Friend Tags state should be cached as enabled")
+
+				tempDB.friendTagSettings = { enabled = false }
+				tempDB.friendTagProfiles = {}
+				tempDB.customFriendTags = {}
+				tempDB.friendCustomTags = {}
+				tempDB.friendBlizzardTags = {}
+				FriendTags:OnDatabaseImported()
+				V:Assert(not FriendTags:IsEnabled(), "Imported settings table should replace the cached enabled state")
+				V:AssertType(tempDB.friendTagSettings, "table", "Imported tag settings should remain normalized")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_RowCacheTracksStreamerMode", {
+		description = "Friend tag row caches should hide existing chips immediately when Streamer Mode becomes active",
+		action = function(V)
+			WithTemporaryDatabase({
+				friendTagSettings = {
+					enabled = true,
+					showRowChips = true,
+					showTagsInStreamerMode = false,
+				},
+				customFriendTags = {},
+				friendCustomTags = {},
+				friendBlizzardTags = {},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				local TagChips = BFL:GetModule("TagChips")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				V:AssertNotNil(TagChips, "TagChips module should exist")
+				FriendTags:OnDatabaseImported()
+
+				local tagId = FriendTags:CreateCustomTag("Streamer Cache")
+				local friend = {
+					type = "wow",
+					uid = "wow_StreamerCache-Realm",
+					name = "StreamerCache-Realm",
+				}
+				V:AssertNotNil(tagId, "Test tag should be created")
+				V:Assert(FriendTags:SetCustomTagForFriend(friend, tagId, true), "Test tag should be assigned")
+
+				local fakeFriendsList = {
+					settingsCache = { compactMode = false, infoDisabled = false },
+					GetButtonWidth = function()
+						return 300
+					end,
+				}
+				local visibleData = TagChips:GetRowData(friend, fakeFriendsList)
+				V:Assert(visibleData.canRender == true, "Assigned tag should render before Streamer Mode")
+
+				tempDB.streamerModeActive = true
+				local hiddenData = TagChips:GetRowData(friend, fakeFriendsList)
+				V:Assert(hiddenData.canRender == false, "Cached tag row should hide in Streamer Mode")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "QuickFilters_ActiveTagsTrackStreamerMode", {
+		description = "An active tag-filter cache should not survive Streamer Mode hiding tag surfaces",
+		action = function(V)
+			WithTemporaryDatabase({
+				friendTagSettings = {
+					enabled = true,
+					showTagsInStreamerMode = false,
+				},
+				customFriendTags = {},
+				friendCustomTags = {},
+				friendBlizzardTags = {},
+				quickFilterTags = {},
+			}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				local QuickFilters = BFL:GetModule("QuickFilters")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				V:AssertNotNil(QuickFilters, "QuickFilters module should exist")
+				FriendTags:OnDatabaseImported()
+				QuickFilters:InvalidateTagFilterCache()
+
+				local tagId = FriendTags:CreateCustomTag("Filter Cache")
+				V:AssertNotNil(tagId, "Test filter tag should be created")
+				tempDB.quickFilterTags[tagId] = true
+				QuickFilters:InvalidateTagFilterCache()
+				local activeBefore = QuickFilters:GetActiveTagFilterDefinitions()
+				V:AssertEqual(#activeBefore, 1, "Assigned filter should be active before Streamer Mode")
+
+				tempDB.streamerModeActive = true
+				local activeAfter = QuickFilters:GetActiveTagFilterDefinitions()
+				V:AssertEqual(#activeAfter, 0, "Hidden tag surfaces should not retain an active cached filter")
+			end)
+		end,
+	})
+
 	TS:RegisterTest("data", "FriendTags_DragOrderPersists", {
 		description = "Friend tag order should persist as one atomic reordered list",
 		action = function(V)
@@ -3119,6 +3222,7 @@ local function RegisterBuiltInTests()
 					local QuickFilters = BFL:GetModule("QuickFilters")
 					V:AssertNotNil(QuickFilters, "QuickFilters module should exist")
 					tempDB.quickFilterTags = { ["blizzard:raiding"] = true }
+					QuickFilters:InvalidateTagFilterCache()
 					V:Assert(
 						QuickFilters:PassesTagFilters(friend),
 						"Direct tag facets should match native Blizzard tags while BFL Friend Tags is disabled"
@@ -5031,6 +5135,34 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "Theme_EffectiveCacheTracksDirectSelectionChanges", {
+		description = "Effective theme cache should follow direct DB changes and addon availability",
+		action = function(V)
+			local originalIsEllesmereUIAvailable = BFL.IsEllesmereUIAvailable
+			local available = true
+			BFL.IsEllesmereUIAvailable = function()
+				return available
+			end
+			local ok, err = pcall(function()
+				WithTemporaryDatabase({ theme = "dark" }, function(tempDB)
+					V:AssertEqual(BFL:GetEffectiveTheme(), "dark", "Initial direct theme should resolve")
+					tempDB.theme = "custom"
+					V:AssertEqual(BFL:GetEffectiveTheme(), "custom", "Direct theme replacement should invalidate by source")
+					tempDB.theme = "ellesmereui"
+					V:AssertEqual(BFL:GetEffectiveTheme(), "ellesmereui", "Available addon theme should resolve")
+					available = false
+					local ThemeManager = BFL:GetModule("ThemeManager")
+					ThemeManager:InvalidateEffectiveTheme()
+					V:AssertEqual(BFL:GetEffectiveTheme(), "blizzard", "Availability loss should invalidate effective theme")
+				end)
+			end)
+			BFL.IsEllesmereUIAvailable = originalIsEllesmereUIAvailable
+			if not ok then
+				error(err, 2)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "Theme_ElvUIFallbackWithoutAddon", {
 		description = "Stored ElvUI theme should fall back to Blizzard when ElvUI is unavailable",
 		action = function(V)
@@ -5150,6 +5282,9 @@ local function RegisterBuiltInTests()
 				function texture:SetTexture(path)
 					self.texture = path
 				end
+				function texture:SetColorTexture(r, g, b, a)
+					self.colorTexture = { r, g, b, a }
+				end
 				function texture:SetTexCoord(...)
 					self.texCoord = { ... }
 				end
@@ -5215,6 +5350,7 @@ local function RegisterBuiltInTests()
 				tabs = {},
 				scrollbar = false,
 				shells = 0,
+				fadeNineSlices = 0,
 			}
 			local facade = {
 				apiVersion = 1,
@@ -5222,6 +5358,9 @@ local function RegisterBuiltInTests()
 					calls.shells = calls.shells + 1
 				end,
 				Inset = function() end,
+				FadeNineSlice = function()
+					calls.fadeNineSlices = calls.fadeNineSlices + 1
+				end,
 				CloseButton = function() end,
 				Button = function(button)
 					if button then
@@ -5432,6 +5571,44 @@ local function RegisterBuiltInTests()
 				skin:SkinLegacyInviteButtons(modernInvite)
 				V:Assert(calls.buttons[modernInvite.AcceptButton] ~= true, "Modern Accept should remain native")
 				V:Assert(calls.buttons[modernInvite.DeclineButton] ~= true, "Modern Decline should remain native")
+				local modernCard = {
+					CardBackground = MakeTexture(),
+					ThemeTint = MakeTexture(),
+					background = MakeTexture(),
+					highlight = MakeTexture(),
+				}
+				skin:SkinModernFriendCard(modernCard)
+				V:AssertEqual(modernCard.CardBackground.alpha, 0, "Modern EUI should hide the native card surface")
+				V:AssertEqual(modernCard.background.colorTexture[4], 0.10, "Modern EUI should apply its restrained row surface")
+				V:AssertEqual(modernCard.highlight.colorTexture[4], 0.035, "Modern EUI should apply its hover surface")
+				-- FriendsUI rewrites these layers whenever a pooled friend row receives
+				-- new data. The EUI pass must restore them even when the palette did not
+				-- change, while leaving the template-owned selected/hover visibility intact.
+				modernCard.CardBackground:SetAlpha(1)
+				modernCard.ThemeTint:Show()
+				modernCard.background:SetColorTexture(0, 0, 0, 0)
+				modernCard.highlight:SetColorTexture(1, 0, 0, 1)
+				modernCard.highlight:SetDesaturated(true)
+				modernCard.highlight:SetVertexColor(1, 0, 0, 1)
+				modernCard.highlight:SetAlpha(0.12)
+				modernCard.highlight:Show()
+				skin:SkinModernFriendCard(modernCard)
+				V:AssertEqual(modernCard.CardBackground.alpha, 0, "Modern EUI should re-hide a recycled native card surface")
+				V:Assert(modernCard.ThemeTint.shown == false, "Modern EUI should re-hide recycled theme tint")
+				V:AssertEqual(modernCard.background.colorTexture[4], 0.10, "Modern EUI should restore a recycled row surface")
+				V:AssertEqual(modernCard.highlight.colorTexture[4], 0.035, "Modern EUI should restore recycled hover and selection color")
+				V:Assert(modernCard.highlight.desaturated == false, "Modern EUI should restore hover saturation")
+				V:AssertEqual(modernCard.highlight.alpha, 1, "Modern EUI should restore hover opacity")
+				V:Assert(modernCard.highlight.shown == true, "Modern EUI should preserve the template's active hover or selection state")
+				local modernFrame = {
+					NineSlice = {},
+					PortraitContainer = MakeTexture(),
+					PortraitIcon = MakeTexture(),
+				}
+				V:Assert(skin:RefreshModernPortraitCorner(modernFrame), "Modern EUI should expose a focused portrait-corner pass")
+				V:AssertEqual(calls.fadeNineSlices, 1, "Modern EUI should re-fade only the restored NineSlice")
+				V:AssertEqual(modernFrame.PortraitContainer.alpha, 0, "Modern EUI should keep the native portrait container transparent")
+				V:AssertEqual(modernFrame.PortraitIcon.alpha, 0, "Modern EUI should keep the native portrait icon transparent")
 			end)
 
 			skin.facade = originalFacade
@@ -8195,6 +8372,55 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("integration", "StreamerMode_HiddenButtonInvalidatesPrivacyRows", {
+		description = "Hiding the Streamer Mode button must disable privacy mode and refresh cached friend rows",
+		action = function(V)
+			local StreamerMode = BFL:GetModule("StreamerMode")
+			if not (StreamerMode and BetterFriendlistDB) then
+				V:Skip("StreamerMode or DB not initialized")
+				return
+			end
+
+			local originalShowButton = BetterFriendlistDB.showStreamerModeButton
+			local originalActive = BetterFriendlistDB.streamerModeActive
+			local originalToggleButton = StreamerMode.toggleButton
+			local originalHeaderText = StreamerMode.originalHeaderText
+			local originalUpdateAnchors = StreamerMode.UpdateAdjacentButtonAnchors
+			local originalForceRefresh = BFL.ForceRefreshFriendsList
+			local refreshes = 0
+			local hidden = false
+			local ok, err = pcall(function()
+				BetterFriendlistDB.showStreamerModeButton = false
+				BetterFriendlistDB.streamerModeActive = true
+				StreamerMode.originalHeaderText = nil
+				StreamerMode.toggleButton = {
+					Hide = function()
+						hidden = true
+					end,
+				}
+				StreamerMode.UpdateAdjacentButtonAnchors = function() end
+				BFL.ForceRefreshFriendsList = function()
+					refreshes = refreshes + 1
+				end
+
+				StreamerMode:UpdateState()
+				V:AssertEqual(BetterFriendlistDB.streamerModeActive, false, "Privacy mode should be disabled")
+				V:AssertEqual(refreshes, 1, "Privacy-filtered rows should be invalidated exactly once")
+				V:Assert(hidden, "The disabled Streamer Mode button should be hidden")
+			end)
+
+			BetterFriendlistDB.showStreamerModeButton = originalShowButton
+			BetterFriendlistDB.streamerModeActive = originalActive
+			StreamerMode.toggleButton = originalToggleButton
+			StreamerMode.originalHeaderText = originalHeaderText
+			StreamerMode.UpdateAdjacentButtonAnchors = originalUpdateAnchors
+			BFL.ForceRefreshFriendsList = originalForceRefresh
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("integration", "Broker_Update_NoError", {
 		description = "Broker Update should not error when called",
 		action = function(V)
@@ -9113,6 +9339,7 @@ local function RegisterBuiltInTests()
 				QuickFilters.GetTagFilterDefinitions = function()
 					return definitions
 				end
+				QuickFilters:InvalidateTagFilterCache()
 				FriendTags.GetTagsForFriend = function(_, friend)
 					return friend.testTags or {}
 				end
@@ -9261,6 +9488,7 @@ local function RegisterBuiltInTests()
 			FriendTags.GetTagsForFriend = originalGetTagsForFriend
 			BFL.ForceRefreshFriendsList = originalForceRefreshFriendsList
 			QuickFilters.RefreshDropdown = originalRefreshDropdown
+			QuickFilters:InvalidateTagFilterCache()
 			if not ok then
 				error(err, 0)
 			end
@@ -11463,16 +11691,6 @@ local PERFY_263_SEARCH_TERMS = {
 	"Backup",
 }
 
-local PERFY_263_RAID_QUERIES = {
-	"",
-	"perfy",
-	"assist",
-	"target",
-	"blackhand",
-}
-
-local PERFY_NIL_SENTINEL = {}
-
 local function PerfyDeepCopy(value, seen)
 	local DB = BFL:GetModule("DB")
 	if DB and DB.InternalDeepCopy then
@@ -11507,7 +11725,6 @@ local function CapturePerfy263FeatureState()
 		friendCustomTags = PerfyDeepCopy(BetterFriendlistDB.friendCustomTags),
 		friendBlizzardTags = PerfyDeepCopy(BetterFriendlistDB.friendBlizzardTags),
 		nextCustomFriendTagID = BetterFriendlistDB.nextCustomFriendTagID,
-		autoRaidAssist = PerfyDeepCopy(BetterFriendlistDB.autoRaidAssist),
 		settingsVersion = BFL.SettingsVersion,
 		friendTagsVersion = BFL.FriendTagsVersion,
 		friendTagsDefinitionVersion = BFL.FriendTagsDefinitionVersion,
@@ -11529,7 +11746,6 @@ local function RestorePerfy263FeatureState(snapshot)
 	BetterFriendlistDB.friendCustomTags = PerfyDeepCopy(snapshot.friendCustomTags)
 	BetterFriendlistDB.friendBlizzardTags = PerfyDeepCopy(snapshot.friendBlizzardTags)
 	BetterFriendlistDB.nextCustomFriendTagID = snapshot.nextCustomFriendTagID
-	BetterFriendlistDB.autoRaidAssist = PerfyDeepCopy(snapshot.autoRaidAssist)
 	BFL.SettingsVersion = (snapshot.settingsVersion or BFL.SettingsVersion or 0) + 1
 	BFL.FriendTagsVersion = (snapshot.friendTagsVersion or BFL.FriendTagsVersion or 0) + 1
 	BFL.FriendTagsDefinitionVersion = (snapshot.friendTagsDefinitionVersion or BFL.FriendTagsDefinitionVersion or BFL.FriendTagsVersion or 0) + 1
@@ -11570,154 +11786,7 @@ local function RefreshPerfy263FeatureSurfaces(FriendsList, forceRender)
 	end
 end
 
-local function GetPerfy263FriendCharacter(friend, fallbackIndex)
-	if type(friend) == "table" then
-		local gameAccountInfo = type(friend.gameAccountInfo) == "table" and friend.gameAccountInfo or nil
-		local name = gameAccountInfo and gameAccountInfo.characterName or friend.characterName or friend.name
-		local realm = gameAccountInfo and gameAccountInfo.realmName or friend.realmName
-		if type(name) == "string" and name ~= "" then
-			name = name:match("([^%-]+)") or name
-			if not realm or realm == "" then
-				realm = GetNormalizedRealmName and GetNormalizedRealmName() or "Blackhand"
-			end
-			return name, realm
-		end
-	end
-	return "PerfyAssist" .. tostring(fallbackIndex), "Blackhand"
-end
-
-local function BuildPerfy263RaidRoster(friends)
-	local roster = {}
-	for index, friend in ipairs(friends or {}) do
-		if #roster >= 40 then
-			break
-		end
-		local name, realm = GetPerfy263FriendCharacter(friend, index)
-		roster[#roster + 1] = {
-			name = name,
-			realm = realm,
-		}
-	end
-	while #roster < 40 do
-		local index = #roster + 1
-		roster[index] = {
-			name = "PerfyAssist" .. tostring(index),
-			realm = "Blackhand",
-		}
-	end
-	return roster
-end
-
-local function GetPerfy263RaidEntry(context, unit)
-	if unit == "player" then
-		return { name = "PerfyLeader", realm = "Blackhand" }
-	end
-	local index = type(unit) == "string" and tonumber(unit:match("^raid(%d+)$")) or nil
-	return index and context.raidRoster and context.raidRoster[index] or nil
-end
-
-local function OverridePerfy263Global(context, name, replacement)
-	context.globalOverrides = context.globalOverrides or {}
-	if context.globalOverrides[name] == nil then
-		local original = _G[name]
-		context.globalOverrides[name] = original == nil and PERFY_NIL_SENTINEL or original
-	end
-	_G[name] = replacement
-end
-
-local function InstallPerfy263RaidMocks(context)
-	context.promotedUnits = {}
-	OverridePerfy263Global(context, "IsInRaid", function()
-		return true
-	end)
-	OverridePerfy263Global(context, "IsInGroup", function()
-		return true
-	end)
-	OverridePerfy263Global(context, "GetNumGroupMembers", function()
-		return context.raidRoster and #context.raidRoster or 0
-	end)
-	OverridePerfy263Global(context, "GetNumSubgroupMembers", function()
-		return math.min(context.raidRoster and #context.raidRoster or 0, 4)
-	end)
-	OverridePerfy263Global(context, "UnitExists", function(unit)
-		return unit == "player" or GetPerfy263RaidEntry(context, unit) ~= nil
-	end)
-	OverridePerfy263Global(context, "UnitIsUnit", function(left, right)
-		return left == right or (left == "player" and right == "player")
-	end)
-	OverridePerfy263Global(context, "UnitIsGroupLeader", function(unit)
-		return unit == "player"
-	end)
-	OverridePerfy263Global(context, "UnitIsGroupAssistant", function(unit)
-		return context.promotedUnits and context.promotedUnits[unit] == true
-	end)
-	OverridePerfy263Global(context, "UnitFullName", function(unit)
-		local entry = GetPerfy263RaidEntry(context, unit)
-		return entry and entry.name or nil, entry and entry.realm or nil
-	end)
-	OverridePerfy263Global(context, "UnitName", function(unit)
-		local entry = GetPerfy263RaidEntry(context, unit)
-		return entry and entry.name or nil, entry and entry.realm or nil
-	end)
-	OverridePerfy263Global(context, "GetNormalizedRealmName", function()
-		return "Blackhand"
-	end)
-	OverridePerfy263Global(context, "UnitRealmRelationship", function()
-		return LE_REALM_RELATION_SAME or 1
-	end)
-
-	context.bflOverrides = {
-		PromoteToAssistant = BFL.PromoteToAssistant,
-		IsActionRestricted = BFL.IsActionRestricted,
-	}
-	BFL.PromoteToAssistant = function(unit)
-		context.promotedUnits[unit] = true
-		context.promoteCount = (context.promoteCount or 0) + 1
-		return true
-	end
-	BFL.IsActionRestricted = function()
-		return false
-	end
-end
-
-local function RestorePerfy263RaidMocks(context)
-	if not context then
-		return
-	end
-	for name, original in pairs(context.globalOverrides or {}) do
-		_G[name] = original == PERFY_NIL_SENTINEL and nil or original
-	end
-	context.globalOverrides = nil
-	if context.bflOverrides then
-		BFL.PromoteToAssistant = context.bflOverrides.PromoteToAssistant
-		BFL.IsActionRestricted = context.bflOverrides.IsActionRestricted
-		context.bflOverrides = nil
-	end
-end
-
-local function ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
-	if not AutoRaidAssist then
-		return
-	end
-	if AutoRaidAssist.pendingTimer and AutoRaidAssist.pendingTimer.Cancel then
-		AutoRaidAssist.pendingTimer:Cancel()
-	end
-	AutoRaidAssist.pendingTimer = nil
-	if AutoRaidAssist.CancelRosterRetryTimers then
-		AutoRaidAssist:CancelRosterRetryTimers()
-	end
-	if AutoRaidAssist.CancelPromotionRetryTimers then
-		AutoRaidAssist:CancelPromotionRetryTimers()
-	end
-	if AutoRaidAssist.ClearPromotionQueue then
-		AutoRaidAssist:ClearPromotionQueue()
-	end
-	AutoRaidAssist.lastPromotionAttempt = {}
-	AutoRaidAssist.promotionAttemptCounts = {}
-	AutoRaidAssist.needsCombatRetry = nil
-end
-
-local function SeedPerfy263FeatureData(context, FriendsList, ContactMemory, FriendTags, AutoRaidAssist)
+local function SeedPerfy263FeatureData(context, FriendsList, ContactMemory, FriendTags)
 	if not BetterFriendlistDB then
 		return
 	end
@@ -11800,36 +11869,6 @@ local function SeedPerfy263FeatureData(context, FriendsList, ContactMemory, Frie
 				end
 			end
 		end
-	end
-
-	context.raidRoster = BuildPerfy263RaidRoster(context.perfyFriends)
-	InstallPerfy263RaidMocks(context)
-	if AutoRaidAssist and AutoRaidAssist.NormalizeDB then
-		local assistDB = AutoRaidAssist:NormalizeDB()
-		assistDB.enabled = true
-		assistDB.targets = {}
-		local ContactIdentity = BFL:GetModule("ContactIdentity")
-		if ContactIdentity then
-			for index, entry in ipairs(context.raidRoster) do
-				if index > 32 then
-					break
-				end
-				local key = ContactIdentity:GetContactKeyFromPlayerName(entry.name, entry.realm)
-				local _, value = ContactIdentity:SplitContactKey(key)
-				if key then
-					assistDB.targets[#assistDB.targets + 1] = {
-						id = key,
-						key = key,
-						kind = "player",
-						value = value,
-						source = (index % 3 == 0 and "group") or (index % 3 == 1 and "friend") or "manual",
-						displayName = entry.name,
-						addedAt = time and time() or 0,
-					}
-				end
-			end
-		end
-		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
 	end
 
 	RefreshPerfy263FeatureSurfaces(FriendsList, context.forceRender)
@@ -11949,7 +11988,7 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 	local ContactMemory = BFL:GetModule("ContactMemory")
 	local FriendTags = BFL:GetModule("FriendTags")
 	local TagChips = BFL:GetModule("TagChips")
-	local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local ScenarioManager = BFL.ScenarioManager
 	mode = NormalizePerfyStressMode(mode)
 	local visibleMode = mode == "visible"
@@ -11964,17 +12003,18 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 		sortIndex = 1,
 		filterIndex = 1,
 		tagSearchIndex = 1,
-		raidQueryIndex = 1,
 		friendIndex = 1,
 		contactIndex = 1,
 		dynamicTagsEnabled = true,
 		scrollDirection = 1,
 		scrollStep = 0.2,
+		sectionIndex = 1,
 		featureSnapshot = CapturePerfy263FeatureState(),
 		originalFilter = QuickFilters and QuickFilters:GetFilter() or (FriendsList and FriendsList.filterMode),
 		originalSort = FriendsList and FriendsList.sortMode,
 		originalSecondarySort = FriendsList and FriendsList.secondarySort,
 		originalSearchText = FriendsList and FriendsList.searchText,
+		originalSection = FriendsUI and FriendsUI.GetSelectedSection and FriendsUI:GetSelectedSection() or "friends",
 		originalTab = (BetterFriendsFrame and PanelTemplates_GetSelectedTab(BetterFriendsFrame)) or 1,
 		originalTopTab = (
 			BetterFriendsFrame
@@ -11984,6 +12024,16 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 		groupStates = {},
 		filterModes = { "all", "online", "offline", "wowonline", "wow", "bnet" },
 		sortModes = { "status", "name", "level", "zone" },
+		modernSections = {
+			"friends",
+			"recent_allies",
+			"friend_requests",
+			"quick_join",
+			"recruit_a_friend",
+			"guild",
+			"who",
+			"raid",
+		},
 	}
 
 	if Groups and Groups.groups then
@@ -12002,6 +12052,7 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 	end
 
 	local friendsTab = 1
+	local modernMode = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
 
 	local function EnsureTab(tabIndex)
 		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
@@ -12062,6 +12113,26 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 			end
 			scrollBar:SetValue(nextValue)
 		end
+	end
+
+	local function SelectNextModernSection()
+		if not (modernMode and FriendsUI and FriendsUI.SelectSection) then
+			EnsureTab(friendsTab)
+			return
+		end
+		if BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+			EnsureTab(friendsTab)
+		end
+		local sections = context.modernSections
+		for _ = 1, #sections do
+			local sectionID = sections[context.sectionIndex]
+			context.sectionIndex = (context.sectionIndex % #sections) + 1
+			if not FriendsUI.IsSectionAvailable or FriendsUI:IsSectionAvailable(sectionID) then
+				FriendsUI:SelectSection(sectionID)
+				return
+			end
+		end
+		FriendsUI:SelectSection("friends")
 	end
 
 	local function ApplyNextFilter()
@@ -12194,44 +12265,16 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 		)
 	end
 
-	local function ExerciseAutoRaidCandidates()
-		if not (AutoRaidAssist and AutoRaidAssist.BuildCandidateList) then
-			return
-		end
-		local query = PERFY_263_RAID_QUERIES[context.raidQueryIndex] or ""
-		context.raidQueryIndex = (context.raidQueryIndex % #PERFY_263_RAID_QUERIES) + 1
-		context.lastAutoRaidCandidates = AutoRaidAssist:BuildCandidateList(query, 25)
-	end
-
-	local function ExerciseAutoRaidEvaluate()
-		if not (AutoRaidAssist and AutoRaidAssist.Evaluate) then
-			return
-		end
-		context.promotedUnits = {}
-		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
-		AutoRaidAssist:Evaluate("perfy-263")
-	end
-
-	local function ExerciseAutoRaidRosterSchedule()
-		if not (AutoRaidAssist and AutoRaidAssist.ScheduleRosterEvaluate) then
-			return
-		end
-		AutoRaidAssist:ScheduleRosterEvaluate("perfy-263")
-		if AutoRaidAssist.CancelRosterRetryTimers then
-			AutoRaidAssist:CancelRosterRetryTimers()
-		end
-	end
-
+	-- Profiling runs inside the live UI session. Keep fixtures internal to BFL;
+	-- replacing global Unit/group APIs taints Blizzard's secret-value paths until reload.
 	if ScenarioManager and ScenarioManager.Load then
 		ScenarioManager:Load("stress_200")
 	else
 		self.Reporter:Warn("ScenarioManager not available")
 	end
 
-	local seeded, seedError = pcall(SeedPerfy263FeatureData, context, FriendsList, ContactMemory, FriendTags, AutoRaidAssist)
+	local seeded, seedError = pcall(SeedPerfy263FeatureData, context, FriendsList, ContactMemory, FriendTags)
 	if not seeded then
-		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
-		RestorePerfy263RaidMocks(context)
 		RestorePerfy263FeatureState(context.featureSnapshot)
 		if ScenarioManager and ScenarioManager.Clear then
 			ScenarioManager:Clear()
@@ -12246,10 +12289,13 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 	end
 
 	local visibleActions = {
+		SelectNextModernSection,
 		function()
-			EnsureTab(friendsTab)
-		end,
-		function()
+			if modernMode and FriendsUI and FriendsUI.SelectSection then
+				FriendsUI:SelectSection("friends")
+			else
+				EnsureTab(friendsTab)
+			end
 			if FriendsList and FriendsList.RenderDisplay then
 				FriendsList:RenderDisplay(true)
 			end
@@ -12263,9 +12309,6 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 		RotatePrivateNote,
 		ApplyNextFilter,
 		ApplyNextSort,
-		ExerciseAutoRaidCandidates,
-		ExerciseAutoRaidEvaluate,
-		ExerciseAutoRaidRosterSchedule,
 		function()
 			if FriendsList and FriendsList.UpdateFriendsList then
 				FriendsList:UpdateFriendsList()
@@ -12282,9 +12325,6 @@ function TestSuite:RunPerfyStress(durationSeconds, mode)
 		RotatePrivateNote,
 		ApplyNextFilter,
 		ApplyNextSort,
-		ExerciseAutoRaidCandidates,
-		ExerciseAutoRaidEvaluate,
-		ExerciseAutoRaidRosterSchedule,
 		function()
 			if FriendsList and FriendsList.UpdateFriendsList then
 				FriendsList:UpdateFriendsList()
@@ -12361,15 +12401,13 @@ function TestSuite:StopPerfyStress(reason)
 	local FriendsList = BFL:GetModule("FriendsList")
 	local QuickFilters = BFL:GetModule("QuickFilters")
 	local Groups = BFL:GetModule("Groups")
-	local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local ScenarioManager = BFL.ScenarioManager
 
 	if context then
 		if context.addonProfilerActive then
 			StopAddonProfiler()
 		end
-		ResetPerfy263AutoRaidRuntime(AutoRaidAssist)
-		RestorePerfy263RaidMocks(context)
 		if QuickFilters and QuickFilters.SetFilter and context.originalFilter then
 			QuickFilters:SetFilter(context.originalFilter)
 		elseif FriendsList and FriendsList.SetFilterMode and context.originalFilter then
@@ -12399,13 +12437,17 @@ function TestSuite:StopPerfyStress(reason)
 				BetterFriendsFrame:Show()
 			end
 		end
-		if BetterFriendsFrame and BetterFriendsFrame:IsShown() and context.originalTab then
-			PanelTemplates_SetTab(BetterFriendsFrame, context.originalTab)
-			if BetterFriendsFrame_ShowBottomTab then
-				BetterFriendsFrame_ShowBottomTab(context.originalTab)
-			end
-			if context.originalTab == 1 and context.originalTopTab and BetterFriendsFrame_ShowTab then
-				BetterFriendsFrame_ShowTab(context.originalTopTab)
+		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+			if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.SelectSection then
+				FriendsUI:SelectSection(context.originalSection or "friends")
+			elseif context.originalTab then
+				PanelTemplates_SetTab(BetterFriendsFrame, context.originalTab)
+				if BetterFriendsFrame_ShowBottomTab then
+					BetterFriendsFrame_ShowBottomTab(context.originalTab)
+				end
+				if context.originalTab == 1 and context.originalTopTab and BetterFriendsFrame_ShowTab then
+					BetterFriendsFrame_ShowTab(context.originalTopTab)
+				end
 			end
 		end
 	end
@@ -13631,6 +13673,223 @@ function TestSuite:RegisterLateUITests()
 			multiAccountRow:Hide()
 			V:AssertEqual(TagChips:GetRowAnchor(owner), owner.Info, "tag chips should otherwise sit below friend info")
 			owner:Hide()
+		end,
+	})
+
+	self:RegisterTest("data", "FriendTags_AssignmentVersionTracksBattleNetCharacterAlias", {
+		description = "Friend tag assignment invalidation should retain Battle.net character aliases without building a UID list on the row hotpath",
+		action = function(V)
+			local FriendTags = BFL:GetModule("FriendTags")
+			V:AssertNotNil(FriendTags, "FriendTags module should exist")
+
+			local originalVersions = FriendTags.friendAssignmentVersions
+			local originalAllVersion = FriendTags.allFriendAssignmentsVersion
+			local originalGlobalVersion = BFL.FriendTagsAssignmentVersion
+			local originalFriendsVersion = BFL.FriendsListVersion
+			local friend = {
+				type = "bnet",
+				battleTag = "AliasProbe#1234",
+				gameAccountInfo = {
+					characterName = "AliasProbe",
+					realmName = "TestRealm",
+				},
+			}
+			local ok, err = pcall(function()
+				local characterUID
+				for _, uid in ipairs(FriendTags:GetRelatedFriendUIDs(friend)) do
+					if uid:match("^wow_") then
+						characterUID = uid
+						break
+					end
+				end
+				V:AssertNotNil(characterUID, "Battle.net character alias should be discoverable")
+
+				FriendTags.friendAssignmentVersions = { [characterUID] = 37 }
+				FriendTags.allFriendAssignmentsVersion = 0
+				BFL.FriendTagsAssignmentVersion = 37
+				BFL.FriendsListVersion = (BFL.FriendsListVersion or 0) + 1
+				V:AssertEqual(
+					FriendTags:GetFriendAssignmentVersion(friend),
+					37,
+					"Character alias should invalidate its Battle.net friend row"
+				)
+			end)
+			FriendTags.friendAssignmentVersions = originalVersions
+			FriendTags.allFriendAssignmentsVersion = originalAllVersion
+			BFL.FriendTagsAssignmentVersion = originalGlobalVersion
+			BFL.FriendsListVersion = originalFriendsVersion
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "SkinEngine_DesaturationCacheRecoversExternalReset", {
+		description = "Dark texture updates should skip identical work but repair native desaturation resets",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+
+			local owner = {}
+			local texture = { desaturated = false, calls = 0 }
+			function texture:IsDesaturated()
+				return self.desaturated
+			end
+			function texture:SetDesaturated(value)
+				self.desaturated = value == true
+				self.calls = self.calls + 1
+			end
+
+			local ok, err = pcall(function()
+				SkinEngine:SetTextureDesaturated(owner, texture, true)
+				SkinEngine:SetTextureDesaturated(owner, texture, true)
+				V:AssertEqual(texture.calls, 1, "Identical desaturation should be applied once")
+
+				texture.desaturated = false
+				SkinEngine:SetTextureDesaturated(owner, texture, true)
+				V:AssertEqual(texture.calls, 2, "A native reset should be detected and repaired")
+				V:Assert(texture.desaturated, "Repaired texture should be desaturated again")
+			end)
+			SkinEngine.registry[owner] = nil
+			owner.BFL_DarkSkin = nil
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "SkinEngine_BackdropCachePreservesStateAndRepairsReset", {
+		description = "Dark backdrop caching should preserve managed hover colors and repair external color resets",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			if not (SkinEngine and CreateFrame) then
+				V:Skip("Frame creation is unavailable")
+				return
+			end
+
+			local owner = CreateFrame("Frame", nil, UIParent)
+			owner:SetSize(20, 20)
+			owner:Hide()
+			local backdrop = SkinEngine:CreateBackdrop(owner, "control")
+			if not (backdrop and backdrop.SetBackdropColor and backdrop.GetBackdropColor) then
+				SkinEngine:RestoreFrame(owner)
+				V:Skip("Backdrop color APIs are unavailable")
+				return
+			end
+
+			local managedBg = { 0.21, 0.22, 0.23, 0.24 }
+			local managedBorder = { 0.31, 0.32, 0.33, 0.34 }
+			SkinEngine:StyleBackdrop(owner, managedBg, managedBorder)
+			SkinEngine:CreateBackdrop(owner, "control")
+			local r, g, b, a = backdrop:GetBackdropColor()
+			V:Assert(
+				r == managedBg[1] and g == managedBg[2] and b == managedBg[3] and a == managedBg[4],
+				"Managed backdrop state should survive a cache hit"
+			)
+
+			backdrop:SetBackdropColor(0.9, 0.8, 0.7, 0.6)
+			SkinEngine:CreateBackdrop(owner, "control")
+			r, g, b, a = backdrop:GetBackdropColor()
+			V:Assert(
+				r == managedBg[1] and g == managedBg[2] and b == managedBg[3] and a == managedBg[4],
+				"External backdrop reset should be repaired"
+			)
+			SkinEngine:RestoreFrame(owner)
+			SkinEngine.registry[owner] = nil
+		end,
+	})
+
+	self:RegisterTest("data", "SkinEngine_DisabledFlatInviteKeepsDisabledAlpha", {
+		description = "Cached Dark-theme invite refreshes should preserve the disabled icon alpha",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+
+			local actionIcon = {
+				alpha = 1,
+				desaturated = false,
+				shown = true,
+				vertexR = 1,
+				vertexG = 1,
+				vertexB = 1,
+				vertexA = 1,
+			}
+			function actionIcon:GetWidth()
+				return 24
+			end
+			function actionIcon:GetAtlas()
+				return "BFL-Test-Invite"
+			end
+			function actionIcon:GetTexture()
+				return nil
+			end
+			function actionIcon:IsDesaturated()
+				return self.desaturated
+			end
+			function actionIcon:SetDesaturated(desaturated)
+				self.desaturated = desaturated == true
+			end
+			function actionIcon:GetVertexColor()
+				return self.vertexR, self.vertexG, self.vertexB, self.vertexA
+			end
+			function actionIcon:SetVertexColor(r, g, b, a)
+				self.vertexR, self.vertexG, self.vertexB, self.vertexA = r, g, b, a
+			end
+			function actionIcon:GetAlpha()
+				return self.alpha
+			end
+			function actionIcon:SetAlpha(alpha)
+				self.alpha = alpha
+			end
+			function actionIcon:Show()
+				self.shown = true
+			end
+
+			local colorVersion = SkinEngine.themeColorVersion or 0
+			local button = {
+				ActionIcon = actionIcon,
+				BFL_DarkForceFlatButton = true,
+				BFL_DarkIconButtonSkinned = true,
+				BFL_DarkBorderlessIconButton = true,
+				BFL_DarkIcon = actionIcon,
+				BFL_DarkFlatActionIcon = actionIcon,
+				BFL_DarkFlatIconSize = 24,
+				BFL_DarkFlatIconAtlas = "BFL-Test-Invite",
+				BFL_DarkFlatColorVersion = colorVersion,
+				BFL_DarkButtonStateKey = "icon:" .. tostring(colorVersion) .. "::0:0:0:",
+			}
+			function button:IsEnabled()
+				return false
+			end
+			function button:IsShown()
+				return true
+			end
+
+			local row = {
+				BFL_DarkRowSkinned = true,
+				BFL_DarkNoRowHighlight = false,
+				BFL_DarkRowStateKey = tostring(colorVersion) .. ":normal:",
+				travelPassButton = button,
+				BFL_DarkTravelPassRowButton = button,
+				BFL_DarkTravelPassRowShown = true,
+				BFL_DarkTravelPassRowEnabled = false,
+			}
+
+			local originalActive = SkinEngine.active
+			local originalTheme = SkinEngine.activeTheme
+			local ok, err = pcall(function()
+				SkinEngine.active = true
+				SkinEngine.activeTheme = "dark"
+				SkinEngine:RefreshRow(row)
+				V:AssertEqual(actionIcon.alpha, 0.35, "Disabled invite icon alpha should survive cached row refreshes")
+			end)
+			SkinEngine.active = originalActive
+			SkinEngine.activeTheme = originalTheme
+			SkinEngine.registry[button] = nil
+			button.BFL_DarkSkin = nil
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 end

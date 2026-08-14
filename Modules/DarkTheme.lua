@@ -933,7 +933,7 @@ end
 local function GetMainFrameStaticSkinKey(frame)
 	local header = frame and frame.FriendsTabHeader
 	local bnetFrame = header and header.BattlenetFrame
-	local broadcast = header and header.BroadcastFrame
+	local broadcast = bnetFrame and bnetFrame.BroadcastFrame
 	return BuildSkinKey(
 		frame,
 		frame and frame.Inset,
@@ -1117,6 +1117,15 @@ function DarkTheme:SkinMainContentForTabs(engine, frame, bottomTabIndex, topTabI
 end
 
 function DarkTheme:RefreshVisibleMainContentDeferred(bottomTabIndex, topTabIndex)
+	-- Modern layout performs one final visible-content skin pass after native tab
+	-- setup. The legacy tab functions are still called for data selection, but
+	-- must not enqueue a second full-frame skin pass for the same section change.
+	if IsModernFriendsUIActive() then
+		self.visibleMainContentRefreshPending = nil
+		self.visibleMainContentRefreshBottomTab = nil
+		self.visibleMainContentRefreshTopTab = nil
+		return
+	end
 	local engine = GetEngine()
 	if not engine or not engine:IsActive() then
 		self.visibleMainContentRefreshPending = nil
@@ -1143,6 +1152,9 @@ function DarkTheme:RefreshVisibleMainContentDeferred(bottomTabIndex, topTabIndex
 		local pendingTopTab = self.visibleMainContentRefreshTopTab
 		self.visibleMainContentRefreshBottomTab = nil
 		self.visibleMainContentRefreshTopTab = nil
+		if IsModernFriendsUIActive() then
+			return
+		end
 		local delayedEngine = GetEngine()
 		local frame = _G.BetterFriendsFrame
 		if delayedEngine and delayedEngine:IsActive() and frame then
@@ -1515,21 +1527,22 @@ function DarkTheme:SkinMainFrame(engine)
 
 		local header = frame.FriendsTabHeader
 		if header then
+			local bnetFrame = header.BattlenetFrame
 			engine:SkinFrame(header, "panel")
 			SkinField(engine, header, "BattlenetFrame", "panel")
-			SkinField(engine, header, "BroadcastFrame", "popup")
-			if header.BroadcastFrame then
-				SkinEditBoxField(engine, header.BroadcastFrame, "EditBox")
-				SkinButtonField(engine, header.BroadcastFrame, "UpdateButton")
-				SkinButtonField(engine, header.BroadcastFrame, "CancelButton")
+			SkinField(engine, bnetFrame, "BroadcastFrame", "popup")
+			if bnetFrame and bnetFrame.BroadcastFrame then
+				SkinEditBoxField(engine, bnetFrame.BroadcastFrame, "EditBox")
+				SkinButtonField(engine, bnetFrame.BroadcastFrame, "UpdateButton")
+				SkinButtonField(engine, bnetFrame.BroadcastFrame, "CancelButton")
 			end
 			SkinDropdownField(engine, header, "StatusDropdown")
 			SkinEditBoxField(engine, header, "SearchBox")
 			SkinDropdownField(engine, header, "QuickFilterDropdown")
 			SkinDropdownField(engine, header, "PrimarySortDropdown")
 			SkinDropdownField(engine, header, "SecondarySortDropdown")
-			SkinButtonField(engine, header.BattlenetFrame, "ContactsMenuButton")
-			SkinButtonField(engine, header.BattlenetFrame, "SettingsButton")
+			SkinButtonField(engine, bnetFrame, "ContactsMenuButton")
+			SkinButtonField(engine, bnetFrame, "SettingsButton")
 		end
 	end
 
@@ -1730,6 +1743,7 @@ function DarkTheme:SkinModernVisibleMainContent(engine, frame)
 	local requests = root and root.RequestsFrame
 	if requests then
 		SkinModernScrollBar(engine, requests.ScrollBar)
+		SkinModernScrollBar(engine, requests.RealIDWarning and requests.RealIDWarning.ScrollBar)
 	end
 
 	local recent = frame.RecentAlliesFrame

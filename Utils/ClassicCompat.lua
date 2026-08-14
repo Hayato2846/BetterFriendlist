@@ -1421,13 +1421,12 @@ function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize
 	end
 
 	if texture.SetAtlas and HasAtlas(atlasName) then
-		local success = pcall(function()
-			if useAtlasSize ~= nil then
-				texture:SetAtlas(atlasName, useAtlasSize)
-			else
-				texture:SetAtlas(atlasName)
-			end
-		end)
+		local success
+		if useAtlasSize ~= nil then
+			success = pcall(texture.SetAtlas, texture, atlasName, useAtlasSize)
+		else
+			success = pcall(texture.SetAtlas, texture, atlasName)
+		end
 		if success then
 			return true
 		end

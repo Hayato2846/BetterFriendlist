@@ -457,6 +457,13 @@ function ElvUISkin:RegisterSkin()
 	if not E then
 		return false
 	end
+	-- Theme resolution may have cached the Blizzard fallback before ElvUI
+	-- finished initializing. Availability changes are rare, explicit lifecycle
+	-- events; invalidate here instead of probing ElvUI on every theme lookup.
+	local ThemeManager = BFL:GetModule("ThemeManager")
+	if ThemeManager and ThemeManager.InvalidateEffectiveTheme then
+		ThemeManager:InvalidateEffectiveTheme()
+	end
 
 	local isEnabled = self:IsSkinEnabled()
 	if not isEnabled then
@@ -3091,6 +3098,28 @@ local function EnsureTransparentBackdrop(frame, inset)
 	return frame.backdrop
 end
 
+local function GetModernElvUIBackdropColors(E)
+	local bgR, bgG, bgB = GetElvUIColor(E and E.media and E.media.backdropcolor, 0.06, 0.06, 0.06, 1)
+	local borderR, borderG, borderB = GetElvUIColor(E and E.media and E.media.bordercolor, 0.18, 0.18, 0.18, 1)
+	return bgR, bgG, bgB, borderR, borderG, borderB
+end
+
+local function BackdropColorMatches(surface, getterName, r, g, b, a)
+	local getter = surface and surface[getterName]
+	if type(getter) ~= "function" then
+		return nil
+	end
+	local ok, currentR, currentG, currentB, currentA = pcall(getter, surface)
+	if not ok then
+		return nil
+	end
+	local epsilon = 0.001
+	return math.abs((currentR or 0) - r) <= epsilon
+		and math.abs((currentG or 0) - g) <= epsilon
+		and math.abs((currentB or 0) - b) <= epsilon
+		and math.abs((currentA == nil and 1 or currentA) - (a == nil and 1 or a)) <= epsilon
+end
+
 local function ApplyModernElvUIBackdrop(E, control, overrideR, overrideG, overrideB)
 	if not control then
 		return nil
@@ -3107,13 +3136,35 @@ local function ApplyModernElvUIBackdrop(E, control, overrideR, overrideG, overri
 		return nil
 	end
 
-	local bgR, bgG, bgB = GetElvUIColor(E and E.media and E.media.backdropcolor, 0.06, 0.06, 0.06, 1)
-	local borderR, borderG, borderB = GetElvUIColor(E and E.media and E.media.bordercolor, 0.18, 0.18, 0.18, 1)
-	if surface.SetBackdropColor then
-		surface:SetBackdropColor(overrideR or bgR, overrideG or bgG, overrideB or bgB, 1)
+	local bgR, bgG, bgB, borderR, borderG, borderB = GetModernElvUIBackdropColors(E)
+	local appliedR, appliedG, appliedB = overrideR or bgR, overrideG or bgG, overrideB or bgB
+	local backdropMatches = BackdropColorMatches(surface, "GetBackdropColor", appliedR, appliedG, appliedB, 1)
+	if
+		surface.SetBackdropColor
+		and (backdropMatches == false
+			or (backdropMatches == nil
+				and (surface.BFL_ElvUIBackdropR ~= appliedR
+			or surface.BFL_ElvUIBackdropG ~= appliedG
+			or surface.BFL_ElvUIBackdropB ~= appliedB)))
+	then
+		surface:SetBackdropColor(appliedR, appliedG, appliedB, 1)
+		surface.BFL_ElvUIBackdropR = appliedR
+		surface.BFL_ElvUIBackdropG = appliedG
+		surface.BFL_ElvUIBackdropB = appliedB
 	end
-	if surface.SetBackdropBorderColor then
+	local borderMatches = BackdropColorMatches(surface, "GetBackdropBorderColor", borderR, borderG, borderB, 1)
+	if
+		surface.SetBackdropBorderColor
+		and (borderMatches == false
+			or (borderMatches == nil
+				and (surface.BFL_ElvUIBorderR ~= borderR
+			or surface.BFL_ElvUIBorderG ~= borderG
+			or surface.BFL_ElvUIBorderB ~= borderB)))
+	then
 		surface:SetBackdropBorderColor(borderR, borderG, borderB, 1)
+		surface.BFL_ElvUIBorderR = borderR
+		surface.BFL_ElvUIBorderG = borderG
+		surface.BFL_ElvUIBorderB = borderB
 	end
 	-- Some BackdropTemplate controls expose SetBackdropColor on the control
 	-- itself. Showing that surface would also show the entire control and can
@@ -3578,7 +3629,7 @@ function ElvUISkin:SkinModernSocialCard(S, button)
 		end
 		button.FactionTint:Hide()
 	end
-	local _, bgR, bgG, bgB = ApplyModernElvUIBackdrop(self.ElvUIEngine, button)
+	local bgR, bgG, bgB = GetModernElvUIBackdropColors(self.ElvUIEngine)
 	if factionR and factionG and factionB and backdrop then
 		local factionMix = 0.22
 		ApplyModernElvUIBackdrop(
@@ -3588,6 +3639,8 @@ function ElvUISkin:SkinModernSocialCard(S, button)
 			bgG * (1 - factionMix) + factionG * factionMix,
 			bgB * (1 - factionMix) + factionB * factionMix
 		)
+	else
+		ApplyModernElvUIBackdrop(self.ElvUIEngine, button)
 	end
 
 	local highlight = button.highlight or button.Highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
@@ -3752,9 +3805,6 @@ function ElvUISkin:SkinModernFrames(E, S, frame, FriendsUI)
 	end
 
 	self.lastAppliedStyle = "modern"
-	if FriendsUI.ApplyModernContentLayout then
-		FriendsUI:ApplyModernContentLayout(FriendsUI:GetSelectedSection() or "friends", true)
-	end
 
 	if not frame.BFL_ElvUIModernFrameSkinned then
 		CallElvUIHandler(S, "HandlePortraitFrame", frame)
@@ -3895,10 +3945,7 @@ function ElvUISkin:SkinModernFrames(E, S, frame, FriendsUI)
 
 	local ignoreWindow = frame.IgnoreListWindow
 	if ignoreWindow then
-		CallElvUIHandler(S, "HandlePortraitFrame", ignoreWindow)
-		self:SkinModernButton(S, ignoreWindow.UnignorePlayerButton)
-		self:SkinModernButton(S, ignoreWindow.GlobalIgnoreListButton)
-		self:SkinModernButton(S, ignoreWindow.EnhanceQoLIgnoreButton)
+		self:SkinIgnoreListWindow(ignoreWindow, E, S)
 	end
 
 	local FriendsList = BFL:GetModule("FriendsList")
@@ -3906,6 +3953,7 @@ function ElvUISkin:SkinModernFrames(E, S, frame, FriendsUI)
 		frame.MinimalScrollBar,
 		frame.RecentAlliesFrame and frame.RecentAlliesFrame.ScrollBar,
 		root.RequestsFrame and root.RequestsFrame.ScrollBar,
+		root.RequestsFrame and root.RequestsFrame.RealIDWarning and root.RequestsFrame.RealIDWarning.ScrollBar,
 		quickJoinInset and quickJoinInset.ScrollBar,
 		raf and raf.RecruitList and raf.RecruitList.ScrollBar,
 		who and who.ScrollBar,
@@ -3985,6 +4033,29 @@ function ElvUISkin:RegisterTests()
 			}
 			ApplyModernElvUIBackdrop({}, hiddenControl)
 			V:Assert(not controlShown, "ElvUI backdrop refresh does not resurrect hidden controls")
+
+			local backdropState = { r = 0, g = 0, b = 0, borderR = 0, borderG = 0, borderB = 0 }
+			local repaired = {
+				SetBackdropColor = function(_, r, g, b)
+					backdropState.r, backdropState.g, backdropState.b = r, g, b
+				end,
+				GetBackdropColor = function()
+					return backdropState.r, backdropState.g, backdropState.b, 1
+				end,
+				SetBackdropBorderColor = function(_, r, g, b)
+					backdropState.borderR, backdropState.borderG, backdropState.borderB = r, g, b
+				end,
+				GetBackdropBorderColor = function()
+					return backdropState.borderR, backdropState.borderG, backdropState.borderB, 1
+				end,
+			}
+			local engine = { media = { backdropcolor = { 0.1, 0.2, 0.3 }, bordercolor = { 0.4, 0.5, 0.6 } } }
+			ApplyModernElvUIBackdrop(engine, repaired)
+			backdropState.r, backdropState.g, backdropState.b = 0.9, 0.8, 0.7
+			backdropState.borderR, backdropState.borderG, backdropState.borderB = 0.7, 0.8, 0.9
+			ApplyModernElvUIBackdrop(engine, repaired)
+			V:AssertEqual(backdropState.r, 0.1, "ElvUI refresh repairs same-object backdrop drift")
+			V:AssertEqual(backdropState.borderB, 0.6, "ElvUI refresh repairs same-object border drift")
 		end,
 	})
 
@@ -4032,6 +4103,7 @@ function ElvUISkin:RegisterTests()
 				V:Assert(not button.backdrop or not button.backdrop:IsShown(), "Modern header icon buttons remain borderless")
 			end
 			local previousTab
+			local selectedTabCount = 0
 			for _, tab in ipairs(FriendsUI.sideTabs or {}) do
 				if tab:IsShown() then
 					V:AssertEqual(tab:GetWidth(), 30, "Modern ElvUI side tabs match SocialUI width")
@@ -4041,6 +4113,16 @@ function ElvUISkin:RegisterTests()
 						V:Assert(tab.ThemeGlow and tab.ThemeGlow:IsShown(), "Modern ElvUI keeps the fitted request glow functional")
 					else
 						V:Assert(not tab.ThemeGlow or not tab.ThemeGlow:IsShown(), "Modern ElvUI hides idle request glows")
+					end
+					local selected = tab.sectionID == FriendsUI.selectedSection
+					local selectedTextureShown = tab.SelectedTexture and tab.SelectedTexture:IsShown() or false
+					V:AssertEqual(
+						selectedTextureShown,
+						selected,
+						"Modern ElvUI exposes the selected texture only for the active side tab"
+					)
+					if selectedTextureShown then
+						selectedTabCount = selectedTabCount + 1
 					end
 					local tabPoint, tabRelativeTo, tabRelativePoint, tabX, tabY = tab:GetPoint(1)
 					V:AssertEqual(tabPoint, "TOPLEFT", "Modern ElvUI side tabs use top-left chaining")
@@ -4058,7 +4140,52 @@ function ElvUISkin:RegisterTests()
 					previousTab = tab
 				end
 			end
+			V:AssertEqual(selectedTabCount, 1, "Modern ElvUI keeps exactly one visible side tab selected")
 			V:AssertEqual(self.lastAppliedStyle, "modern", "Modern ElvUI uses the dedicated skin pipeline")
 		end,
 	})
+end
+
+function ElvUISkin:SkinIgnoreListWindow(ignoreWindow, E, S)
+	if not self:IsSkinEnabled() or not ignoreWindow then
+		return false
+	end
+	E = E or self.ElvUIEngine or (BFL.GetElvUIEngine and BFL:GetElvUIEngine(false))
+	S = S or self.ElvUISkinProxy or (E and E.GetModule and E:GetModule("Skins"))
+	if not S then
+		return false
+	end
+
+	if not ignoreWindow.BFL_ElvUIIgnoreListSkinned then
+		CallElvUIHandler(S, "HandlePortraitFrame", ignoreWindow)
+		if ignoreWindow.Inset then
+			if ignoreWindow.Inset.StripTextures then
+				ignoreWindow.Inset:StripTextures()
+			end
+			if ignoreWindow.Inset.CreateBackdrop then
+				ignoreWindow.Inset:CreateBackdrop("Transparent")
+			end
+		end
+		SkinScrollBar(S, ignoreWindow.ScrollBar or ignoreWindow.ClassicScrollBar)
+		ignoreWindow.BFL_ElvUIIgnoreListSkinned = true
+	end
+
+	for _, button in ipairs({
+		ignoreWindow.UnignorePlayerButton,
+		ignoreWindow.GlobalIgnoreListButton,
+		ignoreWindow.EnhanceQoLIgnoreButton,
+	}) do
+		if button and button.IsObjectType and button:IsObjectType("Button") then
+			if not button.BFL_ElvUIIgnoreButtonSkinned then
+				CallElvUIHandler(S, "HandleButton", button)
+				button.BFL_ElvUIIgnoreButtonSkinned = true
+			end
+			if button.Icon then
+				button.Icon:SetDrawLayer("OVERLAY")
+				button.Icon:SetAlpha(1)
+				button.Icon:Show()
+			end
+		end
+	end
+	return true
 end

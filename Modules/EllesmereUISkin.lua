@@ -320,6 +320,10 @@ function EllesmereUISkin:SkinModernFriendCard(button)
 	-- EUIFriends uses a restrained 10% black tile rather than Blizzard's
 	-- sculpted friends-card atlas. Exchange only the visible surface and hover
 	-- treatment; BFL continues to own row geometry, fonts, and action buttons.
+	-- FriendsUI deliberately rebuilds the native card, faction, hover, and
+	-- locked-selection layers for every recycled-row update. These four visual
+	-- values therefore must remain a cheap dynamic pass; caching them by palette
+	-- version leaves the native card visible as soon as the row is reused.
 	if button.CardBackground then
 		button.CardBackground:SetAlpha(0)
 	end
@@ -377,6 +381,10 @@ function EllesmereUISkin:SkinActionButton(button, keepKeys)
 	if not self:IsSkinEnabled() or not button then
 		return
 	end
+	-- Action controls are few and this function only runs in a coalesced frame
+	-- skin pass. Let EUI's idempotent facade validate its owned surface each time;
+	-- a palette/object marker cannot detect a native mixin rebuilding the same
+	-- button's regions or an external skin removing its generated backdrop.
 	SafeCall(self.facade, "Button", button, keepKeys)
 	SafeCall(self.facade, "StateButtonLabel", button)
 	HideNativeButtonChrome(button)
@@ -596,7 +604,9 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	if not root then
 		return
 	end
-
+	-- This pass is already coalesced by ScheduleMainFrameRefresh. Do not cache it
+	-- by object identity: Blizzard restores template artwork and button state on
+	-- the same control instances during tab changes and frame reopen.
 	self:SkinTabSearchFields(frame)
 	SafeCall(api, "Dropdown", header and header.StatusDropdown)
 	SafeCall(api, "Dropdown", root.FilterBar and root.FilterBar.FilterDropdown)
@@ -607,6 +617,9 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	SafeCall(api, "Dropdown", who and who.ColumnDropdown)
 	SafeCall(api, "Button", root.BattleNetBar and root.BattleNetBar.MenuButton, { "Icon" })
 	self:SkinFooterActionButton(root.BottomActionBar and root.BottomActionBar.AddFriendButton)
+	self:SkinActionButton(
+		root.RequestsFrame and root.RequestsFrame.RealIDWarning and root.RequestsFrame.RealIDWarning.ContinueButton
+	)
 
 	-- Keep the EUI pass intentionally allowlisted. Row hit targets, group
 	-- headers, invite buttons, and side-tab backgrounds remain native in Modern.
@@ -688,6 +701,7 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 		SafeCall(self.facade, "Shell", frame)
 		SkinWidgetTree(self.facade, frame, 7)
 	end
+	self:SkinIgnoreListWindow(_G.BetterFriendsFrame and _G.BetterFriendsFrame.IgnoreListWindow)
 
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
@@ -696,6 +710,45 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 		SkinWidgetTree(self.facade, WhoFrame.builderFlyout, 5)
 		SkinWidgetTree(self.facade, WhoFrame.builderDockedContainer, 5)
 	end
+end
+
+function EllesmereUISkin:RefreshModernPortraitCorner(frame)
+	if not self:IsSkinEnabled() or not frame or not self:IsModernInterfaceActive() then
+		return false
+	end
+	-- PortraitFrameMixin rebuilds the top-left NineSlice when
+	-- SetPortraitShown() runs. EUI's Shell primitive is intentionally
+	-- idempotent and therefore does not re-fade that newly restored artwork on
+	-- a cached shell. Use the dedicated visual-only primitive for this dynamic
+	-- layer instead of rebuilding the entire shell and all of its controls.
+	SafeCall(self.facade, "FadeNineSlice", frame.NineSlice)
+	for _, region in ipairs({
+		frame.portrait,
+		frame.PortraitIcon,
+		frame.PortraitMask,
+	}) do
+		if region and region.SetAlpha then
+			region:SetAlpha(0)
+		end
+	end
+	if frame.PortraitContainer and frame.PortraitContainer.SetAlpha then
+		frame.PortraitContainer:SetAlpha(0)
+	end
+	return true
+end
+
+function EllesmereUISkin:SkinIgnoreListWindow(frame)
+	if not self:IsSkinEnabled() or not frame then
+		return false
+	end
+	local api = self.facade
+	SafeCall(api, "Shell", frame)
+	SafeCall(api, "Inset", frame.Inset)
+	-- EUI intentionally keeps BFL's native scrollbar treatment.
+	self:SkinActionButton(frame.UnignorePlayerButton)
+	self:SkinIconButton(frame.GlobalIgnoreListButton)
+	self:SkinIconButton(frame.EnhanceQoLIgnoreButton)
+	return true
 end
 
 function EllesmereUISkin:SkinAppearanceOnboarding(frame, onboarding)
@@ -761,12 +814,57 @@ function EllesmereUISkin:SkinMainFrame(frame)
 		return
 	end
 	local api = self.facade
-	SafeCall(api, "Shell", frame, { bottomBar = 80, noBorder = true })
-	SafeCall(api, "Inset", frame.Inset)
-	SafeCall(api, "CloseButton", frame.CloseButton)
-
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local modern = self:IsModernInterfaceActive()
+	local who = frame.WhoFrame
+	local guild = frame.GuildFrame
+	local raid = frame.RaidFrame
+	local quickJoin = frame.QuickJoinFrame
+	local paletteVersion = self:GetPaletteVersion()
+	local previous = frame.BFL_EllesmereMainShellSkinState
+	local staticChromeUnchanged = modern
+		and previous
+		and previous.paletteVersion == paletteVersion
+		and previous.inset == frame.Inset
+		and previous.closeButton == frame.CloseButton
+		and previous.whoInset == (who and who.ListInset)
+		and previous.guildInset == (guild and guild.ListInset)
+		and previous.raidInset == (raid and raid.GroupsInset)
+		and previous.quickJoinInset == (quickJoin and quickJoin.ContentInset)
+	if not staticChromeUnchanged then
+		SafeCall(api, "Shell", frame, { bottomBar = 80, noBorder = true })
+		SafeCall(api, "Inset", frame.Inset)
+		SafeCall(api, "CloseButton", frame.CloseButton)
+		SafeCall(api, "Inset", who and who.ListInset)
+		SafeCall(api, "Inset", guild and guild.ListInset)
+		SafeCall(api, "Inset", raid and raid.GroupsInset)
+		SafeCall(api, "Inset", quickJoin and quickJoin.ContentInset)
+		if modern then
+			frame.BFL_EllesmereMainShellSkinState = {
+				paletteVersion = paletteVersion,
+				inset = frame.Inset,
+				closeButton = frame.CloseButton,
+				whoInset = who and who.ListInset,
+				guildInset = guild and guild.ListInset,
+				raidInset = raid and raid.GroupsInset,
+				quickJoinInset = quickJoin and quickJoin.ContentInset,
+			}
+		end
+	end
+	-- Same-object native reinitialization is invisible to the static shell key.
+	-- Fade only the native NineSlice layers on every coalesced refresh while the
+	-- expensive facade Shell/Inset construction remains cached.
+	local function FadeNativeSurface(nativeSurface)
+		if nativeSurface then
+			SafeCall(api, "FadeNineSlice", nativeSurface)
+		end
+	end
+	FadeNativeSurface(frame.NineSlice)
+	FadeNativeSurface(frame.Inset and (frame.Inset.NineSlice or frame.Inset))
+	FadeNativeSurface(who and who.ListInset and (who.ListInset.NineSlice or who.ListInset))
+	FadeNativeSurface(guild and guild.ListInset and (guild.ListInset.NineSlice or guild.ListInset))
+	FadeNativeSurface(raid and raid.GroupsInset and (raid.GroupsInset.NineSlice or raid.GroupsInset))
+	FadeNativeSurface(quickJoin and quickJoin.ContentInset and (quickJoin.ContentInset.NineSlice or quickJoin.ContentInset))
 	if modern then
 		-- PortraitFrameMixin can restore the native portrait ring late in its
 		-- OnShow chain. Keep the focused EUI refresh responsible for restoring
@@ -774,6 +872,7 @@ function EllesmereUISkin:SkinMainFrame(frame)
 		if FriendsUI.ApplyModernPortrait then
 			FriendsUI:ApplyModernPortrait()
 		end
+		self:RefreshModernPortraitCorner(frame)
 		self:SetLegacyPortraitShown(frame, false)
 	else
 		self:SkinLegacyPortrait(frame)
@@ -783,14 +882,6 @@ function EllesmereUISkin:SkinMainFrame(frame)
 		end
 	end
 
-	local who = frame.WhoFrame
-	local guild = frame.GuildFrame
-	local raid = frame.RaidFrame
-	local quickJoin = frame.QuickJoinFrame
-	SafeCall(api, "Inset", who and who.ListInset)
-	SafeCall(api, "Inset", guild and guild.ListInset)
-	SafeCall(api, "Inset", raid and raid.GroupsInset)
-	SafeCall(api, "Inset", quickJoin and quickJoin.ContentInset)
 	if modern then
 		self:SkinModernChrome(frame, FriendsUI)
 	else
@@ -935,7 +1026,6 @@ function EllesmereUISkin:InstallHooks()
 	end
 
 	HookMainFrameObject(BFL:GetModule("FriendsUI"), "FriendsUI", "ApplyModernContentLayout")
-	HookMainFrameObject(BFL:GetModule("FriendsUI"), "FriendsUI", "RefreshModernSideTabSelection")
 	HookObject(BFL:GetModule("Changelog"), "Changelog", "CreateChangelogWindow")
 	HookObject(BFL.HelpFrame, "HelpFrame", "CreateFrame")
 	HookObject(BFL:GetModule("Settings"), "Settings", "CreateExportFrame")

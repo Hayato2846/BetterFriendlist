@@ -93,6 +93,17 @@ local FONT_FLAG_ALIASES = {
 	THINOUTLINE = "OUTLINE",
 }
 
+-- Font flags are applied to every visible friend row. Keep the public set
+-- helpers mutable, but cache the canonical strings used by the render path so
+-- repeated SafeSetFont calls do not allocate parser and serializer tables.
+local NORMALIZED_FONT_FLAG_CACHE = {
+	[""] = "",
+	NONE = "",
+	NORMAL = "",
+}
+local RUNTIME_FONT_FLAG_CACHE = {}
+local DEFAULT_UI_FONT_FLAG_CACHE = {}
+
 local function GetFontFlagSet(flags)
 	local flagSet = {}
 	if flags == nil then
@@ -125,7 +136,15 @@ local function SerializeFontFlags(flagSet)
 end
 
 function FontManager:NormalizeFontFlags(flags)
-	return SerializeFontFlags(GetFontFlagSet(flags))
+	local cacheKey = tostring(flags or "")
+	local cached = NORMALIZED_FONT_FLAG_CACHE[cacheKey]
+	if cached ~= nil then
+		return cached
+	end
+
+	local normalized = SerializeFontFlags(GetFontFlagSet(cacheKey))
+	NORMALIZED_FONT_FLAG_CACHE[cacheKey] = normalized
+	return normalized
 end
 
 function FontManager:GetFontFlagSet(flags)
@@ -185,15 +204,33 @@ function FontManager:IsSlugRenderingAvailable()
 end
 
 function FontManager:GetFontFlags(flags)
-	local flagSet = GetFontFlagSet(flags)
-	if flagSet.SLUG and not self:IsSlugRenderingAvailable() then
-		flagSet.SLUG = nil
+	local normalized = self:NormalizeFontFlags(flags)
+	local cached = RUNTIME_FONT_FLAG_CACHE[normalized]
+	if cached ~= nil then
+		return cached
 	end
-	return SerializeFontFlags(flagSet)
+
+	local resolved = normalized
+	if normalized:find("SLUG", 1, true) and not self:IsSlugRenderingAvailable() then
+		resolved = self:RemoveFontFlag(normalized, "SLUG")
+	end
+	RUNTIME_FONT_FLAG_CACHE[normalized] = resolved
+	return resolved
 end
 
 function FontManager:GetDefaultUIFontFlags(flags)
-	return self:GetFontFlags(self:AddFontFlag(flags, "SLUG"))
+	local resolved = self:GetFontFlags(flags)
+	local cached = DEFAULT_UI_FONT_FLAG_CACHE[resolved]
+	if cached ~= nil then
+		return cached
+	end
+
+	local defaultFlags = resolved
+	if self:IsSlugRenderingAvailable() and not resolved:find("SLUG", 1, true) then
+		defaultFlags = self:AddFontFlag(resolved, "SLUG")
+	end
+	DEFAULT_UI_FONT_FLAG_CACHE[resolved] = defaultFlags
+	return defaultFlags
 end
 
 function FontManager:SafeSetFont(fontObject, fontPath, fontSize, flags)

@@ -26,6 +26,34 @@ function IgnoreList:Initialize()
 	-- Nothing to initialize yet
 end
 
+function IgnoreList:ApplyTheme(frame)
+	frame = frame or (BetterFriendsFrame and BetterFriendsFrame.IgnoreListWindow)
+	if not frame then
+		return false
+	end
+
+	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
+	if theme == "dark" or theme == "custom" then
+		local engine = BFL:GetModule("SkinEngine")
+		local DarkTheme = BFL:GetModule("DarkTheme")
+		if engine and engine.IsActive and engine:IsActive() and DarkTheme and DarkTheme.SkinIgnoreList then
+			DarkTheme:SkinIgnoreList(engine)
+			return true
+		end
+	elseif theme == "elvui" then
+		local ElvUISkin = BFL:GetModule("ElvUISkin")
+		if ElvUISkin and ElvUISkin.SkinIgnoreListWindow then
+			return ElvUISkin:SkinIgnoreListWindow(frame) == true
+		end
+	elseif theme == "ellesmereui" then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		if EllesmereUISkin and EllesmereUISkin.SkinIgnoreListWindow then
+			return EllesmereUISkin:SkinIgnoreListWindow(frame) == true
+		end
+	end
+	return theme == "blizzard"
+end
+
 -- Initialize Ignore List Window (FriendsIgnoreListMixin:OnLoad)
 function IgnoreList:OnLoad(frame)
 	-- Set up frame visuals matching Blizzard's InitializeFrameVisuals
@@ -34,6 +62,12 @@ function IgnoreList:OnLoad(frame)
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
 		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+	end
+	if frame.HookScript and not frame.BFL_IgnoreThemeHooked then
+		frame.BFL_IgnoreThemeHooked = true
+		frame:HookScript("OnShow", function(shownFrame)
+			IgnoreList:ApplyTheme(shownFrame)
+		end)
 	end
 
 	if frame.TopTileStreaks then
@@ -105,6 +139,7 @@ function IgnoreList:OnLoad(frame)
 	end)
 
 	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, scrollBoxView)
+	self:ApplyTheme(frame)
 end
 
 -- Initialize Classic IgnoreList FauxScrollFrame

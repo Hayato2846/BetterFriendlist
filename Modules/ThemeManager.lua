@@ -6,6 +6,9 @@ local ThemeManager = BFL:RegisterModule("ThemeManager", {})
 
 local VALID_THEMES = {}
 local THEME_DEFINITIONS = {}
+local effectiveThemeCache
+local effectiveThemeCacheStored
+local effectiveThemeCacheAvailable
 
 BFL.THEMES = {
 	BLIZZARD = "blizzard",
@@ -117,6 +120,22 @@ local function GetStoredTheme()
 	return NormalizeTheme(BetterFriendlistDB.theme)
 end
 
+local function IsStoredThemeAvailable(theme)
+	if theme == "elvui" then
+		return IsElvUIAvailable() == true
+	end
+	if theme == "ellesmereui" then
+		return IsEllesmereUIAvailable() == true
+	end
+	return true
+end
+
+local function InvalidateEffectiveThemeCache()
+	effectiveThemeCache = nil
+	effectiveThemeCacheStored = nil
+	effectiveThemeCacheAvailable = nil
+end
+
 local function RefreshClassicBlizzardPortraitVisibility(reason)
 	if not (BFL.IsClassic and BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() == "blizzard") then
 		return
@@ -153,14 +172,17 @@ function BFL:ShouldShowLegacyElvUISkinSetting()
 end
 
 function BFL:GetEffectiveTheme()
-	local theme = GetStoredTheme()
-	if theme == "elvui" and not IsElvUIAvailable() then
-		return "blizzard"
+	local storedTheme = GetStoredTheme()
+	if
+		effectiveThemeCache == nil
+		or effectiveThemeCacheStored ~= storedTheme
+	then
+		local available = IsStoredThemeAvailable(storedTheme)
+		effectiveThemeCacheStored = storedTheme
+		effectiveThemeCacheAvailable = available
+		effectiveThemeCache = available and storedTheme or "blizzard"
 	end
-	if theme == "ellesmereui" and not IsEllesmereUIAvailable() then
-		return "blizzard"
-	end
-	return theme
+	return effectiveThemeCache
 end
 
 function BFL:IsThemeActive(theme)
@@ -335,10 +357,12 @@ function ThemeManager:SetTheme(theme, reason)
 		BetterFriendlistDB.enableElvUISkin = theme == "elvui"
 	end
 
+	InvalidateEffectiveThemeCache()
 	self:ApplyCurrentTheme(reason or "set-theme")
 end
 
 function ThemeManager:ApplyCurrentTheme(reason)
+	InvalidateEffectiveThemeCache()
 	local theme = BFL:GetEffectiveTheme()
 
 	if InCombatLockdown and InCombatLockdown() then
@@ -426,6 +450,11 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if theme == "ellesmereui" and EllesmereUISkin and EllesmereUISkin.Apply then
 		EllesmereUISkin:Apply(reason or "theme-manager")
 	end
+	local IgnoreList = BFL:GetModule("IgnoreList")
+	local ignoreWindow = _G.BetterFriendsFrame and _G.BetterFriendsFrame.IgnoreListWindow
+	if IgnoreList and IgnoreList.ApplyTheme and ignoreWindow and ignoreWindow:IsShown() then
+		IgnoreList:ApplyTheme(ignoreWindow)
+	end
 	local AppearanceOnboarding = BFL:GetModule("AppearanceOnboarding")
 	if AppearanceOnboarding and AppearanceOnboarding.ApplySkin then
 		AppearanceOnboarding:ApplySkin(reason or "theme-manager")
@@ -442,6 +471,10 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	end
 
 	return true
+end
+
+function ThemeManager:InvalidateEffectiveTheme()
+	InvalidateEffectiveThemeCache()
 end
 
 function ThemeManager:ApplyPendingTheme()

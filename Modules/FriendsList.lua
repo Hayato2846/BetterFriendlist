@@ -4,6 +4,10 @@ local ADDON_NAME, BFL = ...
 local FriendsList = BFL:RegisterModule("FriendsList", {})
 local L = BFL.L -- Localization table
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+local EMPTY_TABLE = {}
+if table.freeze then
+	table.freeze(EMPTY_TABLE)
+end
 
 -- ========================================
 -- Module Dependencies
@@ -501,17 +505,23 @@ function FriendsList:GetFriendTextRightPadding(friend, isModern, isCompactMode, 
 	)
 end
 
-local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidth)
+local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidth, friend)
 	local nameFontSize = nameSize or BASE_FONT_SIZE
 	local nameLineHeight = nameFontSize + 2
 	local fallbackContentHeight = nameLineHeight * 2
-
-	local function Finish(contentHeight)
-		return math.max(nameLineHeight, math.ceil(contentHeight))
+	local fontCacheVersion = self and self.fontCacheVersion or 0
+	if
+		type(friend) == "table"
+		and friend._bflMeasuredNameText == nameText
+		and friend._bflMeasuredNameWidth == nameWidth
+		and friend._bflMeasuredNameSize == nameFontSize
+		and friend._bflMeasuredNameFontVersion == fontCacheVersion
+	then
+		return friend._bflMeasuredNameHeight
 	end
 
 	if not nameText or nameText == "" or not nameWidth or nameWidth <= 0 then
-		return Finish(fallbackContentHeight)
+		return math.max(nameLineHeight, math.ceil(fallbackContentHeight))
 	end
 
 	if self and not self.nameMeasure then
@@ -528,7 +538,7 @@ local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidt
 	end
 
 	if not (self and self.nameMeasure) then
-		return Finish(fallbackContentHeight)
+		return math.max(nameLineHeight, math.ceil(fallbackContentHeight))
 	end
 
 	local measure = self.nameMeasure
@@ -571,10 +581,18 @@ local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidt
 		end
 	end
 	if measuredHeight <= 0 then
-		return Finish(fallbackContentHeight)
+		measuredHeight = fallbackContentHeight
 	end
 
-	return Finish(measuredHeight)
+	local result = math.max(nameLineHeight, math.ceil(measuredHeight))
+	if type(friend) == "table" then
+		friend._bflMeasuredNameText = nameText
+		friend._bflMeasuredNameWidth = nameWidth
+		friend._bflMeasuredNameSize = nameFontSize
+		friend._bflMeasuredNameFontVersion = fontCacheVersion
+		friend._bflMeasuredNameHeight = result
+	end
+	return result
 end
 
 function FriendsList:MeasureWrappedFriendNameHeight(nameSize, nameText, nameWidth)
@@ -1140,19 +1158,89 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 	elseif itemType == BUTTON_TYPE_SEARCH then
 		return 30
 	elseif itemType == BUTTON_TYPE_FRIEND then
-		local minimumHeight = isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM
+		local fontVersion = self and self.fontCacheVersion or 0
+		local friendsVersion = BFL.FriendsListVersion or 0
+		local settingsVersion = BFL.SettingsVersion or 0
+		local settings = self and self.settingsCache or EMPTY_TABLE
+		local friend = item.friend
+		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, friend) or false
+		local buttonWidth = self and self.GetButtonWidth and self:GetButtonWidth() or 0
+		local streamerModeActive = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive == true or false
+		local FriendTags = BFL:GetModule("FriendTags")
+		local tagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
+			or BFL.FriendTagsVersion
+			or 0
+		local tagsGlobalAssignmentVersion = FriendTags and FriendTags.GetAssignmentVersion and FriendTags:GetAssignmentVersion()
+			or BFL.FriendTagsVersion
+			or 0
+
+		-- ScrollBox asks for the same element extent several times during one
+		-- layout pass. Check the complete external input signature before asking
+		-- TagChips to resolve aliases and row data again. Friend identity and every
+		-- visual input remain part of the key, so provider reuse, resizes, privacy
+		-- changes, and live tag/theme updates cannot retain a stale row height.
+		if
+			item._bflCalculatedHeight ~= nil
+			and item._bflHeightFriend == friend
+			and item._bflHeightFriendsVersion == friendsVersion
+			and item._bflHeightSettingsVersion == settingsVersion
+			and item._bflHeightFontVersion == fontVersion
+			and item._bflHeightTagsGlobalDefinitionVersion == tagsDefinitionVersion
+			and item._bflHeightTagsGlobalAssignmentVersion == tagsGlobalAssignmentVersion
+			and item._bflHeightButtonWidth == buttonWidth
+			and item._bflHeightStreamerModeActive == streamerModeActive
+			and item._bflHeightCompactMode == isCompactMode
+			and item._bflHeightNameSize == nameSize
+			and item._bflHeightInfoSize == infoSize
+			and item._bflHeightInfoDisabled == infoDisabled
+			and item._bflHeightModern == isModern
+			and item._bflHeightFavoriteIcon == settings.enableFavoriteIcon
+			and item._bflHeightFavoriteIconStyle == settings.favoriteIconStyle
+			and item._bflHeightShowGameIcon == settings.showGameIcon
+			and item._bflHeightMultiAccountRow == hasMultiAccountRow
+		then
+			return item._bflCalculatedHeight
+		end
+
 		local tagExtraHeight = 0
 		local TagChips = BFL:GetModule("TagChips")
+		local tagChipRowData
 		if TagChips and TagChips.GetRowData then
-			local tagChipRowData = TagChips:GetRowData(item.friend, self)
+			tagChipRowData = TagChips:GetRowData(item.friend, self)
 			item._bflTagChipsRowData = tagChipRowData
 			tagExtraHeight = tagChipRowData.height or 0
 		elseif TagChips and TagChips.GetRowExtraHeight then
 			tagExtraHeight = TagChips:GetRowExtraHeight(item.friend, self)
 		end
+		if
+			item._bflCalculatedHeight ~= nil
+			and item._bflHeightFriend == friend
+			and item._bflHeightFriendsVersion == friendsVersion
+			and item._bflHeightSettingsVersion == settingsVersion
+			and item._bflHeightFontVersion == fontVersion
+			and item._bflHeightTagsDefinitionVersion == (tagChipRowData and tagChipRowData.cacheTagsDefinitionVersion)
+			and item._bflHeightTagsAssignmentVersion == (tagChipRowData and tagChipRowData.cacheTagsAssignmentVersion)
+			and item._bflHeightTagsSettingsVersion == (tagChipRowData and tagChipRowData.cacheSettingsVersion)
+			and item._bflHeightAvailableWidth == (tagChipRowData and tagChipRowData.availableWidth)
+			and item._bflHeightButtonWidth == buttonWidth
+			and item._bflHeightStreamerModeActive == streamerModeActive
+			and item._bflHeightCompactMode == isCompactMode
+			and item._bflHeightNameSize == nameSize
+			and item._bflHeightInfoSize == infoSize
+			and item._bflHeightInfoDisabled == infoDisabled
+			and item._bflHeightModern == isModern
+			and item._bflHeightFavoriteIcon == settings.enableFavoriteIcon
+			and item._bflHeightFavoriteIconStyle == settings.favoriteIconStyle
+			and item._bflHeightShowGameIcon == settings.showGameIcon
+			and item._bflHeightMultiAccountRow == hasMultiAccountRow
+		then
+			item._bflHeightTagsGlobalDefinitionVersion = tagsDefinitionVersion
+			item._bflHeightTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion
+			return item._bflCalculatedHeight
+		end
+		local minimumHeight = isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM
 
 		if self then
-			local friend = item.friend
 			local line1Text = friend and friend._cache_text_line1
 			if friend and not line1Text and self.GetFormattedButtonText then
 				line1Text = self:GetFormattedButtonText(friend)
@@ -1174,7 +1262,6 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 				displayLine1 = line1BaseText .. spacer .. line1SuffixText
 			end
 
-			local buttonWidth = self:GetButtonWidth()
 			local padding = GetFriendTextRightPadding(
 				self,
 				friend,
@@ -1194,15 +1281,15 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 				self,
 				nameSize,
 				displayLine1,
-				nameWidth
+				nameWidth,
+				friend
 			)
 			item._bflNameContentHeight = nameContentHeight
 		end
 
-		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, item.friend)
 		local nameContentHeight = item._bflNameContentHeight or ((nameSize or BASE_FONT_SIZE) + 2)
 		item._bflNameContentHeight = nameContentHeight
-		return CalculateFriendRowHeight(
+		local height = CalculateFriendRowHeight(
 			isCompactMode,
 			nameSize,
 			infoSize,
@@ -1212,6 +1299,29 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			minimumHeight,
 			nameContentHeight
 		)
+		item._bflCalculatedHeight = height
+		item._bflHeightFriend = friend
+		item._bflHeightFriendsVersion = friendsVersion
+		item._bflHeightSettingsVersion = settingsVersion
+		item._bflHeightFontVersion = fontVersion
+		item._bflHeightTagsGlobalDefinitionVersion = tagsDefinitionVersion
+		item._bflHeightTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion
+		item._bflHeightTagsDefinitionVersion = tagChipRowData and tagChipRowData.cacheTagsDefinitionVersion
+		item._bflHeightTagsAssignmentVersion = tagChipRowData and tagChipRowData.cacheTagsAssignmentVersion
+		item._bflHeightTagsSettingsVersion = tagChipRowData and tagChipRowData.cacheSettingsVersion
+		item._bflHeightAvailableWidth = tagChipRowData and tagChipRowData.availableWidth
+		item._bflHeightButtonWidth = buttonWidth
+		item._bflHeightStreamerModeActive = streamerModeActive
+		item._bflHeightCompactMode = isCompactMode
+		item._bflHeightNameSize = nameSize
+		item._bflHeightInfoSize = infoSize
+		item._bflHeightInfoDisabled = infoDisabled
+		item._bflHeightModern = isModern
+		item._bflHeightFavoriteIcon = settings.enableFavoriteIcon
+		item._bflHeightFavoriteIconStyle = settings.favoriteIconStyle
+		item._bflHeightShowGameIcon = settings.showGameIcon
+		item._bflHeightMultiAccountRow = hasMultiAccountRow
+		return height
 	else
 		return 34 -- Default fallback
 	end
@@ -1225,6 +1335,49 @@ end
 -- Returns a DataProvider object with elementData for each button
 -- Build Display List (Optimization: Returns simplified table instead of DataProvider)
 -- This allows for diffing before committing to ScrollBox
+local function AcquireDisplayBuildList(self)
+	if not BFL.HasModernScrollBox then
+		return {}
+	end
+	local displayList = self.inactiveDisplayBuildList
+	if not displayList or displayList == self.activeProviderDisplayList then
+		displayList = self.cachedDisplayList
+		if displayList == self.activeProviderDisplayList then
+			displayList = nil
+		end
+	end
+	displayList = displayList or {}
+	local pool = displayList._bflEntryPool
+	if type(pool) ~= "table" then
+		pool = {}
+		displayList._bflEntryPool = pool
+	end
+	for index = #displayList, 1, -1 do
+		local entry = displayList[index]
+		displayList[index] = nil
+		if type(entry) == "table" then
+			for key in pairs(entry) do
+				entry[key] = nil
+			end
+			pool[#pool + 1] = entry
+		end
+	end
+	return displayList
+end
+
+local function AppendDisplayBuildEntry(displayList)
+	local pool = displayList._bflEntryPool
+	local entry
+	if pool and #pool > 0 then
+		entry = pool[#pool]
+		pool[#pool] = nil
+	else
+		entry = {}
+	end
+	displayList[#displayList + 1] = entry
+	return entry
+end
+
 local function BuildDisplayList(self)
 	-- PERFY OPTIMIZATION (Phase 2B): Input Version Tracking
 	-- Skip expensive rebuild if inputs unchanged (600+ friends = 600+ operations!)
@@ -1248,6 +1401,11 @@ local function BuildDisplayList(self)
 		and FriendTags.GetSetting
 		and FriendTags:GetSetting("enableDynamicTagGroups", false) == true
 	local tagAssignmentsAffectDisplay = (self.searchText or "") ~= "" or enableDynamicTagGroups == true
+	local QuickFilters = BFL:GetModule("QuickFilters")
+	if not tagAssignmentsAffectDisplay and QuickFilters and QuickFilters.GetActiveTagFilterDefinitions then
+		local activeTagFilters = QuickFilters:GetActiveTagFilterDefinitions()
+		tagAssignmentsAffectDisplay = #activeTagFilters > 0
+	end
 	local Registry = GetFilterSortRegistry()
 	if not tagAssignmentsAffectDisplay and Registry and Registry.ResolveQuickFilter then
 		local resolvedFilter = Registry:ResolveQuickFilter(self.filterMode or "all", true)
@@ -1267,27 +1425,36 @@ local function BuildDisplayList(self)
 		and FriendTags.GetAssignmentVersion
 		and FriendTags:GetAssignmentVersion()
 		or 0
-	local currentSignature = table.concat({
-		BFL.FriendsListVersion or 0,
-		BFL.SettingsVersion or 0, -- Fix: Track settings/groups changes
-		friendTagsDefinitionVersion,
-		friendTagsAssignmentVersion,
-		BFL.FilterSortRegistryVersion or 0,
-		self.filterMode or "all",
-		self.searchText or "",
-		buttonWidthForSignature,
-		numInvitesForSignature,
-		invitesCollapsed,
-	}, "|")
-
-	if self.lastBuildSignature == currentSignature and self.cachedDisplayList then
+	local friendsVersion = BFL.FriendsListVersion or 0
+	local settingsVersion = BFL.SettingsVersion or 0
+	local streamerModeActive = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive == true or false
+	local registryVersion = BFL.FilterSortRegistryVersion or 0
+	local filterMode = self.filterMode or "all"
+	local searchText = self.searchText or ""
+	local inputs = self.lastBuildInputs
+	if
+		self.lastBuildSignature ~= nil
+		and inputs
+		and inputs.friendsVersion == friendsVersion
+		and inputs.settingsVersion == settingsVersion
+		and inputs.streamerModeActive == streamerModeActive
+		and inputs.friendTagsDefinitionVersion == friendTagsDefinitionVersion
+		and inputs.friendTagsAssignmentVersion == friendTagsAssignmentVersion
+		and inputs.registryVersion == registryVersion
+		and inputs.filterMode == filterMode
+		and inputs.searchText == searchText
+		and inputs.buttonWidth == buttonWidthForSignature
+		and inputs.numInvites == numInvitesForSignature
+		and inputs.invitesCollapsed == invitesCollapsed
+		and self.cachedDisplayList
+	then
 		-- BFL:DebugPrint("|cff00ff00BuildDisplayList:|r Cache HIT (inputs unchanged)")
 		self.groupedFriends = self.cachedGroupedFriends or self.groupedFriends or {}
 		return self.cachedDisplayList, true -- cacheHit flag
 	end
 
 	-- BFL:DebugPrint("|cffff8800BuildDisplayList:|r Cache MISS (rebuilding)")
-	local displayList = {}
+	local displayList = AcquireDisplayBuildList(self)
 
 	-- Optimization: SyncGroups removed (Called by UpdateFriendsList before Render)
 	-- self:SyncGroups()
@@ -1321,24 +1488,20 @@ local function BuildDisplayList(self)
 	local showInvitesInline = not FriendsUI or FriendsUI:ShouldShowInvitesInline()
 
 	if showInvitesInline and numInvites and numInvites > 0 then
-		table.insert(displayList, {
-			buttonType = BUTTON_TYPE_INVITE_HEADER,
-			count = numInvites,
-		})
+		local inviteHeader = AppendDisplayBuildEntry(displayList)
+		inviteHeader.buttonType = BUTTON_TYPE_INVITE_HEADER
+		inviteHeader.count = numInvites
 
 		if not GetCVarBool("friendInvitesCollapsed") then
 			for i = 1, numInvites do
-				table.insert(displayList, {
-					buttonType = BUTTON_TYPE_INVITE,
-					inviteIndex = i,
-				})
+				local invite = AppendDisplayBuildEntry(displayList)
+				invite.buttonType = BUTTON_TYPE_INVITE
+				invite.inviteIndex = i
 			end
 
 			-- Add divider if there are friends below
 			if #self.friendsList > 0 then
-				table.insert(displayList, {
-					buttonType = BUTTON_TYPE_DIVIDER,
-				})
+				AppendDisplayBuildEntry(displayList).buttonType = BUTTON_TYPE_DIVIDER
 			end
 		end
 	end
@@ -1639,25 +1802,23 @@ local function BuildDisplayList(self)
 
 			if not shouldSkip then
 				-- Add group header
-				table.insert(displayList, {
-					buttonType = BUTTON_TYPE_GROUP_HEADER,
-					groupId = groupData.id,
-					name = groupData.name,
-					count = #groupFriends,
-					totalCount = totalGroupCounts[groupData.id] or 0,
-					onlineCount = onlineGroupCounts[groupData.id] or 0,
-					collapsed = groupData.collapsed,
-				})
+				local groupHeader = AppendDisplayBuildEntry(displayList)
+				groupHeader.buttonType = BUTTON_TYPE_GROUP_HEADER
+				groupHeader.groupId = groupData.id
+				groupHeader.name = groupData.name
+				groupHeader.count = #groupFriends
+				groupHeader.totalCount = totalGroupCounts[groupData.id] or 0
+				groupHeader.onlineCount = onlineGroupCounts[groupData.id] or 0
+				groupHeader.collapsed = groupData.collapsed
 
 				-- Add friends if not collapsed
 				if not groupData.collapsed then
 					for _, friend in ipairs(groupFriends) do
-						table.insert(displayList, {
-							buttonType = BUTTON_TYPE_FRIEND,
-							friend = friend,
-							groupId = groupData.id,
-							_hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend),
-						})
+						local friendEntry = AppendDisplayBuildEntry(displayList)
+						friendEntry.buttonType = BUTTON_TYPE_FRIEND
+						friendEntry.friend = friend
+						friendEntry.groupId = groupData.id
+						friendEntry._hasMultiAccountRow = ShouldShowMultiAccountRow(self, friend)
 					end
 				end
 			end
@@ -1665,7 +1826,20 @@ local function BuildDisplayList(self)
 	end
 
 	-- PERFY OPTIMIZATION (Phase 2B): Cache built display list
-	self.lastBuildSignature = currentSignature
+	inputs = inputs or {}
+	inputs.friendsVersion = friendsVersion
+	inputs.settingsVersion = settingsVersion
+	inputs.streamerModeActive = streamerModeActive
+	inputs.friendTagsDefinitionVersion = friendTagsDefinitionVersion
+	inputs.friendTagsAssignmentVersion = friendTagsAssignmentVersion
+	inputs.registryVersion = registryVersion
+	inputs.filterMode = filterMode
+	inputs.searchText = searchText
+	inputs.buttonWidth = buttonWidthForSignature
+	inputs.numInvites = numInvitesForSignature
+	inputs.invitesCollapsed = invitesCollapsed
+	self.lastBuildInputs = inputs
+	self.lastBuildSignature = true
 	self.cachedDisplayList = displayList
 	self.groupedFriends = groupedFriends
 	self.cachedGroupedFriends = groupedFriends
@@ -1923,7 +2097,9 @@ function FriendsList:UpdateSearchBoxState()
 	end
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() then
-		FriendsUI:ApplyModernContentLayout(FriendsUI:GetSelectedSection(), true)
+		-- Modern section selection owns its geometry. RenderDisplay reaches this
+		-- helper on every refresh, so applying the entire layout here caused a
+		-- redundant theme/layout pass even when the section did not change.
 		return
 	end
 
@@ -3921,16 +4097,15 @@ function FriendsList:UpdateFontCache()
 	if not self.fontCache then
 		self.fontCache = {}
 	end
-	self.fontCacheVersion = (self.fontCacheVersion or 0) + 1
 
 	local DB = GetDB()
 	if not DB then
 		return
 	end
 
-	-- Fix #35/#40: Track if font sizes changed to force layout rebuild
-	local oldNameSize = self.fontCache.nameSize
-	local oldInfoSize = self.fontCache.infoSize
+	local cache = self.fontCache
+	local oldNamePath, oldNameSize, oldNameOutline = cache.namePath, cache.nameSize, cache.nameOutline
+	local oldInfoPath, oldInfoSize, oldInfoOutline = cache.infoPath, cache.infoSize, cache.infoOutline
 
 	-- Function to safely get color table
 	local function GetColor(key)
@@ -3950,24 +4125,55 @@ function FriendsList:UpdateFontCache()
 
 	-- Name Font
 	local nameFontName = DB:Get("fontFriendName", "Friz Quadrata TT")
-	self.fontCache.namePath = BFL.FontManager:ResolveFontPath(nameFontName)
-	self.fontCache.nameSize = DB:Get("fontSizeFriendName", 12)
-	self.fontCache.nameOutline = BFL.FontManager:GetFontFlags(DB:Get("fontOutlineFriendName", "NONE"))
-	self.fontCache.nameShadow = DB:Get("fontShadowFriendName", false)
-	self.fontCache.nameR, self.fontCache.nameG, self.fontCache.nameB, self.fontCache.nameA =
+	local namePath = BFL.FontManager:ResolveFontPath(nameFontName)
+	local nameSize = DB:Get("fontSizeFriendName", 12)
+	local nameOutline = BFL.FontManager:GetFontFlags(DB:Get("fontOutlineFriendName", "NONE"))
+	local nameShadow = DB:Get("fontShadowFriendName", false)
+	local nameR, nameG, nameB, nameA =
 		GetColor("fontColorFriendName")
 
 	-- Info Font
 	local infoFontName = DB:Get("fontFriendInfo", "Friz Quadrata TT")
-	self.fontCache.infoPath = BFL.FontManager:ResolveFontPath(infoFontName)
-	self.fontCache.infoSize = DB:Get("fontSizeFriendInfo", 10)
-	self.fontCache.infoOutline = BFL.FontManager:GetFontFlags(DB:Get("fontOutlineFriendInfo", "NONE"))
-	self.fontCache.infoShadow = DB:Get("fontShadowFriendInfo", false)
-	self.fontCache.infoR, self.fontCache.infoG, self.fontCache.infoB, self.fontCache.infoA =
+	local infoPath = BFL.FontManager:ResolveFontPath(infoFontName)
+	local infoSize = DB:Get("fontSizeFriendInfo", 10)
+	local infoOutline = BFL.FontManager:GetFontFlags(DB:Get("fontOutlineFriendInfo", "NONE"))
+	local infoShadow = DB:Get("fontShadowFriendInfo", false)
+	local infoR, infoG, infoB, infoA =
 		GetColor("fontColorFriendInfo")
 
-	-- Fix #35/#40: Force layout rebuild if font sizes changed (affects row heights)
-	if oldNameSize ~= self.fontCache.nameSize or oldInfoSize ~= self.fontCache.infoSize then
+	local changed = cache.namePath ~= namePath
+		or cache.nameSize ~= nameSize
+		or cache.nameOutline ~= nameOutline
+		or cache.nameShadow ~= nameShadow
+		or cache.nameR ~= nameR
+		or cache.nameG ~= nameG
+		or cache.nameB ~= nameB
+		or cache.nameA ~= nameA
+		or cache.infoPath ~= infoPath
+		or cache.infoSize ~= infoSize
+		or cache.infoOutline ~= infoOutline
+		or cache.infoShadow ~= infoShadow
+		or cache.infoR ~= infoR
+		or cache.infoG ~= infoG
+		or cache.infoB ~= infoB
+		or cache.infoA ~= infoA
+
+	cache.namePath, cache.nameSize, cache.nameOutline, cache.nameShadow = namePath, nameSize, nameOutline, nameShadow
+	cache.nameR, cache.nameG, cache.nameB, cache.nameA = nameR, nameG, nameB, nameA
+	cache.infoPath, cache.infoSize, cache.infoOutline, cache.infoShadow = infoPath, infoSize, infoOutline, infoShadow
+	cache.infoR, cache.infoG, cache.infoB, cache.infoA = infoR, infoG, infoB, infoA
+	if changed then
+		self.fontCacheVersion = (self.fontCacheVersion or 0) + 1
+	end
+
+	-- Font geometry changes affect wrapped row heights and ScrollBox extents.
+	if oldNamePath ~= namePath
+		or oldNameSize ~= nameSize
+		or oldNameOutline ~= nameOutline
+		or oldInfoPath ~= infoPath
+		or oldInfoSize ~= infoSize
+		or oldInfoOutline ~= infoOutline
+	then
 		self.forceLayoutRebuild = true
 	end
 end
@@ -6141,8 +6347,16 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 	end
 	self.scrollBox:SetDataProvider(newProvider, true) -- retainScrollPosition
 
-	-- Invalidate BuildDisplayList cache (OptimizedGroupToggle bypasses it)
+	-- OptimizedGroupToggle bypasses BuildDisplayList and installs a provider made
+	-- from the previous provider plus transient entries. It therefore cannot
+	-- remain associated with either reusable build-list buffer. The next render
+	-- rebuilds one inactive buffer and establishes a fresh ownership relation.
 	self.lastBuildSignature = nil
+	self.lastBuildInputs = nil
+	self.cachedDisplayList = nil
+	self.cachedGroupedFriends = nil
+	self.activeProviderDisplayList = nil
+	self.inactiveDisplayBuildList = nil
 
 	return true
 end
@@ -6824,8 +7038,18 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 					oldData.totalCount = newData.totalCount
 					oldData.onlineCount = newData.onlineCount
 					oldData.name = newData.name -- Fix #31/#32/#37: Copy renamed group name
+					-- Virtual Friend Tag groups can keep the same structural identity while
+					-- their presentation changes. The active provider owns the old element
+					-- tables, so carry every render-relevant value across the smart update.
+					oldData.virtualTagGroup = newData.virtualTagGroup
+					oldData.color = newData.color
+					oldData.collapsed = newData.collapsed
 				elseif newData.buttonType == BUTTON_TYPE_FRIEND then
-					-- friend reference is same, so data inside friend object is already new
+					-- A stable UID does not guarantee a stable table reference: the
+					-- collection pool can remap a friend to another table after an API
+					-- reorder. Keep the active provider attached to the fresh record.
+					oldData.friend = newData.friend
+					oldData.groupId = newData.groupId
 					oldData._hasMultiAccountRow = newData._hasMultiAccountRow
 					oldData._bflCalculatedHeight = newData._bflCalculatedHeight
 					oldData._bflNameContentHeight = newData._bflNameContentHeight
@@ -6863,6 +7087,8 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 			dataProvider:Insert(data)
 		end
 		self.scrollBox:SetDataProvider(dataProvider, true) -- retainScrollPosition = true
+		self.inactiveDisplayBuildList = self.activeProviderDisplayList
+		self.activeProviderDisplayList = newDisplayList
 	end
 end
 
@@ -8416,7 +8642,7 @@ local function SetFriendStatusVisual(button, statusTexture)
 		end
 	end
 
-	if button.lastStatusVisual == visual then
+	if button.lastStatusVisual == visual and HasAssignedTexture(button.status) then
 		return
 	end
 	if modern and BFL.SetTextureOrAtlas then
@@ -9233,9 +9459,31 @@ function FriendsList:OnFriendsUIStyleChanged()
 	if not BFL.HasModernScrollBox then
 		return
 	end
+	-- Modern card styling deliberately replaces several legacy compatibility
+	-- regions after UpdateFriendButton records their values. Clear only those
+	-- visual markers at a style boundary so the first row pass in the other
+	-- style restores its real textures/colors instead of trusting stale metadata.
+	if self.scrollBox and self.scrollBox.ForEachFrame then
+		self.scrollBox:ForEachFrame(function(button)
+			button.lastBgR = nil
+			button.lastBgG = nil
+			button.lastBgB = nil
+			button.lastBgA = nil
+			button.lastStatusVisual = nil
+			button.lastInviteAtlas = nil
+			button.lastClientProgram = nil
+			button.lastGameIconAlpha = nil
+			button.lastFontVersion = nil
+			button.favoriteMeasureFontVersion = nil
+			button.lastFavoriteIconStyle = nil
+		end)
+	end
 	self.lastBuildSignature = nil
+	self.lastBuildInputs = nil
 	self.cachedDisplayList = nil
 	self.cachedGroupedFriends = nil
+	self.inactiveDisplayBuildList = nil
+	self.activeProviderDisplayList = nil
 	self.forceLayoutRebuild = true
 	self:InitializeScrollBox()
 	self:RenderDisplay(true)

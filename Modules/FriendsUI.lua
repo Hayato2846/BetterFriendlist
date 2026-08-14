@@ -416,6 +416,10 @@ local MODERN_ELVUI_THEME_COLORS = {
 }
 
 local MODERN_WHITE = { 1, 1, 1, 1 }
+local REAL_ID_WARNING_BLIZZARD_BACKGROUND = { 0, 0, 0, 0.85 }
+local ATLAS_TINT_CACHE = setmetatable({}, { __mode = "k" })
+local OPAQUE_THEME_COLOR_CACHE = setmetatable({}, { __mode = "k" })
+local REAL_ID_WARNING_COLOR_CACHE = setmetatable({}, { __mode = "k" })
 
 local function CopyThemeColor(color, fallback)
 	color = type(color) == "table" and color or fallback
@@ -430,7 +434,14 @@ end
 
 local function OpaqueThemeColor(color)
 	color = color or MODERN_BLIZZARD_THEME_COLORS.accent
-	return { color[1] or color.r or 1, color[2] or color.g or 1, color[3] or color.b or 1, 1 }
+	local r, g, b = color[1] or color.r or 1, color[2] or color.g or 1, color[3] or color.b or 1
+	local cached = OPAQUE_THEME_COLOR_CACHE[color]
+	if cached and cached[1] == r and cached[2] == g and cached[3] == b then
+		return cached
+	end
+	cached = { r, g, b, 1 }
+	OPAQUE_THEME_COLOR_CACHE[color] = cached
+	return cached
 end
 
 local function ApplyTextureColor(texture, color)
@@ -443,6 +454,29 @@ local function ApplySolidTextureColor(texture, color)
 	if texture and texture.SetColorTexture and color then
 		texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
 	end
+end
+
+local function ResolveRealIDWarningBackground(palette, theme)
+	if theme == "blizzard" or type(palette) ~= "table" then
+		return REAL_ID_WARNING_BLIZZARD_BACKGROUND
+	end
+
+	-- Theme content backgrounds are intentionally translucent so the main
+	-- window shell can remain visible. The Real ID notice is a modal privacy
+	-- warning and needs an independently opaque surface, matching Blizzard's
+	-- DIALOG overlay rather than the normal content wash.
+	local source = palette.panel or palette.background or REAL_ID_WARNING_BLIZZARD_BACKGROUND
+	local r = source[1] or source.r or 0
+	local g = source[2] or source.g or 0
+	local b = source[3] or source.b or 0
+	local a = math.max(source[4] ~= nil and source[4] or source.a or 1, 0.94)
+	local cached = REAL_ID_WARNING_COLOR_CACHE[source]
+	if cached and cached[1] == r and cached[2] == g and cached[3] == b and cached[4] == a then
+		return cached
+	end
+	cached = { r, g, b, a }
+	REAL_ID_WARNING_COLOR_CACHE[source] = cached
+	return cached
 end
 
 local function ApplyModernOwnedSurface(frame, color, shown)
@@ -474,15 +508,27 @@ end
 
 local function GetAtlasTint(color)
 	color = color or MODERN_BLIZZARD_THEME_COLORS.surface
+	local cached = ATLAS_TINT_CACHE[color]
+	if
+		cached
+		and cached._sourceR == color[1]
+		and cached._sourceG == color[2]
+		and cached._sourceB == color[3]
+	then
+		return cached
+	end
 	-- Blizzard atlases already contain light and shadow information. Mixing the
 	-- requested surface toward white preserves that relief while BFL's owned
 	-- flat-color layers carry the actual theme color.
-	return {
+	local tint = {
 		0.52 + (color[1] or 0) * 0.48,
 		0.52 + (color[2] or 0) * 0.48,
 		0.52 + (color[3] or 0) * 0.48,
 		1,
 	}
+	tint._sourceR, tint._sourceG, tint._sourceB = color[1], color[2], color[3]
+	ATLAS_TINT_CACHE[color] = tint
+	return tint
 end
 
 local function SetTextureDesaturated(texture, desaturated)
@@ -1340,7 +1386,7 @@ function FriendsUI:CaptureLegacyLayout()
 			state.frames["header." .. field] = CaptureFrameState(header[field])
 		end
 		local bnetFrame = header.BattlenetFrame
-		for _, field in ipairs({ "ContactsMenuButton", "SettingsButton" }) do
+		for _, field in ipairs({ "ContactsMenuButton", "SettingsButton", "BroadcastFrame" }) do
 			state.frames["bnet." .. field] = CaptureFrameState(bnetFrame and bnetFrame[field])
 		end
 	end
@@ -1424,6 +1470,30 @@ function FriendsUI:CreateModernRoot()
 	root.PortraitOverlay:SetFrameLevel(root:GetFrameLevel() + 20)
 	root:Hide()
 	self.root = root
+	local portraitButton = root.PortraitOverlay.HitButton
+	portraitButton.BFL_DarkInvisibleOverlayButton = true
+	portraitButton.Glow = root.PortraitOverlay.Glow
+	portraitButton:EnableMouse(true)
+	portraitButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	portraitButton:SetScript("OnClick", function()
+		local Changelog = BFL:GetModule("Changelog")
+		if Changelog and Changelog.ToggleChangelog then
+			Changelog:ToggleChangelog()
+		end
+	end)
+	portraitButton:SetScript("OnEnter", function(button)
+		local Changelog = BFL:GetModule("Changelog")
+		if Changelog and Changelog.OnPortraitEnter then
+			Changelog:OnPortraitEnter(button)
+		end
+	end)
+	portraitButton:SetScript("OnLeave", function()
+		BFL_Tooltip:Hide()
+	end)
+	local Changelog = BFL:GetModule("Changelog")
+	if Changelog and Changelog.CheckVersion then
+		Changelog:CheckVersion()
+	end
 
 	if root.FilterBar.SortButton.SetupMenu then
 		root.FilterBar.SortButton:SetupMenu(function(_, rootDescription)
@@ -1654,7 +1724,8 @@ function FriendsUI:LayoutNavigationTabs(sectionIDs, themed)
 end
 
 function FriendsUI:RefreshNavigation()
-	if self:IsModernActive() then
+	local modernActive = self:IsModernActive()
+	if modernActive then
 		self:HideLegacyTabs()
 	end
 	if not self.sideTabs then
@@ -1701,7 +1772,7 @@ function FriendsUI:RefreshNavigation()
 	local palette, themed = self:GetModernThemeColors()
 	self:LayoutNavigationTabs(availableSections, themed and not palette.preserveNativeSideTabs)
 	if
-		self:IsModernActive()
+		modernActive
 		and self.selectedSection
 		and not visibleSections[self.selectedSection]
 		and availableSections[1]
@@ -1712,7 +1783,15 @@ function FriendsUI:RefreshNavigation()
 		self.refreshingFriendTabSelection = false
 		return
 	end
-	self:ApplyTheme(self.currentTheme)
+	-- Navigation refreshes happen for counters, availability changes, and every
+	-- Modern section switch. The frame palette and content geometry are already
+	-- applied by ThemeManager/ApplyModernContentLayout; rerunning ApplyTheme here
+	-- recursively laid out and re-skinned the whole visible UI for a tab update.
+	if modernActive then
+		self:RefreshModernSideTabSelection()
+	elseif self.root and self.root:IsShown() then
+		self:ApplyTheme(self.currentTheme)
+	end
 end
 
 function FriendsUI:RefreshModernSideTabSelection()
@@ -1722,22 +1801,30 @@ function FriendsUI:RefreshModernSideTabSelection()
 
 	local _, themed = self:GetModernThemeColors()
 	local SkinEngine = themed and BFL:GetModule("SkinEngine") or nil
-	if not (SkinEngine and SkinEngine.IsActive and SkinEngine:IsActive()) then
-		return
-	end
+	local useSkinEngine = SkinEngine and SkinEngine.IsActive and SkinEngine:IsActive()
 
 	-- LargeSideTabButtonTemplate handles MouseDown before BFL switches the
-	-- section. Refresh every managed tab immediately afterwards so the clicked
-	-- tab does not retain SkinEngine's near-black pressed surface.
+	-- section. Refresh the native selection and hover textures for every theme
+	-- immediately afterwards. External skins such as ElvUI reuse those layers;
+	-- without this final pass, a legacy top/bottom-tab update can leave a second
+	-- side tab highlighted. Dark/Custom then refresh their managed backdrop too.
 	for _, definition in ipairs(SECTION_DEFINITIONS) do
 		local tab = definition.tab
 		if tab then
 			local selected = self.selectedSection == definition.id
-			tab.BFL_DarkManagedSelection = selected
-			tab.BFL_DarkButtonStateKey = nil
-			SkinEngine:ApplyButtonState(tab)
-			if tab.BFL_DarkBackdrop then
-				tab.BFL_DarkBackdrop:Show()
+			if tab.SelectedTexture then
+				tab.SelectedTexture:SetShown(selected)
+			end
+			if tab.HighlightTexture then
+				tab.HighlightTexture:SetShown(BFL:IsRegionMouseOver(tab))
+			end
+			if useSkinEngine then
+				tab.BFL_DarkManagedSelection = selected
+				tab.BFL_DarkButtonStateKey = nil
+				SkinEngine:ApplyButtonState(tab)
+				if tab.BFL_DarkBackdrop then
+					tab.BFL_DarkBackdrop:Show()
+				end
 			end
 		end
 	end
@@ -2244,25 +2331,55 @@ function FriendsUI:InitializeRequestsScrollBox()
 	BFL.InitScrollBoxListWithScrollBar(requests.ScrollBox, requests.ScrollBar, view)
 	self.requestsInitialized = true
 	requests.EmptyLabel:SetText(GetL().FRIENDS_UI_REQUESTS_EMPTY or "No pending friend requests")
-	requests.RealIDWarning.Text:SetText(
+	local warning = requests.RealIDWarning
+	local scrollableWarningText = warning.ScrollableWarningText
+	local warningScrollBox = scrollableWarningText and scrollableWarningText.GetScrollBox and scrollableWarningText:GetScrollBox()
+	if
+		warningScrollBox
+		and warning.ScrollBar
+		and ScrollUtil
+		and ScrollUtil.RegisterScrollBoxWithScrollBar
+		and not warning.BFL_ScrollBoxRegistered
+	then
+		ScrollUtil.RegisterScrollBoxWithScrollBar(warningScrollBox, warning.ScrollBar)
+		warning.BFL_ScrollBoxRegistered = true
+	end
+	if warningScrollBox and warningScrollBox.SetEdgeFadeLength then
+		warningScrollBox:SetEdgeFadeLength(10)
+	end
+	local warningText = scrollableWarningText and scrollableWarningText.GetFontString and scrollableWarningText:GetFontString()
+	warning.Text = warningText
+	if warningText and warningText.SetJustifyH then
+		warningText:SetJustifyH("CENTER")
+	end
+	if scrollableWarningText and scrollableWarningText.SetText then
+		scrollableWarningText:SetText(
 		SOCIAL_UI_FRIEND_REQUESTS_REAL_ID_WARNING
 			or GetL().FRIENDS_UI_REAL_ID_WARNING
 			or "Real ID requests reveal your real name."
-	)
-	requests.RealIDWarning.Text:SetTextColor(1, 1, 1, 1)
-	requests.RealIDWarning.Text:ClearAllPoints()
-	requests.RealIDWarning.Text:SetPoint("TOP", requests.RealIDWarning.PlayerIcon, "BOTTOM", 0, -27)
-	requests.RealIDWarning.Text:SetPoint("LEFT", requests.RealIDWarning, "LEFT", 30, 0)
-	requests.RealIDWarning.Text:SetPoint("RIGHT", requests.RealIDWarning, "RIGHT", -30, 0)
-	requests.RealIDWarning.Text:SetPoint("BOTTOM", requests.RealIDWarning.ContinueButton, "TOP", 0, 20)
-	ApplyAtlasTexture(requests.RealIDWarning.PlayerIcon, "friends-icon-addFriend", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-plus.blp")
-	ApplyAtlasTexture(requests.RealIDWarning.BattleNetIcon, "friends-icon-addFriend-logo-battleNet", "Interface\\AddOns\\BetterFriendlist\\Icons\\star.blp")
-	requests.RealIDWarning.ContinueButton:SetText(CONTINUE or GetL().CONTINUE or "Continue")
-	requests.RealIDWarning.ContinueButton:SetScript("OnClick", function()
+		)
+	end
+	if warningText and warningText.SetTextColor then
+		warningText:SetTextColor(1, 1, 1, 1)
+	end
+	ApplyAtlasTexture(warning.PlayerIcon, "friends-icon-addFriend", "Interface\\AddOns\\BetterFriendlist\\Icons\\user-plus.blp")
+	ApplyAtlasTexture(warning.BattleNetIcon, "friends-icon-addFriend-logo-battleNet", "Interface\\AddOns\\BetterFriendlist\\Icons\\star.blp")
+	warning.ContinueButton:SetText(CONTINUE or GetL().CONTINUE or "Continue")
+	warning:EnableMouse(true)
+	if warning.EnableMouseWheel then
+		warning:EnableMouseWheel(true)
+	end
+	if not warning.BFL_OverlayLayoutHooked then
+		warning.BFL_OverlayLayoutHooked = true
+		warning:HookScript("OnShow", function()
+			self:LayoutRealIDWarning()
+		end)
+	end
+	warning.ContinueButton:SetScript("OnClick", function()
 		if SetCVar then
 			SetCVar("pendingInviteInfoShown", "1")
 		end
-		requests.RealIDWarning:Hide()
+		warning:Hide()
 		self:LayoutRequestsFrame()
 	end)
 end
@@ -2326,7 +2443,9 @@ function FriendsUI:ApplyContactChrome(sectionID, header)
 	local simpleModeContacts = self:IsSimpleModeContactSection(sectionID)
 	local showFilterBar = chrome.filterBar == true and not self:DoesSimpleModeHideFilterBar(sectionID)
 	local showFilterControls = showFilterBar and not simpleModeContacts
-	local showActionBar = chrome.action ~= nil
+	-- RAF owns a dedicated SocialUIActionButtonTemplate proxy. Keep the shared
+	-- footer surface visible for that proxy without exposing the shared action.
+	local showActionBar = self:ShouldReserveModernActionFooter(sectionID, chrome)
 	local showSharedSearch = sectionID == "friends" or sectionID == "recent_allies"
 
 	root.FilterBar:SetShown(showFilterBar)
@@ -2349,7 +2468,7 @@ function FriendsUI:ApplyContactChrome(sectionID, header)
 	root.BottomDivider:SetShown(showActionBar)
 		local actionButton = root.BottomActionBar.AddFriendButton
 		if actionButton then
-			actionButton:SetShown(chrome.action ~= "who_actions")
+			actionButton:SetShown(chrome.action ~= nil and chrome.action ~= "who_actions")
 			if chrome.action == "quick_join" then
 				actionButton:SetText(JOIN_QUEUE or "Join Queue")
 				local QuickJoin = BFL:GetModule("QuickJoin")
@@ -2921,6 +3040,52 @@ function FriendsUI:LayoutRequestsFrame()
 	requests.ScrollBox:SetPoint("BOTTOMRIGHT", requests, "BOTTOMRIGHT", -MODERN_SCROLL_BOX_RIGHT_INSET, 0)
 	requests.ScrollBar:SetPoint("TOPLEFT", requests.ScrollBox, "TOPRIGHT", MODERN_SCROLL_BAR_GAP, 0)
 	requests.ScrollBar:SetPoint("BOTTOMLEFT", requests.ScrollBox, "BOTTOMRIGHT", MODERN_SCROLL_BAR_GAP, 0)
+	self:LayoutRealIDWarning()
+end
+
+function FriendsUI:LayoutRealIDWarning()
+	local requests = self.root and self.root.RequestsFrame
+	local warning = requests and requests.RealIDWarning
+	if not warning then
+		return
+	end
+
+	-- Blizzard's 12.1 FriendRequestsListRealIDWarningTemplate is a DIALOG
+	-- overlay. Keep the complete warning, including its BACKGROUND layer,
+	-- above recycled request cards and their buttons.
+	if warning.SetFrameStrata then
+		warning:SetFrameStrata("DIALOG")
+	end
+	if warning.SetFrameLevel then
+		local contentLevel = requests.GetFrameLevel and requests:GetFrameLevel() or 0
+		for _, content in ipairs({ requests.ScrollBox, requests.ScrollBar }) do
+			if content and content.GetFrameLevel then
+				contentLevel = math.max(contentLevel, content:GetFrameLevel() or 0)
+			end
+		end
+		warning:SetFrameLevel(contentLevel + 10)
+	end
+	if warning.Background then
+		if warning.Background.SetDrawLayer then
+			warning.Background:SetDrawLayer("BACKGROUND", 0)
+		end
+		warning.Background:Show()
+	end
+end
+
+function FriendsUI:GetRealIDWarningBackgroundColor(palette, theme)
+	return ResolveRealIDWarningBackground(palette, theme or self.currentTheme or "blizzard")
+end
+
+function FriendsUI:ApplyRealIDWarningTheme(palette, theme)
+	local warning = self.root and self.root.RequestsFrame and self.root.RequestsFrame.RealIDWarning
+	if not (warning and warning.Background) then
+		return
+	end
+	self:LayoutRealIDWarning()
+	local color = self:GetRealIDWarningBackgroundColor(palette, theme)
+	ApplySolidTextureColor(warning.Background, color)
+	warning.BFL_RealIDWarningBackgroundColor = color
 end
 
 local function AnchorModernScrollBar(scrollBar, scrollBox, topOffset, bottomOffset, width)
@@ -2955,7 +3120,7 @@ end
 
 function FriendsUI:AnchorAuxiliaryWindow(window, topOffset)
 	if not (window and BetterFriendsFrame) then
-		return
+		return false
 	end
 	window:ClearAllPoints()
 	window:SetPoint(
@@ -2965,6 +3130,47 @@ function FriendsUI:AnchorAuxiliaryWindow(window, topOffset)
 		self:GetAuxiliaryWindowOffset(),
 		topOffset or 0
 	)
+	return true
+end
+
+function FriendsUI:GetBroadcastFrame()
+	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+	local battleNetFrame = header and header.BattlenetFrame
+	return battleNetFrame and battleNetFrame.BroadcastFrame
+end
+
+function FriendsUI:RefreshBroadcastFrameAnchor()
+	local broadcastFrame = self:GetBroadcastFrame()
+	if not broadcastFrame then
+		return false
+	end
+
+	if self:IsModernActive() then
+		return self:AnchorAuxiliaryWindow(broadcastFrame, 0)
+	end
+
+	local legacyState = self.legacyState
+		and self.legacyState.frames
+		and self.legacyState.frames["bnet.BroadcastFrame"]
+	if legacyState then
+		RestoreFrameState(legacyState, false)
+		return true
+	end
+	return false
+end
+
+function FriendsUI:InstallBroadcastFrameAnchorHook()
+	local broadcastFrame = self:GetBroadcastFrame()
+	if not (broadcastFrame and broadcastFrame.HookScript) then
+		return false
+	end
+	if not broadcastFrame.BFL_ModernAnchorHooked then
+		broadcastFrame.BFL_ModernAnchorHooked = true
+		broadcastFrame:HookScript("OnShow", function()
+			self:RefreshBroadcastFrameAnchor()
+		end)
+	end
+	return self:RefreshBroadcastFrameAnchor()
 end
 
 function FriendsUI:ApplyModernScrollBarGeometry()
@@ -3393,6 +3599,11 @@ function FriendsUI:ApplyModernPortrait()
 	SafeShow(frame.portrait, false)
 	SafeShow(frame.PortraitIcon, false)
 	SafeShow(frame.PortraitMask, false)
+	-- The visible Modern portrait is the interactive changelog button. Keeping
+	-- the legacy button active underneath creates a second, differently placed
+	-- hit rect (especially for EUI's lower logo offset) and makes only parts of
+	-- the artwork clickable.
+	SafeShow(frame.PortraitButton, false)
 	-- External flat skins own a compact BFL logo and must not inherit the
 	-- high-level PortraitFrame container restored by Blizzard's OnShow path.
 	if frame.PortraitContainer then
@@ -3612,6 +3823,22 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 	end
 end
 
+-- Refresh the Modern configuration-dependent geometry without rebuilding the
+-- complete interface style.  Settings callbacks use this contract when a
+-- visibility-affecting option changes; the friend-list render hot path must
+-- not be responsible for repairing unrelated frame geometry.
+function FriendsUI:RefreshModernConfigurationLayout(reason)
+	if not (self:IsModernActive() and self.root and BetterFriendsFrame) then
+		return false
+	end
+
+	self:ApplyModernPortrait()
+	self:ApplyModernContentLayout(self:GetSelectedSection() or "friends", true)
+	self:RefreshModernSideTabSelection()
+	self.lastModernConfigurationLayoutReason = reason
+	return true
+end
+
 function FriendsUI:ApplyModernLayout()
 	local root = self:CreateModernRoot()
 	if not root or not BetterFriendsFrame then
@@ -3655,6 +3882,7 @@ function FriendsUI:ApplyModernLayout()
 		if header.StatusDropdown and header.BattlenetFrame then
 			header.StatusDropdown:SetFrameLevel(header.BattlenetFrame:GetFrameLevel() + 1)
 		end
+		self:InstallBroadcastFrameAnchorHook()
 		self:LayoutBattleTagActions()
 		self:HideModernLegacyHeaderDropdowns(header)
 		local filterDropdown = root.FilterBar.FilterDropdown
@@ -3706,6 +3934,7 @@ function FriendsUI:RestoreLegacyLayout()
 			header.SearchBox.Instructions:SetText(self.legacyState.searchInstruction)
 		end
 	end
+	self:InstallBroadcastFrameAnchorHook()
 	SafeShow(self.root and self.root.PortraitOverlay, false)
 	self:RestoreLegacyTabs(false)
 	self:RestoreLegacyMainInsetLayout()
@@ -3838,7 +4067,6 @@ function FriendsUI:SelectSection(sectionID)
 	self.selectingSection = false
 	if self:IsModernActive() then
 		self:ApplyModernContentLayout(sectionID)
-		self:RefreshModernSideTabSelection()
 	end
 	return sectionID
 end
@@ -3926,7 +4154,10 @@ function FriendsUI:RefreshEffectiveStyleOnShow()
 	-- provider, and asks every theme integration to reskin all of its windows.
 	-- Refresh only the visual state which Blizzard's frame templates can restore.
 	if effective == STYLE_MODERN then
-		self:ApplyModernPortrait()
+		-- Blizzard can restore child visibility, anchors, and template artwork
+		-- while the frame is hidden.  Reassert only the selected section's
+		-- configuration-dependent layout instead of rebuilding the entire style.
+		self:RefreshModernConfigurationLayout("frame-show")
 		-- ElvUI does not use BFL's flat-theme palette and therefore owns its own
 		-- portrait suppression. EUI schedules its focused facade pass from the
 		-- frame's OnShow hook; Dark and Custom need no work beyond the portrait.
@@ -3935,6 +4166,11 @@ function FriendsUI:RefreshEffectiveStyleOnShow()
 			local ElvUISkin = BFL:GetModule("ElvUISkin")
 			if ElvUISkin and ElvUISkin.RefreshModernSkin then
 				ElvUISkin:RefreshModernSkin()
+			end
+		elseif theme == "ellesmereui" then
+			local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+			if EllesmereUISkin and EllesmereUISkin.RefreshModernPortraitCorner then
+				EllesmereUISkin:RefreshModernPortraitCorner(BetterFriendsFrame)
 			end
 		end
 	else
@@ -3974,6 +4210,9 @@ function FriendsUI:ApplyEffectiveStyle(reason)
 	local rafFrame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
 	if RAF and RAF.ApplyFrameStyle and rafFrame then
 		RAF:ApplyFrameStyle(rafFrame)
+	end
+	if RAF and RAF.AnchorRewardsFrame and RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame:IsShown() then
+		RAF:AnchorRewardsFrame()
 	end
 	local FrameSettings = BFL:GetModule("FrameSettings")
 	if FrameSettings and FrameSettings.ApplySettings then
@@ -4494,9 +4733,7 @@ function FriendsUI:ApplyTheme(theme)
 	self:ApplyModernVisibleControlTheme(palette, modernActive and themed)
 
 	local warning = self.root.RequestsFrame and self.root.RequestsFrame.RealIDWarning
-	if warning and warning.Background then
-		ApplySolidTextureColor(warning.Background, themed and palette.background or { 0, 0, 0, 0.85 })
-	end
+	self:ApplyRealIDWarningTheme(palette, self.currentTheme)
 	ApplyThemedFontColor(self.root, self.root.FriendsDisabledText, palette.disabledText, themed)
 	ApplyThemedFontColor(self.root.RequestsFrame, self.root.RequestsFrame and self.root.RequestsFrame.EmptyLabel, palette.disabledText, themed)
 	ApplyThemedFontColor(warning, warning and warning.Text, palette.text, themed)
@@ -5212,6 +5449,20 @@ function FriendsUI:RegisterTests()
 				if label == "RAF recruitment" and frame and button == frame.bflModernRecruitmentButton then
 					V:AssertEqual(button.baseWidth, 160, "Modern RAF recruitment keeps Blizzard's 160 px base width")
 					V:AssertEqual(button.maxWidth, 400, "Modern RAF recruitment keeps Blizzard's 400 px maximum width")
+					V:AssertEqual(
+						button:GetParent(),
+						self.root.BottomActionBar,
+						"Modern RAF recruitment belongs to the visible Modern action footer"
+					)
+					V:Assert(
+						button:GetFrameLevel() > self.root.BottomActionBar:GetFrameLevel(),
+						"Modern RAF recruitment renders above the Modern action footer"
+					)
+					V:AssertEqual(
+						button.buttonArtKit,
+						"128-RedButton",
+						"Blizzard theme keeps the native red SocialUI action-button art kit"
+					)
 					if button.GetScaledDesiredWidth then
 						local expectedWidth = button:GetScaledDesiredWidth()
 						V:Assert(
@@ -5475,6 +5726,15 @@ function FriendsUI:RegisterTests()
 				not self:ShouldReserveModernActionFooter("raid"),
 				"Modern sections without bottom actions keep the full content height"
 			)
+			local frame = BetterFriendsFrame
+			local recruitmentButton = frame and frame.bflModernRecruitmentButton
+			if self.root and recruitmentButton then
+				V:AssertEqual(
+					recruitmentButton:GetParent(),
+					self.root.BottomActionBar,
+					"Every Modern theme keeps RAF recruitment on the shared footer layer"
+				)
+			end
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernRequestLevels", {
@@ -5537,6 +5797,17 @@ function FriendsUI:RegisterTests()
 				end
 				db.simpleMode = false
 				self:ApplyModernPortrait()
+				V:AssertEqual(
+					self.root.PortraitOverlay.HitButton:GetObjectType(),
+					"Button",
+					"Every Modern theme uses the visible portrait as its interaction target"
+				)
+				V:Assert(self.root.PortraitOverlay.HitButton:IsMouseEnabled(), "Modern portrait accepts mouse input")
+				V:Assert(self.root.PortraitOverlay.HitButton:GetScript("OnClick") ~= nil, "Modern portrait opens the changelog")
+				V:Assert(
+					not frame.PortraitButton or not frame.PortraitButton:IsShown(),
+					"Modern hides the differently positioned legacy portrait hit rect"
+				)
 				if BFL.UsesFlatTheme and BFL:UsesFlatTheme() then
 					local point, relativeTo, relativePoint, x, y = self.root.PortraitOverlay:GetPoint(1)
 					V:AssertEqual(self.root.PortraitOverlay:GetWidth(), MODERN_THEMED_PORTRAIT_SIZE, "Modern flat-theme portrait uses the compact square width")
@@ -5578,9 +5849,11 @@ function FriendsUI:RegisterTests()
 			local originalSimpleMode = db.simpleMode
 			local originalSimpleModeShowSearch = db.simpleModeShowSearch
 			local ok, err = pcall(function()
-				db.simpleMode = true
-				db.simpleModeShowSearch = false
-				self:ApplyModernContentLayout("friends", true)
+				self.selectedSection = "friends"
+				local Settings = BFL:GetModule("Settings")
+				V:AssertNotNil(Settings, "Settings module should drive the real Simple Mode path")
+				Settings:OnSimpleModeChanged(true)
+				Settings:OnSimpleModeShowSearchChanged(false)
 				local header = BetterFriendsFrame.FriendsTabHeader
 				local insetPoint, insetRelativeTo, insetRelativePoint, insetX, insetY = BetterFriendsFrame.Inset:GetPoint(1)
 				V:Assert(not self.root.FilterBar:IsShown(), "Modern Simple Mode hides the Contacts filter bar")
@@ -5595,8 +5868,7 @@ function FriendsUI:RegisterTests()
 						and insetY == -7,
 					"Modern Simple Mode expands the Contacts list into the hidden control row"
 				)
-				db.simpleModeShowSearch = true
-				self:ApplyModernContentLayout("friends", true)
+				Settings:OnSimpleModeShowSearchChanged(true)
 				local searchPoint, searchRelativeTo, searchRelativePoint, searchX = header.SearchBox:GetPoint(2)
 				V:Assert(self.root.FilterBar:IsShown(), "Modern Simple Mode can retain its compact search row")
 				V:Assert(header.SearchBox:IsShown(), "Modern Simple Mode search option shows Contacts search")
@@ -5609,13 +5881,14 @@ function FriendsUI:RegisterTests()
 						and searchX == -7,
 					"Modern Simple Mode search expands across the hidden filter controls"
 				)
-				self:ApplyModernContentLayout("who", true)
+				self.selectedSection = "who"
+				self:RefreshModernConfigurationLayout("test-directory")
 				V:Assert(self.root.FilterBar:IsShown(), "Modern Simple Mode preserves directory-specific controls")
 			end)
 			db.simpleMode = originalSimpleMode
 			db.simpleModeShowSearch = originalSimpleModeShowSearch
-			self:ApplyModernPortrait()
-			self:ApplyModernContentLayout(previousSection, true)
+			self.selectedSection = previousSection
+			self:RefreshModernConfigurationLayout("test-restore")
 			if not ok then
 				error(err)
 			end
@@ -6499,6 +6772,46 @@ function FriendsUI:RegisterTests()
 			if not ok then
 				error(err, 0)
 			end
+		end,
+	})
+	TestSuite:RegisterTest("data", "FriendsUI_RealIDWarningThemeBackground", {
+		action = function(V)
+			local blizzard = self:GetRealIDWarningBackgroundColor(MODERN_BLIZZARD_THEME_COLORS, "blizzard")
+			V:AssertEqual(blizzard[4], 0.85, "Blizzard Real ID warning should preserve the native overlay opacity")
+
+			local themed = self:GetRealIDWarningBackgroundColor({
+				background = { 0.1, 0.1, 0.1, 0.3 },
+				panel = { 0.2, 0.2, 0.2, 0.4 },
+			}, "ellesmereui")
+			V:AssertEqual(themed[1], 0.2, "Themed Real ID warning should use the theme panel color")
+			V:AssertEqual(themed[4], 0.94, "Themed Real ID warning should remain readable over request cards")
+		end,
+	})
+	TestSuite:RegisterTest("ui", "FriendsUI_RealIDWarningOverlayLayer", {
+		condition = function()
+			return self:IsModernActive()
+				and self.root
+				and self.root.RequestsFrame
+				and self.root.RequestsFrame.RealIDWarning
+				and self.root.RequestsFrame.ScrollBox
+		end,
+			action = function(V)
+				local requests = self.root.RequestsFrame
+				local warning = requests.RealIDWarning
+				self:LayoutRealIDWarning()
+				V:AssertNotNil(warning.ScrollableWarningText, "Real ID warning should use Blizzard's scrolling text template")
+				V:AssertNotNil(warning.ScrollBar, "Real ID warning should provide Blizzard's minimal overflow scrollbar")
+				local warningText = warning.ScrollableWarningText:GetFontString()
+				V:AssertEqual(warning.Text, warningText, "Theme text styling should target the scrolling warning text")
+				V:AssertEqual(warningText:GetJustifyH(), "CENTER", "Real ID warning text should remain centered horizontally")
+				V:AssertEqual(warningText:GetJustifyV(), "TOP", "Real ID warning text should begin below the icons")
+				V:AssertEqual(warning:GetFrameStrata(), "DIALOG", "Real ID warning should use Blizzard's dialog strata")
+			V:Assert(
+				warning:GetFrameLevel() > requests.ScrollBox:GetFrameLevel(),
+				"Real ID warning should render above recycled request cards"
+			)
+			local drawLayer = warning.Background:GetDrawLayer()
+			V:AssertEqual(drawLayer, "BACKGROUND", "Real ID warning surface should remain behind its own content")
 		end,
 	})
 end

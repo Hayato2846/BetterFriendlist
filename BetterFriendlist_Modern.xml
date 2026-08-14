@@ -303,7 +303,24 @@
 							<MaskedTextures><MaskedTexture childKey="Icon" /></MaskedTextures>
 						</MaskTexture>
 					</Layer>
+					<Layer level="OVERLAY" textureSubLevel="7">
+						<Texture parentKey="Glow" file="Interface\PVPFrame\TournamentOrganizer" alphaMode="ADD" hidden="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-18" y="12" />
+								<Anchor point="BOTTOMRIGHT" x="64" y="-64" />
+							</Anchors>
+							<TexCoords left="0.8525390625" right="0.9775390625" top="0.0009765625" bottom="0.1259765625" />
+						</Texture>
+					</Layer>
 				</Layers>
+				<Frames>
+					<Button parentKey="HitButton" enableMouse="true">
+						<Anchors>
+							<Anchor point="TOPLEFT" />
+							<Anchor point="BOTTOMRIGHT" />
+						</Anchors>
+					</Button>
+				</Frames>
 			</Frame>
 
 			<Frame parentKey="BattleNetBar">
@@ -399,18 +416,11 @@
 						<Anchors><Anchor point="TOPLEFT" /><Anchor point="BOTTOMRIGHT" /></Anchors>
 						<Layers>
 							<Layer level="BACKGROUND"><Texture parentKey="Background" file="Interface\Buttons\WHITE8X8" setAllPoints="true"><Color color="BLACK_FONT_COLOR" a="0.85" /></Texture></Layer>
-							<Layer level="ARTWORK">
+							<Layer level="OVERLAY">
 								<Texture parentKey="PlayerIcon" atlas="friends-icon-addFriend" useAtlasSize="true"><Anchors><Anchor point="TOP" y="-67" /></Anchors></Texture>
+							</Layer>
+							<Layer level="ARTWORK">
 								<Texture parentKey="BattleNetIcon" atlas="friends-icon-addFriend-logo-battleNet" useAtlasSize="true"><Anchors><Anchor point="BOTTOMLEFT" relativeKey="$parent.PlayerIcon" relativePoint="BOTTOM" y="10" /></Anchors></Texture>
-								<FontString parentKey="Text" inherits="UserScaledFontGameHighlight" justifyH="CENTER" justifyV="MIDDLE" wordwrap="true">
-									<Anchors>
-										<Anchor point="TOP" relativeKey="$parent.PlayerIcon" relativePoint="BOTTOM" y="-27" />
-										<Anchor point="LEFT" x="30" />
-										<Anchor point="RIGHT" x="-30" />
-										<Anchor point="BOTTOM" relativeKey="$parent.ContinueButton" relativePoint="TOP" y="20" />
-									</Anchors>
-									<Color color="HIGHLIGHT_FONT_COLOR" />
-								</FontString>
 							</Layer>
 						</Layers>
 						<Frames>
@@ -418,7 +428,25 @@
 								<Size x="100" y="30" />
 								<Anchors><Anchor point="TOP" relativePoint="BOTTOM" y="95" /></Anchors>
 							</Button>
+							<Frame parentKey="ScrollableWarningText" inherits="ScrollingFontTemplate">
+								<Anchors>
+									<Anchor point="TOP" relativeKey="$parent.PlayerIcon" relativePoint="BOTTOM" y="-27" />
+									<Anchor point="LEFT" x="30" />
+									<Anchor point="RIGHT" x="-30" />
+									<Anchor point="BOTTOM" relativeKey="$parent.ContinueButton" relativePoint="TOP" y="20" />
+								</Anchors>
+								<KeyValues>
+									<KeyValue key="fontName" value="UserScaledFontGameHighlight" type="string" />
+								</KeyValues>
+							</Frame>
+							<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeKey="$parent.ScrollableWarningText" relativePoint="TOPRIGHT" x="17" />
+									<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollableWarningText" relativePoint="BOTTOMRIGHT" x="17" />
+								</Anchors>
+							</EventFrame>
 						</Frames>
+						<Scripts><OnMouseWheel function="nop" /></Scripts>
 					</Frame>
 					<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
 						<Anchors><Anchor point="TOPLEFT" /><Anchor point="BOTTOMRIGHT" x="-18" /></Anchors>

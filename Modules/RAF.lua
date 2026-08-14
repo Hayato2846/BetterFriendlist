@@ -388,7 +388,7 @@ local function UpdateNativeRewardsList(rewardsFrame, rewards)
 	end
 end
 
-local function RefreshNativeRewardsFrame()
+local function RefreshNativeRewardsFrame(rebuildTabs, allowNativeFullRefresh)
 	local rewardsFrame = RecruitAFriendRewardsFrame
 	local rafInfo = nativeRewardsState.rafInfo
 	local selectedRAFVersion = nativeRewardsState.selectedRAFVersion
@@ -401,10 +401,10 @@ local function RefreshNativeRewardsFrame()
 		CloseSideDressUpFrame(rewardsFrame)
 	end
 
-	if rewardsFrame.SetUpTabs then
+	if rebuildTabs and rewardsFrame.SetUpTabs then
 		CallBlizzardMethod(rewardsFrame, rewardsFrame.SetUpTabs, rafInfo)
 	end
-	if CanUseNativeRewardsFullRefresh(rewardsFrame, rafInfo) then
+	if allowNativeFullRefresh ~= false and CanUseNativeRewardsFullRefresh(rewardsFrame, rafInfo) then
 		local ok = pcall(CallBlizzardMethod, rewardsFrame, rewardsFrame.FullRefresh)
 		if ok then
 			EnforcePreviewRewardsSafety(rewardsFrame, rafInfo)
@@ -457,7 +457,7 @@ function SelectNativeRewardVersion(rafVersion)
 	end
 
 	nativeRewardsState.selectedRAFVersion = rafVersion
-	return RefreshNativeRewardsFrame()
+	return RefreshNativeRewardsFrame(false, false)
 end
 
 local function IsBetterFriendlistRewardsContext()
@@ -488,14 +488,10 @@ local function HookNativeRewardTabs()
 		if not nativeRewardTabHooks[rewardTab] then
 			rewardTab:HookScript("OnClick", function(tab)
 				if RecruitAFriendRewardsFrame and RecruitAFriendRewardsFrame:IsShown() and IsBetterFriendlistRewardsContext() then
-					local nativeRefreshOwnsSelection = RecruitAFriendRewardsFrame.FullRefresh
-						and RecruitAFriendRewardsFrame.RefreshTabs
-						and not (nativeRewardsState.rafInfo and nativeRewardsState.rafInfo._isMock)
-					if nativeRefreshOwnsSelection then
-						nativeRewardsState.selectedRAFVersion = tab.rafVersion
-					else
-						SelectNativeRewardVersion(tab.rafVersion)
-					end
+					-- Blizzard routes the native handler through the RAF owner selected
+					-- by C_SocialUI. Forced Modern can therefore update only the hidden
+					-- Legacy owner. Mirror every click into BFL's visible context.
+					SelectNativeRewardVersion(tab.rafVersion)
 				end
 			end)
 			nativeRewardTabHooks[rewardTab] = true
@@ -531,6 +527,7 @@ local function InstallNativeRewardsLifecycleHooks(rewardsFrame)
 			if IsPreviewRewardsOwner(rewardsFrame) then
 				EnforcePreviewRewardsSafety(rewardsFrame, nativeRewardsState.rafInfo)
 			end
+			HookNativeRewardTabs()
 		end)
 		nativeRewardsState.fullRefreshHookInstalled = ok == true
 	end
@@ -541,6 +538,9 @@ local function InstallNativeRewardsLifecycleHooks(rewardsFrame)
 			end
 		end)
 		nativeRewardsState.hideHookInstalled = true
+	end
+	if rewardsFrame.HookScript and not rewardsFrame.BFL_AnchorHookInstalled then
+		rewardsFrame.BFL_AnchorHookInstalled = true; rewardsFrame:HookScript("OnShow", function() RAF:AnchorRewardsFrame() end)
 	end
 end
 
@@ -557,7 +557,7 @@ local function PrepareRewardsFrameForInfo(rafInfo, resetToLatest, preview)
 	if not nativeRewardsState.originalGetRecruitAFriendFrame then
 		nativeRewardsState.originalGetRecruitAFriendFrame = rewardsFrame.GetRecruitAFriendFrame
 	end
-	InstallNativeRewardsLifecycleHooks(rewardsFrame)
+	InstallNativeRewardsLifecycleHooks(rewardsFrame); RAF:AnchorRewardsFrame()
 
 	if preview then
 		local proxy = nativeRewardsState.previewProxy or {}
@@ -603,7 +603,7 @@ local function PrepareRewardsFrameForInfo(rafInfo, resetToLatest, preview)
 		nativeRewardsState.selectedRAFVersion = GetNativeLatestRewardVersion(rafInfo)
 	end
 
-	local refreshed = RefreshNativeRewardsFrame()
+	local refreshed = RefreshNativeRewardsFrame(true, true)
 	HookNativeRewardTabs()
 	return refreshed
 end
@@ -1079,12 +1079,9 @@ local function EnsureModernActionButton(owner, key, parent, width, onClick, temp
 		modernButton:SetScript("OnClick", onClick)
 		owner[modernKey] = modernButton
 	end
+	if modernButton:GetParent() ~= parent then modernButton:SetParent(parent) end
 
-	-- SocialUIActionButtonTemplate is only the 70 px base template. Blizzard's
-	-- actual Social UI action button overrides these values in XML before its
-	-- UserScaledButtonFitToTextMixin registers with TextSizeManager. BFL creates
-	-- the proxy dynamically, so SetText() otherwise recalculates it back to the
-	-- 70 px base after our SetSize(), collapsing the disabled three-slice art.
+	-- Match Blizzard's 160 px SocialUI override before UpdateWidth recalculates the dynamic proxy.
 	modernButton.baseWidth = width
 	modernButton.maxWidth = maxWidth or modernButton.maxWidth
 	modernButton:SetSize(width, 30)
@@ -1274,10 +1271,12 @@ function RAF:ApplyFrameStyle(frame)
 	end
 
 	if mainFrame then
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		local recruitmentParent = FriendsUI and FriendsUI.root and FriendsUI.root.BottomActionBar or mainFrame
 		local recruitmentButton = EnsureModernActionButton(
 			mainFrame,
 			"RecruitmentButton",
-			mainFrame,
+			recruitmentParent,
 			160,
 			function(button)
 				RAF:RecruitmentButton_OnClick(button)
@@ -1287,8 +1286,9 @@ function RAF:ApplyFrameStyle(frame)
 		)
 		if recruitmentButton then
 			recruitmentButton:SetText(RAF_RECRUITMENT)
+			recruitmentButton:SetFrameLevel(recruitmentParent:GetFrameLevel() + 1)
 			recruitmentButton:ClearAllPoints()
-			recruitmentButton:SetPoint("BOTTOM", mainFrame, "BOTTOM", 0, 12)
+			recruitmentButton:SetPoint("BOTTOM", recruitmentParent, "BOTTOM", 0, 12)
 		end
 	end
 end
@@ -2741,4 +2741,15 @@ function RAF:RecruitmentButton_OnClick(button)
 
 		CallBlizzardFunction(StaticPopupSpecial_Show, RecruitAFriendRecruitmentFrame)
 	end
+end
+
+function RAF:AnchorRewardsFrame()
+	local rewardsFrame = RecruitAFriendRewardsFrame
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if not (rewardsFrame and FriendsUI and FriendsUI.AnchorAuxiliaryWindow) then
+		return false
+	end
+	-- Keep Blizzard's dialog parent and lifecycle intact. The relative point is
+	-- sufficient to make it follow BFL without entering the UIPanel manager.
+	return FriendsUI:AnchorAuxiliaryWindow(rewardsFrame, 0)
 end

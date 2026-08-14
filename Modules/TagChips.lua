@@ -17,6 +17,8 @@ local CHIP_BORDER_INSET = 1
 local BLIZZARD_PICKER_ICON_ZOOM = 0.16
 local EMPTY_TABLE = {}
 local OVERFLOW_PROFILE = { color = { r = 0.45, g = 0.45, b = 0.45, a = 1 }, textColor = { r = 1, g = 1, b = 1, a = 1 } }
+local DEFAULT_CHIP_COLOR = { r = 0.50, g = 0.78, b = 1.00, a = 1 }
+local DEFAULT_TEXT_COLOR = { r = 1, g = 1, b = 1, a = 1 }
 
 local function GetFriendTags()
 	return BFL:GetModule("FriendTags")
@@ -95,10 +97,33 @@ end
 local measureLabel
 local measuredLabelWidths = {}
 local measuredLabelVersion
+local chipFontPath
+local chipFontSize
+local chipFontFlags
+local chipFontVersion = 0
+
+local function GetChipFontVersion()
+	local fontObject = _G.BetterFriendlistFriendsFontSmall or _G.GameFontHighlightSmall
+	if not (fontObject and fontObject.GetFont) then
+		return BFL.SettingsVersion or 0
+	end
+
+	local path, size, flags = fontObject:GetFont()
+	if path ~= chipFontPath or size ~= chipFontSize or flags ~= chipFontFlags then
+		chipFontPath = path
+		chipFontSize = size
+		chipFontFlags = flags
+		chipFontVersion = chipFontVersion + 1
+		if measureLabel then
+			ApplyFont(measureLabel)
+		end
+	end
+	return chipFontVersion
+end
 
 local function MeasureLabelWidth(labelText)
 	labelText = tostring(labelText or "")
-	local version = BFL.SettingsVersion or 0
+	local version = GetChipFontVersion()
 	if measuredLabelVersion ~= version then
 		measuredLabelWidths = {}
 		measuredLabelVersion = version
@@ -145,7 +170,7 @@ local function HideRow(row)
 	end
 end
 
-local function GetRowCacheVersions(friend, friendsList, FriendTags)
+local function GetRowCacheVersions(friend, friendsList, FriendTags, persistentUID)
 	local settingsCache = friendsList and friendsList.settingsCache
 	FriendTags = FriendTags or GetFriendTags()
 	local friendsVersion = BFL.FriendsListVersion or 0
@@ -155,7 +180,14 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags)
 	local tagsGlobalAssignmentVersion = FriendTags and FriendTags.GetAssignmentVersion and FriendTags:GetAssignmentVersion()
 		or BFL.FriendTagsVersion
 		or 0
-	local settingsVersion = BFL.SettingsVersion or 0
+	-- Tag definitions carry every Friend Tag visual setting change. General BFL
+	-- settings (filters, search, selected tab) must not invalidate all row chips.
+	-- Streamer Mode is deliberately tracked separately from SettingsVersion: it
+	-- changes tag visibility without changing definitions and must never reuse a
+	-- previously visible row-chip result.
+	local fontVersion = GetChipFontVersion()
+	local streamerModeFlag = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive and 1 or 0
+	local settingsVersion = (fontVersion * 2) + streamerModeFlag
 	local compactModeFlag = settingsCache and settingsCache.compactMode and 1 or 0
 	local infoDisabledFlag = settingsCache and settingsCache.infoDisabled and 1 or 0
 	local availableWidth = GetAvailableRowWidth(friendsList)
@@ -180,7 +212,7 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags)
 		end
 	end
 
-	local tagsAssignmentVersion = FriendTags and FriendTags.GetFriendAssignmentVersion and FriendTags:GetFriendAssignmentVersion(friend)
+	local tagsAssignmentVersion = FriendTags and FriendTags.GetFriendAssignmentVersion and FriendTags:GetFriendAssignmentVersion(friend, persistentUID)
 		or BFL.FriendTagsVersion
 		or 0
 	if type(friend) == "table" then
@@ -205,7 +237,6 @@ end
 
 local function RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth)
 	return data
-		and data.cacheFriendsVersion == friendsVersion
 		and data.cacheTagsDefinitionVersion == tagsDefinitionVersion
 		and data.cacheTagsAssignmentVersion == tagsAssignmentVersion
 		and data.cacheSettingsVersion == settingsVersion
@@ -332,28 +363,58 @@ local function ApplyZoomedTexCoord(texture, texCoord, zoom)
 	texture:SetTexCoord(left + (width * zoom), right - (width * zoom), top + (height * zoom), bottom - (height * zoom))
 end
 
+local function ApplyZoomedAtlasName(texture, atlasName, zoom)
+	if type(atlasName) ~= "string" or atlasName == "" then
+		return false
+	end
+	local info = BFL.GetAtlasInfo(atlasName)
+	local textureFile = info and (info.file or info.filename)
+	if textureFile then
+		texture:SetTexture(textureFile)
+		local left = tonumber(info.leftTexCoord) or 0
+		local right = tonumber(info.rightTexCoord) or 1
+		local top = tonumber(info.topTexCoord) or 0
+		local bottom = tonumber(info.bottomTexCoord) or 1
+		local width = right - left
+		local height = bottom - top
+		texture:SetTexCoord(left + (width * zoom), right - (width * zoom), top + (height * zoom), bottom - (height * zoom))
+		texture:Show()
+		return true
+	end
+	return false
+end
+
+local function GetPersistentRowCacheKey(friend, FriendTags)
+	local friendType = type(friend)
+	if friendType == "string" or friendType == "number" then
+		return friendType .. "|" .. tostring(friend), tostring(friend)
+	end
+	if friendType ~= "table" or not (FriendTags and FriendTags.GetFriendUID) then
+		return nil
+	end
+	local uid = FriendTags:GetFriendUID(friend)
+	if not uid then
+		return nil
+	end
+	return tostring(friend.type or "friend") .. "|" .. tostring(uid), uid
+end
+
 local function ApplyZoomedAtlas(texture, profile, zoom)
 	if not (texture and type(profile) == "table" and profile.iconType == "atlas" and BFL.GetAtlasInfo) then
 		return false
 	end
-	local atlasNames = { profile.iconValue or false, profile.atlas or false, profile.fallbackAtlas or false }
-	local seen = {}
-	for _, atlasName in ipairs(atlasNames) do
-		if type(atlasName) == "string" and atlasName ~= "" and not seen[atlasName] then
-			seen[atlasName] = true
-			local info = BFL.GetAtlasInfo(atlasName)
-			local textureFile = info and (info.file or info.filename)
-			if textureFile then
-				texture:SetTexture(textureFile)
-				ApplyZoomedTexCoord(texture, {
-					info.leftTexCoord,
-					info.rightTexCoord,
-					info.topTexCoord,
-					info.bottomTexCoord,
-				}, zoom)
-				texture:Show()
-				return true
-			end
+	local primary = profile.iconValue
+	local atlas = profile.atlas
+	local fallback = profile.fallbackAtlas
+	if ApplyZoomedAtlasName(texture, primary, zoom) then
+		return true
+	end
+	if atlas ~= primary and ApplyZoomedAtlasName(texture, atlas, zoom) then
+		return true
+	end
+	if fallback ~= primary and fallback ~= atlas then
+		if ApplyZoomedAtlasName(texture, fallback, zoom) then
+			return true
 		end
 	end
 	return false
@@ -395,16 +456,30 @@ local function CreateChip(parent)
 	return chip
 end
 
-local function UpdateChipVisual(chip, profile, labelText, options)
+local function UpdateChipVisual(chip, profile, labelText, allowIcon, overflow, maxWidth, forceRefresh)
 	if not chip then
 		return 0, false
 	end
 	profile = type(profile) == "table" and profile or {}
-	options = options or {}
 	labelText = tostring(labelText or "")
+	allowIcon = allowIcon ~= false
+	overflow = overflow == true
+	local fontVersion = GetChipFontVersion()
+	if
+		not forceRefresh
+		and chip._bflVisualProfile == profile
+		and chip._bflVisualLabel == labelText
+		and chip._bflVisualAllowIcon == allowIcon
+		and chip._bflVisualOverflow == overflow
+		and chip._bflVisualMaxWidth == maxWidth
+		and chip._bflVisualFontVersion == fontVersion
+	then
+		chip:Show()
+		return chip._bflVisualWidth or 0, chip._bflVisualHasIcon == true
+	end
 
-	local r, g, b, a = CopyColor(profile.color, { r = 0.50, g = 0.78, b = 1.00, a = 1 })
-	local tr, tg, tb, ta = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 })
+	local r, g, b, a = CopyColor(profile.color, DEFAULT_CHIP_COLOR)
+	local tr, tg, tb, ta = CopyColor(profile.textColor, DEFAULT_TEXT_COLOR)
 	SetPillColor(chip.pillBorder, 0, 0, 0, 1)
 	-- The fill remains opaque enough to preserve the configured color while the
 	-- one-pixel inset reveals the black outline underneath it.
@@ -412,11 +487,11 @@ local function UpdateChipVisual(chip, profile, labelText, options)
 	chip.label:SetTextColor(tr, tg, tb, ta)
 	chip.label:SetText(labelText)
 
-	local hasIcon = options.allowIcon ~= false and (profile.iconValue or profile.icon or profile.texture or profile.atlas)
+	local hasIcon = allowIcon and (profile.iconValue or profile.icon or profile.texture or profile.atlas)
 	if hasIcon then
 		hasIcon = ApplyIcon(chip.icon, profile)
 	end
-	local bareIcon = labelText == "" and hasIcon == true and options.overflow ~= true
+	local bareIcon = labelText == "" and hasIcon == true and not overflow
 	chip.bareIcon = bareIcon
 	SetPillShown(chip.pillBorder, not bareIcon)
 	SetPillShown(chip.pillBackground, not bareIcon)
@@ -439,12 +514,20 @@ local function UpdateChipVisual(chip, profile, labelText, options)
 		chip.label:SetPoint("RIGHT", chip, "RIGHT", -6, 0)
 	end
 
-	local desiredWidth = GetDesiredChipWidth(labelText, hasIcon == true, options.overflow == true)
-	if options.maxWidth then
-		desiredWidth = math.min(desiredWidth, options.maxWidth)
+	local desiredWidth = GetDesiredChipWidth(labelText, hasIcon == true, overflow)
+	if maxWidth then
+		desiredWidth = math.min(desiredWidth, maxWidth)
 	end
 	chip:SetWidth(desiredWidth)
 	chip:Show()
+	chip._bflVisualProfile = profile
+	chip._bflVisualLabel = labelText
+	chip._bflVisualAllowIcon = allowIcon
+	chip._bflVisualOverflow = overflow
+	chip._bflVisualMaxWidth = maxWidth
+	chip._bflVisualFontVersion = fontVersion
+	chip._bflVisualWidth = desiredWidth
+	chip._bflVisualHasIcon = hasIcon == true
 	return desiredWidth, hasIcon == true
 end
 
@@ -472,12 +555,27 @@ end
 
 function TagChips:GetRowData(friend, friendsList)
 	local FriendTags = GetFriendTags()
+	local persistentCacheKey, persistentUID = GetPersistentRowCacheKey(friend, FriendTags)
 	local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
-		GetRowCacheVersions(friend, friendsList, FriendTags)
+		GetRowCacheVersions(friend, friendsList, FriendTags, persistentUID)
+	if self.rowDataCacheDefinitionVersion ~= tagsDefinitionVersion then
+		self.rowDataCacheDefinitionVersion = tagsDefinitionVersion
+		self.rowDataByFriend = {}
+		self.rowDataByFriendCount = 0
+		self.scalarRowCache = {}
+	end
 	local data
-	local useFriendCache = type(friend) == "table"
+	local useFriendCache = type(friend) == "table" and persistentCacheKey == nil
 
-	if useFriendCache then
+	if persistentCacheKey then
+		if not self.rowDataByFriend then
+			self.rowDataByFriend = {}
+		end
+		data = self.rowDataByFriend[persistentCacheKey]
+		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth) then
+			return data
+		end
+	elseif useFriendCache then
 		data = friend._bflTagChipsRowData
 		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth) then
 			return data
@@ -497,7 +595,16 @@ function TagChips:GetRowData(friend, friendsList)
 	end
 
 	data = ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth)
-	if useFriendCache then
+	if persistentCacheKey then
+		if not self.rowDataByFriend[persistentCacheKey] then
+			self.rowDataByFriendCount = (self.rowDataByFriendCount or 0) + 1
+			if self.rowDataByFriendCount > 2048 then
+				self.rowDataByFriend = {}
+				self.rowDataByFriendCount = 1
+			end
+		end
+		self.rowDataByFriend[persistentCacheKey] = data
+	elseif useFriendCache then
 		friend._bflTagChipsRowData = data
 	else
 		local cacheKey = friend
@@ -604,11 +711,24 @@ function TagChips:GetRowAnchor(button)
 end
 
 function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
+	-- The provider can survive an in-place smart refresh while assignments or
+	-- layout inputs change. Validate explicit data before rendering it; the
+	-- version lookup itself is cached on the current friend record.
 	if rowData then
 		local FriendTags = GetFriendTags()
-		local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
-			GetRowCacheVersions(friend, friendsList, FriendTags)
-		if not RowDataMatches(rowData, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth) then
+		local _, persistentUID = GetPersistentRowCacheKey(friend, FriendTags)
+		local friendsVersion, definitionVersion, assignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth =
+			GetRowCacheVersions(friend, friendsList, FriendTags, persistentUID)
+		if not RowDataMatches(
+			rowData,
+			friendsVersion,
+			definitionVersion,
+			assignmentVersion,
+			settingsVersion,
+			compactMode,
+			infoDisabled,
+			availableWidth
+		) then
 			rowData = nil
 		end
 	end
@@ -655,11 +775,14 @@ function TagChips:UpdateRowChips(button, friend, friendsList, rowData)
 				profile = entry.profile or tag and tag.chipProfile or {}
 			end
 
-			local desiredWidth = UpdateChipVisual(chip, profile, labelText, {
-				allowIcon = index <= visibleCount,
-				overflow = index > visibleCount,
-				maxWidth = availableWidth,
-			})
+			local desiredWidth = UpdateChipVisual(
+				chip,
+				profile,
+				labelText,
+				index <= visibleCount,
+				index > visibleCount,
+				availableWidth
+			)
 			if chipsOnLine >= CHIPS_PER_LINE or (chipsOnLine > 0 and cursorX + desiredWidth > availableWidth) then
 				lineIndex = lineIndex + 1
 				cursorX = 0
@@ -683,10 +806,7 @@ function TagChips:CreateStandaloneChip(parent)
 end
 
 function TagChips:UpdateStandaloneChip(chip, profile, labelText, maxWidth)
-	return UpdateChipVisual(chip, profile, labelText, {
-		allowIcon = true,
-		maxWidth = maxWidth or STANDALONE_CHIP_MAX_WIDTH,
-	})
+	return UpdateChipVisual(chip, profile, labelText, true, false, maxWidth or STANDALONE_CHIP_MAX_WIDTH, true)
 end
 
 return TagChips

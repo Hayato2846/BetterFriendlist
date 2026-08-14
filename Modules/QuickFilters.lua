@@ -12,6 +12,10 @@ local FILTER_ROOT_MENU_WIDTH = 120
 local FILTER_ROOT_MAX_TAG_ICONS = 2
 local FRIENDS_FILTER_ICON = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter"
 local visibleMenuLabels = setmetatable({}, { __mode = "k" })
+local EMPTY_TABLE = {}
+if table.freeze then
+	table.freeze(EMPTY_TABLE)
+end
 
 local function GetFriendsList()
 	return BFL:GetModule("FriendsList")
@@ -165,6 +169,7 @@ local function AddDynamicMenuLabel(element, getText)
 end
 
 function QuickFilters:Initialize()
+	self:InvalidateTagFilterCache()
 	local Registry = GetRegistry()
 	if Registry and Registry.NormalizeCurrentSelections then
 		Registry:NormalizeCurrentSelections()
@@ -178,10 +183,26 @@ function QuickFilters:Initialize()
 	end
 end
 
+function QuickFilters:InvalidateTagFilterCache()
+	self.tagFilterDefinitionsCache = nil
+	self.activeTagFilterCache = nil
+end
+
 function QuickFilters:GetTagFilterDefinitions()
 	local FriendTags = GetFriendTags()
 	if not (FriendTags and FriendTags.CanDisplayTags and FriendTags:CanDisplayTags("filter")) then
-		return {}
+		return EMPTY_TABLE
+	end
+
+	local definitionVersion = FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion() or 0
+	local cache = self.tagFilterDefinitionsCache
+	if
+		cache
+		and cache.db == BetterFriendlistDB
+		and cache.friendTags == FriendTags
+		and cache.definitionVersion == definitionVersion
+	then
+		return cache.definitions
 	end
 
 	local definitions = {}
@@ -190,12 +211,18 @@ function QuickFilters:GetTagFilterDefinitions()
 			definitions[#definitions + 1] = tag
 		end
 	end
+	self.tagFilterDefinitionsCache = {
+		db = BetterFriendlistDB,
+		friendTags = FriendTags,
+		definitionVersion = definitionVersion,
+		definitions = definitions,
+	}
 	return definitions
 end
 
 function QuickFilters:GetSelectedTagFilters()
 	if not BetterFriendlistDB then
-		return {}
+		return EMPTY_TABLE
 	end
 	if type(BetterFriendlistDB.quickFilterTags) ~= "table" then
 		BetterFriendlistDB.quickFilterTags = {}
@@ -209,13 +236,39 @@ end
 
 function QuickFilters:GetActiveTagFilterDefinitions()
 	local selected = self:GetSelectedTagFilters()
+	local FriendTags = GetFriendTags()
+	local definitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion() or 0
+	local definitions = self:GetTagFilterDefinitions()
+	local cache = self.activeTagFilterCache
+	if
+		cache
+		and cache.db == BetterFriendlistDB
+		and cache.selected == selected
+		and cache.friendTags == FriendTags
+		and cache.definitionVersion == definitionVersion
+		and cache.definitions == definitions
+	then
+		return cache.activeDefinitions, cache.idSet
+	end
+
 	local active = {}
-	for _, tag in ipairs(self:GetTagFilterDefinitions()) do
+	local activeIdSet = {}
+	for _, tag in ipairs(definitions) do
 		if selected[tag.id] == true then
 			active[#active + 1] = tag
+			activeIdSet[tag.id] = true
 		end
 	end
-	return active
+	self.activeTagFilterCache = {
+		db = BetterFriendlistDB,
+		selected = selected,
+		friendTags = FriendTags,
+		definitionVersion = definitionVersion,
+		definitions = definitions,
+		idSet = activeIdSet,
+		activeDefinitions = active,
+	}
+	return active, activeIdSet
 end
 
 function QuickFilters:SetTagFilter(tagId, selected)
@@ -229,6 +282,7 @@ function QuickFilters:SetTagFilter(tagId, selected)
 	end
 	selectedTags[tagId] = newValue
 	BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+	self:InvalidateTagFilterCache()
 	RefreshVisibleMenuLabels()
 
 	if BFL.ForceRefreshFriendsList then
@@ -240,15 +294,14 @@ function QuickFilters:SetTagFilter(tagId, selected)
 end
 
 function QuickFilters:PassesTagFilters(friend)
-	local activeTags = self:GetActiveTagFilterDefinitions()
+	local activeTags, activeTagIds = self:GetActiveTagFilterDefinitions()
 	if #activeTags == 0 then
 		return true
 	end
 
-	local selected = self:GetSelectedTagFilters()
 	local FriendTags = GetFriendTags()
-	for _, tag in ipairs(FriendTags and FriendTags:GetTagsForFriend(friend, "filter") or {}) do
-		if selected[tag.id] == true then
+	for _, tag in ipairs(FriendTags and FriendTags:GetTagsForFriend(friend, "filter") or EMPTY_TABLE) do
+		if activeTagIds[tag.id] == true then
 			return true
 		end
 	end
