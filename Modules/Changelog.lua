@@ -29,20 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
-
-### Changed
-- **Modern UI Availability** - Retail now uses BetterFriendlist's Modern UI whenever the client provides the 12.1 SocialUI API, even while Blizzard temporarily disables its own new Friendlist frame. BetterFriendlist remains the entry point for every Social UI route in both Modern and Legacy, including Broadcast, Ignore List, and Raid Info windows.
-- **Recent Allies Availability** - BetterFriendlist now reacts immediately to `RECENT_ALLIES_SYSTEM_STATUS_UPDATED`, refreshing Modern navigation, Legacy tabs, and visible Recent Allies content when Blizzard changes the feature state.
-- **Recent Allies Groups** - Converted Legacy friends, pinned allies, and other recent allies now appear in separate groups in the same order as Blizzard's 12.1 Social UI.
-- **Queue Filters** - Retail's friend filters now include In Queue and Available for Queue when Blizzard's native Battle.net search is available. Restricted or unavailable search results safely leave the list usable.
-
-### Fixed
-- **Modern Avatar Interaction** - The visible BFL avatar now owns its changelog click and tooltip area in every Modern theme, including ElvUI and EllesmereUI, instead of relying on a differently positioned invisible Legacy button.
-- **Recruit a Friend Layout** - Long recruit lists now stop above the Modern Recruitment button, and the Blizzard theme once again shows the button's complete native artwork.
-- **Social Side Windows** - Recruit a Friend reward tabs now remain interactive in forced Modern mode, the rewards and Broadcast windows dock beside BetterFriendlist, and the Ignore List is skinned consistently by Dark, Custom, ElvUI, and EllesmereUI.
-- **Social UI Scaling and Dialogs** - Modern friend requests and Recruit a Friend layouts rebuild after Blizzard text-scale changes, while the Friends of Friends window now docks beside BetterFriendlist and follows the active theme.
-
 ## [2.8.0]        - 2026-08-12
 
 BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so far. With a change this broad, a few rough edges or bugs may still show up. We will keep polishing and adjusting the new experience over the next few days. Feedback on GitHub or CurseForge is always welcome.
@@ -58,12 +44,20 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 - **Updated Themes for the New Modern UI** - Dark, Custom, and ElvUI have all been adapted to the new Modern interface, including its frame surfaces, navigation, friend cards, controls, headers, and actions.
 
 ### Improved
+- **Modern UI Availability** - Retail now uses BetterFriendlist's Modern UI whenever the client provides the 12.1 SocialUI API, even while Blizzard temporarily disables its own new Friendlist frame. BetterFriendlist remains the entry point for every Social UI route in both Modern and Legacy, including Broadcast, Ignore List, and Raid Info windows.
+- **Recent Allies Availability** - BetterFriendlist now reacts immediately to `RECENT_ALLIES_SYSTEM_STATUS_UPDATED`, refreshing Modern navigation, Legacy tabs, and visible Recent Allies content when Blizzard changes the feature state.
+- **Recent Allies Groups** - Converted Legacy friends, pinned allies, and other recent allies now appear in separate groups in the same order as Blizzard's 12.1 Social UI.
+- **Queue Filters** - Retail's friend filters now include In Queue and Available for Queue when Blizzard's native Battle.net search is available. Restricted or unavailable search results safely leave the list usable.
 - **Classic Era 1.15.9 Compatibility** - BetterFriendlist and its Menu Bridge now declare support for the latest Classic Era client.
 - **Retail 12.1 Social Actions** - Recent Allies sends WoW title-friend invitations through Blizzard's confirmation dialog, offline WoW-only Title friends no longer expose an unreachable Whisper action, and Quick Join toasts select and scroll to the matching BetterFriendlist group.
 - **Adaptive Friend Rows** - Friend cards now stack their visible name, info, multi-account, and tag lines from a three-pixel top inset and calculate their height from the content that is actually shown. Long names wrap across as many lines as needed, including names without spaces, instead of being truncated. Rows grow beyond the old fixed Modern sizes and retired height cap when configured fonts or extra lines need more room.
 - **WHO Rows** - Alternating row backgrounds now have an adjustable strength control in both settings interfaces.
 
 ### Fixed
+- **Modern Avatar Interaction** - The visible BFL avatar now owns its changelog click and tooltip area in every Modern theme, including ElvUI and EllesmereUI, instead of relying on a differently positioned invisible Legacy button.
+- **Recruit a Friend Layout** - Long recruit lists now stop above the Modern Recruitment button, and the Blizzard theme once again shows the button's complete native artwork.
+- **Social Side Windows** - Recruit a Friend reward tabs now remain interactive in forced Modern mode, the rewards and Broadcast windows dock beside BetterFriendlist, and the Ignore List is skinned consistently by Dark, Custom, ElvUI, and EllesmereUI.
+- **Social UI Scaling and Dialogs** - Modern friend requests and Recruit a Friend layouts rebuild after Blizzard text-scale changes, while the Friends of Friends window now docks beside BetterFriendlist and follows the active theme.
 - **Event Compatibility** - Client-specific or removed events no longer stop addon initialization when Blizzard changes the event registry between game flavors or builds.
 - **Drag and Hover Handling** - Reordering groups, filters, sorters, and broker columns no longer calls the removed global mouse-over helper. Friend-group drops and themed hover states use the cross-flavor Region API as well.
 - **Friends Frame** - The title now uses the correct centered bounds when Simple Mode hides the portrait, and legacy filter/sort dropdowns stay hidden while the Modern UI is active.
