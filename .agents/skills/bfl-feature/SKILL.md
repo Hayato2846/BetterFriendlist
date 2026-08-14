@@ -32,6 +32,14 @@ Before editing, summarize the feature in this compact shape:
 
 If the request is vague, ask the smallest useful clarification or state the working assumption before editing.
 
+## GitHub Issue Safety
+
+- Treat requests to inspect, fix, address, or implement a GitHub issue as authorization for read-only issue inspection and local code work only.
+- Never post a comment or reply to an issue unless the user separately and explicitly asks for that exact GitHub write action.
+- Never close, reopen, or otherwise change an issue's state unless the user separately and explicitly asks for that exact state change.
+- Do not infer permission to comment or close from phrases such as "fix directly", from a successful implementation, validation, deployment, commit, merge, push, or release.
+- Keep issue comments, reactions, labels, assignees, milestones, title/body edits, and state changes untouched by default. Report the recommended GitHub follow-up to the user instead.
+
 ## Implementation
 
 - Prefer existing modules, compatibility helpers, settings components, and localization patterns over new abstractions.
