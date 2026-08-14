@@ -869,6 +869,11 @@ BFL:RegisterLocale("zhCN", function()
 	L.FILTER_HIDE_AFK = "隐藏暂离/勿扰"
 	L.FILTER_RETAIL = "正式版"
 	L.FILTER_INGAME = "游戏中"
+	L.FILTER_IN_QUEUE = "队列中"
+	L.FILTER_AVAILABLE_FOR_QUEUE = "可加入队列"
+	L.RECENT_ALLIES_GROUP_LEGACY = "旧版好友"
+	L.RECENT_ALLIES_GROUP_PINNED = "已置顶"
+	L.RECENT_ALLIES_GROUP_OTHER = "近期盟友"
 	L.TOOLTIP_QUICK_FILTER = "过滤器：%s"
 
 	-- Settings (Broker)

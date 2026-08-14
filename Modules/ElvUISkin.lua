@@ -4189,3 +4189,40 @@ function ElvUISkin:SkinIgnoreListWindow(ignoreWindow, E, S)
 	end
 	return true
 end
+
+function ElvUISkin:SkinFriendsFriendsFrame(frame, E, S)
+	if not self:IsSkinEnabled() or not frame then
+		return false
+	end
+	E = E or self.ElvUIEngine or (BFL.GetElvUIEngine and BFL:GetElvUIEngine(false))
+	S = S or self.ElvUISkinProxy or (E and E.GetModule and E:GetModule("Skins"))
+	if not S then
+		return false
+	end
+
+	if not frame.BFL_ElvUIFriendsFriendsSkinned then
+		if frame.StripTextures then
+			frame:StripTextures()
+		end
+		if frame.Border and frame.Border.StripTextures then
+			frame.Border:StripTextures()
+		end
+		if frame.CreateBackdrop then
+			frame:CreateBackdrop("Transparent")
+		end
+		if frame.ScrollFrameBorder then
+			if frame.ScrollFrameBorder.StripTextures then
+				frame.ScrollFrameBorder:StripTextures()
+			end
+			if frame.ScrollFrameBorder.CreateBackdrop then
+				frame.ScrollFrameBorder:CreateBackdrop("Transparent")
+			end
+		end
+		CallElvUIHandler(S, "HandleDropDownBox", frame.FriendsDropdown, frame.FriendsDropdown and frame.FriendsDropdown:GetWidth())
+		CallElvUIHandler(S, "HandleButton", frame.SendRequestButton)
+		CallElvUIHandler(S, "HandleButton", frame.CloseButton)
+		SkinScrollBar(S, frame.ScrollBar)
+		frame.BFL_ElvUIFriendsFriendsSkinned = true
+	end
+	return true
+end

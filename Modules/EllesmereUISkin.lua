@@ -696,6 +696,7 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 		"BetterFriendlistNoteBackupViewer",
 		"BetterFriendlistRaidToolsFrame",
 		"BetterSavedInstancesFrame",
+		"FriendsFriendsFrame",
 	}) do
 		local frame = _G[frameName]
 		SafeCall(self.facade, "Shell", frame)
@@ -710,6 +711,20 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 		SkinWidgetTree(self.facade, WhoFrame.builderFlyout, 5)
 		SkinWidgetTree(self.facade, WhoFrame.builderDockedContainer, 5)
 	end
+end
+
+function EllesmereUISkin:SkinFriendsFriendsFrame(frame)
+	if not self:IsSkinEnabled() or not frame then
+		return false
+	end
+	local api = self.facade
+	SafeCall(api, "Shell", frame)
+	SafeCall(api, "Inset", frame.ScrollFrameBorder)
+	SafeCall(api, "Dropdown", frame.FriendsDropdown)
+	SafeCall(api, "Button", frame.SendRequestButton)
+	SafeCall(api, "Button", frame.CloseButton)
+	SkinWidgetTree(api, frame, 5)
+	return true
 end
 
 function EllesmereUISkin:RefreshModernPortraitCorner(frame)

@@ -2530,6 +2530,7 @@ function DarkTheme:SkinAuxiliaryFrames(engine)
 		{ "BetterFriendlistRaidToolsFrame", "popup" },
 		{ "BetterSavedInstancesFrame", "popup" },
 		{ "BFL_GuildMemberInfoPanel", "popup" },
+		{ "FriendsFriendsFrame", "popup" },
 	}) do
 		SkinFrameByName(engine, frameInfo[1], frameInfo[2])
 	end

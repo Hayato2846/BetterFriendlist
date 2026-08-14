@@ -287,6 +287,25 @@
 		</Layers>
 	</Frame>
 
+	<Frame name="BetterRecentAlliesHeaderTemplate" virtual="true">
+		<Size y="24" />
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" setAllPoints="true">
+					<Color r="0.035" g="0.035" b="0.04" a="0.82" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Text" inherits="BetterFriendlistFontNormal" justifyH="LEFT" justifyV="MIDDLE" maxLines="1" wordwrap="false">
+					<Anchors>
+						<Anchor point="LEFT" x="8" />
+						<Anchor point="RIGHT" x="-8" />
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
 	<!-- Recent Allies Entry Template (1:1 von Blizzard) -->
 	<Button name="BetterRecentAlliesEntryTemplate" registerForClicks="LeftButtonUp, RightButtonUp"
 		virtual="true">

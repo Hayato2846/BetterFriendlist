@@ -991,6 +991,11 @@ BFL:RegisterLocale("ruRU", function()
 	L.FILTER_HIDE_AFK = "Не AFK"
 	L.FILTER_RETAIL = "Основная версия"
 	L.FILTER_INGAME = "В игре"
+	L.FILTER_IN_QUEUE = "В очереди"
+	L.FILTER_AVAILABLE_FOR_QUEUE = "Доступен для очереди"
+	L.RECENT_ALLIES_GROUP_LEGACY = "Прежние друзья"
+	L.RECENT_ALLIES_GROUP_PINNED = "Закреплённые"
+	L.RECENT_ALLIES_GROUP_OTHER = "Недавние союзники"
 	L.TOOLTIP_QUICK_FILTER = "Фильтр: %s"
 
 	-- Settings (Broker)

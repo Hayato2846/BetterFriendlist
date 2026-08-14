@@ -3114,16 +3114,28 @@ local function RegisterBuiltInTests()
 	TS:RegisterTest("data", "FriendTags_OwnMenuContainsAllTagSources", {
 		description = "BFL's own friend menu should contain both Blizzard-backed and custom tag controls",
 		action = function(V)
-			WithTemporaryDatabase({ enableBetaFeatures = true }, function()
+			WithTemporaryDatabase({
+				enableBetaFeatures = true,
+				customFriendTags = {
+					["custom:test"] = {
+						id = "custom:test",
+						name = "Test Custom Tag",
+						source = "custom",
+						enabled = true,
+						order = 1,
+					},
+				},
+			}, function()
 				local FriendTags = BFL:GetModule("FriendTags")
 				V:AssertNotNil(FriendTags, "FriendTags module should exist")
 				FriendTags:NormalizeDB()
 
-				local items = FriendTags:GetMenuItems({
+				local friend = {
 					type = "bnet",
 					uid = "bnet_Player#1234",
 					battleTag = "Player#1234",
-				}, "bnet_Player#1234", "Player")
+				}
+				local items = FriendTags:GetMenuItems(friend, "bnet_Player#1234", "Player")
 				local seen = {}
 				for _, item in ipairs(items) do
 					if item.text then
@@ -3132,9 +3144,38 @@ local function RegisterBuiltInTests()
 				end
 
 				local L = BFL.L or {}
-				V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_SECTION or "Blizzard Tags"], "BFL's own menu should expose Blizzard-backed tags")
+				V:AssertNil(seen[L.FRIEND_TAGS_BLIZZARD_SECTION or "Blizzard Tags"], "BFL's own menu should not add a redundant Blizzard tag heading")
+				V:AssertNil(seen[L.FRIEND_TAGS_BLIZZARD_COMPAT_SECTION or "Blizzard-compatible Tags"], "BFL's own menu should not add a compatibility heading")
+				V:Assert(seen[L.FRIEND_TAGS_INTERESTS_SECTION or "Interests"], "BFL's own menu should group Blizzard-backed interests")
+				V:Assert(seen[L.FRIEND_TAGS_ROLES_SECTION or "Roles"], "BFL's own menu should group Blizzard-backed roles")
 				V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_DAMAGER or "DPS"], "BFL's own menu should expose Blizzard-backed tag checkboxes")
 				V:Assert(seen[L.FRIEND_TAGS_CUSTOM_SECTION or "Custom Tags"], "BFL's own menu should retain custom tags")
+
+				local createIndex
+				local manageIndex
+				local customTagIndex
+				for index, item in ipairs(items) do
+					if item.text == (L.FRIEND_TAGS_CREATE_CUSTOM or "Create Custom Tag") then
+						createIndex = index
+					elseif item.text == (L.FRIEND_TAGS_MANAGE or "Manage Tags") then
+						manageIndex = index
+					elseif item.text == "Test Custom Tag" then
+						customTagIndex = index
+					end
+				end
+				V:AssertNotNil(customTagIndex, "BFL's own menu should list custom tags before its actions")
+				V:AssertNotNil(createIndex, "BFL's own menu should expose custom tag creation")
+				V:AssertNotNil(manageIndex, "BFL's own menu should expose tag management")
+				V:Assert(customTagIndex < createIndex, "Custom tags should precede the custom tag action block")
+				V:AssertEqual(manageIndex, createIndex + 1, "Custom tag actions should share one action block")
+
+				local countFormat = L.FRIEND_TAGS_MENU_TITLE_COUNT or "Friend Tags (%d)"
+				FriendTags:SetCustomTagForFriend(friend, "custom:test", true)
+				V:AssertEqual(
+					FriendTags:GetMenuTitle(friend, friend.uid),
+					string.format(countFormat, 1),
+					"Friend tag menu title should reflect assignment changes"
+				)
 			end)
 		end,
 	})
@@ -3235,7 +3276,9 @@ local function RegisterBuiltInTests()
 						end
 					end
 					local L = BFL.L or {}
-					V:Assert(seen[L.FRIEND_TAGS_BLIZZARD_SECTION or "Blizzard Tags"], "BFL's own menu should retain Blizzard tags")
+					V:AssertNil(seen[L.FRIEND_TAGS_BLIZZARD_SECTION or "Blizzard Tags"], "BFL's own menu should not add a redundant Blizzard tag heading")
+					V:Assert(seen[L.FRIEND_TAGS_INTERESTS_SECTION or "Interests"], "BFL's own menu should retain native interest tags")
+					V:Assert(seen[L.FRIEND_TAGS_ROLES_SECTION or "Roles"], "BFL's own menu should retain native role tags")
 					V:Assert(seen[raidingLabel], "BFL's own menu should retain native tag checkboxes")
 					V:AssertNil(seen[L.FRIEND_TAGS_CUSTOM_SECTION or "Custom Tags"], "Disabled custom tags should not create a menu section")
 					V:AssertNil(seen[L.FRIEND_TAGS_CREATE_CUSTOM or "Create Custom Tag"], "Disabled custom tags should not expose creation")

@@ -1045,6 +1045,11 @@ local function LoadEnUS()
 	L.FILTER_HIDE_AFK = "Hide AFK/DND"
 	L.FILTER_RETAIL = "Retail Only"
 	L.FILTER_INGAME = "In A Game"
+	L.FILTER_IN_QUEUE = "In Queue"
+	L.FILTER_AVAILABLE_FOR_QUEUE = "Available for Queue"
+	L.RECENT_ALLIES_GROUP_LEGACY = "Legacy Friends"
+	L.RECENT_ALLIES_GROUP_PINNED = "Pinned"
+	L.RECENT_ALLIES_GROUP_OTHER = "Recent Allies"
 	L.TOOLTIP_QUICK_FILTER = "Quick Filter: %s"
 
 	-- Settings (Broker)

@@ -224,6 +224,13 @@ function RecentAllies:Initialize()
 	end, 20)
 end
 
+function RecentAllies:OnTextScaleUpdated()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame
+	if frame and frame:IsShown() then
+		self:Refresh(frame, ScrollBoxConstants.RetainScrollPosition)
+	end
+end
+
 function RecentAllies:OnSystemStatusUpdated()
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if FriendsUI then
@@ -275,7 +282,11 @@ function RecentAllies:OnLoad(frame)
 	local view = CreateScrollBoxListLinearView(topPadding, bottomPadding, leftPadding, rightPadding, elementSpacing)
 
 	view:SetElementFactory(function(factory, elementData)
-		if elementData.isDivider then
+		if elementData.isHeader then
+			factory("BetterRecentAlliesHeaderTemplate", function(header, data)
+				RecentAllies:InitializeHeader(header, data)
+			end)
+		elseif elementData.isDivider then
 			factory("BetterRecentAlliesDividerTemplate")
 		else
 			factory("BetterRecentAlliesEntryTemplate", function(button, elementData)
@@ -301,8 +312,33 @@ function RecentAllies:OnLoad(frame)
 			end)
 		end
 	end)
+	view:SetElementExtentCalculator(function(_, elementData)
+		if elementData.isHeader then
+			return 24
+		elseif elementData.isDivider then
+			return 16
+		end
+		return 53
+	end)
 
 	BFL.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+	self.view = view
+end
+
+function RecentAllies:InitializeHeader(header, elementData)
+	header.elementData = elementData
+	header.Text:SetText(elementData.headerText or "")
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local palette, themed = FriendsUI and FriendsUI.GetModernThemeColors and FriendsUI:GetModernThemeColors()
+	if IsModernSocialUIActive() and themed and palette then
+		local surface = palette.control or palette.surface or { 0.035, 0.035, 0.04, 0.82 }
+		header.Background:SetColorTexture(surface[1] or 0.035, surface[2] or 0.035, surface[3] or 0.04, surface[4] or 0.82)
+		local accent = palette.accent or { 1, 0.82, 0, 1 }
+		header.Text:SetTextColor(accent[1] or 1, accent[2] or 0.82, accent[3] or 0, accent[4] or 1)
+	else
+		header.Background:SetColorTexture(0.035, 0.035, 0.04, 0.82)
+		header.Text:SetTextColor(1, 0.82, 0, 1)
+	end
 end
 
 -- Show Recent Allies Frame (RecentAlliesListMixin:OnShow)
@@ -555,6 +591,24 @@ function RecentAllies:GetFilteredRecentAllies()
 	return C_RecentAllies.GetRecentAllies(), false
 end
 
+function RecentAllies:PartitionByPinAndLegacyState(recentAllies)
+	local convertedLegacyFriends = {}
+	local pinnedAllies = {}
+	local unpinnedAllies = {}
+	for _, ally in ipairs(recentAllies or {}) do
+		local stateData = type(ally.stateData) == "table" and ally.stateData or {}
+		local isPinned = stateData.pinExpirationDate ~= nil
+		if isPinned and stateData.isConvertedLegacyFriend == true then
+			convertedLegacyFriends[#convertedLegacyFriends + 1] = ally
+		elseif isPinned then
+			pinnedAllies[#pinnedAllies + 1] = ally
+		else
+			unpinnedAllies[#unpinnedAllies + 1] = ally
+		end
+	end
+	return convertedLegacyFriends, pinnedAllies, unpinnedAllies
+end
+
 function RecentAllies:BuildDataProvider()
 	-- Get recent allies (presorted by pin state, online status, most recent interaction, alphabetically)
 	local recentAllies, usedNativeSearch = self:GetFilteredRecentAllies()
@@ -573,16 +627,39 @@ function RecentAllies:BuildDataProvider()
 		recentAllies = filtered
 	end
 
-	local dataProvider = CreateDataProvider(recentAllies)
+	local convertedLegacyFriends, pinnedAllies, unpinnedAllies =
+		self:PartitionByPinAndLegacyState(recentAllies)
 
-	-- Insert divider between pinned and unpinned allies
-	local firstUnpinnedIndex = dataProvider:FindIndexByPredicate(function(elementData)
-		return not elementData.stateData.pinExpirationDate
-	end)
-
-	if firstUnpinnedIndex and firstUnpinnedIndex > 1 then
-		dataProvider:InsertAtIndex({ isDivider = true }, firstUnpinnedIndex)
+	local dataProvider = CreateDataProvider()
+	local function InsertGroup(allies, nativeFormat, fallbackLabel)
+		if #allies == 0 then
+			return
+		end
+		local onlineCount = 0
+		for _, ally in ipairs(allies) do
+			if type(ally.stateData) == "table" and ally.stateData.isOnline == true then
+				onlineCount = onlineCount + 1
+			end
+		end
+		local headerText
+		if type(nativeFormat) == "string" then
+			local ok, formatted = pcall(string.format, nativeFormat, onlineCount, #allies)
+			headerText = ok and formatted or nil
+		end
+		headerText = headerText or string.format("%s (%d/%d)", fallbackLabel, onlineCount, #allies)
+		dataProvider:Insert({ isHeader = true, headerText = headerText })
+		for _, ally in ipairs(allies) do
+			dataProvider:Insert(ally)
+		end
 	end
+
+	InsertGroup(
+		convertedLegacyFriends,
+		_G.SOCIAL_UI_RECENT_ALLIES_VIEW_HEADER_LEGACY_FRIENDS,
+		BFL.L.RECENT_ALLIES_GROUP_LEGACY
+	)
+	InsertGroup(pinnedAllies, _G.SOCIAL_UI_RECENT_ALLIES_VIEW_HEADER_PINNED, BFL.L.RECENT_ALLIES_GROUP_PINNED)
+	InsertGroup(unpinnedAllies, _G.SOCIAL_UI_RECENT_ALLIES_VIEW_HEADER_UNPINNED, BFL.L.RECENT_ALLIES_GROUP_OTHER)
 
 	return dataProvider
 end

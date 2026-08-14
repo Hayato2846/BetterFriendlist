@@ -1100,6 +1100,23 @@ function Compat.IsBattleNetFriendsListEnabled()
 	return true
 end
 
+function Compat.CanSearchBattleNetFriends()
+	return BFL.IsRetail == true
+		and C_BattleNet ~= nil
+		and type(C_BattleNet.SearchFriends) == "function"
+end
+
+function Compat.SearchBattleNetFriends(searchInfo)
+	if not Compat.CanSearchBattleNetFriends() or type(searchInfo) ~= "table" then
+		return nil
+	end
+	local ok, result = pcall(C_BattleNet.SearchFriends, searchInfo)
+	if not ok or type(result) ~= "table" then
+		return nil
+	end
+	return result
+end
+
 function Compat.AreBattleNetFriendTagsEnabled()
 	if not Compat.IsBattleNetFriendsListEnabled() then
 		return false
@@ -2774,6 +2791,8 @@ BFL.GetBNetFriendInfo = Compat.GetBNetFriendInfo
 BFL.GetBNetFriendGameAccountInfo = Compat.GetBNetFriendGameAccountInfo
 BFL.IsBattleNetFriendsListSupported = Compat.IsBattleNetFriendsListSupported
 BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
+BFL.CanSearchBattleNetFriends = Compat.CanSearchBattleNetFriends
+BFL.SearchBattleNetFriends = Compat.SearchBattleNetFriends
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
 BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled

@@ -176,6 +176,12 @@ function QuickFilters:Initialize()
 	end
 	if BetterFriendlistDB and BetterFriendlistDB.quickFilter then
 		filterMode = ResolveFilter(BetterFriendlistDB.quickFilter)
+		-- Native queue searches are restricted and their returned friend indices
+		-- are only valid for the current session. Never resurrect a stale result
+		-- from SavedVariables; the user can start a fresh query from the menu.
+		if Registry and Registry.IsNativeQueueFilter and Registry:IsNativeQueueFilter(filterMode) then
+			filterMode = "all"
+		end
 		BetterFriendlistDB.quickFilter = filterMode
 	end
 	if BetterFriendlistDB and type(BetterFriendlistDB.quickFilterTags) ~= "table" then
@@ -438,6 +444,13 @@ end
 
 function QuickFilters:SetFilter(mode)
 	mode = ResolveFilter(mode)
+	local Registry = GetRegistry()
+	local nativeQueueFilter = Registry and Registry.IsNativeQueueFilter and Registry:IsNativeQueueFilter(mode)
+	if nativeQueueFilter and Registry.RefreshNativeQueueFilter then
+		-- This runs directly from the dropdown selection callback so the
+		-- restricted native API receives only fresh, addon-owned input.
+		Registry:RefreshNativeQueueFilter(mode)
+	end
 
 	if BetterFriendlistDB then
 		BetterFriendlistDB.quickFilter = mode
@@ -447,7 +460,7 @@ function QuickFilters:SetFilter(mode)
 
 	local FriendsList = GetFriendsList()
 	if FriendsList then
-		FriendsList:SetFilterMode(mode)
+		FriendsList:SetFilterMode(mode, nativeQueueFilter == true)
 	end
 
 	local Broker = BFL:GetModule("Broker")

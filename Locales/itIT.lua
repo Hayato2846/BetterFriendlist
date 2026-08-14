@@ -1003,6 +1003,11 @@ BFL:RegisterLocale("itIT", function()
 	L.FILTER_HIDE_AFK = "No AFK"
 	L.FILTER_RETAIL = "Retail"
 	L.FILTER_INGAME = "In gioco"
+	L.FILTER_IN_QUEUE = "In coda"
+	L.FILTER_AVAILABLE_FOR_QUEUE = "Disponibile per la coda"
+	L.RECENT_ALLIES_GROUP_LEGACY = "Amici precedenti"
+	L.RECENT_ALLIES_GROUP_PINNED = "Fissati"
+	L.RECENT_ALLIES_GROUP_OTHER = "Alleati recenti"
 	L.TOOLTIP_QUICK_FILTER = "Filtro: %s"
 
 	-- Settings (Broker)

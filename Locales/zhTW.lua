@@ -838,6 +838,11 @@ BFL:RegisterLocale("zhTW", function()
 	L.FILTER_BNET = "戰網"
 	L.FILTER_RETAIL = "正式版"
 	L.FILTER_INGAME = "遊戲中"
+	L.FILTER_IN_QUEUE = "佇列中"
+	L.FILTER_AVAILABLE_FOR_QUEUE = "可加入佇列"
+	L.RECENT_ALLIES_GROUP_LEGACY = "舊版好友"
+	L.RECENT_ALLIES_GROUP_PINNED = "已釘選"
+	L.RECENT_ALLIES_GROUP_OTHER = "近期盟友"
 	L.TOOLTIP_QUICK_FILTER = "過濾器：%s"
 
 	-- Settings (Broker)

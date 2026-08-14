@@ -45,6 +45,13 @@ local function GetRecruitHeight()
 	return IsModernSocialUIActive() and MODERN_RECRUIT_HEIGHT or RECRUIT_HEIGHT
 end
 
+local function GetScaledExtent(value)
+	if IsModernSocialUIActive() and TextSizeManager and TextSizeManager.GetScaledValue then
+		return TextSizeManager:GetScaledValue(value)
+	end
+	return value
+end
+
 local function GetEnumValue(enumTable, key, fallback)
 	return enumTable and enumTable[key] or fallback
 end
@@ -1350,12 +1357,13 @@ function RAF:OnLoad(frame)
 			-- BFL:DebugPrint("|cff00ffffRAF:|r Using Retail ScrollBox mode")
 			local view = CreateScrollBoxListLinearView()
 			view:SetElementExtentCalculator(function(dataIndex, elementData)
-				return elementData.isDivider and DIVIDER_HEIGHT or GetRecruitHeight()
+				return GetScaledExtent(elementData.isDivider and DIVIDER_HEIGHT or GetRecruitHeight())
 			end)
 			view:SetElementInitializer("BetterRecruitListButtonTemplate", function(button, elementData)
 				BetterRecruitListButton_Init(button, elementData)
 			end)
 			BFL.InitScrollBoxListWithScrollBar(frame.RecruitList.ScrollBox, frame.RecruitList.ScrollBar, view)
+			self.recruitListView = view
 		end
 		frame.rafListInitialized = true
 	end
@@ -1375,6 +1383,13 @@ function RAF:OnLoad(frame)
 	if C_RecruitAFriend and C_RecruitAFriend.GetRAFInfo then
 		local rafInfo = C_RecruitAFriend.GetRAFInfo()
 		self:UpdateRAFInfo(frame, rafInfo)
+	end
+end
+
+function RAF:OnTextScaleUpdated()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
+	if frame and frame:IsShown() and frame.rafInfo and frame.rafInfo.recruits then
+		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
 	end
 end
 

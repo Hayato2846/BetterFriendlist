@@ -976,6 +976,11 @@ BFL:RegisterLocale("koKR", function()
 	L.FILTER_HIDE_AFK = "No AFK"
 	L.FILTER_RETAIL = "Retail"
 	L.FILTER_INGAME = "게임 중"
+	L.FILTER_IN_QUEUE = "대기열 참가 중"
+	L.FILTER_AVAILABLE_FOR_QUEUE = "대기열 참가 가능"
+	L.RECENT_ALLIES_GROUP_LEGACY = "이전 친구"
+	L.RECENT_ALLIES_GROUP_PINNED = "고정됨"
+	L.RECENT_ALLIES_GROUP_OTHER = "최근 동료"
 	L.TOOLTIP_QUICK_FILTER = "필터: %s"
 
 	-- Settings (Broker)

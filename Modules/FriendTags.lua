@@ -2572,11 +2572,6 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 	end
 
 	if friend.type == "bnet" and (featureEnabled or nativeBlizzardTagsEnabled) then
-		local sectionTitle = self:AreBlizzardTagsEnabled()
-			and T("FRIEND_TAGS_BLIZZARD_SECTION", "Blizzard Tags")
-			or T("FRIEND_TAGS_BLIZZARD_COMPAT_SECTION", "Blizzard-compatible Tags")
-		items[#items + 1] = { type = "title", text = sectionTitle }
-
 		local workingBlizzardSet = CopySet(self:GetBlizzardTagIdSetForFriend(friend, explicitUID))
 		local function CommitBlizzardTags()
 			self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
@@ -2629,13 +2624,6 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 
 	if featureEnabled then
 		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags") }
-		items[#items + 1] = {
-			text = T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"),
-			func = function()
-				self:ShowCustomTagDialog(friend, displayName, refreshCallback)
-			end,
-		}
-
 		local customTags = self:GetCustomTagDefinitions()
 		if #customTags > 0 then
 			for _, def in ipairs(customTags) do
@@ -2661,6 +2649,12 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 		end
 
 		items[#items + 1] = { type = "divider" }
+		items[#items + 1] = {
+			text = T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"),
+			func = function()
+				self:ShowCustomTagDialog(friend, displayName, refreshCallback)
+			end,
+		}
 		items[#items + 1] = {
 			text = T("FRIEND_TAGS_MANAGE", "Manage Tags"),
 			func = function()
@@ -2695,6 +2689,16 @@ function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayNam
 	return true
 end
 
+function FriendTags:GetMenuTitle(friend, explicitUID)
+	friend = self:NormalizeFriendContext(friend, explicitUID)
+	local title = T("FRIEND_TAGS_MENU_TITLE", "Friend Tags")
+	local tags = self:GetTagsForFriend(friend, "menu")
+	if self:GetSetting("showMenuTagCounts", true) and #tags > 0 then
+		title = string.format(T("FRIEND_TAGS_MENU_TITLE_COUNT", "Friend Tags (%d)"), #tags)
+	end
+	return title
+end
+
 function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayName, refreshCallback, options)
 	if not rootDescription or not rootDescription.CreateButton then
 		return false
@@ -2706,13 +2710,17 @@ function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayNa
 		return false
 	end
 
-	local tags = self:GetTagsForFriend(friend, "menu")
-	local title = T("FRIEND_TAGS_MENU_TITLE", "Friend Tags")
-	if self:GetSetting("showMenuTagCounts", true) and #tags > 0 then
-		title = string.format(T("FRIEND_TAGS_MENU_TITLE_COUNT", "Friend Tags (%d)"), #tags)
+	local submenu = rootDescription:CreateButton(self:GetMenuTitle(friend, explicitUID))
+	if submenu.AddInitializer then
+		submenu:AddInitializer(function(button)
+			local title = self:GetMenuTitle(friend, explicitUID)
+			if button.fontString and button.fontString.SetTextToFit then
+				button.fontString:SetTextToFit(title)
+			elseif button.Text and button.Text.SetText then
+				button.Text:SetText(title)
+			end
+		end)
 	end
-
-	local submenu = rootDescription:CreateButton(title)
 	if submenu.SetScrollMode then
 		submenu:SetScrollMode(320)
 	end

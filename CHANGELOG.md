@@ -10,13 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [DRAFT]
 
 ### Changed
-- **Modern UI Availability** - Retail now uses BetterFriendlist's Modern UI whenever the client provides the 12.1 SocialUI API, even while Blizzard temporarily disables its own new Friendlist frame. Native Blizzard SocialUI routing still follows Blizzard's runtime switch.
+- **Modern UI Availability** - Retail now uses BetterFriendlist's Modern UI whenever the client provides the 12.1 SocialUI API, even while Blizzard temporarily disables its own new Friendlist frame. BetterFriendlist remains the entry point for every Social UI route in both Modern and Legacy, including Broadcast, Ignore List, and Raid Info windows.
 - **Recent Allies Availability** - BetterFriendlist now reacts immediately to `RECENT_ALLIES_SYSTEM_STATUS_UPDATED`, refreshing Modern navigation, Legacy tabs, and visible Recent Allies content when Blizzard changes the feature state.
+- **Recent Allies Groups** - Converted Legacy friends, pinned allies, and other recent allies now appear in separate groups in the same order as Blizzard's 12.1 Social UI.
+- **Queue Filters** - Retail's friend filters now include In Queue and Available for Queue when Blizzard's native Battle.net search is available. Restricted or unavailable search results safely leave the list usable.
 
 ### Fixed
 - **Modern Avatar Interaction** - The visible BFL avatar now owns its changelog click and tooltip area in every Modern theme, including ElvUI and EllesmereUI, instead of relying on a differently positioned invisible Legacy button.
 - **Recruit a Friend Layout** - Long recruit lists now stop above the Modern Recruitment button, and the Blizzard theme once again shows the button's complete native artwork.
 - **Social Side Windows** - Recruit a Friend reward tabs now remain interactive in forced Modern mode, the rewards and Broadcast windows dock beside BetterFriendlist, and the Ignore List is skinned consistently by Dark, Custom, ElvUI, and EllesmereUI.
+- **Social UI Scaling and Dialogs** - Modern friend requests and Recruit a Friend layouts rebuild after Blizzard text-scale changes, while the Friends of Friends window now docks beside BetterFriendlist and follows the active theme.
 
 ## [2.8.0]        - 2026-08-12
 

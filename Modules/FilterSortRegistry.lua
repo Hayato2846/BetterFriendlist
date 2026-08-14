@@ -871,6 +871,23 @@ local function BuiltinQuickFilter_InGame(friend)
 	end)
 end
 
+local NATIVE_QUEUE_FILTER_FIELDS = {
+	inqueue = "isInQueue",
+	availableforqueue = "isAvailableForQueue",
+}
+
+local function CanUseNativeQueueFilters()
+	return BFL.CanSearchBattleNetFriends and BFL.CanSearchBattleNetFriends() == true
+end
+
+local function BuiltinQuickFilter_InQueue(friend)
+	return Registry:EvaluateNativeQueueFilter("inqueue", friend)
+end
+
+local function BuiltinQuickFilter_AvailableForQueue(friend)
+	return Registry:EvaluateNativeQueueFilter("availableforqueue", friend)
+end
+
 local BUILTIN_QUICK_FILTERS = {
 	{
 		id = "all",
@@ -934,6 +951,22 @@ local BUILTIN_QUICK_FILTERS = {
 		icon = BFL_ICON_PREFIX .. "game",
 		order = 90,
 		evaluator = BuiltinQuickFilter_InGame,
+	},
+	{
+		id = "inqueue",
+		labelKey = "FILTER_IN_QUEUE",
+		icon = BFL_ICON_PREFIX .. "game",
+		order = 100,
+		evaluator = BuiltinQuickFilter_InQueue,
+		isSupported = CanUseNativeQueueFilters,
+	},
+	{
+		id = "availableforqueue",
+		labelKey = "FILTER_AVAILABLE_FOR_QUEUE",
+		icon = BFL_ICON_PREFIX .. "status",
+		order = 110,
+		evaluator = BuiltinQuickFilter_AvailableForQueue,
+		isSupported = CanUseNativeQueueFilters,
 	},
 }
 
@@ -1189,6 +1222,10 @@ local function IsBuiltinQuickFilter(id)
 	return id and BUILTIN_QUICK_FILTER_MAP[id] ~= nil
 end
 
+local function IsQuickFilterSupported(entry)
+	return entry ~= nil and (not entry.isSupported or entry.isSupported() == true)
+end
+
 local function IsBuiltinSorter(id)
 	return id and BUILTIN_SORTER_MAP[id] ~= nil
 end
@@ -1226,7 +1263,7 @@ local function ResolveQuickFilterEntry(registry, id, requireVisible)
 		entry = db.customQuickFilters[id]
 		isCustom = entry ~= nil
 	end
-	if not (entry and (not requireVisible or registry:IsQuickFilterVisible(id))) then
+	if not (IsQuickFilterSupported(entry) and (not requireVisible or registry:IsQuickFilterVisible(id))) then
 		entry = BUILTIN_QUICK_FILTER_MAP[registry.FALLBACK_FILTER]
 		isCustom = false
 	end
@@ -1250,6 +1287,10 @@ function Registry:ResolveSorter(id, requireVisible, fallbackId)
 end
 
 function Registry:IsQuickFilterVisible(id)
+	local builtin = id and BUILTIN_QUICK_FILTER_MAP[id]
+	if builtin and not IsQuickFilterSupported(builtin) then
+		return false
+	end
 	local db = self:EnsureDB()
 	if not db or not id then
 		return true
@@ -1303,7 +1344,7 @@ function Registry:GetQuickFilters(includeHidden)
 	local list = {}
 
 	for _, entry in ipairs(BUILTIN_QUICK_FILTERS) do
-		if includeHidden or self:IsQuickFilterVisible(entry.id) then
+		if IsQuickFilterSupported(entry) and (includeHidden or self:IsQuickFilterVisible(entry.id)) then
 			local display = BuildDisplayEntry(entry, false)
 			display.visible = self:IsQuickFilterVisible(entry.id)
 			display._order = orderMap[entry.id] or entry.order
@@ -1422,6 +1463,61 @@ local function GetQuickFilterPlan(registry, id)
 	return plan
 end
 
+function Registry:IsNativeQueueFilter(id)
+	return NATIVE_QUEUE_FILTER_FIELDS[id] ~= nil
+end
+
+function Registry:RefreshNativeQueueFilter(id)
+	local searchField = NATIVE_QUEUE_FILTER_FIELDS[id]
+	if not searchField then
+		self.nativeQueueFilterState = nil
+		return false
+	end
+
+	local result = BFL.SearchBattleNetFriends and BFL.SearchBattleNetFriends({
+		searchText = "",
+		isOnline = false,
+		isOffline = false,
+		isDND = false,
+		isAFK = false,
+		isInQueue = id == "inqueue",
+		isAvailableForQueue = id == "availableforqueue",
+		tags = {},
+	})
+
+	local matches = {}
+	local valid = type(result) == "table"
+	if valid then
+		for _, friendIndex in ipairs(result) do
+			if type(friendIndex) == "number" and not (BFL.IsSecret and BFL:IsSecret(friendIndex)) then
+				matches[friendIndex] = true
+			end
+		end
+	end
+
+	self.nativeQueueFilterVersion = (self.nativeQueueFilterVersion or 0) + 1
+	self.nativeQueueFilterState = {
+		id = id,
+		field = searchField,
+		valid = valid,
+		matches = matches,
+		version = self.nativeQueueFilterVersion,
+	}
+	return valid
+end
+
+function Registry:EvaluateNativeQueueFilter(id, friend)
+	local state = self.nativeQueueFilterState
+	if not state or state.id ~= id or state.valid ~= true then
+		-- Restricted/nil native results must never blank BFL's list.
+		return true
+	end
+	if not friend or friend.type ~= "bnet" then
+		return false
+	end
+	return state.matches[friend.index] == true
+end
+
 function Registry:EvaluateQuickFilter(id, friend)
 	local cacheKey = tostring(id or self.FALLBACK_FILTER)
 	if cacheKey == self.FALLBACK_FILTER then
@@ -1446,6 +1542,7 @@ function Registry:EvaluateQuickFilter(id, friend)
 				or 0
 		end
 		local nicknameVersion = BFL.NicknameCacheVersion or 0
+		local nativeQueueFilterVersion = self.nativeQueueFilterVersion or 0
 		local resultCache = friend._bflQuickFilterResults
 		if
 			friend._bflQuickFilterCacheVersion ~= cacheVersion
@@ -1454,6 +1551,7 @@ function Registry:EvaluateQuickFilter(id, friend)
 			or friend._bflQuickFilterTagsDefinitionVersion ~= tagsDefinitionVersion
 			or friend._bflQuickFilterTagsAssignmentVersion ~= tagsAssignmentVersion
 			or friend._bflQuickFilterNicknameVersion ~= nicknameVersion
+			or friend._bflQuickFilterNativeQueueVersion ~= nativeQueueFilterVersion
 		then
 			resultCache = {}
 			friend._bflQuickFilterResults = resultCache
@@ -1463,6 +1561,7 @@ function Registry:EvaluateQuickFilter(id, friend)
 			friend._bflQuickFilterTagsDefinitionVersion = tagsDefinitionVersion
 			friend._bflQuickFilterTagsAssignmentVersion = tagsAssignmentVersion
 			friend._bflQuickFilterNicknameVersion = nicknameVersion
+			friend._bflQuickFilterNativeQueueVersion = nativeQueueFilterVersion
 		end
 		local cached = resultCache[cacheKey]
 		if cached ~= nil then

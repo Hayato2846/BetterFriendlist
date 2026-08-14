@@ -4178,6 +4178,30 @@ function FriendsList:UpdateFontCache()
 	end
 end
 
+function FriendsList:OnTextScaleUpdated()
+	-- UserScaled regions can change their measured bounds without touching BFL's
+	-- font settings version. Invalidate both row measurements and ScrollBox
+	-- ownership so Modern never reuses extents from the previous text scale.
+	self.fontCacheVersion = (self.fontCacheVersion or 0) + 1
+	if self.scrollBox and self.scrollBox.ForEachFrame then
+		self.scrollBox:ForEachFrame(function(button)
+			button.lastFontVersion = nil
+			button.lastLayoutFontVersion = nil
+			button.favoriteMeasureFontVersion = nil
+		end)
+	end
+	self.lastBuildSignature = nil
+	self.lastBuildInputs = nil
+	self.cachedDisplayList = nil
+	self.cachedGroupedFriends = nil
+	self.inactiveDisplayBuildList = nil
+	self.activeProviderDisplayList = nil
+	self.forceLayoutRebuild = true
+	self:InitializeScrollBox()
+	self:UpdateScrollBoxExtent()
+	self:RenderDisplay(true)
+end
+
 -- Invalidate settings cache (called by DB:Set to ensure immediate UI response)
 function FriendsList:InvalidateSettingsCache()
 	self.settingsCacheVersion = nil
@@ -6010,10 +6034,13 @@ local function RequestFriendsListRefresh(reason)
 end
 
 -- Set filter mode
-function FriendsList:SetFilterMode(mode)
+function FriendsList:SetFilterMode(mode, forceRefresh)
 	local Registry = GetFilterSortRegistry()
 	local newMode = Registry and Registry.NormalizeQuickFilterId and Registry:NormalizeQuickFilterId(mode) or (mode or "all")
 	if self.filterMode == newMode then
+		if forceRefresh then
+			RequestFriendsListRefresh("filter")
+		end
 		return
 	end
 	self.filterMode = newMode

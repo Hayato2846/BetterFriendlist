@@ -2321,14 +2321,21 @@ function FriendsUI:InitializeRequestsScrollBox()
 		end
 	end)
 	view:SetElementExtentCalculator(function(_, elementData)
-		if elementData and elementData.headerText then
-			return 24
-		elseif elementData and elementData.isSpacer then
-			return 2
+		local function Scale(value)
+			if TextSizeManager and TextSizeManager.GetScaledValue then
+				return TextSizeManager:GetScaledValue(value)
+			end
+			return value
 		end
-		return 70
+		if elementData and elementData.headerText then
+			return Scale(24)
+		elseif elementData and elementData.isSpacer then
+			return Scale(2)
+		end
+		return Scale(70)
 	end)
 	BFL.InitScrollBoxListWithScrollBar(requests.ScrollBox, requests.ScrollBar, view)
+	self.requestsView = view
 	self.requestsInitialized = true
 	requests.EmptyLabel:SetText(GetL().FRIENDS_UI_REQUESTS_EMPTY or "No pending friend requests")
 	local warning = requests.RealIDWarning
@@ -3171,6 +3178,58 @@ function FriendsUI:InstallBroadcastFrameAnchorHook()
 		end)
 	end
 	return self:RefreshBroadcastFrameAnchor()
+end
+
+function FriendsUI:ApplyFriendsFriendsFrameTheme(frame)
+	frame = frame or _G.FriendsFriendsFrame
+	if not frame then
+		return false
+	end
+	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or self.currentTheme or "blizzard"
+	if theme == "dark" or theme == "custom" then
+		local engine = BFL:GetModule("SkinEngine")
+		local DarkTheme = BFL:GetModule("DarkTheme")
+		if engine and engine.IsActive and engine:IsActive() and DarkTheme and DarkTheme.SkinCreatedFrame then
+			DarkTheme:SkinCreatedFrame(frame)
+			return true
+		end
+	elseif theme == "elvui" then
+		local ElvUISkin = BFL:GetModule("ElvUISkin")
+		return ElvUISkin and ElvUISkin.SkinFriendsFriendsFrame and ElvUISkin:SkinFriendsFriendsFrame(frame) == true
+	elseif theme == "ellesmereui" then
+		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
+		return EllesmereUISkin
+			and EllesmereUISkin.SkinFriendsFriendsFrame
+			and EllesmereUISkin:SkinFriendsFriendsFrame(frame) == true
+	end
+	return theme == "blizzard"
+end
+
+function FriendsUI:RefreshFriendsFriendsFrame()
+	local frame = _G.FriendsFriendsFrame
+	if not frame then
+		return false
+	end
+	self:AnchorAuxiliaryWindow(frame, 0)
+	self:ApplyFriendsFriendsFrameTheme(frame)
+	return true
+end
+
+function FriendsUI:InstallFriendsFriendsFrameHook()
+	local frame = _G.FriendsFriendsFrame
+	if frame and frame.HookScript and not frame.BFL_FriendsFriendsOnShowHooked then
+		frame.BFL_FriendsFriendsOnShowHooked = true
+		frame:HookScript("OnShow", function()
+			self:RefreshFriendsFriendsFrame()
+		end)
+	end
+	if type(_G.FriendsFriendsFrame_Show) == "function" and hooksecurefunc and not self.friendsFriendsShowHookInstalled then
+		hooksecurefunc("FriendsFriendsFrame_Show", function()
+			self:RefreshFriendsFriendsFrame()
+		end)
+		self.friendsFriendsShowHookInstalled = true
+	end
+	return self:RefreshFriendsFriendsFrame()
 end
 
 function FriendsUI:ApplyModernScrollBarGeometry()
@@ -4089,6 +4148,171 @@ function FriendsUI:ToggleSection(sectionID)
 	self:SelectSection(sectionID)
 end
 
+function FriendsUI:OnTextScaleUpdated()
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.OnTextScaleUpdated then
+		FriendsList:OnTextScaleUpdated()
+	end
+	local RecentAllies = BFL:GetModule("RecentAllies")
+	if RecentAllies and RecentAllies.OnTextScaleUpdated then
+		RecentAllies:OnTextScaleUpdated()
+	end
+	local RAF = BFL:GetModule("RAF")
+	if RAF and RAF.OnTextScaleUpdated then
+		RAF:OnTextScaleUpdated()
+	end
+	if self.requestsInitialized then
+		self:RefreshRequests(false)
+		self:LayoutRealIDWarning()
+	end
+	if self:IsModernActive() then
+		self:ApplyModernContentLayout(self:GetSelectedSection() or "friends", true)
+	end
+	self:RefreshFriendsFriendsFrame()
+end
+
+function FriendsUI:HideOwnedSideWindows()
+	local broadcastFrame = self:GetBroadcastFrame()
+	if broadcastFrame and broadcastFrame:IsShown() then
+		if broadcastFrame.HideFrame then
+			broadcastFrame:HideFrame()
+		else
+			broadcastFrame:Hide()
+		end
+	end
+
+	local ignoreWindow = BetterFriendsFrame and BetterFriendsFrame.IgnoreListWindow
+	if ignoreWindow and ignoreWindow:IsShown() then
+		ignoreWindow:Hide()
+	end
+
+	if RaidInfoFrame and RaidInfoFrame:IsShown() and RaidInfoFrame:GetParent() == BetterFriendsFrame then
+		RaidInfoFrame:Hide()
+	end
+
+	self.activeSocialSideWindowType = nil
+end
+
+function FriendsUI:HideSocialUIReplacement()
+	self:HideOwnedSideWindows()
+	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+		if HideBetterFriendsFrame then
+			HideBetterFriendsFrame()
+		else
+			BetterFriendsFrame:Hide()
+		end
+	end
+end
+
+function FriendsUI:OpenSocialUISection(sectionID)
+	sectionID = self:GetSectionForSocialTab(sectionID) or sectionID or "friends"
+	if not BetterFriendsFrame then
+		return false
+	end
+	if not BetterFriendsFrame:IsShown() then
+		if ShowUIPanel then
+			ShowUIPanel(BetterFriendsFrame)
+		else
+			BetterFriendsFrame:Show()
+		end
+	end
+	self:SelectSection(sectionID)
+	return true
+end
+
+function FriendsUI:ToggleSocialUIReplacement()
+	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+		self:HideSocialUIReplacement()
+	else
+		self:HideOwnedSideWindows()
+		self:OpenSocialUISection(self:GetSelectedSection() or "friends")
+	end
+end
+
+function FriendsUI:ShowSocialSideWindow(sideWindowType)
+	local sideTypes = _G.SocialUISideWindowType
+	if not sideTypes then
+		return false
+	end
+
+	self:HideOwnedSideWindows()
+	local opened = false
+	local function TrackWindow(window)
+		if not (window and window.HookScript) then
+			return
+		end
+		window.BFL_SocialSideWindowType = sideWindowType
+		if not window.BFL_SocialSideWindowHideHooked then
+			window.BFL_SocialSideWindowHideHooked = true
+			window:HookScript("OnHide", function(hiddenWindow)
+				if self.activeSocialSideWindowType == hiddenWindow.BFL_SocialSideWindowType then
+					self.activeSocialSideWindowType = nil
+				end
+			end)
+		end
+	end
+	if sideWindowType == sideTypes.BattleNetBroadcastFrame then
+		local broadcastFrame = self:GetBroadcastFrame()
+		if broadcastFrame then
+			self:AnchorAuxiliaryWindow(broadcastFrame, 0)
+			if broadcastFrame.ShowFrame then
+				broadcastFrame:ShowFrame()
+			else
+				broadcastFrame:Show()
+			end
+			TrackWindow(broadcastFrame)
+			opened = true
+		end
+	elseif sideWindowType == sideTypes.IgnoreListFrame then
+		local ignoreWindow = BetterFriendsFrame and BetterFriendsFrame.IgnoreListWindow
+		if ignoreWindow then
+			self:AnchorAuxiliaryWindow(ignoreWindow, 0)
+			ignoreWindow:Show()
+			TrackWindow(ignoreWindow)
+			opened = true
+		end
+	elseif sideWindowType == sideTypes.RaidInfoFrame then
+		if not RaidInfoFrame and C_AddOns and C_AddOns.LoadAddOn then
+			pcall(C_AddOns.LoadAddOn, "Blizzard_RaidUI")
+		end
+		local raidButton = BetterFriendsFrame
+			and BetterFriendsFrame.RaidFrame
+			and BetterFriendsFrame.RaidFrame.ControlPanel
+			and BetterFriendsFrame.RaidFrame.ControlPanel.RaidInfoButton
+		if raidButton and BetterRaidFrame_RaidInfoButton_OnClick then
+			BetterRaidFrame_RaidInfoButton_OnClick(raidButton)
+			opened = RaidInfoFrame and RaidInfoFrame:IsShown() or false
+			if opened then
+				TrackWindow(RaidInfoFrame)
+			end
+		end
+	elseif sideWindowType == sideTypes.BattleNetUnavailableNoticeFrame then
+		-- BFL exposes the same state inline in the Battle.net header. Keeping the
+		-- main frame open is the BFL equivalent of Blizzard's separate notice.
+		opened = true
+	end
+
+	if opened then
+		self.activeSocialSideWindowType = sideWindowType
+	end
+	return opened
+end
+
+function FriendsUI:ToggleSocialSectionAndSideWindow(tabType, sideWindowType)
+	local sectionID = self:GetSectionForSocialTab(tabType) or "friends"
+	local alreadyOpen = BetterFriendsFrame
+		and BetterFriendsFrame:IsShown()
+		and self:GetSelectedSection() == sectionID
+		and self.activeSocialSideWindowType == sideWindowType
+	if alreadyOpen then
+		self:HideSocialUIReplacement()
+		return
+	end
+
+	self:OpenSocialUISection(sectionID)
+	self:ShowSocialSideWindow(sideWindowType)
+end
+
 function FriendsUI:SetStyle(style)
 	if style ~= STYLE_MODERN and style ~= STYLE_LEGACY then
 		return false
@@ -4295,7 +4519,12 @@ function FriendsUI:InstallTabHooks()
 end
 
 function FriendsUI:InstallSocialUIRedirects()
-	if self.redirectsInstalled or not (BFL.IsRetail and self:IsSocialUIEnabled()) then
+	if self.redirectsInstalled and self.socialUIRedirectControl == _G.SocialUIControl then
+		return
+	elseif self.redirectsInstalled then
+		self:RestoreSocialUIRedirects()
+	end
+	if not (BFL.IsRetail and self:IsSocialUIAvailable()) then
 		return
 	end
 	if not _G.SocialUIControl then
@@ -4305,33 +4534,39 @@ function FriendsUI:InstallSocialUIRedirects()
 	self.originalToggleSocialUI = _G.ToggleSocialUI
 	self.originalSocialUIControl = {}
 	if SocialUIControl then
-		for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab" }) do
+		for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab", "ToggleToTabAndSideWindow", "Hide" }) do
 			self.originalSocialUIControl[key] = SocialUIControl[key]
 		end
 	end
 	self.socialUIRedirectControl = SocialUIControl
 	self.socialUIRedirectFunctions = {}
 	self.socialUIRedirectFunctions.ToggleSocialUI = function()
-		self:ToggleSection(self:GetSelectedSection())
+		self:ToggleSocialUIReplacement()
 	end
 	_G.ToggleSocialUI = self.socialUIRedirectFunctions.ToggleSocialUI
 	if SocialUIControl then
 		self.socialUIRedirectFunctions.Toggle = function()
-			self:ToggleSection(self:GetSelectedSection())
+			self:ToggleSocialUIReplacement()
 		end
 		self.socialUIRedirectFunctions.OpenToTab = function(tabType)
-			local section = self:GetSectionForSocialTab(tabType) or "friends"
-			if not BetterFriendsFrame:IsShown() then
-				ShowUIPanel(BetterFriendsFrame)
-			end
-			self:SelectSection(section)
+			self:HideOwnedSideWindows()
+			self:OpenSocialUISection(tabType)
 		end
 		self.socialUIRedirectFunctions.ToggleToTab = function(tabType)
+			self:HideOwnedSideWindows()
 			self:ToggleSection(self:GetSectionForSocialTab(tabType) or "friends")
+		end
+		self.socialUIRedirectFunctions.ToggleToTabAndSideWindow = function(tabType, sideWindowType)
+			self:ToggleSocialSectionAndSideWindow(tabType, sideWindowType)
+		end
+		self.socialUIRedirectFunctions.Hide = function()
+			self:HideSocialUIReplacement()
 		end
 		SocialUIControl.Toggle = self.socialUIRedirectFunctions.Toggle
 		SocialUIControl.OpenToTab = self.socialUIRedirectFunctions.OpenToTab
 		SocialUIControl.ToggleToTab = self.socialUIRedirectFunctions.ToggleToTab
+		SocialUIControl.ToggleToTabAndSideWindow = self.socialUIRedirectFunctions.ToggleToTabAndSideWindow
+		SocialUIControl.Hide = self.socialUIRedirectFunctions.Hide
 	end
 end
 
@@ -4345,7 +4580,7 @@ function FriendsUI:RestoreSocialUIRedirects()
 	end
 	local control = self.socialUIRedirectControl
 	if control and self.originalSocialUIControl then
-		for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab" }) do
+		for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab", "ToggleToTabAndSideWindow", "Hide" }) do
 			if control[key] == redirects[key] then
 				control[key] = self.originalSocialUIControl[key]
 			end
@@ -4362,7 +4597,7 @@ function FriendsUI:EnsureSocialUIRedirects()
 	if not BFL.IsRetail then
 		return
 	end
-	if not self:IsSocialUIEnabled() then
+	if not self:IsSocialUIAvailable() then
 		self:RestoreSocialUIRedirects()
 		return
 	end
@@ -4450,6 +4685,11 @@ function FriendsUI:RefreshModernThemeRows()
 				row.PartyButton.BFL_DarkForceFlatButton = themed and true or nil
 				if themed and SkinEngine and SkinEngine.RefreshRow then
 					SkinEngine:RefreshRow(row)
+				end
+			elseif row.Text and row.Background then
+				local RecentAllies = BFL:GetModule("RecentAllies")
+				if RecentAllies and RecentAllies.InitializeHeader then
+					RecentAllies:InitializeHeader(row, row.elementData or { headerText = row.Text:GetText() })
 				end
 			end
 		end)
@@ -4761,6 +5001,7 @@ function FriendsUI:ApplyTheme(theme)
 			ElvUISkin:RefreshModernSkin()
 		end
 	end
+	self:RefreshFriendsFriendsFrame()
 end
 
 function FriendsUI:StyleFriendCard(button)
@@ -5538,6 +5779,50 @@ function FriendsUI:RegisterTests()
 				STYLE_LEGACY,
 				"Requested Legacy wins over the developer override"
 			)
+		end,
+	})
+	TestSuite:RegisterTest("ui", "FriendsUI_NativeQueueFilterFallback", {
+		action = function(V)
+			local Registry = BFL:GetModule("FilterSortRegistry")
+			if not Registry then
+				V:Skip("Filter registry is unavailable")
+				return
+			end
+			local originalState = Registry.nativeQueueFilterState
+			Registry.nativeQueueFilterState = {
+				id = "inqueue",
+				valid = true,
+				matches = { [2] = true },
+			}
+			local matchesBattleNet = Registry:EvaluateNativeQueueFilter("inqueue", { type = "bnet", index = 2 })
+			local excludesBattleNet = not Registry:EvaluateNativeQueueFilter("inqueue", { type = "bnet", index = 1 })
+			local excludesCharacterFriend = not Registry:EvaluateNativeQueueFilter("inqueue", { type = "wow", index = 2 })
+			Registry.nativeQueueFilterState.valid = false
+			local preservesListOnRestrictedResult = Registry:EvaluateNativeQueueFilter("inqueue", { type = "bnet", index = 1 })
+			Registry.nativeQueueFilterState = originalState
+			V:Assert(matchesBattleNet, "Native queue result includes matching Battle.net indices")
+			V:Assert(excludesBattleNet, "Native queue result excludes unmatched Battle.net indices")
+			V:Assert(excludesCharacterFriend, "Native queue result does not replace BFL's character-friend provider")
+			V:Assert(preservesListOnRestrictedResult, "Restricted or nil native results fall back to an unfiltered list")
+		end,
+	})
+	TestSuite:RegisterTest("ui", "FriendsUI_RecentAlliesLegacyGroups", {
+		action = function(V)
+			local RecentAllies = BFL:GetModule("RecentAllies")
+			if not RecentAllies or not RecentAllies.PartitionByPinAndLegacyState then
+				V:Skip("Recent Allies is unavailable")
+				return
+			end
+			local legacy, pinned, other = RecentAllies:PartitionByPinAndLegacyState({
+				{ id = "other", stateData = {} },
+				{ id = "pinned", stateData = { pinExpirationDate = 1 } },
+				{ id = "legacy", stateData = { pinExpirationDate = 1, isConvertedLegacyFriend = true } },
+				{ id = "nil-state" },
+			})
+			V:AssertEqual(legacy[1].id, "legacy", "Converted Legacy friends own the first Recent Allies group")
+			V:AssertEqual(pinned[1].id, "pinned", "Pinned allies own the second Recent Allies group")
+			V:AssertEqual(other[1].id, "other", "Unpinned allies remain in the final Recent Allies group")
+			V:AssertEqual(#other, 2, "Missing stateData safely behaves like a normal ally")
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_SectionOrder", {
@@ -6718,10 +7003,38 @@ function FriendsUI:RegisterTests()
 			return self.redirectsInstalled and _G.SocialUIControl ~= nil
 		end,
 		action = function(V)
-			V:Assert(_G.ToggleSocialUI ~= self.originalToggleSocialUI, "ToggleSocialUI is redirected")
-			V:Assert(SocialUIControl.Toggle ~= self.originalSocialUIControl.Toggle, "SocialUI Toggle is redirected")
-			V:Assert(SocialUIControl.OpenToTab ~= self.originalSocialUIControl.OpenToTab, "SocialUI OpenToTab is redirected")
-			V:Assert(SocialUIControl.ToggleToTab ~= self.originalSocialUIControl.ToggleToTab, "SocialUI ToggleToTab is redirected")
+			local originalToggleSocialUI = self.originalToggleSocialUI
+			local originalControl = self.originalSocialUIControl
+			local redirects = {
+				toggleSocialUI = _G.ToggleSocialUI ~= originalToggleSocialUI,
+				toggle = SocialUIControl.Toggle ~= originalControl.Toggle,
+				openToTab = SocialUIControl.OpenToTab ~= originalControl.OpenToTab,
+				toggleToTab = SocialUIControl.ToggleToTab ~= originalControl.ToggleToTab,
+				toggleToTabAndSideWindow = SocialUIControl.ToggleToTabAndSideWindow ~= originalControl.ToggleToTabAndSideWindow,
+				hide = SocialUIControl.Hide ~= originalControl.Hide,
+				ownsAvailableSocialUI = not self:IsSocialUIAvailable() or self.redirectsInstalled,
+			}
+			self:RestoreSocialUIRedirects()
+			local restores = {
+				toggleSocialUI = _G.ToggleSocialUI == originalToggleSocialUI,
+			}
+			for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab", "ToggleToTabAndSideWindow", "Hide" }) do
+				restores[key] = SocialUIControl[key] == originalControl[key]
+			end
+			self:InstallSocialUIRedirects()
+			local reinstalled = self.redirectsInstalled
+			V:Assert(redirects.toggleSocialUI, "ToggleSocialUI is redirected")
+			V:Assert(redirects.toggle, "SocialUI Toggle is redirected")
+			V:Assert(redirects.openToTab, "SocialUI OpenToTab is redirected")
+			V:Assert(redirects.toggleToTab, "SocialUI ToggleToTab is redirected")
+			V:Assert(redirects.toggleToTabAndSideWindow, "SocialUI tab plus side-window routing is redirected")
+			V:Assert(redirects.hide, "SocialUI Hide is redirected")
+			V:Assert(redirects.ownsAvailableSocialUI, "SocialUI API presence keeps BFL as the entry point regardless of Blizzard's runtime switch")
+			V:Assert(restores.toggleSocialUI, "ToggleSocialUI restores symmetrically")
+			for _, key in ipairs({ "Toggle", "OpenToTab", "ToggleToTab", "ToggleToTabAndSideWindow", "Hide" }) do
+				V:Assert(restores[key], "SocialUI " .. key .. " restores symmetrically")
+			end
+			V:Assert(reinstalled, "SocialUI redirects reinstall after a restore or addon reload")
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernPreviewBattleTag", {
@@ -6855,14 +7168,21 @@ function FriendsUI:Initialize()
 	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function()
 		self:RefreshNavigation()
 	end, 80)
+	if EventRegistry and EventRegistry.RegisterCallback and not self.textScaleCallbackRegistered then
+		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", self.OnTextScaleUpdated, self)
+		self.textScaleCallbackRegistered = true
+	end
 	BFL:RegisterEventCallback("ADDON_LOADED", function(loadedAddOn)
 		if loadedAddOn == "Blizzard_SocialUI" or loadedAddOn == "Blizzard_SocialUIShared" then
 			self:InstallSocialUIRedirects()
+		elseif loadedAddOn == "Blizzard_FriendsFrame" then
+			self:InstallFriendsFriendsFrameHook()
 		end
 	end, 80)
 	C_Timer.After(0, function()
 		self:InstallTabHooks()
 		self:EnsureSocialUIRedirects()
+		self:InstallFriendsFriendsFrameHook()
 		if BetterFriendsFrame then
 			BetterFriendsFrame:HookScript("OnShow", function()
 				self:RefreshEffectiveStyleOnShow()
