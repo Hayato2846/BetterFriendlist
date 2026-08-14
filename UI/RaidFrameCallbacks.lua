@@ -661,15 +661,6 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	-- Reparent to BetterFriendsFrame
 	RaidInfoFrame:SetParent(BetterFriendsFrame)
 	ApplyDockedRaidInfoFrameLayering()
-	RaidInfoFrame:ClearAllPoints()
-
-	-- Position next to BetterFriendsFrame (top-aligned)
-	if BetterFriendsFrame:IsShown() then
-		RaidInfoFrame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 0, 0)
-	else
-		-- Fallback if BetterFriendsFrame is hidden
-		RaidInfoFrame:SetPoint("CENTER", UIParent, "CENTER", UI.CENTER_OFFSET, 0)
-	end
 
 	-- Hook the close button to restore original parent
 	if RaidInfoFrame.CloseButton and not RaidInfoFrame.CloseButton._hooked then
@@ -687,8 +678,19 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 		RaidInfoFrame.CloseButton._hooked = true
 	end
 
-	-- Show the frame
-	RaidInfoFrame:Show()
+	-- Show first: Blizzard can restore RaidInfoFrame's native zero-gap anchor in
+	-- its OnShow path. BFL therefore owns the final docked point afterwards.
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	local anchored = BetterFriendsFrame:IsShown()
+		and FriendsUI
+		and FriendsUI.ShowAndAnchorRaidInfoFrame
+		and FriendsUI:ShowAndAnchorRaidInfoFrame(RaidInfoFrame)
+	if not anchored then
+		RaidInfoFrame:Show()
+		RaidInfoFrame:ClearAllPoints()
+		-- Fallback if BetterFriendsFrame is hidden or the UI module is unavailable.
+		RaidInfoFrame:SetPoint("CENTER", UIParent, "CENTER", UI.CENTER_OFFSET, 0)
+	end
 end
 
 -- Update Raid Info Button (Enable/Disable based on saved instances)

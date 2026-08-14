@@ -59,8 +59,10 @@ Choose the smallest validation set that matches risk:
 
 - Light: docs, guidance, comments, or narrow tooling text changes usually need only `git status`, `git diff --stat`, and the smallest relevant focused check.
 - Package/tooling: run `tools\BFL-PackageCheck.ps1` when ignore rules, package metadata, release tooling, or deploy tooling changed.
-- Runtime: run `tools\BFL-PackageCheck.ps1` for Lua/XML/locales/settings/package changes. Deploy with `tools\BFL-Deploy.ps1 -Mode CleanCopy -Client retail -Source .` only when runtime QA is needed or requested.
-- Cross-flavor runtime: deploy with `-Client all` only when TOC/XML, compatibility, settings runtime, shared loading, or packaging behavior changed and deploy validation is needed.
+- Runtime: run `tools\BFL-PackageCheck.ps1` for Lua/XML/locales/settings/package changes.
+- Test-ready deployment: for every user-requested runtime implementation or bugfix, deploy a fresh `CleanCopy` before handoff. The maintainer expects a deployed state for testing without a separate deploy request. Select the affected client explicitly, for example `tools\BFL-Deploy.ps1 -Mode CleanCopy -Client retail -Source .` for Retail-only work.
+- Cross-flavor runtime: deploy the affected Classic client explicitly, or use `-Client all` when TOC/XML, compatibility, settings runtime, shared loading, or packaging behavior affects multiple flavors.
+- Deployment exceptions: skip the required deploy only when the user explicitly opts out or deployment is blocked; report the exact command and reason.
 - Warning delta: run `tools\BFL-PreCommitDelta.ps1` when code changes could introduce new pre-commit warning signatures. Use `tools\BFL-PreCommitDelta.ps1 -UpdateBaseline` only when intentionally accepting a changed warning baseline.
 - Full QA: run `tools\BFL-ReadyForQA.ps1` only for PR readiness, explicit "ready for QA", release-near work, broad/risky changes, or final handoff after substantial runtime work.
 - Focused review diagnostics: run `tools\BFL-ReviewCheck.ps1` when `ReadyForQA` is too broad.

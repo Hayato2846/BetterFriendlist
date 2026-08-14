@@ -13703,6 +13703,25 @@ function TestSuite:RegisterEventCompatibilityTests()
 end
 
 function TestSuite:RegisterLateUITests()
+	self:RegisterTest("integration", "Friends_CompactRowHeight_UsesVisibleContent", {
+		description = "Compact friend cards keep the shared 24px baseline and grow only when their visible name wraps",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.CalculateFriendRowHeightForLayout then
+				V:Skip("FriendsList layout-aware row-height calculator is not available")
+				return
+			end
+
+			local compact = FriendsList:CalculateFriendRowHeightForLayout(true, true, 12, 10, false, false, 0, 14)
+			local wrapped = FriendsList:CalculateFriendRowHeightForLayout(true, true, 12, 10, false, false, 0, 28)
+			local normal = FriendsList:CalculateFriendRowHeightForLayout(true, false, 12, 10, false, false, 0, 14)
+
+			V:AssertEqual(compact, 24, "a one-line Modern Compact card should use the shared compact height")
+			V:AssertEqual(wrapped, 34, "a wrapped Compact name should add only its visible second line")
+			V:AssertEqual(normal, 40, "a normal Modern card should retain room for its full-size action control")
+		end,
+	})
+
 	self:RegisterTest("ui", "Core_RegionMouseOver", {
 		description = "The cross-flavor mouse-over helper uses the Region method and fails closed",
 		action = function(V)

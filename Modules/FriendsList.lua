@@ -402,7 +402,7 @@ end
 local BASE_FONT_SIZE = 12
 local FRIEND_ROW_VERTICAL_PADDING = 3
 local FRIEND_ROW_LINE_GAP = 1
-local LEGACY_ROW_MINIMUM = 22 -- 16px status icon plus the shared vertical inset
+local LEGACY_ROW_MINIMUM, COMPACT_ROW_MINIMUM = 22, 24 -- shared stable row baselines
 local MODERN_ROW_MINIMUM = 40 -- 34px Modern action button plus the shared vertical inset
 local FRIEND_TEXT_BASE_RIGHT_PADDING = 25
 local FRIEND_TEXT_RIGHT_ELEMENT_GAP = 24
@@ -488,7 +488,7 @@ local function GetFriendTextRightPadding(
 	-- so long title/contact names wrap before the button instead of underneath it.
 	local hasActionButton = friend ~= nil and (isModern or isConnectedBNetFriend)
 
-	local minimumHeight = isModern and MODERN_ROW_MINIMUM or 34
+	local minimumHeight = isCompactMode and COMPACT_ROW_MINIMUM or (isModern and MODERN_ROW_MINIMUM or 34)
 	local iconBaseRowHeight = CalculateFriendRowHeight(
 		isCompactMode,
 		nameSize,
@@ -1262,7 +1262,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			item._bflHeightTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion
 			return item._bflCalculatedHeight
 		end
-		local minimumHeight = isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM
+		local minimumHeight = isCompactMode and COMPACT_ROW_MINIMUM or (isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM)
 
 		if self then
 			local line1Text = friend and friend._cache_text_line1
@@ -8789,7 +8789,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
-	local visualMinimum = modern and MODERN_ROW_MINIMUM or 34
+	local visualMinimum = isCompactMode and COMPACT_ROW_MINIMUM or (modern and MODERN_ROW_MINIMUM or 34)
 	local rowHeight = button:GetHeight()
 		or CalculateFriendRowHeight(
 			isCompactMode,
@@ -9980,6 +9980,30 @@ function FriendsList:UpdateSearchBoxWidth()
 
 	-- BFL:DebugPrint(string.format("|cff00ffffFriendsList:|r SearchBox width updated: %.1fpx (frame width: %.1fpx)",
 	-- 	availableWidth, frameWidth))
+end
+
+function FriendsList:CalculateFriendRowHeightForLayout(
+	isModern,
+	isCompactMode,
+	nameSize,
+	infoSize,
+	infoDisabled,
+	hasMultiAccountRow,
+	tagExtraHeight,
+	nameContentHeight
+)
+	local minimumHeight = isCompactMode and COMPACT_ROW_MINIMUM
+		or (isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM)
+	return CalculateFriendRowHeight(
+		isCompactMode,
+		nameSize,
+		infoSize,
+		infoDisabled,
+		hasMultiAccountRow,
+		tagExtraHeight,
+		minimumHeight,
+		nameContentHeight
+	)
 end
 
 -- Expose Drag Handlers for other modules (Broker)

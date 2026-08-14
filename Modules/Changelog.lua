@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.1]        - 2026-08-14
+
+### Fixed
+- **Raid Info** - The Raid Info button is visible again in Dark and Custom themes, and its window now opens at the correct distance in both Modern and Legacy layouts.
+- **Compact Mode** - Friend cards once again fit their visible content without leaving unnecessary empty space.
+
+---
+
 ## [2.8.0]        - 2026-08-12
 
 BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so far. With a change this broad, a few rough edges or bugs may still show up. We will keep polishing and adjusting the new experience over the next few days. Feedback on GitHub or CurseForge is always welcome.

@@ -1,6 +1,6 @@
 -- Core.lua
 -- Main initialization file for BetterFriendlist addon
--- Version 2.8.0 - August 2026
+-- Version 2.8.1 - August 2026
 -- Complete replacement for WoW Friends frame with modular architecture
 
 -- Create addon namespace

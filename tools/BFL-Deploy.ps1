@@ -77,6 +77,10 @@ function Invoke-BFLAddonMirror {
         throw "robocopy failed with exit code $robocopyExitCode while mirroring '$SourceRoot' to '$DestinationRoot'. $detailText"
     }
 
+    # Robocopy uses 1-7 for successful copy states. Do not leak those codes to
+    # callers such as ReadyForQA, which correctly treats non-zero as failure.
+    $global:LASTEXITCODE = 0
+
     Assert-BFLAddonRootByToc -Path $DestinationRoot -TocFile $TocFile | Out-Null
 }
 

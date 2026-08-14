@@ -280,6 +280,21 @@ local function RestoreLegacyActionButton(owner, key)
 	return legacyButton
 end
 
+local function ConfigureModernRaidInfoButton(button, legacyButton)
+	if not button then
+		return
+	end
+
+	local label = RAID_INFO
+	if (not label or label == "") and legacyButton and legacyButton.GetText then
+		label = legacyButton:GetText()
+	end
+	if label and label ~= "" then
+		button:SetText(label)
+	end
+	button:Show()
+end
+
 local function ConfigureModernReadyCheckButton(button, legacyButton)
 	if not button then
 		return
@@ -1427,7 +1442,8 @@ function FriendsUI:ApplyModernActionButtonTemplates()
 	local raid = frame.RaidFrame
 	local control = raid and raid.ControlPanel
 	if control then
-		EnsureModernActionButton(control, "RaidInfoButton")
+		local raidInfo = EnsureModernActionButton(control, "RaidInfoButton")
+		ConfigureModernRaidInfoButton(raidInfo, control.BFL_LegacyRaidInfoButton)
 		local readyCheck = EnsureModernActionButton(control, "ReadyCheckButton")
 		ConfigureModernReadyCheckButton(readyCheck, control.BFL_LegacyReadyCheckButton)
 	end
@@ -2865,6 +2881,7 @@ function FriendsUI:ApplyModernRaidGeometry()
 	end
 
 	if control.RaidInfoButton then
+		ConfigureModernRaidInfoButton(control.RaidInfoButton, control.BFL_LegacyRaidInfoButton)
 		control.RaidInfoButton:ClearAllPoints()
 		control.RaidInfoButton:SetPoint("TOPRIGHT", control, "TOPRIGHT", -rightPadding, -2)
 		control.RaidInfoButton:SetSize(raidInfoWidth, utilityButtonHeight)
@@ -3119,15 +3136,48 @@ function FriendsUI:GetModernScrollBarGap()
 	return MODERN_SCROLL_BAR_GAP
 end
 
+function FriendsUI:HasVisibleModernSideTabs()
+	if not self.sideTabs then
+		return false
+	end
+	for _, tab in ipairs(self.sideTabs) do
+		if tab and tab.IsVisible and tab:IsVisible() then
+			return true
+		end
+	end
+	return false
+end
+
 function FriendsUI:GetAuxiliaryWindowOffset()
 	-- LargeSideTabButtonTemplate protrudes from the main frame's right edge.
-	-- Leave the complete tab rail plus a small visual gap unobstructed.
-	return self:IsModernActive() and 68 or 5
+	-- The visible rail is authoritative here: during Blizzard's side-window
+	-- callback the stored style can briefly lag behind the already applied layout.
+	local hasModernRail = self:IsModernActive() or self:HasVisibleModernSideTabs()
+	return hasModernRail and 68 or 5
+end
+
+function FriendsUI:GetRaidInfoMoverRuntimeState(window)
+	if window ~= _G.RaidInfoFrame then
+		return nil
+	end
+	local enhanceQoL = _G.EnhanceQoL
+	local mover = enhanceQoL and enhanceQoL.Mover
+	local variables = mover and mover.variables
+	local runtimeState = variables and variables.runtimeState
+	return runtimeState and runtimeState[window] or nil
 end
 
 function FriendsUI:AnchorAuxiliaryWindow(window, topOffset)
 	if not (window and BetterFriendsFrame) then
 		return false
+	end
+	-- EnhanceQoLMover restores saved UIParent coordinates from a SetPoint hook.
+	-- While BFL owns RaidInfoFrame as a docked child, suppress only that runtime
+	-- re-entry guard; do not alter the user's saved mover position or setting.
+	local moverState = self:GetRaidInfoMoverRuntimeState(window)
+	local moverWasApplying = moverState and moverState.isApplying
+	if moverState then
+		moverState.isApplying = true
 	end
 	window:ClearAllPoints()
 	window:SetPoint(
@@ -3137,7 +3187,49 @@ function FriendsUI:AnchorAuxiliaryWindow(window, topOffset)
 		self:GetAuxiliaryWindowOffset(),
 		topOffset or 0
 	)
+	if moverState then
+		moverState.isApplying = moverWasApplying
+	end
 	return true
+end
+
+function FriendsUI:RefreshRaidInfoFrameAnchor(frame)
+	frame = frame or _G.RaidInfoFrame
+	if not (frame and BetterFriendsFrame and frame.GetParent and frame:GetParent() == BetterFriendsFrame) then
+		return false
+	end
+	return self:AnchorAuxiliaryWindow(frame, 0)
+end
+
+function FriendsUI:QueueRaidInfoFrameAnchorRefresh(frame)
+	if not (frame and C_Timer and C_Timer.After) then
+		return false
+	end
+	local function RefreshAnchor()
+		if frame.IsShown and not frame:IsShown() then
+			return
+		end
+		self:RefreshRaidInfoFrameAnchor(frame)
+	end
+	-- Blizzard's Raid Info contents and side-window controller both perform
+	-- deferred layout work. Reassert the dock after those passes have completed.
+	C_Timer.After(0, RefreshAnchor)
+	C_Timer.After(0.1, RefreshAnchor)
+	return true
+end
+
+function FriendsUI:ShowAndAnchorRaidInfoFrame(frame)
+	if not (frame and frame.Show) then
+		return false
+	end
+	-- RaidInfoFrame carries Blizzard's own parent-relative anchor. Finalize BFL's
+	-- docking only after OnShow has had a chance to restore that native point.
+	frame:Show()
+	local anchored = self:RefreshRaidInfoFrameAnchor(frame)
+	if anchored then
+		self:QueueRaidInfoFrameAnchorRefresh(frame)
+	end
+	return anchored
 end
 
 function FriendsUI:GetBroadcastFrame()
@@ -4455,6 +4547,7 @@ function FriendsUI:ApplyEffectiveStyle(reason)
 		ThemeManager:ApplyCurrentTheme()
 	end
 	self:SelectSection(selected)
+	self:RefreshRaidInfoFrameAnchor()
 	local WhoFrame = BFL:GetModule("WhoFrame")
 	if WhoFrame then
 		if effective == STYLE_LEGACY then
@@ -5074,17 +5167,33 @@ function FriendsUI:StyleFriendCard(button)
 	end
 	local actionButton = button.travelPassButton
 	if actionButton then
+		local rowHeight = button.GetHeight and button:GetHeight() or 40
+		if not rowHeight or rowHeight <= 0 then
+			rowHeight = 40
+		end
+		local actionSize = math.min(34, math.max(1, math.floor(rowHeight * 0.94)))
+		local gameIconSize = math.min(20, math.max(1, math.floor(rowHeight * 0.82)))
 		local skinInviteButton = themed and not palette.preserveNativeInviteButtons
 		actionButton.BFL_DarkForceFlatButton = skinInviteButton and true or nil
 		actionButton.friendData = friend
 		actionButton.friendIndex = friend and friend.index or nil
-		actionButton:SetSize(34, 34)
+		actionButton:SetSize(actionSize, actionSize)
 		actionButton:ClearAllPoints()
 		actionButton:SetPoint("RIGHT", button, "RIGHT", -4, 0)
 		ApplyAtlasTexture(actionButton.NormalTexture, "common-button-tertiary-square-normal")
 		ApplyAtlasTexture(actionButton.PushedTexture, "common-button-tertiary-square-pressed")
 		ApplyAtlasTexture(actionButton.DisabledTexture, "common-button-tertiary-square-normal")
 		ApplyAtlasTexture(actionButton.HighlightTexture, "common-button-tertiary-square-normal")
+		for _, texture in ipairs({
+			actionButton.NormalTexture,
+			actionButton.PushedTexture,
+			actionButton.DisabledTexture,
+			actionButton.HighlightTexture,
+		}) do
+			if texture and texture.SetSize then
+				texture:SetSize(actionSize, actionSize)
+			end
+		end
 		SetTextureDesaturated(actionButton.NormalTexture, skinInviteButton)
 		SetTextureDesaturated(actionButton.PushedTexture, skinInviteButton)
 		SetTextureDesaturated(actionButton.DisabledTexture, skinInviteButton)
@@ -5112,6 +5221,7 @@ function FriendsUI:StyleFriendCard(button)
 				atlas = atlas .. "-dis"
 			end
 			ApplyAtlasTexture(actionButton.ActionIcon, atlas)
+			actionButton.ActionIcon:SetSize(math.min(24, actionSize), math.min(24, actionSize))
 			SetTextureDesaturated(actionButton.ActionIcon, skinInviteButton)
 			ApplyTextureColor(
 				actionButton.ActionIcon,
@@ -5121,7 +5231,7 @@ function FriendsUI:StyleFriendCard(button)
 		end
 		actionButton:Show()
 		if button.gameIcon then
-			button.gameIcon:SetSize(20, 20)
+			button.gameIcon:SetSize(gameIconSize, gameIconSize)
 			button.gameIcon:ClearAllPoints()
 			button.gameIcon:SetPoint("RIGHT", actionButton, "LEFT", -6, 1)
 		end
@@ -6036,12 +6146,66 @@ function FriendsUI:RegisterTests()
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernAuxiliarySpacing", {
+		condition = function()
+			return BetterFriendsFrame ~= nil
+		end,
 		action = function(V)
-			if self:IsModernActive() then
-				V:AssertEqual(self:GetAuxiliaryWindowOffset(), 68, "Modern auxiliary windows clear the side-tab rail")
-			else
-				V:AssertEqual(self:GetAuxiliaryWindowOffset(), 5, "Legacy auxiliary windows retain their original gap")
+			local expectedOffset = (self:IsModernActive() or self:HasVisibleModernSideTabs()) and 68 or 5
+			V:AssertEqual(self:GetAuxiliaryWindowOffset(), expectedOffset, "Auxiliary window spacing follows the active UI style")
+			local originalSideTabs = self.sideTabs
+			local originalIsModernActive = self.IsModernActive
+			self.sideTabs = {
+				{
+					IsVisible = function()
+						return true
+					end,
+				},
+			}
+			self.IsModernActive = function()
+				return false
 			end
+			local transitionOffset = self:GetAuxiliaryWindowOffset()
+			self.sideTabs = originalSideTabs
+			self.IsModernActive = originalIsModernActive
+			V:AssertEqual(transitionOffset, 68, "Visible Modern side tabs remain authoritative during style transitions")
+			local anchor
+			local shown = false
+			local moverState = { isApplying = false }
+			local probe = {
+				GetParent = function()
+					return BetterFriendsFrame
+				end,
+				Show = function()
+					shown = true
+					-- Reproduce Blizzard restoring RaidInfoFrame's native zero-gap point.
+					anchor = { "TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 0, -28 }
+				end,
+				ClearAllPoints = function()
+					anchor = nil
+				end,
+				SetPoint = function(_, ...)
+					if moverState.isApplying then
+						anchor = { ... }
+					else
+						-- Reproduce a mover restoring its saved UIParent position.
+						anchor = { "TOPLEFT", UIParent, "TOPLEFT", 395, -217 }
+					end
+				end,
+			}
+			local originalGetMoverState = self.GetRaidInfoMoverRuntimeState
+			self.GetRaidInfoMoverRuntimeState = function()
+				return moverState
+			end
+			local anchored = self:ShowAndAnchorRaidInfoFrame(probe)
+			self.GetRaidInfoMoverRuntimeState = originalGetMoverState
+			V:Assert(anchored, "Raid Info uses the shared auxiliary-window anchor")
+			V:Assert(shown, "Raid Info is shown before BFL finalizes its docked anchor")
+			V:AssertEqual(moverState.isApplying, false, "Raid Info preserves the external mover's runtime state")
+			V:AssertEqual(anchor[1], "TOPLEFT", "Raid Info anchors from its top-left corner")
+			V:AssertEqual(anchor[2], BetterFriendsFrame, "Raid Info anchors to BetterFriendlist")
+			V:AssertEqual(anchor[3], "TOPRIGHT", "Raid Info starts beyond BetterFriendlist's right edge")
+			V:AssertEqual(anchor[4], expectedOffset, "Raid Info clears the side-tab rail only in Modern UI")
+			V:AssertEqual(anchor[5], 0, "Raid Info remains top-aligned with BetterFriendlist")
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernSimplePortraitReopen", {
@@ -6220,7 +6384,11 @@ function FriendsUI:RegisterTests()
 		action = function(V)
 			local raid = BetterFriendsFrame.RaidFrame
 			local control = raid.ControlPanel
+			control.RaidInfoButton:SetText("")
+			control.RaidInfoButton:Hide()
 			self:ApplyModernRaidGeometry()
+			V:Assert(control.RaidInfoButton:IsShown(), "Modern Raid Info restores its visible state during layout")
+			V:AssertEqual(control.RaidInfoButton:GetText(), RAID_INFO, "Modern Raid Info restores its localized label")
 			V:Assert(control.EveryoneAssistIcon:IsShown(), "Modern Raid shows Blizzard's separate assist icon")
 			V:Assert(control.RoleSummary:IsShown(), "Modern Raid uses BFL's compact combined role summary")
 			local PreviewMode = BFL:GetModule("PreviewMode")
