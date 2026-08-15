@@ -5241,7 +5241,7 @@ function FriendsUI:StyleFriendCard(button)
 	if palette.skinFriendCardSurface then
 		local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
 		if EllesmereUISkin and EllesmereUISkin.SkinModernFriendCard then
-			EllesmereUISkin:SkinModernFriendCard(button)
+			EllesmereUISkin:SkinModernFriendCard(button, factionTint)
 		end
 	end
 end

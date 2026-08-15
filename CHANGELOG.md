@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.2]        - 2026-08-15
+
+### Fixed
+- **EllesmereUI Theme** - Faction-colored friend backgrounds in the Modern interface are now softer and easier to read.
+
+---
+
 ## [2.8.1]        - 2026-08-14
 
 ### Fixed
@@ -131,26 +138,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 ### Fixed
 - **Classic Friends List** - Fixed class-colored names for WoW friends whose localized class data could miss Classic class ID gaps, including druids on Anniversary realms.
 - **Classic UI** - Adjusted the WHO zone dropdown spacing and stabilized copy-name dialogs so their input fields fit on first open.
-
----
-
-## [2.6.3]        - 2026-06-22
-
-### Added
-- **Settings Center Beta** - Added a LibSettingsDesigner-based Settings Center with dashboard, task-based categories, native controls, changelog/help pages, support links, New badges, and BFL Dark/Custom and ElvUI skin support. Enable it through Beta Features; the classic settings window remains the default.
-- **Notes & Tags Beta** - Added local private notes for friends and ignored players plus Blizzard-compatible and custom BetterFriendlist tags, with row chips, tooltips, context menu actions, and Settings Center controls.
-- **Auto Raid Assist** - Added an opt-in assistant picker for BattleTag friends, nickname matches, manual Character-Realm targets, friends, guild members, and current party or raid characters.
-
-### Improved
-- **QuickFilter Builder** - Added friend tag rules for tag text, tag source, tag count, and has-tag matching.
-- **Auto Raid Assist** - Improved promotion reliability after party-to-raid conversion, cooldown waits, multiple matching targets, and same-realm character matching.
-- **Client Compatibility** - Prepared Recruit A Friend, Quick Join, Battle.net friend metadata, censored Group Finder entries, and guild rank refreshes for Retail 12.1.
-
-### Fixed
-- **Classic Guild Window** - Kept Classic clients on Blizzard's separate Guild window so the Guild keybind no longer opens the Friends list.
-
-### Removed
-- **Settings Statistics** - Removed the retired settings statistics page from the modern and legacy settings flows.
 
 ---
 

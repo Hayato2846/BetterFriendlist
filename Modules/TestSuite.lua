@@ -5669,6 +5669,7 @@ local function RegisterBuiltInTests()
 				local modernCard = {
 					CardBackground = MakeTexture(),
 					ThemeTint = MakeTexture(),
+					FactionTint = MakeTexture(),
 					background = MakeTexture(),
 					highlight = MakeTexture(),
 				}
@@ -5681,16 +5682,22 @@ local function RegisterBuiltInTests()
 				-- change, while leaving the template-owned selected/hover visibility intact.
 				modernCard.CardBackground:SetAlpha(1)
 				modernCard.ThemeTint:Show()
+				modernCard.FactionTint:SetColorTexture(0.03, 0.30, 0.85, 1)
+				modernCard.FactionTint:Show()
 				modernCard.background:SetColorTexture(0, 0, 0, 0)
 				modernCard.highlight:SetColorTexture(1, 0, 0, 1)
 				modernCard.highlight:SetDesaturated(true)
 				modernCard.highlight:SetVertexColor(1, 0, 0, 1)
 				modernCard.highlight:SetAlpha(0.12)
 				modernCard.highlight:Show()
-				skin:SkinModernFriendCard(modernCard)
+				skin:SkinModernFriendCard(modernCard, { 0.03, 0.30, 0.85 })
 				V:AssertEqual(modernCard.CardBackground.alpha, 0, "Modern EUI should re-hide a recycled native card surface")
 				V:Assert(modernCard.ThemeTint.shown == false, "Modern EUI should re-hide recycled theme tint")
-				V:AssertEqual(modernCard.background.colorTexture[4], 0.10, "Modern EUI should restore a recycled row surface")
+				V:Assert(modernCard.FactionTint.shown == false, "Modern EUI should hide the opaque faction layer")
+				V:AssertEqual(modernCard.background.colorTexture[1], 0.03, "Modern EUI should transfer faction red to its row surface")
+				V:AssertEqual(modernCard.background.colorTexture[2], 0.30, "Modern EUI should transfer faction green to its row surface")
+				V:AssertEqual(modernCard.background.colorTexture[3], 0.85, "Modern EUI should transfer faction blue to its row surface")
+				V:AssertEqual(modernCard.background.colorTexture[4], 0.22, "Modern EUI should keep faction color visible but subdued")
 				V:AssertEqual(modernCard.highlight.colorTexture[4], 0.035, "Modern EUI should restore recycled hover and selection color")
 				V:Assert(modernCard.highlight.desaturated == false, "Modern EUI should restore hover saturation")
 				V:AssertEqual(modernCard.highlight.alpha, 1, "Modern EUI should restore hover opacity")

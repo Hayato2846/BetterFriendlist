@@ -8,6 +8,7 @@ local THEME_ID = "ellesmereui"
 local SKIN_REGISTRATION_NAME = "BetterFriendlist"
 local EUI_FRIENDS_BACKGROUND = { 0.03, 0.045, 0.05, 1 }
 local EUI_FRIENDS_ROW = { 0, 0, 0, 0.10 }
+local EUI_FRIENDS_FACTION_ALPHA = 0.22
 local EUI_FRIENDS_HOVER = { 1, 1, 1, 0.035 }
 local EUI_BATTLENET_TEXT = { 0.26, 0.68, 0.94, 1 }
 local BFL_PORTRAIT_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Textures\\PortraitIcon"
@@ -312,7 +313,7 @@ function EllesmereUISkin:GetPalette()
 	}
 end
 
-function EllesmereUISkin:SkinModernFriendCard(button)
+function EllesmereUISkin:SkinModernFriendCard(button, factionTint)
 	if not self:IsSkinEnabled() or not button then
 		return
 	end
@@ -330,8 +331,20 @@ function EllesmereUISkin:SkinModernFriendCard(button)
 	if button.ThemeTint then
 		button.ThemeTint:Hide()
 	end
+	-- FriendsUI renders faction color as an opaque layer below the native card
+	-- atlas. EUI removes that atlas, so leaving the faction layer in place turns
+	-- the entire row into a saturated red/blue block. FriendsUI passes its
+	-- already resolved faction color directly so this dynamic skin does not rely
+	-- on a pooled texture's current visibility state.
+	if button.FactionTint then
+		button.FactionTint:Hide()
+	end
 	if button.background and button.background.SetColorTexture then
-		button.background:SetColorTexture(unpack(EUI_FRIENDS_ROW))
+		if factionTint then
+			button.background:SetColorTexture(factionTint[1], factionTint[2], factionTint[3], EUI_FRIENDS_FACTION_ALPHA)
+		else
+			button.background:SetColorTexture(unpack(EUI_FRIENDS_ROW))
+		end
 		button.background:Show()
 	end
 	local highlight = button.highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
