@@ -54,11 +54,42 @@ local DEFAULT_SETTINGS = {
 	rowMode = "chip_line",
 	compactRowMode = "icon_only",
 	maxRowChips = 3,
+	chipsPerLine = 3,
+	fullWidthTagRows = false,
+	hideDynamicGroupTagChip = false,
+	chipIconSize = 11,
+	chipFont = "Friz Quadrata TT",
+	chipFontSize = 10,
+	chipFontFlags = "SLUG",
 	maxTooltipChips = 8,
 	enableDynamicTagGroups = false,
 	includeCustomTagsInSearch = true,
 	includeBlizzardTagsInSearch = true,
 }
+
+local CHIP_PROFILE_ICON_FIELDS = {
+	"iconMode",
+	"iconType",
+	"iconValue",
+	"icon",
+	"atlas",
+	"fallbackAtlas",
+	"texture",
+	"texCoord",
+	"iconZoom",
+}
+
+local VALID_CHIP_ICON_MODES = {
+	option = true,
+	selected = true,
+	custom = true,
+	none = true,
+}
+
+local function NormalizeChipIconMode(value)
+	value = type(value) == "string" and value or nil
+	return value and VALID_CHIP_ICON_MODES[value] and value or nil
+end
 
 local ICON_OPTIONS = {
 	{ id = "tag", labelKey = "FRIEND_TAGS_ICON_TAG", fallback = "Tag", texture = TAG_ICON },
@@ -1653,6 +1684,7 @@ function FriendTags:GetDefaultChipProfile(tag)
 	local defaultOrder = tonumber(tag.order) or (tag.source == SOURCE_CUSTOM and 1000 or 0)
 	local profile = {
 		chipLabel = nil,
+		iconMode = nil,
 		iconType = defaultIcon.iconType,
 		iconValue = defaultIcon.iconValue,
 		icon = defaultIcon.icon,
@@ -1683,6 +1715,10 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 	if profile.chipLabel ~= nil then
 		pruned.chipLabel = tostring(profile.chipLabel)
 	end
+	local iconMode = NormalizeChipIconMode(profile.iconMode)
+	if iconMode then
+		pruned.iconMode = iconMode
+	end
 	if profile.iconType ~= nil and profile.iconType ~= defaultProfile.iconType then
 		pruned.iconType = profile.iconType
 	end
@@ -1704,10 +1740,12 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 	if type(profile.texCoord) == "table" and not SameTexCoord(profile.texCoord, defaultProfile.texCoord) then
 		pruned.texCoord = CopyTexCoord(profile.texCoord)
 	end
-	local profileIconZoom = NormalizeIconZoom(profile.iconZoom)
-	local defaultIconZoom = NormalizeIconZoom(defaultProfile.iconZoom)
-	if profileIconZoom ~= defaultIconZoom then
-		pruned.iconZoom = profileIconZoom
+	if profile.iconZoom ~= nil then
+		local profileIconZoom = NormalizeIconZoom(profile.iconZoom)
+		local defaultIconZoom = NormalizeIconZoom(defaultProfile.iconZoom)
+		if profileIconZoom ~= defaultIconZoom then
+			pruned.iconZoom = profileIconZoom
+		end
 	end
 	if profile.visible == false then
 		pruned.visible = false
@@ -1774,6 +1812,7 @@ function FriendTags:GetChipProfile(tag)
 
 	local profile = {
 		chipLabel = override.chipLabel,
+		iconMode = NormalizeChipIconMode(override.iconMode),
 		iconType = iconType,
 		iconValue = iconValue,
 		icon = iconType == "atlas" and (iconValue or atlas or fallbackAtlas) or texture or legacyIcon or iconValue,
@@ -1807,6 +1846,11 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 
 	local profile = CopyProfile(db.friendTagProfiles[tagId])
 	local clearFields = type(profilePatch.clearFields) == "table" and profilePatch.clearFields or {}
+	if profilePatch.replaceIcon == true then
+		for _, field in ipairs(CHIP_PROFILE_ICON_FIELDS) do
+			profile[field] = nil
+		end
+	end
 	for field, shouldClear in pairs(clearFields) do
 		if shouldClear then
 			profile[field] = nil
@@ -1815,6 +1859,9 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 
 	if profilePatch.chipLabel ~= nil then
 		profile.chipLabel = profilePatch.chipLabel == false and nil or tostring(profilePatch.chipLabel)
+	end
+	if profilePatch.iconMode ~= nil then
+		profile.iconMode = profilePatch.iconMode == false and nil or NormalizeChipIconMode(profilePatch.iconMode)
 	end
 	if profilePatch.iconType ~= nil then
 		profile.iconType = profilePatch.iconType == false and "none" or tostring(profilePatch.iconType)

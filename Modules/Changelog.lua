@@ -29,6 +29,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.3]        - 2026-08-18
+
+### Added
+- **Friend Tag Layout** - Choose how many tags can appear in total and on each line. Tags can also use separate full-width lines. When friends are grouped by a tag, that tag can be hidden from their rows.
+- **Tag Appearance** - Pick the font, size, style, and icon size used by friend tags. Each tag can also have its own text color to match its background.
+
+### Improved
+- **Friend Tag Editor** - Typing a label now switches to Custom Label automatically. Pressing Enter or Escape finishes text entry, and icon or label changes show up right away.
+- **Cleaner Settings** - Options that only work with Modern or Legacy are now shown when that interface is active, while shared options remain available in both.
+
+### Fixed
+- **Tag Icons and Labels** - Icon Only now works on the first click. Custom icon paths stay selected, switching between icon types no longer brings back an older icon, and reordering tags keeps their chosen icon zoom.
+- **Tag Rows** - Tag lines wrap more reliably with the chosen limits and sizes. Full-width tag rows no longer overlap the game icon or Invite button.
+- **Legacy Settings** - Sliders update the friend list without rebuilding the page while dragging. Dropdown widths, menu-count alignment, scrollbars, and right-click color resets have also been tidied up.
+- **Friend Search** - Clearing the search box once again restores its hint text and hides the clear button on Retail and Classic.
+- **Favorite Icons** - BFL and Blizzard favorite icons now leave a more even gap between the character name and the following friend info.
+
+---
+
 ## [2.8.2]        - 2026-08-15
 
 ### Fixed
@@ -152,14 +171,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 - **Classic Dropdowns** - Friends header, WHO, settings, and builder dropdowns now have cleaner icon placement and more reliable click areas in Dark/Custom themes and ElvUI.
 - **Classic Simple Mode** - Turning Simple Mode on or off updates the frame right away, no reload needed.
 - **Classic UI** - More Classic menus use the newer menu style where the client supports it, and shared icon art is safer on Classic.
-
----
-
-## [2.6.4]        - 2026-06-25
-
-### Fixed
-- **Classic Friends List** - Fixed class-colored names for WoW friends whose localized class data could miss Classic class ID gaps, including druids on Anniversary realms.
-- **Classic UI** - Adjusted the WHO zone dropdown spacing and stabilized copy-name dialogs so their input fields fit on first open.
 
 ---
 

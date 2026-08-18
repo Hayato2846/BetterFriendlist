@@ -127,6 +127,33 @@ local function CreateInput(parent, width, maxLetters)
 	return editBox
 end
 
+function FriendTagEditor:CommitEditorInputAndClearFocus(editBox)
+	self.releasingEditorInputFocus = true
+	if editBox and editBox.ClearFocus then
+		editBox:ClearFocus()
+	end
+	self.releasingEditorInputFocus = false
+	self:FlushAutoSave()
+end
+
+function FriendTagEditor:BindEditorInputFocusHandlers(editBox)
+	if not (editBox and editBox.SetScript) then
+		return false
+	end
+	editBox:SetScript("OnEnterPressed", function(input)
+		self:CommitEditorInputAndClearFocus(input)
+	end)
+	editBox:SetScript("OnEscapePressed", function(input)
+		self:CommitEditorInputAndClearFocus(input)
+	end)
+	editBox:SetScript("OnEditFocusLost", function()
+		if not self.releasingEditorInputFocus then
+			self:FlushAutoSave()
+		end
+	end)
+	return true
+end
+
 local function FindIconOptionByTexture(options, texture)
 	if type(options) ~= "table" then
 		return nil
@@ -137,6 +164,53 @@ local function FindIconOptionByTexture(options, texture)
 		end
 	end
 	return nil
+end
+
+local VALID_ICON_MODES = {
+	option = true,
+	selected = true,
+	custom = true,
+	none = true,
+}
+
+local function ResolveStoredIconMode(profile, dbProfile, selectedIcon)
+	profile = type(profile) == "table" and profile or {}
+	dbProfile = type(dbProfile) == "table" and dbProfile or {}
+	local storedMode = type(dbProfile.iconMode) == "string" and dbProfile.iconMode or nil
+	if storedMode and VALID_ICON_MODES[storedMode] then
+		return storedMode
+	end
+
+	local iconValue = profile.iconValue or profile.atlas or profile.texture or profile.icon
+	if not iconValue or iconValue == "" or profile.iconType == "none" then
+		return "none"
+	end
+	if selectedIcon then
+		-- Profiles saved before iconMode existed can contain a custom path that is
+		-- also the fallback texture of an atlas option. Treat an explicit
+		-- texture-only override as Custom Path so reopening the tag cannot replace
+		-- it with that option's atlas.
+		local explicitTexture = dbProfile.texture or dbProfile.iconValue or dbProfile.icon
+		local matchesOptionFallback = explicitTexture ~= nil
+			and selectedIcon.texture ~= nil
+			and tostring(explicitTexture) == tostring(selectedIcon.texture)
+		local hasOptionAtlasState = dbProfile.atlas ~= nil
+			or dbProfile.fallbackAtlas ~= nil
+			or dbProfile.texCoord ~= nil
+		if
+			profile.iconType == "texture"
+			and matchesOptionFallback
+			and (selectedIcon.atlas ~= nil or selectedIcon.fallbackAtlas ~= nil)
+			and not hasOptionAtlasState
+		then
+			return "custom"
+		end
+		return "option"
+	end
+	if NormalizeIconZoom(profile.iconZoom) ~= false then
+		return "selected"
+	end
+	return "custom"
 end
 
 local function CopyTexCoord(texCoord)
@@ -444,6 +518,7 @@ function FriendTagEditor:RefreshList()
 		if not ApplyIcon(icon, profile) then
 			icon:Hide()
 		end
+		row.icon = icon
 
 		local name = CreateFont(row, "BetterFriendlistFontHighlightSmall")
 		name:SetPoint("LEFT", icon, "RIGHT", 6, 7)
@@ -482,6 +557,26 @@ function FriendTagEditor:RefreshList()
 	end
 
 	frame.listContent:SetHeight(math.max(1, (#definitions * (ROW_HEIGHT + ROW_GAP)) - ROW_GAP))
+end
+
+function FriendTagEditor:RefreshListRowIcon(tagId)
+	local frame = self.frame
+	local FriendTags = GetFriendTags()
+	if not (frame and frame.tagRows and FriendTags and tagId) then
+		return false
+	end
+	for _, row in ipairs(frame.tagRows) do
+		if row.tagId == tagId and row.icon then
+			local profile = FriendTags:GetChipProfile(tagId)
+			if ApplyIcon(row.icon, profile) then
+				row.icon:Show()
+			else
+				row.icon:Hide()
+			end
+			return true
+		end
+	end
+	return false
 end
 
 function FriendTagEditor:BeginTagDrag(row)
@@ -597,16 +692,9 @@ function FriendTagEditor:LoadState(def)
 		end
 	end
 
-	local iconMode = "option"
+	local iconMode = ResolveStoredIconMode(profile, dbProfile, selectedIcon)
 	local iconValue = profile.iconValue or profile.atlas or profile.texture or profile.icon or ""
 	local iconOptionID = selectedIcon and selectedIcon.id or "tag"
-	if not iconValue or iconValue == "" or profile.iconType == "none" then
-		iconMode = "none"
-	elseif not selectedIcon and NormalizeIconZoom(profile.iconZoom) ~= false then
-		iconMode = "selected"
-	elseif not selectedIcon then
-		iconMode = "custom"
-	end
 
 	self.editState = {
 		tagId = def.id,
@@ -637,6 +725,17 @@ end
 function FriendTagEditor:GetSelectedDefinition()
 	local FriendTags = GetFriendTags()
 	return FriendTags and self.selectedTagId and FriendTags:GetTagDefinition(self.selectedTagId) or nil
+end
+
+function FriendTagEditor:GetLabelModeForText(text)
+	return tostring(text or "") == "" and "default" or "custom"
+end
+
+function FriendTagEditor:GetLabelModeAfterTextChange(text, currentMode, userInput)
+	if userInput ~= true then
+		return currentMode
+	end
+	return self:GetLabelModeForText(text)
 end
 
 function FriendTagEditor:RefreshEditor()
@@ -677,28 +776,24 @@ function FriendTagEditor:RefreshEditor()
 			state.name = GetEditBoxText(self.nameInput)
 			self:RefreshPreview()
 		end)
-		self.nameInput:SetScript("OnEnterPressed", function(editBox)
-			editBox:ClearFocus()
-			self:FlushAutoSave()
-		end)
-		self.nameInput:SetScript("OnEditFocusLost", function()
-			self:FlushAutoSave()
-		end)
+		self:BindEditorInputFocusHandlers(self.nameInput)
 		y = y - 36
 	end
 
 	self.labelInput = self:CreateLabeledInput(content, L("FRIEND_TAGS_EDITOR_LABEL", "Chip Label"), state.labelValue, y, 168, 32)
-	self.labelInput:SetScript("OnTextChanged", function()
+	self.labelInput:SetScript("OnTextChanged", function(_, userInput)
 		if self.suppressEditorChanges then
 			return
 		end
 		state.labelValue = GetEditBoxText(self.labelInput)
-		if state.labelMode ~= "icon_only" then
-			state.labelMode = state.labelValue == "" and "default" or "custom"
+		state.labelMode = self:GetLabelModeAfterTextChange(state.labelValue, state.labelMode, userInput)
+		if userInput ~= true then
+			return
 		end
 		self:RefreshPreview()
 		self:QueueAutoSave()
 	end)
+	self:BindEditorInputFocusHandlers(self.labelInput)
 
 	local defaultButton = CreateSmallButton(content, L("FRIEND_TAGS_EDITOR_LABEL_DEFAULT", "Default"), 100, function()
 		state.labelMode = "default"
@@ -728,7 +823,7 @@ function FriendTagEditor:RefreshEditor()
 	self:CreateColorControl(content, y, "color", L("FRIEND_TAGS_EDITOR_COLOR", "Chip Color"), "colorButton")
 	y = y - 38
 
-	self:CreateColorControl(content, y, "textColor", L("SETTINGS_FONT_COLOR", "Font Color"), "textColorButton")
+	self:CreateColorControl(content, y, "textColor", L("FRIEND_TAGS_EDITOR_TEXT_COLOR", "Chip Font Color"), "textColorButton")
 	y = y - 38
 
 	self:CreateVisibilityControls(content, y)
@@ -862,7 +957,7 @@ function FriendTagEditor:CreateIconControls(parent, y)
 
 	local previewHolder = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	previewHolder:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
-	previewHolder:SetSize(26, 26)
+	previewHolder:SetSize(32, 32)
 	previewHolder:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -959,10 +1054,7 @@ function FriendTagEditor:CreateIconControls(parent, y)
 		self:RefreshPreview()
 		self:QueueAutoSave()
 	end)
-	self.iconInput:SetScript("OnEnterPressed", function(editBox)
-		editBox:ClearFocus()
-		self:FlushAutoSave()
-	end)
+	self:BindEditorInputFocusHandlers(self.iconInput)
 
 	self.iconNoneButton = noneButton
 	self.iconCustomButton = customButton
@@ -980,7 +1072,7 @@ function FriendTagEditor:UpdateIconControls()
 		local iconValue = profile.iconValue or profile.icon or profile.texture or profile.atlas
 		local TagChips = GetTagChips()
 		if self.iconButtonPreview.chip and TagChips and TagChips.UpdateStandaloneChip and profile.iconType ~= "none" and iconValue and iconValue ~= "" then
-			TagChips:UpdateStandaloneChip(self.iconButtonPreview.chip, profile, "", 22)
+			TagChips:UpdateStandaloneChip(self.iconButtonPreview.chip, profile, "", 28)
 		else
 			if self.iconButtonPreview.chip then
 				self.iconButtonPreview.chip:Hide()
@@ -1182,9 +1274,11 @@ function FriendTagEditor:CommitState()
 		iconZoom = NormalizeIconZoom(iconProfile.iconZoom)
 	end
 
-	FriendTags:SetChipProfile(def.id, {
+	local saved = FriendTags:SetChipProfile(def.id, {
 		chipLabel = chipLabel,
 		clearFields = clearFields,
+		replaceIcon = true,
+		iconMode = state.iconMode,
 		iconType = iconType,
 		iconValue = iconValue,
 		icon = icon,
@@ -1201,7 +1295,10 @@ function FriendTagEditor:CommitState()
 		brokerVisible = state.brokerVisible,
 		order = state.order,
 	})
-	return true
+	if saved then
+		self:RefreshListRowIcon(def.id)
+	end
+	return saved == true
 end
 
 function FriendTagEditor:Save()

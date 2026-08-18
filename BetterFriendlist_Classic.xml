@@ -922,14 +922,11 @@
 							<Anchor point="TOPRIGHT" relativeKey="$parent.$parent.Inset" x="-10" y="50"/>
 						</Anchors>
 						<Scripts>
-							<OnTextChanged>
-								local text = self:GetText();
-								if text and text ~= "" then
-									self.Instructions:Hide();
-								else
-									self.Instructions:Show();
-								end
-								BetterFriendsFrame_OnSearchTextChanged(self);
+						<OnTextChanged>
+							if SearchBoxTemplate_OnTextChanged then
+								SearchBoxTemplate_OnTextChanged(self);
+							end
+							BetterFriendsFrame_OnSearchTextChanged(self);
 							</OnTextChanged>
 						</Scripts>
 					</EditBox>

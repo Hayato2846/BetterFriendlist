@@ -5097,6 +5097,33 @@ function FriendsUI:ApplyTheme(theme)
 	self:RefreshFriendsFriendsFrame()
 end
 
+function FriendsUI:GetFriendCardControlOffsets(
+	controlRowHeight,
+	actionSize,
+	gameIconSize,
+	nameContentHeight,
+	fullWidthTagRows
+)
+	if not fullWidthTagRows then
+		return 0, 1
+	end
+	local FriendsList = BFL:GetModule("FriendsList")
+	if not (FriendsList and FriendsList.GetFriendControlTopOffsetForLayout) then
+		return 0, 1
+	end
+	return FriendsList:GetFriendControlTopOffsetForLayout(
+		controlRowHeight,
+		actionSize,
+		nameContentHeight,
+		true
+	), FriendsList:GetFriendControlTopOffsetForLayout(
+		controlRowHeight,
+		gameIconSize,
+		nameContentHeight,
+		true
+	)
+end
+
 function FriendsUI:StyleFriendCard(button)
 	if not self:IsModernActive() or not button then
 		return
@@ -5171,15 +5198,28 @@ function FriendsUI:StyleFriendCard(button)
 		if not rowHeight or rowHeight <= 0 then
 			rowHeight = 40
 		end
-		local actionSize = math.min(34, math.max(1, math.floor(rowHeight * 0.94)))
-		local gameIconSize = math.min(20, math.max(1, math.floor(rowHeight * 0.82)))
+		local controlRowHeight = button.bflControlRowHeight or rowHeight
+		local actionSize = math.min(34, math.max(1, math.floor(controlRowHeight * 0.94)))
+		local gameIconSize = math.min(20, math.max(1, math.floor(controlRowHeight * 0.82)))
+		local fullWidthTagRows = button.lastFullWidthTagRows == true
+		local actionYOffset, gameIconYOffset = self:GetFriendCardControlOffsets(
+			controlRowHeight,
+			actionSize,
+			gameIconSize,
+			button.bflNameContentHeight,
+			fullWidthTagRows
+		)
 		local skinInviteButton = themed and not palette.preserveNativeInviteButtons
 		actionButton.BFL_DarkForceFlatButton = skinInviteButton and true or nil
 		actionButton.friendData = friend
 		actionButton.friendIndex = friend and friend.index or nil
 		actionButton:SetSize(actionSize, actionSize)
 		actionButton:ClearAllPoints()
-		actionButton:SetPoint("RIGHT", button, "RIGHT", -4, 0)
+		if fullWidthTagRows then
+			actionButton:SetPoint("TOPRIGHT", button, "TOPRIGHT", -4, actionYOffset)
+		else
+			actionButton:SetPoint("RIGHT", button, "RIGHT", -4, 0)
+		end
 		ApplyAtlasTexture(actionButton.NormalTexture, "common-button-tertiary-square-normal")
 		ApplyAtlasTexture(actionButton.PushedTexture, "common-button-tertiary-square-pressed")
 		ApplyAtlasTexture(actionButton.DisabledTexture, "common-button-tertiary-square-normal")
@@ -5233,7 +5273,17 @@ function FriendsUI:StyleFriendCard(button)
 		if button.gameIcon then
 			button.gameIcon:SetSize(gameIconSize, gameIconSize)
 			button.gameIcon:ClearAllPoints()
-			button.gameIcon:SetPoint("RIGHT", actionButton, "LEFT", -6, 1)
+			if fullWidthTagRows then
+				button.gameIcon:SetPoint(
+					"TOPRIGHT",
+					button,
+					"TOPRIGHT",
+					-(actionSize + 10),
+					gameIconYOffset
+				)
+			else
+				button.gameIcon:SetPoint("RIGHT", actionButton, "LEFT", -6, 1)
+			end
 		end
 	end
 	-- FriendsList owns row height and the top-down text stack. Modern styling

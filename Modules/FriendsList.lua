@@ -421,7 +421,8 @@ local function CalculateFriendRowHeight(
 	hasMultiAccountRow,
 	tagExtraHeight,
 	minimumHeight,
-	nameContentHeight
+	nameContentHeight,
+	fullWidthTagRows
 )
 	local nameFontSize = nameSize or BASE_FONT_SIZE
 	local infoFontSize = infoSize or BASE_FONT_SIZE
@@ -437,8 +438,13 @@ local function CalculateFriendRowHeight(
 		end
 	end
 
-	calculatedHeight = calculatedHeight + math.max(0, tonumber(tagExtraHeight) or 0)
-	return math.max(tonumber(minimumHeight) or 1, math.ceil(calculatedHeight))
+	local resolvedTagExtraHeight = math.max(0, tonumber(tagExtraHeight) or 0)
+	local resolvedMinimumHeight = tonumber(minimumHeight) or 1
+	if fullWidthTagRows and resolvedTagExtraHeight > 0 then
+		return math.max(resolvedMinimumHeight, math.ceil(calculatedHeight)) + math.ceil(resolvedTagExtraHeight)
+	end
+	calculatedHeight = calculatedHeight + resolvedTagExtraHeight
+	return math.max(resolvedMinimumHeight, math.ceil(calculatedHeight))
 end
 
 function FriendsList:CalculateFriendRowHeight(
@@ -448,7 +454,8 @@ function FriendsList:CalculateFriendRowHeight(
 	hasMultiAccountRow,
 	tagExtraHeight,
 	minimumHeight,
-	nameContentHeight
+	nameContentHeight,
+	fullWidthTagRows
 )
 	return CalculateFriendRowHeight(
 		false,
@@ -458,8 +465,46 @@ function FriendsList:CalculateFriendRowHeight(
 		hasMultiAccountRow,
 		tagExtraHeight,
 		minimumHeight,
-		nameContentHeight
+		nameContentHeight,
+		fullWidthTagRows
 	)
+end
+
+local function GetFriendControlTopOffset(rowHeight, controlHeight, nameContentHeight, fullWidthTagRows)
+	rowHeight = math.max(1, tonumber(rowHeight) or 1)
+	controlHeight = math.max(1, tonumber(controlHeight) or 1)
+	if not fullWidthTagRows then
+		return -math.floor((rowHeight - controlHeight) / 2)
+	end
+
+	-- Full-width chips have their own block below the friend content. Keep the
+	-- controls in that upper block and center them on the Name FontString where
+	-- their size permits, clamping larger controls to the card boundary.
+	local resolvedNameHeight = math.max(1, tonumber(nameContentHeight) or 1)
+	local targetTop = FRIEND_ROW_VERTICAL_PADDING + ((resolvedNameHeight - controlHeight) / 2)
+	local maximumTop = math.max(0, rowHeight - controlHeight)
+	local clampedTop = math.max(0, math.min(maximumTop, targetTop))
+	return -math.floor(clampedTop + 0.5)
+end
+
+local function GetFavoriteIconLayout(fontSize, style)
+	fontSize = tonumber(fontSize) or BASE_FONT_SIZE
+	local bflIconSize = math.max(1, math.floor(fontSize * 0.70))
+	local isBlizzard = style == "blizzard"
+	local iconSize = isBlizzard and math.max(1, math.floor(fontSize * 1.2)) or bflIconSize
+	local sizeDifferenceOffset = isBlizzard and math.floor((iconSize - bflIconSize) / 2) or 0
+	return {
+		iconSize = iconSize,
+		-- Keep the release anchoring: both artworks sit against the character
+		-- name even though Blizzard's atlas is physically larger.
+		xOffset = 2 - sizeDifferenceOffset,
+		yOffset = sizeDifferenceOffset,
+		-- The suffix already begins with one space. Three explicit spaces leave
+		-- both favorite artworks enough breathing room before the following info
+		-- while avoiding Blizzard's previous five-space reservation from #119.
+		compactSpacer = "   ",
+		rightPadding = iconSize + 2,
+	}
 end
 
 local function GetFriendTextRightPadding(
@@ -510,11 +555,15 @@ local function GetFriendTextRightPadding(
 	end
 
 	if showFavoriteIcon then
-		local iconScale = (settings and settings.favoriteIconStyle) == "blizzard" and 1.2 or 0.70
-		padding = padding + math.floor((nameSize or BASE_FONT_SIZE) * iconScale) + 2
+		local favoriteLayout = GetFavoriteIconLayout(nameSize, settings and settings.favoriteIconStyle)
+		padding = padding + favoriteLayout.rightPadding
 	end
 
 	return padding
+end
+
+function FriendsList:GetFavoriteIconLayout(fontSize, style)
+	return GetFavoriteIconLayout(fontSize, style)
 end
 
 function FriendsList:GetFriendTextRightPadding(friend, isModern, isCompactMode, nameSize, infoSize, showFavoriteIcon)
@@ -527,6 +576,19 @@ function FriendsList:GetFriendTextRightPadding(friend, isModern, isCompactMode, 
 		infoSize,
 		showFavoriteIcon
 	)
+end
+
+local function ConfigureNameMeasureFont(self, measure, nameFontSize)
+	if self.fontCache and self.fontCache.namePath then
+		local outline = self.fontCache.nameOutline
+		if outline == "NONE" then
+			outline = ""
+		end
+		SafeSetFont(measure, self.fontCache.namePath, nameFontSize, outline)
+	else
+		local _, _, flags = measure:GetFont()
+		SafeSetFont(measure, STANDARD_TEXT_FONT, nameFontSize, GetDefaultUIFontFlags(flags))
+	end
 end
 
 local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidth, friend)
@@ -566,16 +628,7 @@ local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidt
 	end
 
 	local measure = self.nameMeasure
-	if self.fontCache and self.fontCache.namePath then
-		local outline = self.fontCache.nameOutline
-		if outline == "NONE" then
-			outline = ""
-		end
-		SafeSetFont(measure, self.fontCache.namePath, nameFontSize, outline)
-	else
-		local _, _, flags = measure:GetFont()
-		SafeSetFont(measure, STANDARD_TEXT_FONT, nameFontSize, GetDefaultUIFontFlags(flags))
-	end
+	ConfigureNameMeasureFont(self, measure, nameFontSize)
 
 	measure:SetWidth(nameWidth)
 	if measure.SetMaxLines then
@@ -1191,6 +1244,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		local buttonWidth = self and self.GetButtonWidth and self:GetButtonWidth() or 0
 		local streamerModeActive = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive == true or false
 		local FriendTags = BFL:GetModule("FriendTags")
+		local fullWidthTagRows = FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true or false
 		local tagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
 			or BFL.FriendTagsVersion
 			or 0
@@ -1206,6 +1260,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		if
 			item._bflCalculatedHeight ~= nil
 			and item._bflHeightFriend == friend
+			and item._bflHeightGroupId == item.groupId
 			and item._bflHeightFriendsVersion == friendsVersion
 			and item._bflHeightSettingsVersion == settingsVersion
 			and item._bflHeightFontVersion == fontVersion
@@ -1222,6 +1277,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			and item._bflHeightFavoriteIconStyle == settings.favoriteIconStyle
 			and item._bflHeightShowGameIcon == settings.showGameIcon
 			and item._bflHeightMultiAccountRow == hasMultiAccountRow
+			and item._bflHeightFullWidthTagRows == fullWidthTagRows
 		then
 			return item._bflCalculatedHeight
 		end
@@ -1230,15 +1286,17 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		local TagChips = BFL:GetModule("TagChips")
 		local tagChipRowData
 		if TagChips and TagChips.GetRowData then
-			tagChipRowData = TagChips:GetRowData(item.friend, self)
+			tagChipRowData = TagChips:GetRowData(item.friend, self, item.groupId)
 			item._bflTagChipsRowData = tagChipRowData
 			tagExtraHeight = tagChipRowData.height or 0
+			fullWidthTagRows = tagChipRowData.fullWidthTagRows == true
 		elseif TagChips and TagChips.GetRowExtraHeight then
-			tagExtraHeight = TagChips:GetRowExtraHeight(item.friend, self)
+			tagExtraHeight = TagChips:GetRowExtraHeight(item.friend, self, item.groupId)
 		end
 		if
 			item._bflCalculatedHeight ~= nil
 			and item._bflHeightFriend == friend
+			and item._bflHeightGroupId == item.groupId
 			and item._bflHeightFriendsVersion == friendsVersion
 			and item._bflHeightSettingsVersion == settingsVersion
 			and item._bflHeightFontVersion == fontVersion
@@ -1246,6 +1304,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			and item._bflHeightTagsAssignmentVersion == (tagChipRowData and tagChipRowData.cacheTagsAssignmentVersion)
 			and item._bflHeightTagsSettingsVersion == (tagChipRowData and tagChipRowData.cacheSettingsVersion)
 			and item._bflHeightAvailableWidth == (tagChipRowData and tagChipRowData.availableWidth)
+			and item._bflHeightTagGroupId == (tagChipRowData and tagChipRowData.cacheGroupId)
 			and item._bflHeightButtonWidth == buttonWidth
 			and item._bflHeightStreamerModeActive == streamerModeActive
 			and item._bflHeightCompactMode == isCompactMode
@@ -1257,6 +1316,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			and item._bflHeightFavoriteIconStyle == settings.favoriteIconStyle
 			and item._bflHeightShowGameIcon == settings.showGameIcon
 			and item._bflHeightMultiAccountRow == hasMultiAccountRow
+			and item._bflHeightFullWidthTagRows == fullWidthTagRows
 		then
 			item._bflHeightTagsGlobalDefinitionVersion = tagsDefinitionVersion
 			item._bflHeightTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion
@@ -1279,11 +1339,11 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 
 			local displayLine1 = line1Text or ""
 			if isCompactMode and line1SuffixText ~= "" and showFavIcon then
-				local spacer = "  "
-				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
-					spacer = "     "
-				end
-				displayLine1 = line1BaseText .. spacer .. line1SuffixText
+				local favoriteLayout = GetFavoriteIconLayout(
+					nameSize,
+					self.settingsCache and self.settingsCache.favoriteIconStyle
+				)
+				displayLine1 = line1BaseText .. favoriteLayout.compactSpacer .. line1SuffixText
 			end
 
 			local padding = GetFriendTextRightPadding(
@@ -1321,10 +1381,12 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 			hasMultiAccountRow,
 			tagExtraHeight,
 			minimumHeight,
-			nameContentHeight
+			nameContentHeight,
+			fullWidthTagRows
 		)
 		item._bflCalculatedHeight = height
 		item._bflHeightFriend = friend
+		item._bflHeightGroupId = item.groupId
 		item._bflHeightFriendsVersion = friendsVersion
 		item._bflHeightSettingsVersion = settingsVersion
 		item._bflHeightFontVersion = fontVersion
@@ -1334,6 +1396,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		item._bflHeightTagsAssignmentVersion = tagChipRowData and tagChipRowData.cacheTagsAssignmentVersion
 		item._bflHeightTagsSettingsVersion = tagChipRowData and tagChipRowData.cacheSettingsVersion
 		item._bflHeightAvailableWidth = tagChipRowData and tagChipRowData.availableWidth
+		item._bflHeightTagGroupId = tagChipRowData and tagChipRowData.cacheGroupId
 		item._bflHeightButtonWidth = buttonWidth
 		item._bflHeightStreamerModeActive = streamerModeActive
 		item._bflHeightCompactMode = isCompactMode
@@ -1345,6 +1408,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		item._bflHeightFavoriteIconStyle = settings.favoriteIconStyle
 		item._bflHeightShowGameIcon = settings.showGameIcon
 		item._bflHeightMultiAccountRow = hasMultiAccountRow
+		item._bflHeightFullWidthTagRows = fullWidthTagRows
 		return height
 	else
 		return 34 -- Default fallback
@@ -8803,21 +8867,29 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		nameSize,
 		infoSize,
 		self.settingsCache.infoDisabled,
-		false,
-		0,
-		visualMinimum
-	)
+			false,
+			0,
+			visualMinimum
+		)
+	local tagChipRowData = elementData and elementData._bflTagChipsRowData
+	local fullWidthTagRows = tagChipRowData
+		and tagChipRowData.canRender == true
+		and tagChipRowData.fullWidthTagRows == true
+	local tagExtraHeight = fullWidthTagRows and (tonumber(tagChipRowData.height) or 0) or 0
+	local controlRowHeight = fullWidthTagRows and math.max(1, rowHeight - tagExtraHeight) or rowHeight
 
 	-- Compact mode: actual row height may be smaller than the 2-line fallback used by
 	-- CalculateFriendRowHeight. Clamp icon base so icons never exceed the real row.
-	if iconBaseRowHeight > rowHeight then
-		iconBaseRowHeight = rowHeight
+	if iconBaseRowHeight > controlRowHeight then
+		iconBaseRowHeight = controlRowHeight
 	end
 
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
 	-- Update layout if CompactMode changed OR font version changed OR row height changed
 	local infoDisabled = self.settingsCache.infoDisabled or false
 	local nameContentHeight = elementData and elementData._bflNameContentHeight or (nameSize + 2)
+	button.bflControlRowHeight = controlRowHeight
+	button.bflNameContentHeight = nameContentHeight
 	local showFavoriteIcon = friend.type == "bnet"
 		and friend.isFavorite
 		and self.settingsCache.enableFavoriteIcon
@@ -8839,6 +8911,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		or button.lastHasMultiAccountRow ~= hasMultiAccountRow
 		or button.lastModernLayout ~= modern
 		or button.lastNameContentHeight ~= nameContentHeight
+		or button.lastFullWidthTagRows ~= fullWidthTagRows
 		or textRightPaddingChanged
 	if layoutChanged then
 		button.lastCompactMode = isCompactMode
@@ -8848,6 +8921,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		button.lastHasMultiAccountRow = hasMultiAccountRow
 		button.lastModernLayout = modern
 		button.lastNameContentHeight = nameContentHeight
+		button.lastFullWidthTagRows = fullWidthTagRows
 
 		local textLeftInset = modern and 38 or 44
 		button.textLeftInset = textLeftInset
@@ -8899,14 +8973,24 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- All icons scale proportionally to row height (no artificial min/max limits)
 		-- Status icon: 16px at 34px row height = 47%
 		local statusSize = math.floor(iconBaseRowHeight * 0.47)
-		local statusYOffset = -math.floor((rowHeight - statusSize) / 2)
+		local statusYOffset = GetFriendControlTopOffset(
+			controlRowHeight,
+			statusSize,
+			nameContentHeight,
+			fullWidthTagRows
+		)
 		button.status:SetSize(statusSize, statusSize)
 		button.status:ClearAllPoints()
 		button.status:SetPoint("TOPLEFT", 4, statusYOffset)
 
 		-- Game icon: 28px at 34px row height = 82%
 		local gameIconSize = math.floor(iconBaseRowHeight * 0.82)
-		local gameIconYOffset = -math.floor((rowHeight - gameIconSize) / 2)
+		local gameIconYOffset = GetFriendControlTopOffset(
+			controlRowHeight,
+			gameIconSize,
+			nameContentHeight,
+			fullWidthTagRows
+		)
 		button.gameIcon:SetSize(gameIconSize, gameIconSize)
 		button.gameIcon:ClearAllPoints()
 		button.gameIcon:SetPoint("TOPRIGHT", -30, gameIconYOffset)
@@ -8915,7 +8999,12 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		if button.travelPassButton then
 			local tpHeight = math.floor(iconBaseRowHeight * 0.94)
 			local tpWidth = math.floor(tpHeight * 0.75)
-			local tpYOffset = -math.floor((rowHeight - tpHeight) / 2)
+			local tpYOffset = GetFriendControlTopOffset(
+				controlRowHeight,
+				tpHeight,
+				nameContentHeight,
+				fullWidthTagRows
+			)
 			button.travelPassButton:SetSize(tpWidth, tpHeight)
 			button.travelPassButton:ClearAllPoints()
 			button.travelPassButton:SetPoint("TOPRIGHT", 0, tpYOffset)
@@ -9339,12 +9428,12 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- Optimized Phase 4: State Check for Text
 	local textChanged = false
 	local displayLine1 = line1Text
-	if isCompactMode and line1SuffixText ~= "" and showFavIcon then
-		local spacer = "  "
-		if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
-			spacer = "     "
-		end
-		displayLine1 = line1BaseText .. spacer .. line1SuffixText
+	if showFavIcon and isCompactMode and line1SuffixText ~= "" then
+		local favoriteLayout = GetFavoriteIconLayout(
+			nameSize,
+			self.settingsCache and self.settingsCache.favoriteIconStyle
+		)
+		displayLine1 = line1BaseText .. favoriteLayout.compactSpacer .. line1SuffixText
 	end
 	if button.lastLine1Text ~= displayLine1 then
 		EnsureFontSet(button.Name)
@@ -9355,7 +9444,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	-- We check if favorite state changed OR if the text changed (which means width changed)
 	-- Also check if font changed, as that affects text width
-	if button.lastIsFavorite ~= showFavIcon or (showFavIcon and (textChanged or fontChanged)) then
+	if button.lastIsFavorite ~= showFavIcon or (showFavIcon and (textChanged or fontChanged or layoutChanged)) then
 		button.lastIsFavorite = showFavIcon
 
 		if showFavIcon then
@@ -9396,21 +9485,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				end
 
 				local _, fontSize = button.Name:GetFont()
-				local nameHeight = fontSize or 12
-				local iconScale = 0.70
-				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
-					iconScale = 1.2
-				end
-				local iconSize = math.floor(nameHeight * iconScale)
-				button.favoriteIcon:SetSize(iconSize, iconSize)
-				local iconYOffset = 0
-				local iconPadding = 2
-				if (self.settingsCache and self.settingsCache.favoriteIconStyle) == "blizzard" then
-					-- Adjust X/Y offset to align Blizzard icon with BFL icon position
-					local bflIconSize = math.floor(nameHeight * 0.70)
-					iconYOffset = math.floor((iconSize - bflIconSize) / 2)
-					iconPadding = 2 - math.floor((iconSize - bflIconSize) / 2)
-				end
+				fontSize = tonumber(fontSize) or BASE_FONT_SIZE
+				local activeIconStyle = self.settingsCache and self.settingsCache.favoriteIconStyle
+				local favoriteLayout = GetFavoriteIconLayout(fontSize, activeIconStyle)
+				button.favoriteIcon:SetSize(favoriteLayout.iconSize, favoriteLayout.iconSize)
 
 				-- Re-measure width (crucial for delayed updates)
 				local currentWidth = button.Name:GetStringWidth() or 0
@@ -9448,8 +9526,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				end
 
 				button.favoriteIcon:ClearAllPoints()
-				-- Offset relative to text start + text width
-				button.favoriteIcon:SetPoint("TOPLEFT", button.Name, "TOPLEFT", currentWidth + iconPadding, iconYOffset)
+				button.favoriteIcon:SetPoint(
+					"TOPLEFT",
+					button.Name,
+					"TOPLEFT",
+					currentWidth + favoriteLayout.xOffset,
+					favoriteLayout.yOffset
+				)
 				button.favoriteIcon:Show()
 			end
 
@@ -9494,7 +9577,13 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	local TagChips = BFL:GetModule("TagChips")
 	if TagChips and TagChips.UpdateRowChips then
-		TagChips:UpdateRowChips(button, friend, self, elementData and elementData._bflTagChipsRowData)
+		TagChips:UpdateRowChips(
+			button,
+			friend,
+			self,
+			elementData and elementData.groupId,
+			elementData and elementData._bflTagChipsRowData
+		)
 	end
 
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
@@ -9990,7 +10079,8 @@ function FriendsList:CalculateFriendRowHeightForLayout(
 	infoDisabled,
 	hasMultiAccountRow,
 	tagExtraHeight,
-	nameContentHeight
+	nameContentHeight,
+	fullWidthTagRows
 )
 	local minimumHeight = isCompactMode and COMPACT_ROW_MINIMUM
 		or (isModern and MODERN_ROW_MINIMUM or LEGACY_ROW_MINIMUM)
@@ -10002,8 +10092,13 @@ function FriendsList:CalculateFriendRowHeightForLayout(
 		hasMultiAccountRow,
 		tagExtraHeight,
 		minimumHeight,
-		nameContentHeight
+		nameContentHeight,
+		fullWidthTagRows
 	)
+end
+
+function FriendsList:GetFriendControlTopOffsetForLayout(rowHeight, controlHeight, nameContentHeight, fullWidthTagRows)
+	return GetFriendControlTopOffset(rowHeight, controlHeight, nameContentHeight, fullWidthTagRows)
 end
 
 -- Expose Drag Handlers for other modules (Broker)

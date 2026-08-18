@@ -2458,7 +2458,7 @@ local function AddReorderList(pageID, data)
 	})
 end
 
-local function AddFontFlags(pageID, key, group, order, parentCheck)
+local function AddFontFlags(pageID, key, group, order, parentCheck, visibleWhen)
 	local list, orderList = GetFontFlagOptions()
 	app:RegisterControl(pageID, {
 		id = key,
@@ -2476,6 +2476,7 @@ local function AddFontFlags(pageID, key, group, order, parentCheck)
 		default = { SLUG = true },
 		order = order,
 		parentCheck = parentCheck,
+		visibleWhen = visibleWhen,
 		getSelection = function()
 			return GetFontFlagSelection(key)
 		end,
@@ -3553,18 +3554,18 @@ local function RegisterAppearancePages()
 	local fontGroups = {
 		{ id = "friendName", title = T("SETTINGS_FONT_FRIEND_NAME_TITLE", "Friend Name Text"), font = "fontFriendName", size = "fontSizeFriendName", flags = "fontOutlineFriendName", shadow = "fontShadowFriendName", color = "fontColorFriendName", defaultSize = 12, defaultColor = { r = 0.510, g = 0.773, b = 1.0, a = 1 }, order = 100 },
 		{ id = "friendInfo", title = T("SETTINGS_FONT_FRIEND_INFO_TITLE", "Friend Info Text"), font = "fontFriendInfo", size = "fontSizeFriendInfo", flags = "fontOutlineFriendInfo", shadow = "fontShadowFriendInfo", color = "fontColorFriendInfo", defaultSize = 10, defaultColor = { r = 0.510, g = 0.510, b = 0.510, a = 1 }, order = 200 },
-		{ id = "tabs", title = T("SETTINGS_FONT_TABS_TITLE", "Tabs Text"), font = "fontTabText", size = "fontSizeTabText", flags = "fontOutlineTabText", shadow = "fontShadowTabText", color = "fontColorTabText", defaultSize = 12, defaultColor = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, order = 300 },
+		{ id = "tabs", title = T("SETTINGS_FONT_TABS_TITLE", "Tabs Text"), font = "fontTabText", size = "fontSizeTabText", flags = "fontOutlineTabText", shadow = "fontShadowTabText", color = "fontColorTabText", defaultSize = 12, defaultColor = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, order = 300, visibleWhen = function() return not SettingsDesigner:IsModernFriendsUI() end },
 		{ id = "raid", title = T("SETTINGS_FONT_RAID_TITLE", "Raid Name Text"), font = "fontRaidName", size = "fontSizeRaidName", flags = "fontOutlineRaidName", shadow = "fontShadowRaidName", color = "fontColorRaidName", defaultSize = 12, defaultColor = { r = 1.0, g = 0.82, b = 0.0, a = 1 }, order = 400 },
 		{ id = "groupHeader", title = T("SETTINGS_GROUP_FONT_HEADER", "Group Header Font"), font = "fontGroupHeader", size = "fontSizeGroupHeader", flags = "fontOutlineGroupHeader", shadow = "fontShadowGroupHeader", color = nil, defaultSize = 12, order = 500 },
 	}
 	for _, group in ipairs(fontGroups) do
 		AddGroup("appearance.fonts", group.id, group.title, group.order)
-		AddDropdown("appearance.fonts", { key = group.font, group = group.id, label = T("SETTINGS_FONT", "Font:"), desc = T("SETTINGS_FONT_TOOLTIP", "Choose a font."), listFunc = GetFontOptions, default = "Friz Quadrata TT", order = group.order + 1, after = RefreshFonts })
-		AddSlider("appearance.fonts", { key = group.size, group = group.id, label = T("SETTINGS_FONT_SIZE_NUM", "Font Size:"), desc = T("SETTINGS_FONT_SIZE_TOOLTIP", "Set the font size."), min = 8, max = 24, step = 1, default = group.defaultSize, integer = true, order = group.order + 2, after = RefreshFonts })
-		AddFontFlags("appearance.fonts", group.flags, group.id, group.order + 3)
-		AddToggle("appearance.fonts", { key = group.shadow, group = group.id, label = T("SETTINGS_FONT_SHADOW", "Shadow"), desc = T("SETTINGS_FONT_SHADOW_TOOLTIP", "Draw a shadow behind this text."), default = false, order = group.order + 4, after = RefreshFonts })
+		AddDropdown("appearance.fonts", { key = group.font, group = group.id, label = T("SETTINGS_FONT", "Font:"), desc = T("SETTINGS_FONT_TOOLTIP", "Choose a font."), listFunc = GetFontOptions, default = "Friz Quadrata TT", order = group.order + 1, after = RefreshFonts, visibleWhen = group.visibleWhen })
+		AddSlider("appearance.fonts", { key = group.size, group = group.id, label = T("SETTINGS_FONT_SIZE_NUM", "Font Size:"), desc = T("SETTINGS_FONT_SIZE_TOOLTIP", "Set the font size."), min = 8, max = 24, step = 1, default = group.defaultSize, integer = true, order = group.order + 2, after = RefreshFonts, visibleWhen = group.visibleWhen })
+		AddFontFlags("appearance.fonts", group.flags, group.id, group.order + 3, nil, group.visibleWhen)
+		AddToggle("appearance.fonts", { key = group.shadow, group = group.id, label = T("SETTINGS_FONT_SHADOW", "Shadow"), desc = T("SETTINGS_FONT_SHADOW_TOOLTIP", "Draw a shadow behind this text."), default = false, order = group.order + 4, after = RefreshFonts, visibleWhen = group.visibleWhen })
 		if group.color then
-			AddColor("appearance.fonts", { key = group.color, group = group.id, label = T("SETTINGS_FONT_COLOR", "Font Color"), desc = T("SETTINGS_FONT_COLOR_TOOLTIP", "Set the text color."), default = group.defaultColor, hasOpacity = true, order = group.order + 5, after = RefreshFonts })
+			AddColor("appearance.fonts", { key = group.color, group = group.id, label = T("SETTINGS_FONT_COLOR", "Font Color"), desc = T("SETTINGS_FONT_COLOR_TOOLTIP", "Set the text color."), default = group.defaultColor, hasOpacity = true, order = group.order + 5, after = RefreshFonts, visibleWhen = group.visibleWhen })
 		end
 	end
 
@@ -3660,6 +3661,144 @@ local function RegisterFriendTagsControls()
 			SetFriendTagSetting("maxRowChips", value)
 		end,
 	})
+	AddSlider("groups.friendtags", {
+		id = "friendTags.chipsPerLine",
+		group = "general",
+		label = T("FRIEND_TAGS_CHIPS_PER_LINE", "Chips per Line"),
+		desc = T("FRIEND_TAGS_CHIPS_PER_LINE_DESC", "Limits chips on each line independently from the total row-chip limit."),
+		min = 1,
+		max = 9,
+		step = 1,
+		default = 3,
+		integer = true,
+		order = 121,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("chipsPerLine", 3)
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("chipsPerLine", value)
+		end,
+	})
+	AddSlider("groups.friendtags", {
+		id = "friendTags.chipIconSize",
+		group = "general",
+		label = T("FRIEND_TAGS_CHIP_ICON_SIZE", "Chip / Icon Size"),
+		desc = T("FRIEND_TAGS_CHIP_ICON_SIZE_DESC", "Sets the size of icons in friend-list chips and the tag-editor preview."),
+		min = 8,
+		max = 24,
+		step = 1,
+		default = 11,
+		integer = true,
+		order = 122,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("chipIconSize", 11)
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("chipIconSize", value)
+		end,
+	})
+	AddDropdown("groups.friendtags", {
+		id = "friendTags.chipFont",
+		group = "general",
+		label = T("SETTINGS_FONT", "Font:"),
+		desc = T("SETTINGS_FONT_TOOLTIP", "Choose a font."),
+		listFunc = GetFontOptions,
+		default = "Friz Quadrata TT",
+		order = 123,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("chipFont", "Friz Quadrata TT")
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("chipFont", value or "Friz Quadrata TT")
+		end,
+	})
+	AddSlider("groups.friendtags", {
+		id = "friendTags.chipFontSize",
+		group = "general",
+		label = T("FRIEND_TAGS_CHIP_FONT_SIZE", "Chip Font Size"),
+		desc = T("FRIEND_TAGS_CHIP_FONT_SIZE_DESC", "Sets the text size in friend-list chips and the tag-editor preview."),
+		min = 8,
+		max = 24,
+		step = 1,
+		default = 10,
+		integer = true,
+		order = 124,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("chipFontSize", 10)
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("chipFontSize", value)
+		end,
+	})
+	AddMultiDropdown("groups.friendtags", {
+		id = "friendTags.chipFontFlags",
+		group = "general",
+		label = T("SETTINGS_FONT_FLAGS", "Font Flags:"),
+		desc = T(
+			"SETTINGS_FONT_FLAGS_TOOLTIP",
+			"Choose one or more rendering flags for this font. Slug is applied only on clients that support it."
+		),
+		options = GetFontFlagOptions(),
+		orderList = select(2, GetFontFlagOptions()),
+		default = { SLUG = true },
+		order = 125,
+		parentCheck = IsFriendTagsEnabled,
+		getSelection = function()
+			local flags = GetFriendTagSetting("chipFontFlags", "SLUG")
+			local selection = BFL.FontManager and BFL.FontManager.GetFontFlagSet
+				and BFL.FontManager:GetFontFlagSet(flags)
+				or {}
+			if next(selection) == nil then
+				selection.NONE = true
+			end
+			return selection
+		end,
+		setSelectedFunc = function(value, selected)
+			local flags = GetFriendTagSetting("chipFontFlags", "SLUG")
+			local selection = BFL.FontManager and BFL.FontManager.GetFontFlagSet
+				and BFL.FontManager:GetFontFlagSet(flags)
+				or {}
+			selection.NONE = nil
+			if value == "NONE" then
+				selection = {}
+			elseif selected then
+				selection[value] = true
+				if value == "OUTLINE" then
+					selection.THICKOUTLINE = nil
+				elseif value == "THICKOUTLINE" then
+					selection.OUTLINE = nil
+				end
+			else
+				selection[value] = nil
+			end
+			flags = BFL.FontManager and BFL.FontManager.SerializeFontFlags
+				and BFL.FontManager:SerializeFontFlags(selection)
+				or ""
+			SetFriendTagSetting("chipFontFlags", flags)
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.fullWidthTagRows",
+		group = "general",
+		label = T("FRIEND_TAGS_FULL_WIDTH_ROWS", "Full-width Tag Rows"),
+		desc = T(
+			"FRIEND_TAGS_FULL_WIDTH_ROWS_DESC",
+			"Place tag chips on separate rows that use the full friend-card width."
+		),
+		default = false,
+		order = 126,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("fullWidthTagRows", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("fullWidthTagRows", value == true)
+		end,
+	})
 	AddDropdown("groups.friendtags", {
 		id = "friendTags.compactRowMode",
 		group = "general",
@@ -3672,7 +3811,7 @@ local function RegisterFriendTagsControls()
 		},
 		orderList = { "icon_only", "chip_line", "hidden" },
 		default = "icon_only",
-		order = 125,
+		order = 127,
 		parentCheck = IsFriendTagsEnabled,
 		getValue = function()
 			return GetFriendTagSetting("compactRowMode", "icon_only")
@@ -3810,6 +3949,21 @@ local function RegisterFriendTagsControls()
 			SetFriendTagSetting("enableDynamicTagGroups", value == true)
 		end,
 		refreshOnChange = true,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.hideDynamicGroupTagChip",
+		group = "groups",
+		label = T("FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG", "Hide Group Tag Chip"),
+		desc = T("FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG_DESC", "Hides only the chip for the tag that forms the current dynamic tag group."),
+		default = false,
+		order = 310,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("hideDynamicGroupTagChip", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("hideDynamicGroupTagChip", value == true)
+		end,
 	})
 
 	AddGroup("groups.friendtags", "editor", T("FRIEND_TAGS_SETTINGS_EDITOR", "Tag Editor"), 400)

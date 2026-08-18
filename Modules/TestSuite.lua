@@ -1531,6 +1531,20 @@ local function RegisterBuiltInTests()
 			)
 			V:AssertNil(controls["friendTags.tagList"], "Tag management should live only in the dedicated editor")
 			V:AssertNotNil(controls["friendTags.showMenuTagCounts"], "Menu count settings should remain available")
+			V:AssertNotNil(controls["friendTags.chipsPerLine"], "Per-line chip limits should be mirrored in Settings Center")
+			V:AssertNotNil(controls["friendTags.chipIconSize"], "Chip icon size should be mirrored in Settings Center")
+			V:AssertNotNil(controls["friendTags.chipFont"], "Chip font should be mirrored in Settings Center")
+			V:AssertNotNil(controls["friendTags.chipFontSize"], "Chip font size should be mirrored in Settings Center")
+			V:AssertNotNil(controls["friendTags.chipFontFlags"], "Chip font flags should be mirrored in Settings Center")
+			V:AssertNotNil(controls["friendTags.fullWidthTagRows"], "Full-width tag rows should be mirrored in Settings Center")
+			V:AssertNotNil(controls["friendTags.hideDynamicGroupTagChip"], "Dynamic group chip hiding should be mirrored in Settings Center")
+			V:AssertEqual(controls["friendTags.chipsPerLine"].default, 3, "Per-line chips should default to three")
+			V:AssertEqual(controls["friendTags.chipIconSize"].default, 11, "Chip icon size should default to 11")
+			V:AssertEqual(controls["friendTags.chipFont"].default, "Friz Quadrata TT", "Chip font should use the standard BFL default")
+			V:AssertEqual(controls["friendTags.chipFontSize"].default, 10, "Chip font size should default to 10")
+			V:AssertEqual(controls["friendTags.chipFontFlags"].type, "multidropdown", "Chip font flags should support multiple compatible flags")
+			V:Assert(controls["friendTags.chipFontFlags"].default.SLUG, "Chip font flags should retain locale-safe slug rendering by default")
+			V:AssertEqual(controls["friendTags.fullWidthTagRows"].default, false, "Full-width tag rows should default to disabled")
 			local syncControl = controls["friendTags.syncLocalBlizzard"]
 			V:AssertNotNil(syncControl, "Legacy Blizzard-tag handoff should remain available when needed")
 			V:AssertType(
@@ -1557,9 +1571,303 @@ local function RegisterBuiltInTests()
 
 			V:AssertNil(controls.simpleMode.visibleWhen, "Simple Mode should be available in both Modern and Legacy")
 			V:AssertNil(controls.simpleModeShowSearch.visibleWhen, "Simple Mode search should be available in Modern and Legacy")
+			V:AssertNil(controls.fontFriendName.visibleWhen, "Friend name font should remain available in both styles")
+			for _, controlID in ipairs({
+				"fontTabText",
+				"fontSizeTabText",
+				"fontOutlineTabText",
+				"fontShadowTabText",
+				"fontColorTabText",
+			}) do
+				V:AssertType(controls[controlID].visibleWhen, "function", "Every Tabs Text control should be style-gated")
+			end
+			local friendTabsPage = settingsApp.GetPage and settingsApp:GetPage("friends.tabs")
+			V:AssertNotNil(friendTabsPage, "Modern Friend Tabs page should remain registered")
+			V:AssertType(friendTabsPage.visibleWhen, "function", "Modern Friend Tabs page should remain style-gated")
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			if FriendsUI and FriendsUI.IsModernActive then
+				local oldIsModernActive = FriendsUI.IsModernActive
+				local oldIsRetail = BFL.IsRetail
+				local ok, err = pcall(function()
+					BFL.IsRetail = true
+					FriendsUI.IsModernActive = function()
+						return true
+					end
+					V:Assert(not controls.fontTabText.visibleWhen(), "Tabs Text should be hidden for Modern UI")
+					V:Assert(friendTabsPage.visibleWhen(), "Friend Tabs page should be shown for Modern UI")
+					FriendsUI.IsModernActive = function()
+						return false
+					end
+					V:Assert(controls.fontTabText.visibleWhen(), "Tabs Text should be shown for Legacy UI")
+					V:Assert(not friendTabsPage.visibleWhen(), "Friend Tabs page should be hidden for Legacy UI")
+				end)
+				FriendsUI.IsModernActive = oldIsModernActive
+				BFL.IsRetail = oldIsRetail
+				if not ok then
+					error(err, 0)
+				end
+			end
 			V:AssertEqual(controls.friendsFrameStyle.type, "custom", "Style selector should own per-option capability state")
 			V:AssertType(controls.friendsFrameStyle.render, "function", "Style selector should provide its host renderer")
 			V:AssertEqual(controls.friendsFrameStyle.refreshOnChange, true, "Style changes should refresh Settings visibility")
+		end,
+	})
+
+	TS:RegisterTest("ui", "SearchBox_NativeStateUpdatesBeforeBFLSearch", {
+		description = "Retail and Classic search boxes run Blizzard placeholder/Clear-state logic before BFL filtering",
+		action = function(V)
+			local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+			local searchBox = header and header.SearchBox
+			local handler = searchBox and searchBox.GetScript and searchBox:GetScript("OnTextChanged")
+			if not handler then
+				V:Skip("Persistent friend search box is not loaded")
+				return
+			end
+
+			local oldNative = _G.SearchBoxTemplate_OnTextChanged
+			local oldBFL = _G.BetterFriendsFrame_OnSearchTextChanged
+			local order = {}
+			local ok, err = pcall(function()
+				_G.SearchBoxTemplate_OnTextChanged = function(target)
+					V:AssertEqual(target, searchBox, "Native search handler should receive the active SearchBox")
+					order[#order + 1] = "native"
+				end
+				_G.BetterFriendsFrame_OnSearchTextChanged = function(target)
+					V:AssertEqual(target, searchBox, "BFL search handler should receive the active SearchBox")
+					order[#order + 1] = "bfl"
+				end
+				handler(searchBox, true)
+				V:AssertEqual(order[1], "native", "Blizzard SearchBox state should update first")
+				V:AssertEqual(order[2], "bfl", "BFL filtering should run after Blizzard state synchronization")
+			end)
+			_G.SearchBoxTemplate_OnTextChanged = oldNative
+			_G.BetterFriendsFrame_OnSearchTextChanged = oldBFL
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("ui", "Settings_LegacyFriendTagSliderUsesRuntimeRefresh", {
+		description = "Friend-tag sliders update rows and caches without reconstructing the active Legacy Settings page",
+		action = function(V)
+			WithTemporaryDatabase({ friendTagSettings = { enabled = true } }, function()
+				local Settings = BFL:GetModule("Settings")
+				local FriendTags = BFL:GetModule("FriendTags")
+				local tab = Settings and Settings.GetFriendTagsTabHost and Settings:GetFriendTagsTabHost()
+				if not (Settings and FriendTags and tab) then
+					V:Skip("Legacy Friend Tags settings page is not loaded")
+					return
+				end
+				FriendTags:OnDatabaseImported()
+				Settings:RefreshFriendTagsTab()
+
+				local expectedLabel = BFL.L.FRIEND_TAGS_CHIPS_PER_LINE or "Chips per Line"
+				local expectedFullWidthLabel = BFL.L.FRIEND_TAGS_FULL_WIDTH_ROWS or "Full-width Tag Rows"
+				local expectedFontLabel = BFL.L.SETTINGS_FONT or "Font:"
+				local expectedFontFlagsLabel = BFL.L.SETTINGS_FONT_FLAGS or "Font Flags:"
+				local expectedCompactLabel = BFL.L.FRIEND_TAGS_SETTINGS_COMPACT_MODE or "Compact Row Mode"
+				local sliderHolder
+				local fullWidthHolder
+				local fontHolder
+				local fontFlagsHolder
+				local compactHolder
+				for _, component in ipairs(tab.components or {}) do
+					if component.Label and component.Label:GetText() == expectedLabel and component.Slider then
+						sliderHolder = component
+					end
+					if not fullWidthHolder and component.GetRegions then
+						for _, region in ipairs({ component:GetRegions() }) do
+							if region.GetText and region:GetText() == expectedFullWidthLabel then
+								fullWidthHolder = component
+								break
+							end
+						end
+					end
+					if component.Label and component.DropDown and component.Label:GetText() == expectedFontLabel then
+						fontHolder = component
+					elseif component.Label and component.DropDown and component.Label:GetText() == expectedFontFlagsLabel then
+						fontFlagsHolder = component
+					elseif component.Label and component.DropDown and component.Label:GetText() == expectedCompactLabel then
+						compactHolder = component
+					end
+				end
+				V:AssertNotNil(sliderHolder, "Legacy Friend Tags page should expose the per-line slider")
+				V:AssertNotNil(fullWidthHolder, "Legacy Friend Tags page should expose full-width tag rows first")
+				V:AssertNotNil(fullWidthHolder.LeftCheckbox, "Full-width tag rows should occupy the left Legacy column")
+				V:AssertNotNil(fontHolder, "Legacy Friend Tags page should expose the chip font first")
+				V:AssertNotNil(fontFlagsHolder, "Legacy Friend Tags page should expose chip font flags first")
+				V:AssertNotNil(compactHolder, "Legacy Friend Tags page should expose Compact Row Mode")
+				V:AssertEqual(
+					fontHolder.DropDown:GetWidth(),
+					compactHolder.DropDown:GetWidth(),
+					"Legacy Friend Tags dropdowns should use one shared control width"
+				)
+				V:AssertEqual(
+					fontFlagsHolder.DropDown:GetWidth(),
+					compactHolder.DropDown:GetWidth(),
+					"Legacy chip font flags should align with the other dropdowns"
+				)
+
+				local oldRefreshTab = Settings.RefreshFriendTagsTab
+				local oldSchedule = BFL.ScheduleFriendsListRefresh
+				local oldForce = BFL.ForceRefreshFriendsList
+				local pageRebuilds = 0
+				local runtimeRefreshes = 0
+				local ok, err = pcall(function()
+					Settings.RefreshFriendTagsTab = function()
+						pageRebuilds = pageRebuilds + 1
+					end
+					BFL.ScheduleFriendsListRefresh = function()
+						runtimeRefreshes = runtimeRefreshes + 1
+					end
+					BFL.ForceRefreshFriendsList = function()
+						runtimeRefreshes = runtimeRefreshes + 1
+					end
+					sliderHolder:SetValue(4)
+					V:AssertEqual(FriendTags:GetSetting("chipsPerLine"), 4, "Slider should persist its rounded value")
+					V:Assert(runtimeRefreshes > 0, "Slider should request a lightweight runtime refresh")
+					V:AssertEqual(pageRebuilds, 0, "Dragging the slider must not rebuild the Legacy Settings page")
+				end)
+				Settings.RefreshFriendTagsTab = oldRefreshTab
+				BFL.ScheduleFriendsListRefresh = oldSchedule
+				BFL.ForceRefreshFriendsList = oldForce
+				if not ok then
+					error(err, 0)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("ui", "Settings_LegacyScrollbarTracksScrollRange", {
+		description = "Legacy Settings hides an unscrollable scrollbar and restores it when content becomes longer",
+		action = function(V)
+			local Settings = BFL:GetModule("Settings")
+			if not (Settings and Settings.UpdateLegacySettingsScrollbar) then
+				V:Skip("Legacy scrollbar helper is not available")
+				return
+			end
+
+			local range = 0
+			local barScripts = {}
+			local frameScripts = {}
+			local scrollBar = {
+				shown = true,
+				SetHideIfUnscrollable = function(self, value)
+					self.hideIfUnscrollable = value
+				end,
+				SetShown = function(self, value)
+					self.shown = value == true
+				end,
+				Hide = function(self)
+					self.shown = false
+				end,
+				HookScript = function(_, scriptName, callback)
+					barScripts[scriptName] = callback
+				end,
+			}
+			local scrollFrame = {
+				ScrollBar = scrollBar,
+				GetVerticalScrollRange = function()
+					return range
+				end,
+				HookScript = function(_, scriptName, callback)
+					frameScripts[scriptName] = callback
+				end,
+			}
+
+			Settings:UpdateLegacySettingsScrollbar(scrollFrame)
+			V:Assert(scrollBar.hideIfUnscrollable == true, "Retail scrollbar should enable native hide-if-unscrollable")
+			V:Assert(not scrollBar.shown, "Zero scroll range should hide the scrollbar")
+			V:AssertType(frameScripts.OnScrollRangeChanged, "function", "Range changes should stay synchronized")
+			V:AssertType(barScripts.OnShow, "function", "Skin-forced Show calls should be guarded")
+
+			range = 30
+			frameScripts.OnScrollRangeChanged(scrollFrame)
+			V:Assert(scrollBar.shown, "Positive scroll range should restore the scrollbar")
+			range = 0
+			scrollBar.shown = true
+			barScripts.OnShow(scrollBar)
+			V:Assert(not scrollBar.shown, "A skin must not force-show a scrollbar with zero range")
+		end,
+	})
+
+	TS:RegisterTest("ui", "Settings_GroupColorRightClickRefreshesTargetSwatch", {
+		description = "Count and arrow right-click handlers pass their swatches and immediately apply inherited RGBA",
+		action = function(V)
+			local Components = BFL.SettingsComponents
+			local Settings = BFL:GetModule("Settings")
+			if not (Components and Settings) then
+				V:Skip("Settings components are not loaded")
+				return
+			end
+
+			local parent = CreateFrame("Frame", nil, UIParent)
+			parent:Hide()
+			local countTarget, countReset, arrowTarget, arrowReset
+			local row = Components:CreateListItem(
+				parent,
+				"Swatch Test",
+				1,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				function(target, isReset)
+					countTarget, countReset = target, isReset
+				end,
+				function(target, isReset)
+					arrowTarget, arrowReset = target, isReset
+				end,
+				{ fallback = { r = 1, g = 0.82, b = 0, a = 1 } }
+			)
+			row.countColorButton:GetScript("OnClick")(row.countColorButton, "RightButton")
+			row.arrowColorButton:GetScript("OnClick")(row.arrowColorButton, "RightButton")
+			V:AssertEqual(countTarget, row.countColorSwatch, "Count reset should receive its own swatch")
+			V:Assert(countReset == true, "Count right-click should preserve reset semantics")
+			V:AssertEqual(arrowTarget, row.arrowColorSwatch, "Arrow reset should receive its own swatch")
+			V:Assert(arrowReset == true, "Arrow right-click should preserve reset semantics")
+
+			WithTemporaryDatabase({}, function(tempDB)
+				local Groups = BFL:GetModule("Groups")
+				local oldGet = Groups.Get
+				local oldForce = BFL.ForceRefreshFriendsList
+				local inherited = { r = 0.20, g = 0.35, b = 0.60, a = 0.45 }
+				local group = { color = inherited }
+				local countRGBA, arrowRGBA
+				local refreshes = 0
+				local ok, err = pcall(function()
+					Groups.Get = function()
+						return group
+					end
+					BFL.ForceRefreshFriendsList = function()
+						refreshes = refreshes + 1
+					end
+					Settings:ShowGroupCountColorPicker("swatch-test", "Swatch Test", {
+						SetColorTexture = function(_, r, g, b, a)
+							countRGBA = { r, g, b, a }
+						end,
+					}, true)
+					Settings:ShowGroupArrowColorPicker("swatch-test", "Swatch Test", {
+						SetColorTexture = function(_, r, g, b, a)
+							arrowRGBA = { r, g, b, a }
+						end,
+					}, true)
+					for index, expected in ipairs({ inherited.r, inherited.g, inherited.b, inherited.a }) do
+						V:AssertEqual(countRGBA[index], expected, "Count swatch should inherit complete RGBA")
+						V:AssertEqual(arrowRGBA[index], expected, "Arrow swatch should inherit complete RGBA")
+					end
+					V:AssertEqual(tempDB.groupCountColors["swatch-test"].a, inherited.a, "Count reset should persist alpha")
+					V:AssertEqual(tempDB.groupArrowColors["swatch-test"].a, inherited.a, "Arrow reset should persist alpha")
+					V:AssertEqual(refreshes, 2, "Both resets should refresh the Friendlist")
+				end)
+				Groups.Get = oldGet
+				BFL.ForceRefreshFriendsList = oldForce
+				if not ok then
+					error(err, 0)
+				end
+			end)
 		end,
 	})
 
@@ -2260,6 +2568,13 @@ local function RegisterBuiltInTests()
 				V:AssertType(tempDB.friendBlizzardTags, "table", "friendBlizzardTags should be a table")
 				V:AssertEqual(tempDB.friendTagSettings.enabled, true, "Friend Tags should default to enabled")
 				V:AssertEqual(tempDB.friendTagSettings.maxRowChips, 3, "Row chips should default to three tags")
+				V:AssertEqual(tempDB.friendTagSettings.chipsPerLine, 3, "Chip rows should default to three chips per line")
+				V:AssertEqual(tempDB.friendTagSettings.fullWidthTagRows, false, "Full-width tag rows should default to disabled")
+				V:AssertEqual(tempDB.friendTagSettings.hideDynamicGroupTagChip, false, "Dynamic groups should show their tag chip by default")
+				V:AssertEqual(tempDB.friendTagSettings.chipIconSize, 11, "Chip icons should default to 11 pixels")
+				V:AssertEqual(tempDB.friendTagSettings.chipFont, "Friz Quadrata TT", "Chip font should use the standard BFL default")
+				V:AssertEqual(tempDB.friendTagSettings.chipFontSize, 10, "Chip text should default to 10 pixels")
+				V:AssertEqual(tempDB.friendTagSettings.chipFontFlags, "SLUG", "Chip font should retain locale-safe slug rendering")
 				V:AssertEqual(
 					tempDB.friendTagSettings.compactRowMode,
 					"icon_only",
@@ -2414,6 +2729,263 @@ local function RegisterBuiltInTests()
 				local reordered = FriendTags:GetAllTagDefinitions()
 				V:AssertEqual(reordered[1].id, reversedIds[1], "The dragged tag should persist at the first position")
 				V:AssertEqual(reordered[#reordered].id, reversedIds[#reversedIds], "The remaining order should stay stable")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_SparseIconZoomAndAtomicIconModes", {
+		description = "Sparse order changes keep default icon zoom while icon modes retain their origin and discard incompatible fields",
+		action = function(V)
+			WithTemporaryDatabase({}, function(tempDB)
+				local FriendTags = BFL:GetModule("FriendTags")
+				V:AssertNotNil(FriendTags, "FriendTags module should exist")
+				FriendTags:OnDatabaseImported()
+
+				local definitions = FriendTags:GetAllTagDefinitions()
+				local order = { "blizzard:roleplaying" }
+				for index = #definitions, 1, -1 do
+					if definitions[index].id ~= "blizzard:roleplaying" then
+						order[#order + 1] = definitions[index].id
+					end
+				end
+				V:Assert(FriendTags:SetTagOrder(order), "Tag order should be saved")
+				local roleOverride = tempDB.friendTagProfiles["blizzard:roleplaying"]
+				V:AssertNotNil(roleOverride, "Roleplaying should receive an order override")
+				V:AssertNil(roleOverride.iconZoom, "An order-only override must not write a false icon zoom")
+				V:AssertEqual(
+					FriendTags:GetChipProfile("blizzard:roleplaying").iconZoom,
+					0.30,
+					"Roleplaying should retain its default zoom after reordering"
+				)
+				V:Assert(
+					FriendTags:SetChipProfile("blizzard:roleplaying", { iconZoom = false }),
+					"Explicitly disabling icon zoom should remain supported"
+				)
+				V:AssertEqual(
+					FriendTags:GetChipProfile("blizzard:roleplaying").iconZoom,
+					false,
+					"Explicit false icon zoom should override the default"
+				)
+
+				local tagId = FriendTags:CreateCustomTag("Icon Modes")
+				V:AssertNotNil(tagId, "Custom tag should be created")
+				local fallbackTexture = "Interface\\Icons\\INV_Misc_Gear_08"
+				V:Assert(FriendTags:SetChipProfile(tagId, {
+					replaceIcon = true,
+					iconType = "texture",
+					iconValue = fallbackTexture,
+					icon = fallbackTexture,
+					texture = fallbackTexture,
+				}), "Texture icon mode should save")
+				local Editor = BFL:GetModule("FriendTagEditor")
+				Editor:LoadState(FriendTags:GetTagDefinition(tagId))
+				V:AssertEqual(
+					Editor.editState.iconMode,
+					"custom",
+					"Legacy custom paths matching an option fallback must reopen as Custom Path"
+				)
+				local legacyCustomPreview = Editor:GetPreviewIconProfile()
+				V:AssertEqual(legacyCustomPreview.texture, fallbackTexture, "Custom preview should retain the entered texture")
+				V:AssertNil(legacyCustomPreview.atlas, "Custom preview must not substitute the matching option atlas")
+				V:Assert(FriendTags:SetChipProfile(tagId, {
+					replaceIcon = true,
+					iconMode = "custom",
+					iconType = "texture",
+					iconValue = fallbackTexture,
+					icon = fallbackTexture,
+					texture = fallbackTexture,
+				}), "Explicit Custom Path mode should save")
+				V:AssertEqual(tempDB.friendTagProfiles[tagId].iconMode, "custom", "Custom Path origin should persist")
+				V:Assert(FriendTags:SetChipProfile(tagId, {
+					replaceIcon = true,
+					iconMode = "selected",
+					iconType = "atlas",
+					iconValue = "Raid",
+					icon = "Raid",
+					atlas = "Raid",
+					fallbackAtlas = "groupfinder-button-raids",
+					iconZoom = 0.25,
+				}), "Atlas icon mode should save")
+				local atlasOverride = tempDB.friendTagProfiles[tagId]
+				V:AssertEqual(atlasOverride.iconMode, "selected", "Selected icon origin should replace Custom Path")
+				V:AssertNil(atlasOverride.texture, "Atlas mode should remove the previous texture")
+				V:AssertNil(atlasOverride.texCoord, "Atlas mode should remove the previous texture coordinates")
+				V:AssertEqual(FriendTags:GetChipProfile(tagId).atlas, "Raid", "Resolved profile should use the atlas")
+
+				V:Assert(FriendTags:SetChipProfile(tagId, {
+					replaceIcon = true,
+					iconMode = "none",
+					iconType = "none",
+					iconValue = false,
+					icon = false,
+					atlas = false,
+					fallbackAtlas = false,
+					texture = false,
+					texCoord = false,
+					iconZoom = false,
+				}), "No-icon mode should save")
+				local noneOverride = tempDB.friendTagProfiles[tagId]
+				V:AssertEqual(noneOverride.iconMode, "none", "No-icon origin should persist")
+				V:AssertEqual(noneOverride.iconType, "none", "No-icon mode should be explicit")
+				V:AssertNil(noneOverride.atlas, "No-icon mode should remove the old atlas")
+				V:AssertNil(noneOverride.texture, "No-icon mode should not retain a texture")
+				local noneProfile = FriendTags:GetChipProfile(tagId)
+				V:AssertNil(noneProfile.icon, "Resolved no-icon profile should have no icon")
+				V:AssertNil(noneProfile.atlas, "Resolved no-icon profile should have no atlas")
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTags_RowChipLayoutAndDynamicGroupContext", {
+		description = "Row chips honor per-line limits, runtime geometry, overflow, and group-specific tag hiding",
+		action = function(V)
+			WithTemporaryDatabase({
+				friendTagSettings = {
+					enabled = true,
+					showRowChips = true,
+					maxRowChips = 3,
+					chipsPerLine = 2,
+					hideDynamicGroupTagChip = true,
+					chipIconSize = 20,
+					chipFont = "Fonts\\MORPHEUS.TTF",
+					chipFontSize = 8,
+					chipFontFlags = "OUTLINE,MONOCHROME",
+				},
+			}, function()
+				local FriendTags = BFL:GetModule("FriendTags")
+				local TagChips = BFL:GetModule("TagChips")
+				FriendTags:OnDatabaseImported()
+				local friend = { type = "wow", uid = "wow_ChipLayout-Realm", name = "ChipLayout-Realm" }
+				local tagIds = {}
+				for index = 1, 4 do
+					tagIds[index] = FriendTags:CreateCustomTag("Layout " .. index)
+					V:Assert(FriendTags:SetCustomTagForFriend(friend, tagIds[index], true), "Layout tag should be assigned")
+				end
+				local fakeFriendsList = {
+					settingsCache = { compactMode = false, infoDisabled = false },
+					GetButtonWidth = function()
+						return 1000
+					end,
+				}
+				local normal = TagChips:GetRowData(friend, fakeFriendsList)
+				local grouped = TagChips:GetRowData(friend, fakeFriendsList, "tag:" .. tagIds[1])
+				V:Assert(normal ~= grouped, "Different group contexts should use different row-cache entries")
+				V:AssertEqual(normal.cacheGroupId, "", "Ungrouped cache should use the empty group context")
+				V:AssertEqual(grouped.cacheGroupId, "tag:" .. tagIds[1], "Grouped cache should retain its group ID")
+				V:AssertEqual(#normal.renderableTags, 4, "Ungrouped row should retain all assigned tags")
+				V:AssertEqual(#grouped.renderableTags, 3, "Dynamic group row should hide only its forming tag")
+				for _, entry in ipairs(grouped.renderableTags) do
+					V:Assert(entry.tag.id ~= tagIds[1], "Forming tag must be absent from the grouped row")
+				end
+				V:AssertEqual(normal.chipsPerLine, 2, "Configured per-line chip limit should be used")
+				V:AssertEqual(normal.lineCount, 2, "Three chips plus overflow should wrap into two lines")
+				V:AssertEqual(normal.metrics.iconSize, 20, "Runtime icon size should be resolved")
+				V:AssertEqual(normal.metrics.fontName, "Fonts\\MORPHEUS.TTF", "Runtime chip font should retain the configured source")
+				V:AssertEqual(normal.metrics.fontPath, "Fonts\\MORPHEUS.TTF", "Runtime chip font should resolve its file path")
+				V:AssertEqual(normal.metrics.fontSize, 8, "Runtime font size should be resolved independently")
+				V:AssertEqual(normal.metrics.fontFlags, "OUTLINE,MONOCHROME", "Runtime chip font flags should be normalized")
+				V:AssertEqual(normal.metrics.height, 23, "Chip height should follow max(icon+3, font+4)")
+				V:AssertEqual(normal.height, 50, "Two chip lines should use the resolved height and row gap")
+
+				local constrainedWidth = normal.availableWidth
+				FriendTags:SetSetting("fullWidthTagRows", true, function() end)
+				local fullWidth = TagChips:GetRowData(friend, fakeFriendsList)
+				V:Assert(fullWidth.fullWidthTagRows, "Full-width row data should retain the active layout mode")
+				V:AssertEqual(fullWidth.availableWidth, 984, "Full-width rows should retain an eight-pixel inset on both sides")
+				V:Assert(
+					fullWidth.availableWidth > constrainedWidth,
+					"Full-width rows should expose more horizontal space than action-aligned rows"
+				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTagEditor_LabelModeAndTargetedIconRefresh", {
+		description = "Manual label text selects the expected mode and committed icons refresh only their navigation row",
+			action = function(V)
+				local Editor = BFL:GetModule("FriendTagEditor")
+				local FriendTags = BFL:GetModule("FriendTags")
+				local handlers = {}
+				local focusClears = 0
+				local flushes = 0
+				local fakeInput = {
+					SetScript = function(_, event, callback)
+						handlers[event] = callback
+					end,
+					ClearFocus = function()
+						focusClears = focusClears + 1
+					end,
+				}
+				local oldFlushAutoSave = Editor.FlushAutoSave
+				local ok, err = pcall(function()
+					Editor.FlushAutoSave = function()
+						flushes = flushes + 1
+					end
+					V:Assert(Editor:BindEditorInputFocusHandlers(fakeInput), "Editor input handlers should bind")
+					V:AssertType(handlers.OnEnterPressed, "function", "Enter should have a focus-release handler")
+					V:AssertType(handlers.OnEscapePressed, "function", "Escape should have a focus-release handler")
+					V:AssertType(handlers.OnEditFocusLost, "function", "Focus loss should flush pending edits")
+					handlers.OnEnterPressed(fakeInput)
+					handlers.OnEscapePressed(fakeInput)
+					V:AssertEqual(focusClears, 2, "Enter and Escape should both release editor input focus")
+					V:AssertEqual(flushes, 2, "Enter and Escape should both commit pending editor input")
+				end)
+				Editor.FlushAutoSave = oldFlushAutoSave
+				if not ok then
+					error(err, 0)
+				end
+				V:AssertEqual(Editor:GetLabelModeForText("Manual"), "custom", "Non-empty input should select Custom Label")
+				V:AssertEqual(Editor:GetLabelModeForText(""), "default", "Empty manual input should restore Default Label")
+				V:AssertEqual(
+					Editor:GetLabelModeAfterTextChange("", "icon_only", false),
+					"icon_only",
+					"Programmatic Icon Only clearing must preserve Icon Only mode"
+				)
+				V:AssertEqual(
+					Editor:GetLabelModeAfterTextChange("", "custom", true),
+					"default",
+					"Manually clearing a custom label should restore Default Label"
+				)
+				V:AssertEqual(
+					Editor:GetLabelModeAfterTextChange("Manual", "default", true),
+					"custom",
+					"Manually typing a label should select Custom Label"
+				)
+
+				WithTemporaryDatabase({}, function()
+				FriendTags:OnDatabaseImported()
+				local tagId = FriendTags:CreateCustomTag("Nav Icon")
+				local shown = false
+				local hidden = false
+				local oldFrame = Editor.frame
+				local oldApplyIconProfile = BFL.ApplyIconProfile
+				BFL.ApplyIconProfile = function()
+					return true
+				end
+				Editor.frame = {
+					tagRows = {
+						{
+							tagId = tagId,
+							icon = {
+								Show = function()
+									shown = true
+								end,
+								Hide = function()
+									hidden = true
+								end,
+							},
+						},
+					},
+				}
+				local ok, err = pcall(function()
+					V:Assert(Editor:RefreshListRowIcon(tagId), "Matching navigation row should refresh")
+					V:Assert(shown and not hidden, "Resolved navigation icon should be shown in place")
+				end)
+				Editor.frame = oldFrame
+				BFL.ApplyIconProfile = oldApplyIconProfile
+				if not ok then
+					error(err, 0)
+				end
 			end)
 		end,
 	})
@@ -4131,7 +4703,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("data", "FriendTags_CustomTagCRUDAndChipProfile", {
-		description = "Friend Tags should support custom tag rename/delete and icon-only chip profiles",
+		description = "Friend Tags should support custom tag rename/delete and per-chip visual profiles",
 		action = function(V)
 			WithTemporaryDatabase({
 				enableBetaFeatures = true,
@@ -4160,6 +4732,7 @@ local function RegisterBuiltInTests()
 					chipLabel = "",
 					iconType = "texture",
 					iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+					textColor = { r = 0.15, g = 0.8, b = 0.35, a = 0.9 },
 				}), "SetChipProfile should accept icon-only labels")
 
 				local profile = FriendTags:GetChipProfile(tagId)
@@ -4169,6 +4742,14 @@ local function RegisterBuiltInTests()
 					"Interface\\Icons\\INV_Misc_QuestionMark",
 					"Icon-only profile should keep its icon"
 				)
+				V:AssertEqual(profile.textColor.r, 0.15, "Chip font color should be saved per tag")
+				V:AssertEqual(profile.textColor.g, 0.8, "Chip font color should retain its green channel")
+				V:AssertEqual(profile.textColor.b, 0.35, "Chip font color should retain its blue channel")
+				V:AssertEqual(profile.textColor.a, 0.9, "Chip font color should retain alpha")
+				local otherTagId = FriendTags:CreateCustomTag("Other Team")
+				local otherProfile = FriendTags:GetChipProfile(otherTagId)
+				V:AssertEqual(otherProfile.textColor.r, 1, "A chip font color must not leak to another tag")
+				V:AssertEqual(otherProfile.textColor.g, 1, "Other tags should retain their own default font color")
 				V:Assert(FriendTags:FriendHasTag(friend, tagId), "Icon-only chip profile should keep the tag assigned")
 
 				V:Assert(FriendTags:DeleteCustomTag(tagId), "DeleteCustomTag should succeed")
@@ -7858,6 +8439,37 @@ local function RegisterBuiltInTests()
 			V:Assert(
 				favoritePadding > titlePadding,
 				"the favorite texture should reserve additional room before the right-side controls"
+			)
+		end,
+	})
+
+	TS:RegisterTest("integration", "Friends_FavoriteIconKeepsReleaseAnchorAndBalancedSuffix", {
+		description = "Compact favorite icons retain their release anchoring while the following info text uses balanced spacing",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not (FriendsList and FriendsList.GetFavoriteIconLayout) then
+				V:Skip("Favorite layout helpers are not available")
+				return
+			end
+
+			local bfl = FriendsList:GetFavoriteIconLayout(12, "bfl")
+			local blizzard = FriendsList:GetFavoriteIconLayout(12, "blizzard")
+			V:AssertEqual(bfl.iconSize, 8, "BFL favorite icon should retain its release size")
+			V:AssertEqual(bfl.xOffset, 2, "BFL favorite icon should retain its release name anchor")
+			V:AssertEqual(bfl.yOffset, 0, "BFL favorite icon should retain its release vertical anchor")
+			V:AssertEqual(#bfl.compactSpacer, 3, "BFL Compact Info should leave one additional spacer after the icon")
+			V:AssertEqual(blizzard.iconSize, 14, "Blizzard favorite icon should retain its release size")
+			V:AssertEqual(blizzard.xOffset, -1, "Blizzard favorite icon should retain its compensated release name anchor")
+			V:AssertEqual(blizzard.yOffset, 3, "Blizzard favorite icon should retain its compensated release vertical anchor")
+			V:AssertEqual(
+				#blizzard.compactSpacer,
+				3,
+				"Blizzard Compact Info should reserve only its three-pixel wider right edge"
+			)
+			V:AssertEqual(
+				#blizzard.compactSpacer,
+				#bfl.compactSpacer,
+				"Both icon styles should give following Compact Info the same explicit breathing room"
 			)
 		end,
 	})
@@ -13722,10 +14334,59 @@ function TestSuite:RegisterLateUITests()
 			local compact = FriendsList:CalculateFriendRowHeightForLayout(true, true, 12, 10, false, false, 0, 14)
 			local wrapped = FriendsList:CalculateFriendRowHeightForLayout(true, true, 12, 10, false, false, 0, 28)
 			local normal = FriendsList:CalculateFriendRowHeightForLayout(true, false, 12, 10, false, false, 0, 14)
+			local actionAlignedTags = FriendsList:CalculateFriendRowHeightForLayout(
+				true,
+				false,
+				12,
+				10,
+				false,
+				false,
+				25,
+				14,
+				false
+			)
+			local fullWidthTags = FriendsList:CalculateFriendRowHeightForLayout(
+				true,
+				false,
+				12,
+				10,
+				false,
+				false,
+				25,
+				14,
+				true
+			)
 
 			V:AssertEqual(compact, 24, "a one-line Modern Compact card should use the shared compact height")
 			V:AssertEqual(wrapped, 34, "a wrapped Compact name should add only its visible second line")
 			V:AssertEqual(normal, 40, "a normal Modern card should retain room for its full-size action control")
+			V:AssertEqual(actionAlignedTags, 58, "action-aligned chips may use otherwise empty minimum-height space")
+			V:AssertEqual(fullWidthTags, 65, "separate chips should be added below the complete base friend card")
+			V:AssertEqual(
+				FriendsList:GetFriendControlTopOffsetForLayout(65, 18, 14, false),
+				-23,
+				"action-aligned controls should continue centering on the complete row"
+			)
+			V:AssertEqual(
+				FriendsList:GetFriendControlTopOffsetForLayout(40, 18, 14, true),
+				-1,
+				"full-width layout controls should align to the friend-name FontString"
+			)
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			if FriendsUI and FriendsUI.GetFriendCardControlOffsets then
+				local actionOffset, gameIconOffset = FriendsUI:GetFriendCardControlOffsets(40, 34, 20, 14, true)
+				V:AssertEqual(actionOffset, 0, "Full-width Modern Invite should be clamped to the name-content block")
+				V:AssertEqual(gameIconOffset, -1, "Full-width Modern game icon should center on the name FontString")
+				local centeredActionOffset, centeredGameIconOffset = FriendsUI:GetFriendCardControlOffsets(
+					65,
+					34,
+					20,
+					14,
+					false
+				)
+				V:AssertEqual(centeredActionOffset, 0, "Normal Modern Invite should retain center anchoring")
+				V:AssertEqual(centeredGameIconOffset, 1, "Normal Modern game icon should retain its established offset")
+			end
 		end,
 	})
 

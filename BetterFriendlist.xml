@@ -1701,14 +1701,9 @@
 								end
 							</OnLoad>
 							<OnTextChanged>
-								-- Update the instruction text visibility
-								local text = self:GetText();
-								if text and text ~= "" then
-								self.Instructions:Hide();
-								else
-								self.Instructions:Show();
+								if SearchBoxTemplate_OnTextChanged then
+									SearchBoxTemplate_OnTextChanged(self);
 								end
-								-- Call the search handler
 								BetterFriendsFrame_OnSearchTextChanged(self);
 							</OnTextChanged>
 						</Scripts>

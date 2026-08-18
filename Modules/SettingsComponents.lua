@@ -1445,7 +1445,7 @@ function Components:CreateListItem(
 			if button == "RightButton" then
 				-- Reset to nil (Inherit)
 				if onArrowColor then
-					onArrowColor(nil, true)
+					onArrowColor(holder.arrowColorSwatch, true)
 				end
 			else
 				if onArrowColor then
@@ -1539,7 +1539,7 @@ function Components:CreateListItem(
 			if button == "RightButton" then
 				-- Reset to nil (Inherit)
 				if onCountColor then
-					onCountColor(nil, true)
+					onCountColor(holder.countColorSwatch, true)
 				end
 			else
 				if onCountColor then

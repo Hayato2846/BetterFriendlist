@@ -42,6 +42,77 @@ local function SafeResetVerticalScroll(scrollFrame)
 	return ok
 end
 
+local function GetLegacySettingsScrollBar(scrollFrame)
+	if not scrollFrame then
+		return nil
+	end
+	if scrollFrame.ScrollBar then
+		return scrollFrame.ScrollBar
+	end
+	local name = scrollFrame.GetName and scrollFrame:GetName()
+	if name and _G[name .. "ScrollBar"] then
+		return _G[name .. "ScrollBar"]
+	end
+	for _, child in ipairs({ scrollFrame:GetChildren() }) do
+		if child.IsObjectType and child:IsObjectType("Slider") then
+			return child
+		end
+	end
+	return nil
+end
+
+local function GetLegacySettingsScrollRange(scrollFrame, scrollBar)
+	local range
+	if scrollFrame and scrollFrame.GetVerticalScrollRange then
+		local ok, value = pcall(scrollFrame.GetVerticalScrollRange, scrollFrame)
+		if ok then
+			range = tonumber(value)
+		end
+	end
+	if range == nil and scrollBar and scrollBar.GetMinMaxValues then
+		local ok, minimum, maximum = pcall(scrollBar.GetMinMaxValues, scrollBar)
+		if ok then
+			range = (tonumber(maximum) or 0) - (tonumber(minimum) or 0)
+		end
+	end
+	return range
+end
+
+local function UpdateLegacySettingsScrollbar(scrollFrame)
+	local scrollBar = GetLegacySettingsScrollBar(scrollFrame)
+	if not scrollBar then
+		return
+	end
+	if scrollBar.SetHideIfUnscrollable then
+		pcall(scrollBar.SetHideIfUnscrollable, scrollBar, true)
+	end
+
+	local range = GetLegacySettingsScrollRange(scrollFrame, scrollBar)
+	if range ~= nil then
+		scrollBar:SetShown(range > 0.5)
+	end
+	if not scrollBar._bflHideIfUnscrollableHooked and scrollBar.HookScript then
+		scrollBar._bflHideIfUnscrollableHooked = true
+		scrollBar:HookScript("OnShow", function(bar)
+			local currentRange = GetLegacySettingsScrollRange(scrollFrame, bar)
+			if currentRange ~= nil and currentRange <= 0.5 then
+				bar:Hide()
+			end
+		end)
+	end
+
+	if not scrollFrame._bflScrollbarVisibilityHooked and scrollFrame.HookScript then
+		scrollFrame._bflScrollbarVisibilityHooked = true
+		scrollFrame:HookScript("OnScrollRangeChanged", function(frame)
+			UpdateLegacySettingsScrollbar(frame)
+		end)
+	end
+end
+
+function Settings:UpdateLegacySettingsScrollbar(scrollFrame)
+	UpdateLegacySettingsScrollbar(scrollFrame)
+end
+
 local function SetDeleteIconTexture(texture)
 	if not texture then
 		return
@@ -218,10 +289,10 @@ local function GetFontFlagLabel(value)
 	return tostring(value)
 end
 
-local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback, controlWidth)
+local function CreateFontFlagsDropdown(parent, db, dbKey, refreshCallback, controlWidth, defaultValue)
 	local function GetFlagSet()
 		if BFL.FontManager and BFL.FontManager.GetFontFlagSet then
-			return BFL.FontManager:GetFontFlagSet(db:Get(dbKey, ""))
+			return BFL.FontManager:GetFontFlagSet(db:Get(dbKey, defaultValue or ""))
 		end
 		return {}
 	end
@@ -1292,6 +1363,7 @@ function Settings:SelectCategory(categoryID)
 		-- Reset scroll position to top (User Request: Fix scroll staying down when switching tabs)
 		if settingsFrame.ContentScrollFrame then
 			SafeResetVerticalScroll(settingsFrame.ContentScrollFrame)
+			UpdateLegacySettingsScrollbar(settingsFrame.ContentScrollFrame)
 		end
 	end
 end
@@ -1355,6 +1427,14 @@ function Settings:AdjustContentHeight(tabID)
 	-- This ensures no unnecessary scrolling for small content
 	local newHeight = math.max(maxHeight, availableHeight)
 	content:SetHeight(newHeight)
+	UpdateLegacySettingsScrollbar(scrollFrame)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			if settingsFrame and settingsFrame.ContentScrollFrame == scrollFrame then
+				UpdateLegacySettingsScrollbar(scrollFrame)
+			end
+		end)
+	end
 end
 
 -- Calculate the actual content height of a tab
@@ -1689,6 +1769,9 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 		if group then
 			group.countColor = { r = r, g = g, b = b, a = a }
 		end
+		if colorSwatch and colorSwatch.SetColorTexture then
+			colorSwatch:SetColorTexture(r, g, b, a)
+		end
 
 		BFL:ForceRefreshFriendsList()
 		return
@@ -1812,6 +1895,9 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 
 		if group then
 			group.arrowColor = { r = r, g = g, b = b, a = a }
+		end
+		if colorSwatch and colorSwatch.SetColorTexture then
+			colorSwatch:SetColorTexture(r, g, b, a)
 		end
 
 		BFL:ForceRefreshFriendsList()
@@ -5416,12 +5502,32 @@ function Settings:RefreshFriendTagsTab()
 	tab.components = {}
 
 	local allFrames = {}
-	local function RefreshFriendTagsSettings()
-		if BFL.ForceRefreshFriendsList then
+	local function RefreshFriendTagRuntime()
+		if BFL.ScheduleFriendsListRefresh then
+			BFL:ScheduleFriendsListRefresh("friend-tag-settings", 0.05)
+		elseif BFL.ForceRefreshFriendsList then
 			BFL:ForceRefreshFriendsList()
 		end
+	end
+	local function RefreshFriendTagsSettings()
+		RefreshFriendTagRuntime()
 		self:RefreshFriendTagsTab()
 	end
+	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
+	local fontPaths = {}
+	for index, fontName in ipairs(fontList) do
+		fontPaths[index] = BFL.FontManager:ResolveFontPath(fontName)
+	end
+	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
+	local friendTagSettingsAdapter = {
+		Get = function(_, key, default)
+			return FriendTags:GetSetting(key, default)
+		end,
+		Set = function(_, key, value)
+			FriendTags:SetSetting(key, value)
+		end,
+	}
 
 	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags"))
 	table.insert(
@@ -5490,6 +5596,17 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_STREAMER_MODE_DESC or "Allow friend tags while Streamer Mode is active.",
 	}))
 
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_FULL_WIDTH_ROWS or "Full-width Tag Rows",
+		initialValue = FriendTags:GetSetting("fullWidthTagRows", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("fullWidthTagRows", val == true, RefreshFriendTagRuntime)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_FULL_WIDTH_ROWS or "Full-width Tag Rows",
+		tooltipDesc = L.FRIEND_TAGS_FULL_WIDTH_ROWS_DESC
+			or "Place tag chips on separate rows that use the full friend-card width.",
+	}, nil))
+
 	local compactOptions = {
 		labels = {
 			L.FRIEND_TAGS_COMPACT_HIDDEN or "Hidden",
@@ -5521,14 +5638,66 @@ function Settings:RefreshFriendTagsTab()
 		FriendTags:GetSetting("maxRowChips", 3), function(value)
 			return tostring(math.floor((tonumber(value) or 0) + 0.5))
 		end, function(value)
-			FriendTags:SetSetting("maxRowChips", math.floor((tonumber(value) or 3) + 0.5), RefreshFriendTagsSettings)
+			FriendTags:SetSetting("maxRowChips", math.floor((tonumber(value) or 3) + 0.5), RefreshFriendTagRuntime)
 		end))
+
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_CHIPS_PER_LINE or "Chips per Line", 1, 9,
+		FriendTags:GetSetting("chipsPerLine", 3), function(value)
+			return tostring(math.floor((tonumber(value) or 0) + 0.5))
+		end, function(value)
+			FriendTags:SetSetting("chipsPerLine", math.floor((tonumber(value) or 3) + 0.5), RefreshFriendTagRuntime)
+		end))
+
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_CHIP_ICON_SIZE or "Chip / Icon Size", 8, 24,
+		FriendTags:GetSetting("chipIconSize", 11), function(value)
+			return tostring(math.floor((tonumber(value) or 0) + 0.5))
+		end, function(value)
+			FriendTags:SetSetting("chipIconSize", math.floor((tonumber(value) or 11) + 0.5), RefreshFriendTagRuntime)
+		end))
+
+	local currentChipFont = FriendTags:GetSetting("chipFont", "Friz Quadrata TT")
+	local chipFontDropdown
+	chipFontDropdown = Components:CreateDropdown(
+		tab,
+		L.SETTINGS_FONT or "Font:",
+		fontOptions,
+		function(value)
+			return value == currentChipFont
+		end,
+		function(value)
+			currentChipFont = value
+			FriendTags:SetSetting("chipFont", value, RefreshFriendTagRuntime)
+			if chipFontDropdown.DropDown then
+				BFL.SetDropdownText(chipFontDropdown.DropDown, value)
+			end
+		end
+	)
+	if chipFontDropdown.SetTooltip then
+		chipFontDropdown:SetTooltip(L.SETTINGS_FONT or "Font:", L.SETTINGS_FONT_TOOLTIP or "Choose a font.")
+	end
+	table.insert(allFrames, chipFontDropdown)
+
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_CHIP_FONT_SIZE or "Chip Font Size", 8, 24,
+		FriendTags:GetSetting("chipFontSize", 10), function(value)
+			return tostring(math.floor((tonumber(value) or 0) + 0.5))
+		end, function(value)
+			FriendTags:SetSetting("chipFontSize", math.floor((tonumber(value) or 10) + 0.5), RefreshFriendTagRuntime)
+		end))
+
+	table.insert(allFrames, CreateFontFlagsDropdown(
+		tab,
+		friendTagSettingsAdapter,
+		"chipFontFlags",
+		nil,
+		nil,
+		"SLUG"
+	))
 
 	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_TOOLTIP_CHIPS or "Max Tooltip Chips", 1, 20,
 		FriendTags:GetSetting("maxTooltipChips", 8), function(value)
 			return tostring(math.floor((tonumber(value) or 0) + 0.5))
 		end, function(value)
-			FriendTags:SetSetting("maxTooltipChips", math.floor((tonumber(value) or 8) + 0.5), RefreshFriendTagsSettings)
+			FriendTags:SetSetting("maxTooltipChips", math.floor((tonumber(value) or 8) + 0.5), RefreshFriendTagRuntime)
 		end))
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5551,7 +5720,7 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_SEARCH_CUSTOM_DESC or "Include custom tags in friend search.",
 	}))
 
-	table.insert(allFrames, Components:CreateCheckbox(tab, {
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
 		label = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
 		initialValue = FriendTags:GetSetting("showMenuTagCounts", true) ~= false,
 		callback = function(val)
@@ -5559,11 +5728,11 @@ function Settings:RefreshFriendTagsTab()
 		end,
 		tooltipTitle = L.FRIEND_TAGS_SHOW_MENU_COUNTS or "Show Menu Counts",
 		tooltipDesc = L.FRIEND_TAGS_SHOW_MENU_COUNTS_DESC or "Show assigned tag counts in supported context menus.",
-	}))
+	}, nil))
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_GROUPS or "Dynamic Tag Groups"))
-	table.insert(allFrames, Components:CreateCheckbox(tab, {
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
 		label = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
 		initialValue = FriendTags:GetSetting("enableDynamicTagGroups", false) == true,
 		callback = function(val)
@@ -5572,6 +5741,15 @@ function Settings:RefreshFriendTagsTab()
 		tooltipTitle = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
 		tooltipDesc = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS_DESC
 			or "Add virtual groups for assigned tags without writing those groups to Blizzard notes.",
+	}, {
+		label = L.FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG or "Hide Group Tag Chip",
+		initialValue = FriendTags:GetSetting("hideDynamicGroupTagChip", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("hideDynamicGroupTagChip", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG or "Hide Group Tag Chip",
+		tooltipDesc = L.FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG_DESC
+			or "Hide only the tag chip that forms the current dynamic tag group.",
 	}))
 
 	local pendingAssignments = FriendTags:GetLocalBlizzardTagAssignmentCount()
@@ -6006,18 +6184,21 @@ function Settings:RefreshFontsTab()
 	-- -------------------------------------------------------------------------
 	-- Tabs Text Settings
 	-- -------------------------------------------------------------------------
-	table.insert(allFrames, Components:CreateSpacer(tab))
-	local tabsFontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_TABS_TITLE or "Tabs Text")
-	table.insert(allFrames, tabsFontHeader)
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modernFriendsUI = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	if not modernFriendsUI then
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		local tabsFontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_TABS_TITLE or "Tabs Text")
+		table.insert(allFrames, tabsFontHeader)
 
-	-- Determine defaults
-	local _, defaultTabSize = _G.GameFontNormalSmall:GetFont()
+		-- Determine defaults
+		local _, defaultTabSize = _G.GameFontNormalSmall:GetFont()
 
 	-- Tabs Font Face
-	local currentTabFont = DB:Get("fontTabText", "Friz Quadrata TT")
-	local currentTabSize = DB:Get("fontSizeTabText", defaultTabSize)
-	local tabFontDropdown
-	tabFontDropdown = Components:CreateDropdown(tab, "Font:", fontOptions, function(val)
+		local currentTabFont = DB:Get("fontTabText", "Friz Quadrata TT")
+		local currentTabSize = DB:Get("fontSizeTabText", defaultTabSize)
+		local tabFontDropdown
+		tabFontDropdown = Components:CreateDropdown(tab, "Font:", fontOptions, function(val)
 		return val == currentTabFont
 	end, function(val)
 		DB:Set("fontTabText", val)
@@ -6029,11 +6210,11 @@ function Settings:RefreshFontsTab()
 			BFL:ApplyTabFonts() -- Immediate Apply
 			BFL:ForceRefreshFriendsList()
 		end)
-	end, FONT_SETTINGS_CONTROL_WIDTH)
-	table.insert(allFrames, tabFontDropdown)
+		end, FONT_SETTINGS_CONTROL_WIDTH)
+		table.insert(allFrames, tabFontDropdown)
 
 	-- Tabs Font Size
-	local tabSizeSlider = Components:CreateSlider(
+		local tabSizeSlider = Components:CreateSlider(
 		tab,
 		L.SETTINGS_FONT_SIZE_NUM or "Font Size:",
 		8,
@@ -6050,16 +6231,17 @@ function Settings:RefreshFontsTab()
 			end)
 		end,
 		FONT_SETTINGS_CONTROL_WIDTH
-	)
-	table.insert(allFrames, tabSizeSlider)
+		)
+		table.insert(allFrames, tabSizeSlider)
 
-	local tabFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineTabText", function()
+		local tabFlagsDropdown = CreateFontFlagsDropdown(tab, DB, "fontOutlineTabText", function()
 		C_Timer.After(0.01, function()
 			BFL:ApplyTabFonts()
 			BFL:ForceRefreshFriendsList()
 		end)
-	end, FONT_SETTINGS_CONTROL_WIDTH)
-	table.insert(allFrames, tabFlagsDropdown)
+		end, FONT_SETTINGS_CONTROL_WIDTH)
+		table.insert(allFrames, tabFlagsDropdown)
+	end
 
 	-- -------------------------------------------------------------------------
 	-- Raid Name Settings
