@@ -5797,6 +5797,14 @@ function BetterRAF_OnLoad(frame)
 	end
 end
 
+-- RAF Frame OnShow (called from XML)
+function BetterRAF_OnShow(frame)
+	local RAF = GetRAF()
+	if RAF then
+		RAF:OnShow(frame)
+	end
+end
+
 -- RAF Frame OnEvent (called from XML)
 function BetterRAF_OnEvent(frame, event, ...)
 	local RAF = GetRAF()

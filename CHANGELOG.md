@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.4]        - 2026-08-21
+
+### Improved
+- **Raid Tab** - When you are not in a raid, the Raid tab now shows Blizzard's helpful explanation instead of a short placeholder.
+- **Recruit A Friend** - The recruit list now adjusts correctly after changing the game's text size, even if the tab was closed at the time.
+
+### Fixed
+- **Friend Requests** - Accepting or declining a Battle.net friend request no longer causes the game to freeze.
+- **ElvUI BattleTag** - Your BattleTag now stays visible and keeps the same colors when switching between Legacy and Modern or using the copy button.
+
+---
+
 ## [2.8.3]        - 2026-08-18
 
 ### Added
@@ -131,24 +143,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 - **Auto Raid Assist** - Your chosen assistants are picked up more reliably after raid changes, zoning, difficulty changes, or when WoW is slow to finish loading the roster.
 - **Auto Raid Assist** - If you take assistant away from someone yourself, they stay that way until they leave the raid.
 - **Classic Login** - Classic Era and Season of Discovery should no longer show a protected action warning when you log in with BetterFriendlist enabled.
-
----
-
-## [2.6.5]        - 2026-06-28
-
-### Added
-- **NSRT Compatibility** - You can now dock Northern Sky Raid Tools' Missing Raid Buffs panel into the BetterFriendlist Raid tab. This currently requires an NSRT alpha version.
-- **Theme Customization** - Dark and Custom themes are no longer beta and now work on Retail and Classic. Find them in the old settings under Settings > Theme, or in the Settings Center under Appearance > Theme. ElvUI users can pick the ElvUI skin from that same Theme page.
-
-### Fixed
-- **Classic Themes** - The Friends window should look cleaner in Dark and Custom themes now: search box, bottom tabs, selected tab highlight, scroll buttons, WHO headers, and Raid role icons line up better.
-- **Classic Simple Mode** - The missing top-left Blizzard frame corner is back when the avatar is hidden in Blizzard theme.
-- **Quick Join** - Retail group tooltips now show better member info when available, including classes, roles, and leader markers.
-
-### Improved
-- **Classic Dropdowns** - Friends header, WHO, settings, and builder dropdowns now have cleaner icon placement and more reliable click areas in Dark/Custom themes and ElvUI.
-- **Classic Simple Mode** - Turning Simple Mode on or off updates the frame right away, no reload needed.
-- **Classic UI** - More Classic menus use the newer menu style where the client supports it, and shared icon art is safer on Classic.
 
 ---
 

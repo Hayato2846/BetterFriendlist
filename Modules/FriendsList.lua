@@ -221,7 +221,7 @@ local function EventCallback_GroupRosterUpdate(...)
 end
 
 local function EventCallback_BNetInviteListInitialized()
-	BFL.FriendsList:OnFriendListUpdate(true) -- Force immediate update
+	BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05) -- Defer synchronous request-card event handling
 end
 
 local function EventCallback_BNetInviteAdded()
@@ -232,11 +232,11 @@ local function EventCallback_BNetInviteAdded()
 	if collapsed then
 		BFL.FriendsList:FlashInviteHeader()
 	end
-	BFL.FriendsList:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
+	BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05)
 end
 
 local function EventCallback_BNetInviteRemoved()
-	BFL.FriendsList:OnFriendListUpdate(true) -- Force immediate update (Phase 2)
+	BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05)
 end
 
 local function HookScript_OnFrameShow()

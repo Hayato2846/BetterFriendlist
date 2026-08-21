@@ -1077,7 +1077,7 @@ function ElvUISkin:SkinFrames(E, S)
 			end
 
 			if bnet.Tag then
-				bnet.Tag:SetParent(bnet.backdrop)
+				self:RestoreLegacyBattleNetDisplay(bnet)
 			end
 			-- Set initial border color to default (not blue)
 			if E.media and E.media.bordercolor then
@@ -3842,8 +3842,14 @@ function ElvUISkin:SkinModernFrames(E, S, frame, FriendsUI)
 		if battleNetDisplay.backdrop and battleNetDisplay.backdrop.Hide then
 			battleNetDisplay.backdrop:Hide()
 		end
-		if battleNetDisplay.Tag and battleNetDisplay.Tag.SetTextColor then
+		if battleNetDisplay.Tag then
+			-- Legacy ElvUI parents the BattleTag to its backdrop. Modern hides that
+			-- backdrop, so restore the FontString to the visible display owner first.
+			battleNetDisplay.Tag:SetParent(battleNetDisplay)
 			battleNetDisplay.Tag:SetTextColor(1, 1, 1)
+			-- The Legacy skin can leave a plain white BattleTag behind. Reapply BFL's
+			-- canonical Blizzard-style suffix before the user can trigger a refresh.
+			FriendsUI:RefreshBattleTag()
 		end
 	end
 
@@ -4007,6 +4013,19 @@ function ElvUISkin:RefreshModernSkin()
 	return result
 end
 
+function ElvUISkin:RestoreLegacyBattleNetDisplay(bnet)
+	local backdrop = bnet and bnet.backdrop
+	local tag = bnet and bnet.Tag
+	if not (backdrop and tag) then
+		return false
+	end
+	-- Modern hides the Legacy ElvUI backdrop after detaching the BattleTag.
+	-- Reusing that backdrop requires restoring its visibility in the reverse path.
+	backdrop:Show()
+	tag:SetParent(backdrop)
+	return true
+end
+
 function ElvUISkin:RegisterTests()
 	if self.testsRegistered then
 		return
@@ -4056,6 +4075,17 @@ function ElvUISkin:RegisterTests()
 			ApplyModernElvUIBackdrop(engine, repaired)
 			V:AssertEqual(backdropState.r, 0.1, "ElvUI refresh repairs same-object backdrop drift")
 			V:AssertEqual(backdropState.borderB, 0.6, "ElvUI refresh repairs same-object border drift")
+
+			local legacyBackdropShown = false
+			local legacyTagParent
+			local legacyBackdrop = { Show = function() legacyBackdropShown = true end }
+			local legacyDisplay = {
+				backdrop = legacyBackdrop,
+				Tag = { SetParent = function(_, parent) legacyTagParent = parent end },
+			}
+			V:Assert(self:RestoreLegacyBattleNetDisplay(legacyDisplay), "Legacy BattleTag display is restorable")
+			V:Assert(legacyBackdropShown, "Legacy BattleTag restore shows the backdrop hidden by Modern")
+			V:AssertEqual(legacyTagParent, legacyBackdrop, "Legacy BattleTag returns to the visible backdrop")
 		end,
 	})
 
@@ -4098,6 +4128,20 @@ function ElvUISkin:RegisterTests()
 			V:Assert(
 				not root.BattleNetBar.Background or root.BattleNetBar.Background:GetAlpha() == 0,
 				"Modern ElvUI suppresses the Battle.net bar background"
+			)
+			local battleNetDisplay = header and header.BattlenetFrame
+			V:AssertNotNil(battleNetDisplay and battleNetDisplay.Tag, "Modern ElvUI keeps the BattleTag FontString")
+			V:AssertEqual(
+				battleNetDisplay.Tag:GetParent(),
+				battleNetDisplay,
+				"Modern ElvUI detaches the BattleTag from the hidden Legacy backdrop"
+			)
+			local initialBattleTagText = battleNetDisplay.Tag:GetText()
+			FriendsUI:RefreshBattleTag()
+			V:AssertEqual(
+				battleNetDisplay.Tag:GetText(),
+				initialBattleTagText,
+				"Modern ElvUI BattleTag formatting remains stable across copy-time refreshes"
 			)
 			for _, button in ipairs({ root.BattleNetBar.CopyBattleTagButton, BetterFriendsFrame.StreamerModeButton }) do
 				V:Assert(not button.backdrop or not button.backdrop:IsShown(), "Modern header icon buttons remain borderless")

@@ -2184,10 +2184,12 @@ function FriendsUI:OpenRequestDeclineMenu(button)
 		{
 			text = BFL.L.DECLINE or DECLINE or "Decline",
 			func = function()
-				if not self:RemoveMockInvite(inviteID, false) and BNDeclineFriendInvite then
+				if self:RemoveMockInvite(inviteID, false) then
+					self:RefreshRequests()
+				elseif BNDeclineFriendInvite then
 					BNDeclineFriendInvite(inviteID)
+					self:ScheduleRequestsRefresh(false)
 				end
-				self:RefreshRequests()
 			end,
 		},
 	}
@@ -2245,10 +2247,12 @@ function FriendsUI:SetupRequestDeclineButton(declineButton)
 			if StaticPopup_Hide then
 				StaticPopup_Hide("CONFIRM_BLOCK_INVITES")
 			end
-			if not self:RemoveMockInvite(dropdown.inviteID, false) and BNDeclineFriendInvite then
+			if self:RemoveMockInvite(dropdown.inviteID, false) then
+				self:RefreshRequests()
+			elseif BNDeclineFriendInvite then
 				BNDeclineFriendInvite(dropdown.inviteID)
+				self:ScheduleRequestsRefresh(false)
 			end
-			self:RefreshRequests()
 		end)
 		InitializeScaledRequestMenuElement(decline)
 
@@ -2304,10 +2308,13 @@ function FriendsUI:InitializeRequestCard(button, elementData)
 	button.AcceptButton:SetScript("OnClick", function()
 		if self:RemoveMockInvite(button.inviteID, true) then
 			-- The deterministic preview fixture is local and must never call the live API.
+			self:RefreshRequests()
 		elseif BNAcceptFriendInvite and button.inviteID then
 			BNAcceptFriendInvite(button.inviteID)
+			-- Event delivery normally schedules this first; keep a coalesced fallback
+			-- for clients that do not emit BN_FRIEND_INVITE_REMOVED immediately.
+			self:ScheduleRequestsRefresh(false)
 		end
-		self:RefreshRequests()
 	end)
 	button.DeclineButton.inviteIndex = button.inviteIndex
 	button.DeclineButton.inviteID = button.inviteID
@@ -3417,6 +3424,26 @@ function FriendsUI:RefreshRequests(newInvite)
 		self:StartRequestGlow()
 	end
 	self:RefreshNavigation()
+end
+
+function FriendsUI:ScheduleRequestsRefresh(newInvite)
+	-- BN_FRIEND_INVITE_* events are synchronous. In particular,
+	-- BNAcceptFriendInvite can remove and recycle the request card before its
+	-- OnClick responder has returned. Coalesce the event and API fallback onto
+	-- the next frame so the ScrollBox provider is replaced only once and never
+	-- from inside the responder that owns the clicked button.
+	self.pendingRequestsRefreshNewInvite = self.pendingRequestsRefreshNewInvite or newInvite == true
+	if self.pendingRequestsRefresh then
+		return
+	end
+
+	self.pendingRequestsRefresh = true
+	C_Timer.After(0, function()
+		self.pendingRequestsRefresh = nil
+		local showNewInvite = self.pendingRequestsRefreshNewInvite == true
+		self.pendingRequestsRefreshNewInvite = nil
+		self:RefreshRequests(showNewInvite)
+	end)
 end
 
 function FriendsUI:HideAllContentFrames()
@@ -7372,13 +7399,13 @@ function FriendsUI:Initialize()
 		end
 	end, 10)
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function()
-		self:RefreshRequests(false)
+		self:ScheduleRequestsRefresh(false)
 	end, 20)
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_ADDED", function()
-		self:RefreshRequests(true)
+		self:ScheduleRequestsRefresh(true)
 	end, 20)
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function()
-		self:RefreshRequests(false)
+		self:ScheduleRequestsRefresh(false)
 	end, 20)
 	BFL:RegisterEventCallback("BN_INFO_CHANGED", function()
 		self:RefreshBattleTag()

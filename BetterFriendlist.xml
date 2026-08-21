@@ -2143,6 +2143,9 @@
 					<OnLoad>
 						BetterRAF_OnLoad(self)
 					</OnLoad>
+					<OnShow>
+						BetterRAF_OnShow(self)
+					</OnShow>
 					<OnEvent>
 						BetterRAF_OnEvent(self, event, ...)
 					</OnEvent>
@@ -3194,15 +3197,14 @@
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">
-						<!-- "Not in Raid" placeholder text (shown when in party, not raid) -->
-						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontLarge"
-							text="Raid roster is only available when in a raid group" hidden="true"
-							wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
+						<!-- Match Blizzard's Raid tab explanation when no raid is active. -->
+						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontNormal"
+							text="RAID_DESCRIPTION" hidden="true"
+							wordwrap="true" justifyH="LEFT" justifyV="TOP">
 							<Anchors>
-								<Anchor point="CENTER" relativeKey="$parent.GroupsInset" x="0"
-									y="0" />
+								<Anchor point="TOPLEFT" relativeKey="$parent.GroupsInset" x="20" y="-20" />
+								<Anchor point="BOTTOMRIGHT" relativeKey="$parent.GroupsInset" x="-20" y="20" />
 							</Anchors>
-							<Color r="0.5" g="0.5" b="0.5" />
 						</FontString>
 					</Layer>
 				</Layers>

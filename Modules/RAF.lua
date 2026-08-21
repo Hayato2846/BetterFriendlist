@@ -1388,8 +1388,8 @@ end
 
 function RAF:OnTextScaleUpdated()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RecruitAFriendFrame
-	if frame and frame:IsShown() and frame.rafInfo and frame.rafInfo.recruits then
-		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+	if frame then
+		self:RefreshScaledRecruitLayout(frame)
 	end
 end
 
@@ -2767,4 +2767,35 @@ function RAF:AnchorRewardsFrame()
 	-- Keep Blizzard's dialog parent and lifecycle intact. The relative point is
 	-- sufficient to make it follow BFL without entering the UIPanel manager.
 	return FriendsUI:AnchorAuxiliaryWindow(rewardsFrame, 0)
+end
+
+function RAF:RefreshScaledRecruitLayout(frame)
+	if not frame then
+		return
+	end
+	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
+		-- Reassigning the text forces SimpleHTML to recalculate its scaled height.
+		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or L.RAF_NO_RECRUITS_DESC)
+	end
+	if not (frame.rafInfo and frame.rafInfo.recruits) then
+		return
+	end
+	if IsBetterRAFFrameVisible(frame) then
+		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+	else
+		-- Match Blizzard's SocialView contract: rebuild scaled row extents on show.
+		MarkRecruitListDirty(frame)
+	end
+end
+
+function RAF:OnShow(frame)
+	if not frame then
+		return
+	end
+	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
+		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or L.RAF_NO_RECRUITS_DESC)
+	end
+	if frame.recruitListDirty and frame.rafInfo and frame.rafInfo.recruits then
+		self:UpdateRecruitList(frame, frame.rafInfo.recruits)
+	end
 end

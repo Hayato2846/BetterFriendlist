@@ -1170,7 +1170,7 @@ function RaidFrame:Initialize()
 	if frame then
 		-- Localize empty state text
 		if frame.NotInRaid then
-			frame.NotInRaid:SetText(L.RAID_NOT_IN_RAID_DETAILS)
+			frame.NotInRaid:SetText(RAID_DESCRIPTION or L.RAID_NOT_IN_RAID_DETAILS)
 		end
 
 		-- Localize control panel buttons
