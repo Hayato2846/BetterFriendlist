@@ -37,6 +37,8 @@ local lastUpdateTime = 0
 local THROTTLE_INTERVAL = 0.1 -- Update max 10 times per second (crisp but not spammy)
 local pendingDeferredUpdate = false
 local pendingTextUpdate = false
+local pendingTooltipRefresh = false
+local pendingTooltipBattleNetInvalidation = false
 local friendCountsCache = nil
 local FRIEND_COUNTS_CACHE_TTL = 2.0
 local friendCountsEventVersion = 0
@@ -882,7 +884,15 @@ function Broker:UpdateBrokerText(force)
 		return
 	end
 
-	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
+	-- The broker text is permanently visible outside BFL and only presents raw
+	-- online/total counts. Quick filters, tags, and custom filter predicates are
+	-- tooltip/friend-list detail and must not run in this background path.
+	local wowOnline, wowTotal, bnetOnline, bnetTotal
+	if previewData and previewData.friends then
+		wowOnline, wowTotal, bnetOnline, bnetTotal = GetPreviewFriendCounts("all")
+	else
+		wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
+	end
 	local totalOnline = wowOnline + bnetOnline
 	local totalFriends = wowTotal + bnetTotal
 
@@ -929,30 +939,16 @@ function Broker:UpdateBrokerText(force)
 	end
 end
 
-function Broker:ScheduleBrokerTextUpdate(hardInvalidate, hardInvalidateBattleNet)
+function Broker:ScheduleBrokerTextUpdate(invalidateBattleNet)
 	pendingTextUpdate = true
-	local invalidateBattleNet = hardInvalidateBattleNet
-	if invalidateBattleNet == nil then
-		invalidateBattleNet = hardInvalidate
-	end
 
 	if pendingDeferredUpdate then
-		if hardInvalidate then
-			InvalidateFriendCountsCache()
-		else
-			friendCountsCache = nil
-		end
 		if invalidateBattleNet then
 			InvalidateBattleNetCountsCache()
 		end
 		return
 	end
 
-	if hardInvalidate then
-		InvalidateFriendCountsCache()
-	else
-		friendCountsCache = nil
-	end
 	if invalidateBattleNet then
 		InvalidateBattleNetCountsCache()
 	end
@@ -971,6 +967,54 @@ function Broker:ScheduleBrokerTextUpdate(hardInvalidate, hardInvalidateBattleNet
 		C_Timer.After(0.25, FlushBrokerTextUpdate)
 	else
 		FlushBrokerTextUpdate()
+	end
+end
+
+local function IsBrokerTooltipObserved()
+	if not (LQT and tooltip and tooltip.IsShown and tooltip:IsShown()) then
+		return false
+	end
+
+	if tooltip.IsMouseOver and tooltip:IsMouseOver() then
+		return true
+	end
+
+	local anchor = tooltip.anchorFrame
+	return anchor and anchor.IsMouseOver and anchor:IsMouseOver() or false
+end
+
+-- Presence/details are only observable while the broker tooltip is hovered.
+-- Coalesce its noisy Battle.net events and do no cache work at all otherwise.
+function Broker:ScheduleObservedTooltipRefresh(invalidateBattleNet)
+	if not IsBrokerTooltipObserved() then
+		return
+	end
+
+	pendingTooltipBattleNetInvalidation = pendingTooltipBattleNetInvalidation or invalidateBattleNet
+	if pendingTooltipRefresh then
+		return
+	end
+
+	pendingTooltipRefresh = true
+	local function FlushObservedTooltipRefresh()
+		pendingTooltipRefresh = false
+		if not IsBrokerTooltipObserved() then
+			pendingTooltipBattleNetInvalidation = false
+			return
+		end
+
+		InvalidateFriendCountsCache()
+		if pendingTooltipBattleNetInvalidation then
+			InvalidateBattleNetCountsCache()
+		end
+		pendingTooltipBattleNetInvalidation = false
+		Broker:RefreshTooltip()
+	end
+
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0.25, FlushObservedTooltipRefresh)
+	else
+		FlushObservedTooltipRefresh()
 	end
 end
 
@@ -2896,11 +2940,15 @@ function Broker:Initialize()
 			if tooltip and tooltip.IsShown and tooltip:IsShown() and tooltip.anchorFrame == anchorFrame then
 				return
 			end
+			InvalidateFriendCountsCache()
+			InvalidateBattleNetCountsCache()
 			tooltip = CreateLibQTipTooltip(anchorFrame)
 		end
 	else
 		dataObjectDef.OnTooltipShow = function(gameTooltip)
 			if gameTooltip and gameTooltip.AddLine then
+				InvalidateFriendCountsCache()
+				InvalidateBattleNetCountsCache()
 				if BetterFriendlistDB.brokerTooltipMode == "advanced" then
 					CreateAdvancedTooltip(gameTooltip)
 				else
@@ -2927,48 +2975,59 @@ function Broker:RegisterEvents()
 		return
 	end
 
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(...)
-		Broker:ScheduleBrokerTextUpdate()
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(_, isCompanionApp)
+		if not (BetterFriendlistDB.treatMobileAsOffline and isCompanionApp) then
+			Broker:ScheduleBrokerTextUpdate(true)
+		end
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(...)
-		Broker:ScheduleBrokerTextUpdate()
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(_, isCompanionApp)
+		if not (BetterFriendlistDB.treatMobileAsOffline and isCompanionApp) then
+			Broker:ScheduleBrokerTextUpdate(true)
+		end
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...)
-		Broker:ScheduleBrokerTextUpdate()
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("BN_INFO_CHANGED", function(...)
-		Broker:ScheduleBrokerTextUpdate(true, true)
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	pcall(function()
 		BFL:RegisterEventCallback("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", function(...)
-			Broker:ScheduleBrokerTextUpdate(true, true)
+			Broker:ScheduleObservedTooltipRefresh(false)
 		end)
 	end)
 
 	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...)
-		Broker:ScheduleBrokerTextUpdate(true, true)
+		Broker:ScheduleBrokerTextUpdate(true)
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
-		Broker:ScheduleBrokerTextUpdate(true, false)
+		Broker:ScheduleBrokerTextUpdate(false)
+		Broker:ScheduleObservedTooltipRefresh(false)
 	end)
 
 	pcall(function()
 		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", function(...)
-			Broker:ScheduleBrokerTextUpdate(true, false)
+			Broker:ScheduleBrokerTextUpdate(false)
+			Broker:ScheduleObservedTooltipRefresh(false)
 		end)
 	end)
 
 	BFL:RegisterEventCallback("BN_CONNECTED", function(...)
-		Broker:ScheduleBrokerTextUpdate(true, true)
+		Broker:ScheduleBrokerTextUpdate(true)
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
-		Broker:ScheduleBrokerTextUpdate(true, true)
+		Broker:ScheduleBrokerTextUpdate(true)
+		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 end
 
