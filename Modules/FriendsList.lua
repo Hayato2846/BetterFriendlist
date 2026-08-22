@@ -4406,6 +4406,15 @@ end
 function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Micro-Throttling)
 	-- Instead of updating immediately for every event, we schedule an update for the next frame.
 	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
+	-- Visibility is the first gate: BNet readiness is only relevant when the list
+	-- can be rendered. Keeping this ahead of the readiness fast path prevents a
+	-- hidden, never-rendered list from calling UpdateFriendsList for every event.
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		if not needsRenderOnShow then
+			needsRenderOnShow = true
+		end
+		return
+	end
 
 	-- Phase 2: Allow bypassing throttle for critical UI interactions (Invites)
 	-- Also bypass until BNet data is fully ready (battleTags loaded) for instant population
@@ -4416,17 +4425,6 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 		end
 		self:CancelScheduledRefresh()
 		self:UpdateFriendsList()
-		return
-	end
-
-	-- Phase 9.5 Strict Throttling:
-	-- If frame is hidden, DO NOT allocate a timer or closure.
-	-- Just mark as dirty (needsRenderOnShow) and return.
-	-- This saves valid memory/CPU cycles during gameplay when frame is closed.
-	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
-		if not needsRenderOnShow then
-			needsRenderOnShow = true
-		end
 		return
 	end
 

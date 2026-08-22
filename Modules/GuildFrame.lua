@@ -97,6 +97,11 @@ local lastRosterRequestTime = 0
 -- Dirty flag: Set when data changes while frame is hidden
 local rosterDirty = true
 
+local function IsGuildFrameVisible()
+	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	return BetterFriendsFrame and BetterFriendsFrame:IsShown() and guildFrame and guildFrame:IsShown()
+end
+
 local function MarkDisplayListDirty(self)
 	if not self then
 		return
@@ -340,7 +345,11 @@ function GuildFrame:RegisterGuildEvents()
 	end, 50)
 
 	BFL:RegisterEventCallback("GUILD_MOTD", function(motd)
-		self:UpdateMOTD()
+		if IsGuildFrameVisible() then
+			self:UpdateMOTD()
+		else
+			needsRenderOnShow = true
+		end
 	end, 50)
 
 	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function(...)
@@ -384,7 +393,7 @@ function GuildFrame:OnGuildTabSettingChanged()
 	rosterDirty = true
 	MarkDisplayListDirty(self)
 	needsRenderOnShow = true
-	if self:EnsureEnabled() then
+	if self:EnsureEnabled() and IsGuildFrameVisible() then
 		self:Refresh()
 	end
 end
@@ -394,11 +403,8 @@ function GuildFrame:OnPlayerLogin()
 		return
 	end
 
-	-- Request initial guild roster data if in a guild
-	local provider = GetGuildRosterData()
-	if provider and provider.IsInGuild and provider:IsInGuild() then
-		self:RequestRosterUpdate()
-	end
+	-- The Guild section requests a fresh roster from its OnShow handler.
+	needsRenderOnShow = true
 end
 
 -- ========================================
@@ -414,8 +420,7 @@ function GuildFrame:OnGuildRosterUpdate(canRequestRosterUpdate)
 	MarkDisplayListDirty(self)
 
 	-- Check if our frame is visible
-	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
-	if guildFrame and guildFrame:IsShown() then
+	if IsGuildFrameVisible() then
 		self:Refresh()
 	else
 		needsRenderOnShow = true
@@ -431,8 +436,7 @@ function GuildFrame:OnPlayerGuildUpdate(unitTarget)
 	MarkDisplayListDirty(self)
 
 	-- Update empty state visibility
-	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
-	if guildFrame and guildFrame:IsShown() then
+	if IsGuildFrameVisible() then
 		self:UpdateEmptyState()
 		local provider = GetGuildRosterData()
 		if provider and provider.IsInGuild and provider:IsInGuild() then
@@ -734,6 +738,10 @@ function GuildFrame:Refresh()
 		self.guildMembers = {}
 		self.displayList = {}
 		ResetGuildRenderCache(self)
+		return
+	end
+	if not IsGuildFrameVisible() then
+		needsRenderOnShow = true
 		return
 	end
 
@@ -1591,6 +1599,10 @@ end
 function GuildFrame:UpdateMOTD()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
 	if not guildFrame or not guildFrame.MOTDText then return end
+	if not IsGuildFrameVisible() then
+		needsRenderOnShow = true
+		return
+	end
 
 	local motd = ""
 	local provider = GetGuildRosterData()
@@ -1626,7 +1638,11 @@ function GuildFrame:UpdateMOTD()
 	if self._layoutTimer then self._layoutTimer:Cancel() end
 	self._layoutTimer = C_Timer.NewTimer(0, function()
 		self._layoutTimer = nil
-		self:UpdateLayout()
+		if IsGuildFrameVisible() then
+			self:UpdateLayout()
+		else
+			needsRenderOnShow = true
+		end
 	end)
 end
 

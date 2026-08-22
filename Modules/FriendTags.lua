@@ -612,8 +612,11 @@ local function GetPopupEditBox(dialog)
 	return dialog.editBox or dialog.EditBox or (_G[dialog:GetName() and (dialog:GetName() .. "EditBox") or ""])
 end
 
+local runtimeFriendCachesDirty = false
+
 local function ClearRuntimeCaches()
 	FriendTags.runtimeCache = nil
+	runtimeFriendCachesDirty = false
 end
 
 local FRIEND_CACHE_TAG_SURFACES = { "default", "row", "search", "tooltip", "broker", "group", "menu", "filter" }
@@ -663,12 +666,12 @@ local function ClearRuntimeFriendCaches(cache)
 	if not cache then
 		return
 	end
-	cache.blizzardTagSets = {}
-	cache.customTagSets = {}
-	cache.tagsByFriendSurface = {}
-	cache.searchTextByFriend = {}
-	cache.tooltipTextByFriend = {}
-	cache.brokerTextByFriend = {}
+	if type(cache.blizzardTagSets) == "table" then wipe(cache.blizzardTagSets) else cache.blizzardTagSets = {} end
+	if type(cache.customTagSets) == "table" then wipe(cache.customTagSets) else cache.customTagSets = {} end
+	if type(cache.tagsByFriendSurface) == "table" then wipe(cache.tagsByFriendSurface) else cache.tagsByFriendSurface = {} end
+	if type(cache.searchTextByFriend) == "table" then wipe(cache.searchTextByFriend) else cache.searchTextByFriend = {} end
+	if type(cache.tooltipTextByFriend) == "table" then wipe(cache.tooltipTextByFriend) else cache.tooltipTextByFriend = {} end
+	if type(cache.brokerTextByFriend) == "table" then wipe(cache.brokerTextByFriend) else cache.brokerTextByFriend = {} end
 end
 
 local function RefreshSurfaces(refreshCallback, options)
@@ -891,6 +894,10 @@ local function GetRuntimeCache(self)
 		and cache.customAssignments == customAssignments
 		and cache.blizzardAssignments == blizzardAssignments
 	then
+		if runtimeFriendCachesDirty then
+			ClearRuntimeFriendCaches(cache)
+			runtimeFriendCachesDirty = false
+		end
 		return cache
 	end
 
@@ -919,6 +926,7 @@ local function GetRuntimeCache(self)
 		brokerTextByFriend = {},
 	}
 	self.runtimeCache = cache
+	runtimeFriendCachesDirty = false
 	return cache
 end
 
@@ -1055,6 +1063,16 @@ local function RefreshFriendAssignment(refreshCallback, friend, explicitUID, sup
 	elseif BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
+end
+
+local function DeferAllFriendAssignmentRefresh()
+	if runtimeFriendCachesDirty then
+		return
+	end
+	BumpAssignmentVersion()
+	FriendTags.allFriendAssignmentsVersion = BFL.FriendTagsAssignmentVersion or 0
+	RefreshRuntimeCacheMetadata(FriendTags)
+	runtimeFriendCachesDirty = true
 end
 
 function FriendTags:GetDefinitionVersion()
@@ -2941,8 +2959,13 @@ function FriendTags:Initialize()
 			end, 35)
 		end
 		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
-			self.pendingBlizzardTagSets = {}
-			RefreshFriendAssignment(nil, nil, nil, true)
+			if type(self.pendingBlizzardTagSets) == "table" then
+				wipe(self.pendingBlizzardTagSets)
+			end
+			-- This synchronous event often arrives once per Battle.net friend. Mark
+			-- the aggregate cache dirty once and clear it lazily when a tag surface is
+			-- next observed instead of replacing six cache tables for every event.
+			DeferAllFriendAssignmentRefresh()
 		end, 85)
 	end
 end

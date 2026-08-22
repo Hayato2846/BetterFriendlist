@@ -23,6 +23,13 @@ function StreamerMode:Initialize()
 		if not StreamerMode:IsActive() then
 			return
 		end
+		if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+			local FriendsUI = BFL:GetModule("FriendsUI")
+			if FriendsUI then
+				FriendsUI.battleTagDirty = true
+			end
+			return
+		end
 		if
 			BetterFriendsFrame
 			and BetterFriendsFrame.FriendsTabHeader

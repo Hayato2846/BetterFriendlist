@@ -86,6 +86,7 @@ QuickJoin.groupSortOrderCache = {} -- Per-update stable sort order cache
 
 -- Dirty flag: Set when data changes while frame is hidden
 local needsRenderOnShow = false
+local needsRefreshOnShow = false
 local updateTimer = nil
 local RELATIONSHIP_CACHE_TTL = 0.5
 
@@ -1788,25 +1789,20 @@ function QuickJoin:Initialize()
 	-- Initial update
 	self:Update()
 
-	-- Start periodic cache cleanup (every 5 minutes)
-	if self.cleanupTicker then
-		self.cleanupTicker:Cancel()
-		self.cleanupTicker = nil
-	end
-
-	self.cleanupTicker = C_Timer.NewTicker(300, function()
-		self:CleanupCache()
-	end)
-
 	-- Hook OnShow to re-render if data changed while hidden
 	if BetterFriendsFrame then
 		BetterFriendsFrame:HookScript("OnShow", function()
-			if needsRenderOnShow then
-				-- Only trigger update if we are on the QuickJoin tab
-				if BetterFriendsFrame.QuickJoinFrame and BetterFriendsFrame.QuickJoinFrame:IsShown() then
-					self:Update(true)
-					needsRenderOnShow = false
-				end
+			if needsRefreshOnShow then
+				-- Refresh live data once when BFL becomes observable again. Update() will
+				-- still defer the ScrollBox if another Modern section is selected.
+				needsRefreshOnShow = false
+				self:Update(true)
+			elseif needsRenderOnShow
+				and BetterFriendsFrame.QuickJoinFrame
+				and BetterFriendsFrame.QuickJoinFrame:IsShown()
+			then
+				self:Update(true)
+				needsRenderOnShow = false
 			end
 		end)
 	end
@@ -2146,6 +2142,7 @@ end
 -- Cleanup old cache entries (called every 5 minutes)
 function QuickJoin:CleanupCache()
 	local currentTime = GetTime()
+	self.lastCacheCleanup = currentTime
 	local maxAge = 300 -- 5 minutes
 	local cleaned = 0
 
@@ -2163,10 +2160,16 @@ end
 
 -- Update available groups list
 function QuickJoin:Update(forceUpdate)
+	local frameShown = BetterFriendsFrame and BetterFriendsFrame:IsShown()
+	if not frameShown then
+		needsRefreshOnShow = true
+		needsRenderOnShow = true
+		return
+	end
 	local previewOnly = self:IsCombinedPreviewActive()
 	local previewVersion = self.mockGroupsVersion
 	local quickJoinVisible = BetterFriendsFrame
-		and BetterFriendsFrame:IsShown()
+		and frameShown
 		and BetterFriendsFrame.QuickJoinFrame
 		and BetterFriendsFrame.QuickJoinFrame:IsShown()
 	if previewOnly and self.previewPreparedMockVersion == previewVersion then
@@ -2197,6 +2200,9 @@ function QuickJoin:Update(forceUpdate)
 	end
 
 	self.lastUpdate = GetTime()
+	if not previewOnly and self.lastUpdate - (self.lastCacheCleanup or 0) >= 300 then
+		self:CleanupCache()
+	end
 	self.updateQueued = false
 	-- PERF: Do NOT wipe relationshipCache here. TTL-based invalidation (RELATIONSHIP_CACHE_TTL)
 	-- handles expiration. Wiping forces CacheAndReturnRelationship to re-allocate new tables
@@ -3380,6 +3386,14 @@ function QuickJoin:InstallToastSelectionBridge()
 end
 
 function QuickJoin:OnSocialQueueUpdate(groupGUID, numAddedItems)
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		if groupGUID then
+			self.groupCache[groupGUID] = nil
+		end
+		needsRefreshOnShow = true
+		needsRenderOnShow = true
+		return
+	end
 	if self:IsCombinedPreviewActive() then
 		self:Update()
 		return

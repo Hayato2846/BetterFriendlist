@@ -4552,7 +4552,7 @@ function BetterFriendsFrame_UpdateQuickJoinTab() -- Quick Join is Retail only
 	end
 
 	local frame = BetterFriendsFrame
-	if not frame or not frame.BottomTab4 then
+	if not frame or not frame:IsShown() or not frame.BottomTab4 then
 		return
 	end
 

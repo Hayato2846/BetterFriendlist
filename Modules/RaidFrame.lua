@@ -104,6 +104,11 @@ RaidFrame.pendingUpdate = false -- Throttle flag for roster updates
 local needsRenderOnShow = false
 local isUpdatingRaid = false
 
+local function IsRaidFrameVisible()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+	return BetterFriendsFrame and BetterFriendsFrame:IsShown() and frame and frame:IsShown()
+end
+
 -- Difficulty constants (from Blizzard)
 RaidFrame.DIFFICULTY_PRIMARYRAID_NORMAL = 14
 RaidFrame.DIFFICULTY_PRIMARYRAID_HEROIC = 15
@@ -1400,6 +1405,7 @@ function RaidFrame:UpdateRaidMembers()
 				role = role, -- "MAINTANK", "MAINASSIST" or nil (raid assignment)
 				isML = isML, -- Is master looter
 				unit = unit,
+				readyStatus = GetReadyCheckStatus and GetReadyCheckStatus(unit) or nil,
 			}
 
 			table.insert(self.raidMembers, member)
@@ -1429,6 +1435,7 @@ function RaidFrame:UpdatePartyMembers()
 		role = playerRole,
 		isML = false,
 		unit = "player",
+		readyStatus = GetReadyCheckStatus and GetReadyCheckStatus("player") or nil,
 	})
 
 	-- Party members
@@ -1454,6 +1461,7 @@ function RaidFrame:UpdatePartyMembers()
 				role = role,
 				isML = false,
 				unit = unit,
+				readyStatus = GetReadyCheckStatus and GetReadyCheckStatus(unit) or nil,
 			})
 		end
 	end
@@ -2382,10 +2390,11 @@ function RaidFrame:OnRaidRosterUpdate(...)
 	-- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
 	-- Just mark it as dirty so it updates when shown.
-	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+	if not IsRaidFrameVisible() then
 		needsRenderOnShow = true
 		return
 	end
+	needsRenderOnShow = false
 
 	-- Event Coalescing (Micro-Throttling)
 	if self.updateTimer then
@@ -2396,6 +2405,10 @@ function RaidFrame:OnRaidRosterUpdate(...)
 	-- This fixes issues where new members aren't visible immediately
 	self.updateTimer = C_Timer.After(0.1, function()
 		self.updateTimer = nil
+		if not IsRaidFrameVisible() then
+			needsRenderOnShow = true
+			return
+		end
 
 		-- Immediate update for crisp UI response
 		self:UpdateRaidMembers()
@@ -2424,6 +2437,10 @@ function RaidFrame:OnGroupLeft(...)
 	wipe(self.raidMembers)
 	wipe(self.displayList)
 	self.selectedMember = nil
+	if not IsRaidFrameVisible() then
+		needsRenderOnShow = true
+		return
+	end
 
 	-- Update UI to clear buttons
 	self:UpdateAllMemberButtons()
@@ -2437,6 +2454,10 @@ function RaidFrame:OnGroupLeft(...)
 end
 
 function RaidFrame:OnInstanceInfoUpdate(...)
+	if not IsRaidFrameVisible() then
+		needsRenderOnShow = true
+		return
+	end
 	-- Update saved instances
 	self:UpdateSavedInstances()
 end
@@ -2448,6 +2469,10 @@ end
 
 --- Handle Ready Check start
 function RaidFrame:OnReadyCheck(initiator, timeLeft)
+	if not IsRaidFrameVisible() then
+		needsRenderOnShow = true
+		return
+	end
 	-- Mark all members with their current ready check status
 	for _, member in ipairs(self.raidMembers) do
 		if member.unit then
@@ -2470,6 +2495,10 @@ end
 
 --- Handle Ready Check confirmation
 function RaidFrame:OnReadyCheckConfirm(unitTarget, isReady)
+	if not IsRaidFrameVisible() then
+		needsRenderOnShow = true
+		return
+	end
 	-- Find member by unit and update status
 	for _, member in ipairs(self.raidMembers) do
 		if member.unit == unitTarget then
@@ -2486,14 +2515,21 @@ end
 
 --- Handle Ready Check finished
 function RaidFrame:OnReadyCheckFinished(preempted)
+	if not IsRaidFrameVisible() then
+		needsRenderOnShow = true
+		return
+	end
 	-- Clear ready check status after a delay (like Blizzard does)
 	C_Timer.After(5, function()
 		for _, member in ipairs(self.raidMembers) do
 			member.readyStatus = nil
 		end
 
-		-- Update all visible buttons
-		self:RefreshMemberButtons()
+		if IsRaidFrameVisible() then
+			self:RefreshMemberButtons()
+		else
+			needsRenderOnShow = true
+		end
 	end)
 end
 

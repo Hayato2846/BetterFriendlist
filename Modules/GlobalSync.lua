@@ -305,6 +305,11 @@ function GlobalSync:RegisterEvents()
 end
 
 function GlobalSync:OnFriendListUpdate()
+	if not BetterFriendlistDB
+		or (not BetterFriendlistDB.enableGlobalSync and not BetterFriendlistDB.enableGlobalSyncDeletion)
+	then
+		return
+	end
 	-- Throttle updates
 	if self.updateTimer then
 		return
@@ -316,6 +321,11 @@ function GlobalSync:OnFriendListUpdate()
 end
 
 function GlobalSync:PerformSync()
+	if not BetterFriendlistDB
+		or (not BetterFriendlistDB.enableGlobalSync and not BetterFriendlistDB.enableGlobalSyncDeletion)
+	then
+		return
+	end
 	-- Skip if queue is being processed (re-entry guard)
 	if self.processingQueue then
 		return

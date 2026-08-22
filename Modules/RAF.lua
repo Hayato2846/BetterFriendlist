@@ -484,6 +484,17 @@ local function MarkRecruitListDirty(frame)
 	end
 end
 
+local function RegisterNativeRAFEvents(frame)
+	if not (frame and BFL.HasRAF and C_RecruitAFriend) then
+		return
+	end
+	frame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
+	frame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
+	frame:RegisterEvent("RAF_SYSTEM_INFO_UPDATED")
+	frame:RegisterEvent("RAF_INFO_UPDATED")
+	frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
+end
+
 local function HookNativeRewardTabs()
 	local rewardsFrame = RecruitAFriendRewardsFrame
 	local rewardTabPool = rewardsFrame and rewardsFrame.rewardTabPool
@@ -1327,15 +1338,6 @@ function RAF:OnLoad(frame)
 	-- Unregister existing events to prevent duplicates
 	frame:UnregisterAllEvents()
 
-	-- Native events must not replace the deterministic local fixture while previewing.
-	if nativeAvailable and not previewActive then
-		frame:RegisterEvent("RAF_SYSTEM_ENABLED_STATUS")
-		frame:RegisterEvent("RAF_RECRUITING_ENABLED_STATUS")
-		frame:RegisterEvent("RAF_SYSTEM_INFO_UPDATED")
-		frame:RegisterEvent("RAF_INFO_UPDATED")
-		frame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
-	end
-
 	-- Set up no recruits text (use Blizzard global)
 	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
 		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or L.RAF_NO_RECRUITS_DESC)
@@ -1373,17 +1375,10 @@ function RAF:OnLoad(frame)
 		return
 	end
 
-	-- Get RAF system info
-	if C_RecruitAFriend and C_RecruitAFriend.GetRAFSystemInfo then
-		local rafSystemInfo = C_RecruitAFriend.GetRAFSystemInfo()
-		self:UpdateSystemInfo(rafSystemInfo)
-	end
-
-	-- Get RAF info
-	if C_RecruitAFriend and C_RecruitAFriend.GetRAFInfo then
-		local rafInfo = C_RecruitAFriend.GetRAFInfo()
-		self:UpdateRAFInfo(frame, rafInfo)
-	end
+	-- Native RAF state is only observable while this section is open. OnShow
+	-- registers its events and reads a fresh snapshot, so hidden frames do not
+	-- consume Battle.net friend bursts.
+	MarkRecruitListDirty(frame)
 end
 
 function RAF:OnTextScaleUpdated()
@@ -1466,6 +1461,10 @@ function RAF:RenderClassicRAFButtons()
 end
 
 function RAF:OnEvent(frame, event, ...)
+	if not IsBetterRAFFrameVisible(frame) then
+		MarkRecruitListDirty(frame)
+		return
+	end
 	if self:IsPreviewActive() or (frame and frame.previewRAF) then
 		return
 	end
@@ -1499,6 +1498,9 @@ function RAF:OnEvent(frame, event, ...)
 end
 
 function RAF:OnHide(frame)
+	if frame then
+		frame:UnregisterAllEvents()
+	end
 	-- Hide splash frame if shown
 	if frame.SplashFrame then
 		frame.SplashFrame:Hide()
@@ -2791,6 +2793,21 @@ end
 function RAF:OnShow(frame)
 	if not frame then
 		return
+	end
+	local previewActive = self:IsPreviewActive() or frame.previewRAF
+	if not previewActive then
+		RegisterNativeRAFEvents(frame)
+		frame.rafEnabled = BFL.IsRAFSystemEnabled and BFL.IsRAFSystemEnabled() or false
+		frame.rafRecruitingEnabled = C_RecruitAFriend
+			and C_RecruitAFriend.IsRecruitingEnabled
+			and C_RecruitAFriend.IsRecruitingEnabled()
+			or false
+		if C_RecruitAFriend and C_RecruitAFriend.GetRAFSystemInfo then
+			self:UpdateSystemInfo(C_RecruitAFriend.GetRAFSystemInfo())
+		end
+		if C_RecruitAFriend and C_RecruitAFriend.GetRAFInfo then
+			self:UpdateRAFInfo(frame, C_RecruitAFriend.GetRAFInfo())
+		end
 	end
 	if frame.RecruitList and frame.RecruitList.NoRecruitsDesc then
 		frame.RecruitList.NoRecruitsDesc:SetText(RAF_NO_RECRUITS_DESC or L.RAF_NO_RECRUITS_DESC)

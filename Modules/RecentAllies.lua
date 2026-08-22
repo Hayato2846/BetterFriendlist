@@ -233,6 +233,12 @@ end
 
 function RecentAllies:OnSystemStatusUpdated()
 	local FriendsUI = BFL:GetModule("FriendsUI")
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		if FriendsUI then
+			FriendsUI.navigationDirty = true
+		end
+		return
+	end
 	if FriendsUI then
 		if FriendsUI:IsModernActive() then
 			FriendsUI:RefreshNavigation()

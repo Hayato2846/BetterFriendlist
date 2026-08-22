@@ -112,6 +112,10 @@ local function IsPromotionActionRestricted()
 	return InCombatLockdown and InCombatLockdown() == true
 end
 
+local function IsActiveRaidContext()
+	return IsInRaid and IsInRaid() == true
+end
+
 local function IsWoWGameAccount(gameAccountInfo)
 	if type(gameAccountInfo) ~= "table" then
 		return false
@@ -315,6 +319,7 @@ function AutoRaidAssist:Initialize()
 	self.candidateCache = nil
 	self.normalizedDB = nil
 	self.dbCacheDirty = true
+	self.raidContextActive = IsActiveRaidContext()
 	self:GetDB()
 	DebugLog("Initialize enabled=%s targets=%d", DebugValue(self:IsEnabled()), self:GetTargetCount())
 	self:RegisterEvents()
@@ -336,17 +341,33 @@ function AutoRaidAssist:RegisterEvents()
 	DebugLog("RegisterEvents installing callbacks")
 
 	local function Schedule(reason)
-		if not AutoRaidAssist:GetEnabledSetting() then
+		-- Friend status events can fire in large bursts while solo. Auto Assist has
+		-- no work to do until a raid exists, so reject them before cache invalidation
+		-- or timer allocation.
+		if
+			not AutoRaidAssist.raidContextActive
+			or not IsActiveRaidContext()
+			or not AutoRaidAssist:GetEnabledSetting()
+		then
 			return
 		end
+		AutoRaidAssist.raidContextActive = true
 		AutoRaidAssist:InvalidateCandidateCache()
 		DebugLog("Event trigger reason=%s -> ScheduleEvaluate", DebugValue(reason))
 		AutoRaidAssist:ScheduleEvaluate(reason)
 	end
 	local function ScheduleRoster(reason)
+		local inRaid = IsActiveRaidContext()
+		if not inRaid then
+			if AutoRaidAssist.raidContextActive then
+				AutoRaidAssist:DeactivateRaidContext(reason or "roster")
+			end
+			return
+		end
 		if not AutoRaidAssist:GetEnabledSetting() then
 			return
 		end
+		AutoRaidAssist.raidContextActive = true
 		AutoRaidAssist:InvalidateCandidateCache()
 		DebugLog("Roster event trigger reason=%s -> ScheduleRosterEvaluate", DebugValue(reason))
 		AutoRaidAssist:ScheduleRosterEvaluate(reason)
@@ -391,6 +412,19 @@ function AutoRaidAssist:RegisterEvents()
 
 	self:RegisterConversionHooks()
 	self:RegisterDemotionHooks()
+end
+
+function AutoRaidAssist:DeactivateRaidContext(reason)
+	self.raidContextActive = false
+	self.needsCombatRetry = nil
+	if self.pendingTimer and self.pendingTimer.Cancel then
+		self.pendingTimer:Cancel()
+	end
+	self.pendingTimer = nil
+	self:CancelRosterRetryTimers()
+	self:CancelPromotionRetryTimers()
+	self:ClearPromotionQueue()
+	self:ClearDemotedTargets(reason or "not-raid")
 end
 
 function AutoRaidAssist:RegisterConversionHooks()
@@ -1312,6 +1346,11 @@ function AutoRaidAssist:ScheduleEvaluate(reason, delay)
 		DebugLog("ScheduleEvaluate skipped reason=%s gate=disabled", DebugValue(reason))
 		return
 	end
+	if not IsActiveRaidContext() then
+		DebugLog("ScheduleEvaluate skipped reason=%s gate=notRaidGroup", DebugValue(reason))
+		return
+	end
+	self.raidContextActive = true
 	delay = delay or EVALUATE_DELAY
 	if self.pendingTimer and self.pendingTimer.Cancel then
 		self.pendingTimer:Cancel()
@@ -1346,6 +1385,13 @@ function AutoRaidAssist:CancelRosterRetryTimers()
 end
 
 function AutoRaidAssist:ScheduleRosterEvaluate(reason)
+	if not IsActiveRaidContext() then
+		if self.raidContextActive then
+			self:DeactivateRaidContext(reason or "roster")
+		end
+		return
+	end
+	self.raidContextActive = true
 	DebugLog("ScheduleRosterEvaluate reason=%s", DebugValue(reason))
 	self:PruneDemotedTargetsForCurrentRaid(reason or "roster")
 	self:ScheduleEvaluate(reason)

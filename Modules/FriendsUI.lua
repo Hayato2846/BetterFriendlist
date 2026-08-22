@@ -1740,6 +1740,11 @@ function FriendsUI:LayoutNavigationTabs(sectionIDs, themed)
 end
 
 function FriendsUI:RefreshNavigation()
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self.navigationDirty = true
+		return false
+	end
+	self.navigationDirty = nil
 	local modernActive = self:IsModernActive()
 	if modernActive then
 		self:HideLegacyTabs()
@@ -1894,6 +1899,11 @@ function FriendsUI:RefreshBattleTag()
 	if not (self.root and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader) then
 		return
 	end
+	if not BetterFriendsFrame:IsShown() then
+		self.battleTagDirty = true
+		return false
+	end
+	self.battleTagDirty = nil
 	local header = BetterFriendsFrame.FriendsTabHeader
 	local bnetFrame = header.BattlenetFrame
 	if bnetFrame and bnetFrame.Tag then
@@ -3393,6 +3403,12 @@ function FriendsUI:ApplyModernScrollBarGeometry()
 end
 
 function FriendsUI:RefreshRequests(newInvite)
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self.requestsRefreshDirty = true
+		self.pendingRequestsRefreshNewInvite = self.pendingRequestsRefreshNewInvite or newInvite == true
+		return false
+	end
+	self.requestsRefreshDirty = nil
 	local count = GetFriendInviteCount()
 	if self.root and self.requestsInitialized then
 		local dataProvider = CreateDataProvider()
@@ -3433,6 +3449,10 @@ function FriendsUI:ScheduleRequestsRefresh(newInvite)
 	-- the next frame so the ScrollBox provider is replaced only once and never
 	-- from inside the responder that owns the clicked button.
 	self.pendingRequestsRefreshNewInvite = self.pendingRequestsRefreshNewInvite or newInvite == true
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self.requestsRefreshDirty = true
+		return
+	end
 	if self.pendingRequestsRefresh then
 		return
 	end
@@ -4009,7 +4029,13 @@ function FriendsUI:RefreshModernConfigurationLayout(reason)
 	if not (self:IsModernActive() and self.root and BetterFriendsFrame) then
 		return false
 	end
+	if not BetterFriendsFrame:IsShown() then
+		self.modernConfigurationDirty = true
+		self.lastModernConfigurationLayoutReason = reason
+		return false
+	end
 
+	self.modernConfigurationDirty = nil
 	self:ApplyModernPortrait()
 	self:ApplyModernContentLayout(self:GetSelectedSection() or "friends", true)
 	self:RefreshModernSideTabSelection()
@@ -4268,6 +4294,11 @@ function FriendsUI:ToggleSection(sectionID)
 end
 
 function FriendsUI:OnTextScaleUpdated()
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self.textScaleDirty = true
+		return
+	end
+	self.textScaleDirty = nil
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.OnTextScaleUpdated then
 		FriendsList:OnTextScaleUpdated()
@@ -4488,7 +4519,7 @@ end
 
 function FriendsUI:RefreshEffectiveStyleOnShow()
 	local effective = self:GetEffectiveStyle()
-	if self.appliedStyle ~= effective then
+	if self.pendingStyle or self.appliedStyle ~= effective then
 		return self:ApplyEffectiveStyle("show-style-change")
 	end
 
@@ -7388,7 +7419,11 @@ function FriendsUI:Initialize()
 	pcall(function()
 		BFL:RegisterEventCallback("SOCIAL_UI_SYSTEM_STATUS_UPDATED", function()
 			self:EnsureSocialUIRedirects()
-			self:ApplyEffectiveStyle("social-ui-status")
+			if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+				self:ApplyEffectiveStyle("social-ui-status")
+			else
+				self.effectiveStyleDirty = true
+			end
 			local Settings = BFL:GetModule("Settings")
 			if Settings and Settings.RefreshGeneralTab then
 				Settings:RefreshGeneralTab()
@@ -7401,7 +7436,11 @@ function FriendsUI:Initialize()
 	end)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		if self.pendingStyle then
-			self:ApplyEffectiveStyle("combat-ended")
+			if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+				self:ApplyEffectiveStyle("combat-ended")
+			else
+				self.effectiveStyleDirty = true
+			end
 		end
 	end, 10)
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_LIST_INITIALIZED", function()
@@ -7436,7 +7475,22 @@ function FriendsUI:Initialize()
 		self:InstallFriendsFriendsFrameHook()
 		if BetterFriendsFrame then
 			BetterFriendsFrame:HookScript("OnShow", function()
+				self.effectiveStyleDirty = nil
 				self:RefreshEffectiveStyleOnShow()
+				if self.battleTagDirty then
+					self:RefreshBattleTag()
+				end
+				if self.textScaleDirty then
+					self:OnTextScaleUpdated()
+				end
+				if self.navigationDirty then
+					self:RefreshNavigation()
+				end
+				if self.requestsRefreshDirty then
+					local showNewInvite = self.pendingRequestsRefreshNewInvite == true
+					self.pendingRequestsRefreshNewInvite = nil
+					self:RefreshRequests(showNewInvite)
+				end
 			end)
 		end
 		self:ApplyEffectiveStyle("initialize")
