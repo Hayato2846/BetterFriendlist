@@ -16,6 +16,9 @@ local ELVUI_CLASSIC_WHO_COLUMN_DROPDOWN_Y_OFFSET = 2
 local IsModernDropdown, CallElvUIHandler = BFL.IsModernDropdown
 local classicDropdownSelectedValueFixes = setmetatable({}, { __mode = "k" })
 local classicDropdownTextHookInstalled = false
+local function ShouldSkinLegacyElvUIPortrait(isClassic, simpleMode)
+	return not isClassic and simpleMode ~= true
+end
 
 local function GetTexturePathFromMarkup(text)
 	if type(text) ~= "string" then
@@ -598,21 +601,18 @@ function ElvUISkin:SkinFrames(E, S)
 			S:HandlePortraitFrame(frame)
 		end)
 	end
-	local portraitButton, shouldSkinPortrait = frame.PortraitButton, frame.PortraitButton ~= nil
+	local portraitButton, DB = frame.PortraitButton, BFL:GetModule("DB")
+	local simpleMode = DB and DB:Get("simpleMode", false) == true
+	local shouldSkinPortrait = portraitButton ~= nil and ShouldSkinLegacyElvUIPortrait(BFL.IsClassic, simpleMode)
 	-- Skin Portrait Button (Changelog)
 	if portraitButton then
 		-- BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
 		local button = portraitButton
 
-		-- Classic: Hide portrait when ElvUI active and NOT in Simple Mode
-		-- (Changelog will be accessible via Contacts Menu instead)
-		if BFL.IsClassic then
-			local DB = BFL:GetModule("DB")
-			local simpleMode = DB and DB:Get("simpleMode", false) or false
-			if not simpleMode then
-				button:Hide()
-				shouldSkinPortrait = false
-			end
+		-- Simple Mode never shows an avatar. Classic ElvUI keeps this area free
+		-- in every mode and exposes the changelog through the Contacts menu.
+		if not shouldSkinPortrait then
+			button:Hide()
 		end
 
 		if shouldSkinPortrait then
@@ -662,14 +662,14 @@ function ElvUISkin:SkinFrames(E, S)
 			end
 
 			-- Handle Glow (New Version Indicator)
-			if button.Glow then
-				button.Glow:SetParent(button)
-				button.Glow:ClearAllPoints()
-				button.Glow:SetInside(button.backdrop)
-				button.Glow:SetDrawLayer("OVERLAY")
-				-- Use a cleaner glow texture for ElvUI
-				button.Glow:SetTexture(E.Media.Textures.Highlight)
-				button.Glow:SetVertexColor(1, 0.82, 0, 0.5)
+			-- Changelog owns the shape-aware indicator instead of the skin.
+			-- Refresh after ElvUI has finalized the portrait dimensions,
+			-- so the relative anchors follow the fitted square automatically
+			-- and keep the current theme accent without a separate texture.
+			-- The Changelog module also preserves the indicator's visibility.
+			local Changelog = BFL:GetModule("Changelog")
+			if Changelog and Changelog.RefreshPortraitIndicator then
+				Changelog:RefreshPortraitIndicator()
 			end
 
 			-- Add Hover Effect
@@ -783,12 +783,12 @@ function ElvUISkin:SkinFrames(E, S)
 		frame.ListInset:CreateBackdrop("Transparent")
 	end
 
-	-- Skin WhoFrame Inset
-	if frame.WhoFrame and frame.WhoFrame.ListInset then
-		frame.WhoFrame.ListInset:StripTextures()
-		frame.WhoFrame.ListInset:CreateBackdrop("Transparent")
+	-- Skin WhoFrame and GuildFrame Insets
+	for _, owner in pairs({ frame.WhoFrame, frame.GuildFrame }) do
+		local inset = owner and owner.ListInset
+		if inset then inset:StripTextures() end
+		if inset then inset:CreateBackdrop("Transparent") end
 	end
-
 	-- Skin RecruitAFriendFrame
 	BFL:DebugPrint("ElvUISkin: Skinning RAF")
 	self:SkinRecruitAFriend(E, S, frame)
@@ -934,9 +934,9 @@ function ElvUISkin:SkinFrames(E, S)
 		end
 	end
 
-	-- Raid Frame ScrollBar
-	if frame.RaidFrame and frame.RaidFrame.ScrollBar then
-		SkinScrollBar(S, frame.RaidFrame.ScrollBar)
+	-- Guild and Raid Frame ScrollBars
+	for _, owner in pairs({ frame.GuildFrame, frame.RaidFrame }) do
+		if owner and owner.ScrollBar then SkinScrollBar(S, owner.ScrollBar) end
 	end
 
 	-- Skin Buttons
@@ -3450,7 +3450,7 @@ function ElvUISkin:SkinModernPortrait(E, frame, FriendsUI)
 	end
 	SetTextureAlpha(portrait.Mask, 0)
 	portrait.BFL_ModernSquarePortrait = true
-	portrait:Show()
+	portrait:SetShown(not (FriendsUI.IsSimpleModeEnabled and FriendsUI:IsSimpleModeEnabled()))
 end
 
 function ElvUISkin:SkinModernActionButton(S, button)
@@ -4052,6 +4052,9 @@ function ElvUISkin:RegisterTests()
 			}
 			ApplyModernElvUIBackdrop({}, hiddenControl)
 			V:Assert(not controlShown, "ElvUI backdrop refresh does not resurrect hidden controls")
+			V:Assert(ShouldSkinLegacyElvUIPortrait(false, false), "Retail Legacy ElvUI skins the avatar outside Simple Mode")
+			V:Assert(not ShouldSkinLegacyElvUIPortrait(false, true), "Retail Legacy ElvUI hides the avatar in Simple Mode")
+			V:Assert(not ShouldSkinLegacyElvUIPortrait(true, false), "Classic ElvUI keeps the Legacy avatar area free")
 
 			local backdropState = { r = 0, g = 0, b = 0, borderR = 0, borderG = 0, borderB = 0 }
 			local repaired = {
@@ -4125,6 +4128,7 @@ function ElvUISkin:RegisterTests()
 			V:AssertEqual(relativePoint, "TOPLEFT", "Modern ElvUI portrait aligns with the frame corner")
 			V:AssertEqual(x, 4, "Modern ElvUI portrait keeps the Legacy horizontal inset")
 			V:AssertEqual(y, -4, "Modern ElvUI portrait keeps the Legacy vertical inset")
+			V:AssertEqual(portrait:IsShown(), not FriendsUI:IsSimpleModeEnabled(), "Modern ElvUI keeps the avatar hidden in Simple Mode")
 			V:Assert(
 				not root.BattleNetBar.Background or root.BattleNetBar.Background:GetAlpha() == 0,
 				"Modern ElvUI suppresses the Battle.net bar background"

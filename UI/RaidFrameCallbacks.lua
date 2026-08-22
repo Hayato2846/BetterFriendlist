@@ -821,10 +821,13 @@ function BetterRaidMemberButton_PostClick(self, button)
 			ClearAllSelections()
 		end
 	elseif button == "RightButton" then
-		-- RightButton: Context menu is handled by the "togglemenu" secure attribute.
+		-- RightButton: Context menu is handled by the secure menu attribute.
 		-- PostClick still runs after the secure action; on Retail SecretValues builds,
 		-- reopening UnitPopup from addon Lua taints protected entries like Set Focus.
 		if not IsModifierKeyDown() and self.unit then
+			if self.BFL_RaidContextMenuType == "RAID" then
+				return
+			end
 			if BFL.HasSecretValues then
 				return
 			end
@@ -998,11 +1001,13 @@ function BetterRaidMemberButton_OnDragStop(self)
 	-- GetMouseFoci() returns array in WoW 11.2+, GetMouseFocus() was deprecated
 	local mouseFoci = GetMouseFoci and GetMouseFoci() or {}
 	local targetFrame = nil
+	local RaidFrame = GetRaidFrame()
 
 	-- Search through all frames under mouse to find a raid member button
 	for _, frame in ipairs(mouseFoci) do
-		if frame and frame.groupIndex and frame.slotIndex then
-			targetFrame = frame
+		local memberButton = RaidFrame and RaidFrame:ResolveMemberButton(frame)
+		if memberButton then
+			targetFrame = memberButton
 			break
 		end
 	end
@@ -1010,14 +1015,11 @@ function BetterRaidMemberButton_OnDragStop(self)
 	-- Fallback for older WoW versions
 	if not targetFrame and GetMouseFocus then
 		local frame = GetMouseFocus()
-		if frame and frame.groupIndex and frame.slotIndex then
-			targetFrame = frame
-		end
+		targetFrame = RaidFrame and RaidFrame:ResolveMemberButton(frame)
 	end
 
 	if not targetFrame or not targetFrame.groupIndex then
 		-- Clear drag highlights before returning
-		local RaidFrame = GetRaidFrame()
 		if RaidFrame then
 			if BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
 				RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)
@@ -1036,7 +1038,6 @@ function BetterRaidMemberButton_OnDragStop(self)
 	-- Don't allow dropping on self
 	if targetFrame.unit == BetterRaidFrame_DraggedUnit.unit then
 		-- Clear drag highlights before returning
-		local RaidFrame = GetRaidFrame()
 		if RaidFrame then
 			if BetterRaidFrame_DraggedUnit and BetterRaidFrame_DraggedUnit.raidIndex then
 				RaidFrame:SetButtonDragHighlight(BetterRaidFrame_DraggedUnit.raidIndex, false)

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.8.4]        - 2026-08-21
+## [2.8.4]        - 2026-08-22
 
 ### Improved
 - **Raid Tab** - When you are not in a raid, the Raid tab now shows Blizzard's helpful explanation instead of a short placeholder.
@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Friend Requests** - Accepting or declining a Battle.net friend request no longer causes the game to freeze.
 - **ElvUI BattleTag** - Your BattleTag now stays visible and keeps the same colors when switching between Legacy and Modern or using the copy button.
+- **Changelog Notice** - The “NEW” glow around the BFL avatar now follows round and square avatar styles in every theme.
+- **ElvUI Simple Mode** - The avatar now stays hidden when switching between Legacy and Modern while Simple Mode is active.
+- **ElvUI Guild Tab** - The Legacy guild member list now uses a background that matches the ElvUI theme.
+- **Modern Raid Tab** - Raid member right-click menus, shortcuts, selections, and drag-and-drop now stay connected to the correct player.
 
 ---
 
@@ -133,16 +137,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 
 ### Fixed
 - **Static Friend Groups** - Assigning a friend to a custom group now removes them from "No Group" as expected. Dropping a friend onto "No Group" removes their custom-group assignments cleanly.
-
----
-
-## [2.6.6]        - 2026-06-30
-
-### Fixed
-- **Raid Tab Menus** - Right-clicking raid members on Retail should open the normal Blizzard menu again, including options like Set Focus.
-- **Auto Raid Assist** - Your chosen assistants are picked up more reliably after raid changes, zoning, difficulty changes, or when WoW is slow to finish loading the roster.
-- **Auto Raid Assist** - If you take assistant away from someone yourself, they stay that way until they leave the raid.
-- **Classic Login** - Classic Era and Season of Discovery should no longer show a protected action warning when you log in with BetterFriendlist enabled.
 
 ---
 

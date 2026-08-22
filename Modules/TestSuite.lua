@@ -13377,7 +13377,7 @@ function TestSuite:Initialize()
 	self:RegisterMobileOnlyAccountTest()
 	self:RegisterFriendUpdateDebounceTest()
 	self:RegisterEventCompatibilityTests()
-	self:RegisterLateUITests()
+	self:RegisterLateUITests(); self:RegisterRaidInteractionTest()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
 end
 
@@ -14669,6 +14669,58 @@ function TestSuite:RegisterLateUITests()
 			SkinEngine.activeTheme = originalTheme
 			SkinEngine.registry[button] = nil
 			button.BFL_DarkSkin = nil
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+end
+
+function TestSuite:RegisterRaidInteractionTest()
+	self:RegisterTest("integration", "RaidFrame_ModernInteractionContract", {
+		description = "Modern raid rows keep Blizzard's Raid menu and resolve child overlays back to their member button",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			if InCombatLockdown() then
+				V:Skip("Secure attributes cannot be tested during combat")
+				return
+			end
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+			V:AssertNotNil(FriendsUI, "FriendsUI module should exist")
+
+			local originalIsModernActive = FriendsUI.IsModernActive
+			local attributes = {}
+			local fakeButton = {
+				memberData = {},
+				unit = "raid1",
+				name = "RaidMember",
+				groupIndex = 1,
+				slotIndex = 1,
+				SetAttribute = function(self, key, value)
+					attributes[key] = value
+				end,
+			}
+			local childOverlay = { GetParent = function() return fakeButton end }
+			local ok, err = pcall(function()
+				FriendsUI.IsModernActive = function() return true end
+				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
+				V:AssertEqual(attributes.type2, "menu", "Modern Raid uses an explicit menu action")
+				V:AssertType(attributes["menu-function"], "function", "Modern Raid supplies its explicit context-menu handler")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID", "Modern Raid uses Blizzard's Raid-tab menu")
+				V:AssertEqual(RaidFrame:ResolveMemberButton(childOverlay), fakeButton, "Child tooltip overlays resolve to their raid member row")
+
+				attributes = {}
+				FriendsUI.IsModernActive = function() return false end
+				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
+				V:AssertEqual(attributes.type2, "togglemenu", "Legacy Raid keeps its established unit-menu action")
+				V:AssertEqual(attributes["menu-function"], nil, "Legacy Raid clears the Modern menu handler")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Legacy Raid keeps its established Raid Player menu")
+			end)
+			FriendsUI.IsModernActive = originalIsModernActive
 			if not ok then
 				error(err, 0)
 			end

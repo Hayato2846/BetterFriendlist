@@ -11,6 +11,11 @@ local SUPPORT_LINKS = {
 	{ id = "github", url = "https://github.com/Hayato2846/BetterFriendlist/issues" },
 	{ id = "kofi", url = "https://ko-fi.com/hayato2846" },
 }
+local PORTRAIT_GLOW_TEXTURES = {
+	circle = "Interface\\AddOns\\BetterFriendlist\\Icons\\circle",
+	square = "Interface\\AddOns\\BetterFriendlist\\Icons\\square",
+}
+local PORTRAIT_GLOW_PADDING = 5
 
 local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	if BFL.GetThemeAccentColor then
@@ -29,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.8.4]        - 2026-08-21
+## [2.8.4]        - 2026-08-22
 
 ### Improved
 - **Raid Tab** - When you are not in a raid, the Raid tab now shows Blizzard's helpful explanation instead of a short placeholder.
@@ -38,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Friend Requests** - Accepting or declining a Battle.net friend request no longer causes the game to freeze.
 - **ElvUI BattleTag** - Your BattleTag now stays visible and keeps the same colors when switching between Legacy and Modern or using the copy button.
+- **Changelog Notice** - The “NEW” glow around the BFL avatar now follows round and square avatar styles in every theme.
+- **ElvUI Simple Mode** - The avatar now stays hidden when switching between Legacy and Modern while Simple Mode is active.
+- **ElvUI Guild Tab** - The Legacy guild member list now uses a background that matches the ElvUI theme.
+- **Modern Raid Tab** - Raid member right-click menus, shortcuts, selections, and drag-and-drop now stay connected to the correct player.
 
 ---
 
@@ -155,16 +164,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 
 ### Fixed
 - **Static Friend Groups** - Assigning a friend to a custom group now removes them from "No Group" as expected. Dropping a friend onto "No Group" removes their custom-group assignments cleanly.
-
----
-
-## [2.6.6]        - 2026-06-30
-
-### Fixed
-- **Raid Tab Menus** - Right-clicking raid members on Retail should open the normal Blizzard menu again, including options like Set Focus.
-- **Auto Raid Assist** - Your chosen assistants are picked up more reliably after raid changes, zoning, difficulty changes, or when WoW is slow to finish loading the roster.
-- **Auto Raid Assist** - If you take assistant away from someone yourself, they stay that way until they leave the raid.
-- **Classic Login** - Classic Era and Season of Discovery should no longer show a protected action warning when you log in with BetterFriendlist enabled.
 
 ---
 
@@ -460,6 +459,8 @@ function Changelog:IsNewVersion()
 end
 
 function Changelog:Initialize()
+	self:RegisterTests()
+
 	-- Setup PortraitButton for Classic - create entirely in Lua for full control
 	if BFL.IsClassic and BetterFriendsFrame then
 		self:SetupClassicPortraitButton()
@@ -586,14 +587,39 @@ function Changelog:GetPortraitButton()
 	return BetterFriendsFrame and BetterFriendsFrame.PortraitButton
 end
 
+function Changelog:GetPortraitGlowShape(theme)
+	theme = theme or (BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()) or "blizzard"
+	return theme == "blizzard" and "circle" or "square"
+end
+
+function Changelog:ApplyPortraitGlowStyle(button, accentR, accentG, accentB, accentA)
+	local glow = button and button.Glow
+	if not glow then
+		return nil
+	end
+
+	local shape = self:GetPortraitGlowShape()
+	glow:SetTexture(PORTRAIT_GLOW_TEXTURES[shape])
+	glow:SetTexCoord(0, 1, 0, 1)
+	glow:SetBlendMode("ADD")
+	glow:ClearAllPoints()
+	glow:SetPoint("TOPLEFT", button, "TOPLEFT", -PORTRAIT_GLOW_PADDING, PORTRAIT_GLOW_PADDING)
+	glow:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", PORTRAIT_GLOW_PADDING, -PORTRAIT_GLOW_PADDING)
+	glow:SetDrawLayer("OVERLAY", 1)
+	glow:SetVertexColor(accentR, accentG, accentB, (accentA or 1) * 0.9)
+	return shape
+end
+
 function Changelog:ShowGlow(show)
 	local button = self:GetPortraitButton()
 	if button then
 		local accentR, accentG, accentB, accentA = GetAccentColor(1, 0.82, 0, 1)
+		self:ApplyPortraitGlowStyle(button, accentR, accentG, accentB, accentA)
 
 		-- Create NewLabel texture if it doesn't exist
 		if not button.NewLabel then
 			button.NewLabel = button:CreateTexture(nil, "OVERLAY")
+			button.NewLabel:SetDrawLayer("OVERLAY", 2)
 			button.NewLabel:SetPoint("CENTER", button, "CENTER", 0, 0)
 			if BFL.IsClassic then
 				if BFL.SetTextureOrAtlas then
@@ -635,6 +661,10 @@ function Changelog:ShowGlow(show)
 	end
 end
 
+function Changelog:RefreshPortraitIndicator()
+	self:ShowGlow(self:IsNewVersion())
+end
+
 function Changelog:ToggleChangelog()
 	if not changelogFrame then
 		self:CreateChangelogWindow()
@@ -674,6 +704,8 @@ function Changelog:Show()
 end
 
 function Changelog:RefreshAccentColors()
+	self:RefreshPortraitIndicator()
+
 	if not changelogFrame then
 		return
 	end
@@ -695,6 +727,26 @@ function Changelog:RefreshAccentColors()
 			end
 		end
 	end
+end
+
+function Changelog:RegisterTests()
+	if self.testsRegistered then
+		return
+	end
+	local TestSuite = BFL:GetModule("TestSuite")
+	if not (TestSuite and TestSuite.RegisterTest) then
+		return
+	end
+	self.testsRegistered = true
+
+	TestSuite:RegisterTest("ui", "Changelog_PortraitGlowShape", {
+		action = function(V)
+			V:AssertEqual(self:GetPortraitGlowShape("blizzard"), "circle", "Blizzard avatars keep a circular update glow")
+			for _, theme in ipairs({ "dark", "custom", "elvui", "ellesmereui" }) do
+				V:AssertEqual(self:GetPortraitGlowShape(theme), "square", theme .. " avatars use a square update glow")
+			end
+		end,
+	})
 end
 
 function Changelog:CreateChangelogWindow()

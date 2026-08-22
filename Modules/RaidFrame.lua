@@ -303,7 +303,7 @@ local function EnsureRaidAssignmentTooltip(button, texture, storageKey)
 		return hitBox
 	end
 	hitBox = CreateFrame("Frame", nil, button)
-	hitBox:EnableMouse(true)
+	hitBox:EnableMouse(true); if hitBox.SetPassThroughButtons then hitBox:SetPassThroughButtons("LeftButton", "RightButton", "Button3", "Button4", "Button5") end
 	hitBox:SetFrameLevel(button:GetFrameLevel() + 3)
 	hitBox:SetScript("OnEnter", function(frame)
 		if not frame.tooltipText then
@@ -947,9 +947,9 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 	button:SetAttribute("*type1", nil)
 	button:SetAttribute("type1", nil)
 
-	-- Keep the unmodified right-click on the visual InsecureActionButtonTemplate.
-	-- PostClick must not reopen this menu from addon Lua on SecretValues builds.
-	button:SetAttribute("type2", "togglemenu")
+	-- Modern mirrors Blizzard's explicit RAID menu; Legacy keeps RAID_PLAYER.
+	-- Both styles retain their shortcuts on this same visual interaction button.
+	self:ApplyMemberContextMenuAttributes(button)
 
 	-- Apply ONLY MainTank/MainAssist shortcuts (have native secure types)
 	ApplyRaidShortcutAttributes(button, shortcuts)
@@ -3615,6 +3615,42 @@ end
 -- Keep old CreateMockRaidData for backwards compatibility
 function RaidFrame:CreateMockRaidData()
 	self:CreateMockPreset_Standard()
+end
+
+function RaidFrame.OpenModernRaidMemberContextMenu(owner, unit)
+	if not (owner and unit and owner.name and UnitExists(unit)) then
+		return
+	end
+	if owner.pendingName or IsPendingRaidRosterName(owner.name) then
+		return
+	end
+	if BFL.Compat and BFL.Compat.OpenUnitPopupMenu then
+		BFL.Compat.OpenUnitPopupMenu("RAID", {
+			unit = unit,
+			name = owner.name,
+		})
+	end
+end
+
+function RaidFrame:ApplyMemberContextMenuAttributes(button)
+	if IsModernRaidLayout() then
+		button.BFL_RaidContextMenuType = "RAID"
+		button:SetAttribute("type2", "menu")
+		button:SetAttribute("menu-function", RaidFrame.OpenModernRaidMemberContextMenu)
+	else
+		button.BFL_RaidContextMenuType = "RAID_PLAYER"
+		button:SetAttribute("type2", "togglemenu")
+	end
+end
+
+function RaidFrame:ResolveMemberButton(frame)
+	while frame do
+		if frame.groupIndex and frame.slotIndex then
+			return frame
+		end
+		frame = frame.GetParent and frame:GetParent() or nil
+	end
+	return nil
 end
 
 -- ========================================
