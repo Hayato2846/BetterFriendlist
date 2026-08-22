@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 2.8.4
+## Version: 2.8.5
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
@@ -80,6 +80,7 @@ Modules\FriendsUI.lua [AllowLoadGameType mainline]
 Modules\Groups.lua
 Modules\RecentlyAdded.lua
 Modules\FriendsList.lua
+Modules\FriendLevelDiagnostics.lua
 Modules\WhoFrame.lua
 Modules\IgnoreList.lua
 Modules\RecentAllies.lua [AllowLoadGameType mainline]

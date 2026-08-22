@@ -3461,6 +3461,14 @@ local function RefreshRowTravelPassButton(engine, row, button, buttonKey, shownK
 				iconSize = width
 			end
 		end
+		local buttonWidth = button.GetWidth and button:GetWidth() or nil
+		local buttonHeight = button.GetHeight and button:GetHeight() or nil
+		if buttonWidth and buttonWidth > 0 and buttonHeight and buttonHeight > 0 then
+			-- Flat theming must never grow the native Invite glyph to the complete
+			-- button extent; retain a two-pixel inset even on Compact controls.
+			local containedSize = math.max(1, math.floor(math.min(buttonWidth, buttonHeight) - 4))
+			iconSize = math.min(iconSize, containedSize)
+		end
 		local iconAtlas = actionIcon and actionIcon.GetAtlas and actionIcon:GetAtlas() or nil
 		local iconTexture = not iconAtlas and actionIcon and actionIcon.GetTexture and actionIcon:GetTexture() or nil
 		local colorVersion = engine.themeColorVersion or 0

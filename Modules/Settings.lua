@@ -5634,14 +5634,14 @@ function Settings:RefreshFriendTagsTab()
 	end
 	table.insert(allFrames, compactDropdown)
 
-	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_ROW_CHIPS or "Max Row Chips", 1, 9,
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_ROW_CHIPS or "Max Row Chips", 1, 20,
 		FriendTags:GetSetting("maxRowChips", 3), function(value)
 			return tostring(math.floor((tonumber(value) or 0) + 0.5))
 		end, function(value)
 			FriendTags:SetSetting("maxRowChips", math.floor((tonumber(value) or 3) + 0.5), RefreshFriendTagRuntime)
 		end))
 
-	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_CHIPS_PER_LINE or "Chips per Line", 1, 9,
+	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_CHIPS_PER_LINE or "Chips per Line", 1, 20,
 		FriendTags:GetSetting("chipsPerLine", 3), function(value)
 			return tostring(math.floor((tonumber(value) or 0) + 0.5))
 		end, function(value)
@@ -5751,6 +5751,16 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG_DESC
 			or "Hide only the tag chip that forms the current dynamic tag group.",
 	}))
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS or "Hide All Tags in Dynamic Groups",
+		initialValue = FriendTags:GetSetting("hideAllDynamicGroupTagChips", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("hideAllDynamicGroupTagChips", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS or "Hide All Tags in Dynamic Groups",
+		tooltipDesc = L.FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS_DESC
+			or "Hide every tag chip on rows inside dynamic tag groups.",
+	}, nil))
 
 	local pendingAssignments = FriendTags:GetLocalBlizzardTagAssignmentCount()
 	if FriendTags:AreBlizzardTagsEnabled() and pendingAssignments > 0 then

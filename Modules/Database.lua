@@ -505,6 +505,25 @@ function DB:NormalizeThemeSettings()
 	end
 end
 
+function DB:ShouldPushNicknameToCustomNames(lib, libKey)
+	if not lib or not libKey or type(lib.Get) ~= "function" then
+		return false
+	end
+
+	if lib.Get(libKey) ~= libKey then
+		return false
+	end
+
+	-- Some CustomNames versions fail to read BattleTags containing digits in
+	-- the account-name portion, although Set accepts them. Its BNet lookup
+	-- still reports the stored entry, so do not rewrite it on every login.
+	if libKey:match("#") and type(lib.IsInBnetDatabase) == "function" and lib.IsInBnetDatabase(libKey) then
+		return false
+	end
+
+	return true
+end
+
 function DB:Initialize()
 	-- Initialize Settings Version Counter (Optimization)
 	if not BFL.SettingsVersion then
@@ -761,9 +780,8 @@ function DB:Initialize()
 				local libKey = self:GetLibKey(uid)
 				-- Only push if we have a valid lib key (not a raw bnet_ID that failed to resolve)
 				if libKey and nickname and not libKey:match("^bnet_") then
-					local libName = lib.Get(libKey)
 					-- Only push if Lib doesn't have a custom name yet (returns original name)
-					if libName == libKey then
+					if self:ShouldPushNicknameToCustomNames(lib, libKey) then
 						lib.Set(libKey, nickname)
 						-- BFL:DebugPrint("Database: Synced " .. libKey .. " to CustomNames Lib")
 					end

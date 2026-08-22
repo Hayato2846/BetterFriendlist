@@ -12,7 +12,7 @@ local DEFAULT_CHIP_FONT_FLAGS = "SLUG"
 local DEFAULT_CHIPS_PER_LINE = 3
 local FULL_WIDTH_ROW_INSET = 8
 local STANDALONE_CHIP_MAX_WIDTH = 180
-local MAX_ROW_CHIPS = 9
+local MAX_ROW_CHIPS = 20
 local MAX_RENDERED_CHIPS = MAX_ROW_CHIPS + 1
 local CHIP_BORDER_INSET = 1
 local BLIZZARD_PICKER_ICON_ZOOM = 0.16
@@ -231,16 +231,25 @@ local function GetDesiredChipWidth(labelText, hasIcon, overflow, metrics)
 	return math.max(metrics.minimumWidth, MeasureLabelWidth(labelText, metrics) + padding)
 end
 
-local function GetAvailableRowWidth(friendsList, FriendTags)
-	local buttonWidth = friendsList and friendsList.GetButtonWidth and friendsList:GetButtonWidth() or 300
+local function GetRowInsets(friendsList, FriendTags)
 	FriendTags = FriendTags or GetFriendTags()
 	if FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true then
-		return math.max(36, math.floor(buttonWidth - (FULL_WIDTH_ROW_INSET * 2)))
+		return FULL_WIDTH_ROW_INSET, FULL_WIDTH_ROW_INSET
 	end
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 	local textLeftInset = modern and 38 or 44
-	return math.max(36, math.floor(buttonWidth - textLeftInset - 84))
+	local rightInset = 84
+	if friendsList and friendsList.GetFriendTagRowRightInset then
+		rightInset = tonumber(friendsList:GetFriendTagRowRightInset()) or rightInset
+	end
+	return textLeftInset, math.max(0, rightInset)
+end
+
+local function GetAvailableRowWidth(friendsList, FriendTags)
+	local buttonWidth = friendsList and friendsList.GetButtonWidth and friendsList:GetButtonWidth() or 300
+	local leftInset, rightInset = GetRowInsets(friendsList, FriendTags)
+	return math.max(36, math.floor(buttonWidth - leftInset - rightInset))
 end
 
 local function HideRow(row)
@@ -611,16 +620,18 @@ local function UpdateChipVisual(chip, profile, labelText, allowIcon, overflow, m
 	if hasIcon then
 		hasIcon = ApplyIcon(chip.icon, profile)
 	end
-	local bareIcon = labelText == "" and hasIcon == true and not overflow
+	local iconOnly = labelText == "" and hasIcon == true and not overflow
+	local bareIcon = iconOnly and profile.iconOnlyChip ~= true
+	local iconOnlyOffsetX = iconOnly and not bareIcon and (tonumber(profile.chipIconOffsetX) or 0) or 0
 	chip.bareIcon = bareIcon
 	SetPillShown(chip.pillBorder, not bareIcon)
 	SetPillShown(chip.pillBackground, not bareIcon)
-	chip.label:SetShown(not bareIcon)
+	chip.label:SetShown(not iconOnly)
 	chip.icon:ClearAllPoints()
 	chip.label:ClearAllPoints()
-	if bareIcon then
+	if iconOnly then
 		chip.icon:SetSize(metrics.iconSize, metrics.iconSize)
-		chip.icon:SetPoint("CENTER", chip, "CENTER", 0, 0)
+		chip.icon:SetPoint("CENTER", chip, "CENTER", iconOnlyOffsetX, 0)
 	elseif hasIcon then
 		chip.icon:SetSize(metrics.iconSize, metrics.iconSize)
 		chip.icon:SetPoint("LEFT", chip, "LEFT", metrics.iconLeft, 0)
@@ -746,6 +757,10 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 	if not CanRenderRow(friend, friendsList, FriendTags) then
 		return data
 	end
+	local dynamicGroupTagId = type(groupId) == "string" and groupId:match("^tag:(.+)$") or nil
+	if dynamicGroupTagId and FriendTags:GetSetting("hideAllDynamicGroupTagChips", false) then
+		return data
+	end
 
 	local tags = FriendTags and FriendTags:GetTagsForFriend(friend, "row") or EMPTY_TABLE
 	if #tags == 0 then
@@ -756,12 +771,11 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 	local iconOnly = compactMode == "icon_only"
 	local maxChips = tonumber(FriendTags:GetSetting("maxRowChips", 3)) or 3
 	maxChips = math.max(1, math.min(maxChips, MAX_ROW_CHIPS))
-	local chipsPerLine = ClampNumber(FriendTags:GetSetting("chipsPerLine", DEFAULT_CHIPS_PER_LINE), 1, 9, DEFAULT_CHIPS_PER_LINE)
+	local chipsPerLine = ClampNumber(FriendTags:GetSetting("chipsPerLine", DEFAULT_CHIPS_PER_LINE), 1, MAX_ROW_CHIPS, DEFAULT_CHIPS_PER_LINE)
 	local metrics = ResolveChipMetrics(FriendTags)
-	local hiddenGroupTagId
-	if FriendTags:GetSetting("hideDynamicGroupTagChip", false) and type(groupId) == "string" then
-		hiddenGroupTagId = groupId:match("^tag:(.+)$")
-	end
+	local hiddenGroupTagId = FriendTags:GetSetting("hideDynamicGroupTagChip", false)
+		and dynamicGroupTagId
+		or nil
 
 	local renderableTags = data.renderableTags
 	if renderableTags == EMPTY_TABLE then
@@ -909,10 +923,13 @@ function TagChips:UpdateRowChips(button, friend, friendsList, groupId, rowData)
 		row:SetPoint("RIGHT", button, "RIGHT", -FULL_WIDTH_ROW_INSET, 0)
 	else
 		-- Multi-account details are a real third text line. Anchor chips below it
-		-- instead of stacking both surfaces below Info.
+		-- instead of stacking both surfaces below Info. The right edge uses the
+		-- same live control inset as measurement, so Compact rows do not wrap while
+		-- usable space still exists before the game and Invite controls.
 		local anchor = self:GetRowAnchor(button)
+		local _, rightInset = GetRowInsets(friendsList, GetFriendTags())
 		row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -metrics.rowGap)
-		row:SetPoint("RIGHT", button, "RIGHT", -80, 0)
+		row:SetPoint("RIGHT", button, "RIGHT", -rightInset, 0)
 	end
 	row:SetHeight(rowData.height - metrics.rowGap)
 

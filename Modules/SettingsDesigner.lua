@@ -3648,7 +3648,7 @@ local function RegisterFriendTagsControls()
 		label = T("FRIEND_TAGS_SETTINGS_MAX_ROW_CHIPS", "Maximum Row Chips"),
 		desc = T("FRIEND_TAGS_SETTINGS_MAX_ROW_CHIPS_DESC", "Limits how many tags are shown in each friend row before using a +count chip."),
 		min = 1,
-		max = 9,
+		max = 20,
 		step = 1,
 		default = 3,
 		integer = true,
@@ -3667,7 +3667,7 @@ local function RegisterFriendTagsControls()
 		label = T("FRIEND_TAGS_CHIPS_PER_LINE", "Chips per Line"),
 		desc = T("FRIEND_TAGS_CHIPS_PER_LINE_DESC", "Limits chips on each line independently from the total row-chip limit."),
 		min = 1,
-		max = 9,
+		max = 20,
 		step = 1,
 		default = 3,
 		integer = true,
@@ -3963,6 +3963,24 @@ local function RegisterFriendTagsControls()
 		end,
 		setValue = function(value)
 			SetFriendTagSetting("hideDynamicGroupTagChip", value == true)
+		end,
+	})
+	AddToggle("groups.friendtags", {
+		id = "friendTags.hideAllDynamicGroupTagChips",
+		group = "groups",
+		label = T("FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS", "Hide All Tags in Dynamic Groups"),
+		desc = T(
+			"FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS_DESC",
+			"Hide every tag chip on rows inside dynamic tag groups."
+		),
+		default = false,
+		order = 320,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("hideAllDynamicGroupTagChips", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("hideAllDynamicGroupTagChips", value == true)
 		end,
 	})
 

@@ -1538,7 +1538,13 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(controls["friendTags.chipFontFlags"], "Chip font flags should be mirrored in Settings Center")
 			V:AssertNotNil(controls["friendTags.fullWidthTagRows"], "Full-width tag rows should be mirrored in Settings Center")
 			V:AssertNotNil(controls["friendTags.hideDynamicGroupTagChip"], "Dynamic group chip hiding should be mirrored in Settings Center")
+			V:AssertNotNil(
+				controls["friendTags.hideAllDynamicGroupTagChips"],
+				"All-chip dynamic group hiding should be mirrored in Settings Center"
+			)
 			V:AssertEqual(controls["friendTags.chipsPerLine"].default, 3, "Per-line chips should default to three")
+			V:AssertEqual(controls["friendTags.maxRowChips"].max, 20, "Settings Center should allow up to 20 row chips")
+			V:AssertEqual(controls["friendTags.chipsPerLine"].max, 20, "Settings Center should allow up to 20 chips per line")
 			V:AssertEqual(controls["friendTags.chipIconSize"].default, 11, "Chip icon size should default to 11")
 			V:AssertEqual(controls["friendTags.chipFont"].default, "Friz Quadrata TT", "Chip font should use the standard BFL default")
 			V:AssertEqual(controls["friendTags.chipFontSize"].default, 10, "Chip font size should default to 10")
@@ -2571,6 +2577,11 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(tempDB.friendTagSettings.chipsPerLine, 3, "Chip rows should default to three chips per line")
 				V:AssertEqual(tempDB.friendTagSettings.fullWidthTagRows, false, "Full-width tag rows should default to disabled")
 				V:AssertEqual(tempDB.friendTagSettings.hideDynamicGroupTagChip, false, "Dynamic groups should show their tag chip by default")
+				V:AssertEqual(
+					tempDB.friendTagSettings.hideAllDynamicGroupTagChips,
+					false,
+					"Dynamic groups should show all other tag chips by default"
+				)
 				V:AssertEqual(tempDB.friendTagSettings.chipIconSize, 11, "Chip icons should default to 11 pixels")
 				V:AssertEqual(tempDB.friendTagSettings.chipFont, "Friz Quadrata TT", "Chip font should use the standard BFL default")
 				V:AssertEqual(tempDB.friendTagSettings.chipFontSize, 10, "Chip text should default to 10 pixels")
@@ -2861,10 +2872,14 @@ local function RegisterBuiltInTests()
 					tagIds[index] = FriendTags:CreateCustomTag("Layout " .. index)
 					V:Assert(FriendTags:SetCustomTagForFriend(friend, tagIds[index], true), "Layout tag should be assigned")
 				end
+				local testWidth = 1000
 				local fakeFriendsList = {
 					settingsCache = { compactMode = false, infoDisabled = false },
 					GetButtonWidth = function()
-						return 1000
+						return testWidth
+					end,
+					GetFriendTagRowRightInset = function()
+						return 55
 					end,
 				}
 				local normal = TagChips:GetRowData(friend, fakeFriendsList)
@@ -2877,6 +2892,12 @@ local function RegisterBuiltInTests()
 				for _, entry in ipairs(grouped.renderableTags) do
 					V:Assert(entry.tag.id ~= tagIds[1], "Forming tag must be absent from the grouped row")
 				end
+				FriendTags:SetSetting("hideAllDynamicGroupTagChips", true, function() end)
+				local fullyHidden = TagChips:GetRowData(friend, fakeFriendsList, "tag:" .. tagIds[1])
+				V:Assert(fullyHidden.canRender == false, "Dynamic groups should hide every row chip when configured")
+				V:AssertEqual(fullyHidden.height, 0, "Fully hidden dynamic-group chips should not add row height")
+				V:AssertEqual(#fullyHidden.renderableTags, 0, "Fully hidden dynamic-group rows should expose no chips")
+				FriendTags:SetSetting("hideAllDynamicGroupTagChips", false, function() end)
 				V:AssertEqual(normal.chipsPerLine, 2, "Configured per-line chip limit should be used")
 				V:AssertEqual(normal.lineCount, 2, "Three chips plus overflow should wrap into two lines")
 				V:AssertEqual(normal.metrics.iconSize, 20, "Runtime icon size should be resolved")
@@ -2886,6 +2907,13 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(normal.metrics.fontFlags, "OUTLINE,MONOCHROME", "Runtime chip font flags should be normalized")
 				V:AssertEqual(normal.metrics.height, 23, "Chip height should follow max(icon+3, font+4)")
 				V:AssertEqual(normal.height, 50, "Two chip lines should use the resolved height and row gap")
+				local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+				local expectedLeftInset = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and 38 or 44
+				V:AssertEqual(
+					normal.availableWidth,
+					testWidth - expectedLeftInset - 55,
+					"Action-aligned rows should reserve the live control inset instead of a fixed 84px"
+				)
 
 				local constrainedWidth = normal.availableWidth
 				FriendTags:SetSetting("fullWidthTagRows", true, function() end)
@@ -2896,6 +2924,19 @@ local function RegisterBuiltInTests()
 					fullWidth.availableWidth > constrainedWidth,
 					"Full-width rows should expose more horizontal space than action-aligned rows"
 				)
+
+				for index = 5, 20 do
+					tagIds[index] = FriendTags:CreateCustomTag("Layout " .. index)
+					V:Assert(FriendTags:SetCustomTagForFriend(friend, tagIds[index], true), "Expanded layout tag should be assigned")
+				end
+				testWidth = 4000
+				FriendTags:SetSetting("maxRowChips", 20, function() end)
+				FriendTags:SetSetting("chipsPerLine", 20, function() end)
+				local expanded = TagChips:GetRowData(friend, fakeFriendsList)
+				V:AssertEqual(#expanded.renderableTags, 20, "Rows should retain 20 assigned tags")
+				V:AssertEqual(expanded.maxChips, 20, "Runtime row-chip limit should allow 20 tags")
+				V:AssertEqual(expanded.chipsPerLine, 20, "Runtime per-line limit should allow 20 tags")
+				V:AssertEqual(expanded.lineCount, 1, "A wide row should fit all 20 configured chips on one line")
 			end)
 		end,
 	})
@@ -2987,6 +3028,45 @@ local function RegisterBuiltInTests()
 					error(err, 0)
 				end
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "FriendTagEditor_RefreshesRuntimeAndSelection", {
+		description = "Editor reorder, reset, and delete callbacks refresh friend rows and recover a valid selection",
+			action = function(V)
+				local Editor = BFL:GetModule("FriendTagEditor")
+				local oldSelectedTagId = Editor.selectedTagId
+				local oldEnsureFrame = Editor.EnsureFrame
+			local oldGetSelectedDefinition = Editor.GetSelectedDefinition
+			local oldGetDefinitions = Editor.GetDefinitions
+			local oldRefreshList = Editor.RefreshList
+			local oldRefreshEditor = Editor.RefreshEditor
+			local oldSchedule = BFL.ScheduleFriendsListRefresh
+			local runtimeRefreshes = 0
+			local editorRefreshes = 0
+			local ok, err = pcall(function()
+				Editor.selectedTagId = "deleted"
+				Editor.EnsureFrame = function() return {} end
+				Editor.GetSelectedDefinition = function() return nil end
+				Editor.GetDefinitions = function() return { { id = "first" } } end
+				Editor.RefreshList = function() editorRefreshes = editorRefreshes + 1 end
+				Editor.RefreshEditor = function() editorRefreshes = editorRefreshes + 1 end
+				BFL.ScheduleFriendsListRefresh = function() runtimeRefreshes = runtimeRefreshes + 1 end
+				Editor:RefreshAfterDefinitionChange("test")
+				V:AssertEqual(runtimeRefreshes, 1, "Editor definition changes should refresh friend rows immediately")
+				V:AssertEqual(editorRefreshes, 2, "Editor definition changes should rebuild both editor panes")
+				V:AssertEqual(Editor.selectedTagId, "first", "A deleted selection should fall back to the first remaining tag")
+			end)
+			Editor.EnsureFrame = oldEnsureFrame
+			Editor.GetSelectedDefinition = oldGetSelectedDefinition
+			Editor.GetDefinitions = oldGetDefinitions
+				Editor.RefreshList = oldRefreshList
+				Editor.RefreshEditor = oldRefreshEditor
+				Editor.selectedTagId = oldSelectedTagId
+				BFL.ScheduleFriendsListRefresh = oldSchedule
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 
@@ -3477,6 +3557,11 @@ local function RegisterBuiltInTests()
 					"UI-LFG-RoleIcon-DPS-Micro-GroupFinder",
 					"DPS chip profile should resolve to Blizzard's RoleCount atlas"
 				)
+				V:AssertEqual(
+					profile.chipIconOffsetX,
+					0.5,
+					"Default role chips should opt into the half-pixel optical centering correction"
+				)
 			end)
 		end,
 	})
@@ -3730,13 +3815,23 @@ local function RegisterBuiltInTests()
 				local createIndex
 				local manageIndex
 				local customTagIndex
+				local selectAllItem
+				local clearAllItem
+				local checkboxItems = {}
 				for index, item in ipairs(items) do
+					if item.type == "checkbox" and type(item.checked) == "function" then
+						checkboxItems[#checkboxItems + 1] = item
+					end
 					if item.text == (L.FRIEND_TAGS_CREATE_CUSTOM or "Create Custom Tag") then
 						createIndex = index
 					elseif item.text == (L.FRIEND_TAGS_MANAGE or "Manage Tags") then
 						manageIndex = index
 					elseif item.text == "Test Custom Tag" then
 						customTagIndex = index
+					elseif item.text == (L.FRIEND_TAGS_SELECT_ALL or "Select All") then
+						selectAllItem = item
+					elseif item.text == (L.FRIEND_TAGS_CLEAR_ALL or "Clear All") then
+						clearAllItem = item
 					end
 				end
 				V:AssertNotNil(customTagIndex, "BFL's own menu should list custom tags before its actions")
@@ -3744,6 +3839,22 @@ local function RegisterBuiltInTests()
 				V:AssertNotNil(manageIndex, "BFL's own menu should expose tag management")
 				V:Assert(customTagIndex < createIndex, "Custom tags should precede the custom tag action block")
 				V:AssertEqual(manageIndex, createIndex + 1, "Custom tag actions should share one action block")
+				V:AssertNotNil(selectAllItem, "Friend tag menus should expose Select All")
+				V:AssertNotNil(clearAllItem, "Friend tag menus should expose Clear All")
+				selectAllItem.func()
+				for _, item in ipairs(checkboxItems) do
+					V:Assert(item.checked(), "Select All should check every tag in the still-open context menu")
+				end
+				V:AssertEqual(
+					FriendTags:GetTagCount(friend),
+					#FriendTags:GetBlizzardTagDefinitions() + 1,
+					"Select All should assign every built-in and custom tag"
+				)
+				clearAllItem.func()
+				for _, item in ipairs(checkboxItems) do
+					V:Assert(not item.checked(), "Clear All should uncheck every tag in the still-open context menu")
+				end
+				V:AssertEqual(FriendTags:GetTagCount(friend), 0, "Clear All should remove every built-in and custom tag")
 
 				local countFormat = L.FRIEND_TAGS_MENU_TITLE_COUNT or "Friend Tags (%d)"
 				FriendTags:SetCustomTagForFriend(friend, "custom:test", true)
@@ -4730,6 +4841,7 @@ local function RegisterBuiltInTests()
 
 				V:Assert(FriendTags:SetChipProfile(tagId, {
 					chipLabel = "",
+					iconOnlyChip = true,
 					iconType = "texture",
 					iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
 					textColor = { r = 0.15, g = 0.8, b = 0.35, a = 0.9 },
@@ -4737,6 +4849,7 @@ local function RegisterBuiltInTests()
 
 				local profile = FriendTags:GetChipProfile(tagId)
 				V:AssertEqual(profile.chipLabel, "", "Empty chip label should be preserved for icon-only chips")
+				V:Assert(profile.iconOnlyChip == true, "Icon-only chips should preserve their colored background on request")
 				V:AssertEqual(
 					profile.icon,
 					"Interface\\Icons\\INV_Misc_QuestionMark",
@@ -4747,6 +4860,12 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(profile.textColor.b, 0.35, "Chip font color should retain its blue channel")
 				V:AssertEqual(profile.textColor.a, 0.9, "Chip font color should retain alpha")
 				local otherTagId = FriendTags:CreateCustomTag("Other Team")
+				local reservedTagId, reservedReason = FriendTags:CreateCustomTag(BFL.L.FRIEND_TAGS_BLIZZARD_PVP or "PvP")
+				V:AssertNil(reservedTagId, "Built-in tag names should be reserved for built-in tags")
+				V:AssertEqual(reservedReason, "reservedName", "Built-in name collisions should return a useful reason")
+				local renamedToBuiltIn, renameReason = FriendTags:RenameCustomTag(otherTagId, BFL.L.FRIEND_TAGS_BLIZZARD_DUNGEONS or "Dungeons")
+				V:Assert(not renamedToBuiltIn, "Custom tags should not be renamed to built-in tag names")
+				V:AssertEqual(renameReason, "reservedName", "Rename collisions should return the reserved-name reason")
 				local otherProfile = FriendTags:GetChipProfile(otherTagId)
 				V:AssertEqual(otherProfile.textColor.r, 1, "A chip font color must not leak to another tag")
 				V:AssertEqual(otherProfile.textColor.g, 1, "Other tags should retain their own default font color")
@@ -8327,6 +8446,110 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("integration", "FriendLevelDiagnostics_ClassifiesLevelSources", {
+		description = "The internal level diagnostic separates upstream zero values from accessor and BFL normalization mismatches",
+		action = function(V)
+			local Diagnostics = BFL:GetModule("FriendLevelDiagnostics")
+			V:AssertNotNil(Diagnostics, "Friend level diagnostics should be loaded")
+			V:AssertEqual(SLASH_BFLLEVELDIAG1, "/bfllvldiag", "The internal diagnostic should use its standalone slash command")
+			V:Assert(type(SlashCmdList.BFLLEVELDIAG) == "function", "The internal diagnostic slash handler should be registered")
+
+			local rawZero = {
+				gameAccountID = 41,
+				clientProgram = "WoW",
+				isOnline = true,
+				characterLevel = 0,
+			}
+			local _, apiVerdict = Diagnostics:AnalyzeRecord({
+				kind = "bnet",
+				focused = rawZero,
+				bflFriend = {
+					connected = true,
+					level = 0,
+					gameAccountInfo = rawZero,
+				},
+				gameAccounts = {
+					{ index = 1, raw = rawZero, byID = { characterLevel = 0 } },
+				},
+			})
+			V:AssertEqual(apiVerdict, "API_REPORTED_NONPOSITIVE_LEVEL", "Consensus zero values should be attributed to the API")
+
+			local _, accessorVerdict = Diagnostics:AnalyzeRecord({
+				kind = "bnet",
+				focused = rawZero,
+				gameAccounts = {
+					{ index = 1, raw = rawZero, byID = { characterLevel = 70 } },
+				},
+			})
+			V:AssertEqual(accessorVerdict, "API_ACCESSOR_MISMATCH", "A positive alternate accessor should expose an API inconsistency")
+
+			local rawPositive = {
+				gameAccountID = 42,
+				clientProgram = "WoW",
+				isOnline = true,
+				characterLevel = 70,
+			}
+			local _, bflVerdict = Diagnostics:AnalyzeRecord({
+				kind = "bnet",
+				focused = rawPositive,
+				bflFriend = {
+					connected = true,
+					level = 0,
+					gameAccountInfo = rawPositive,
+				},
+				gameAccounts = {
+					{ index = 1, raw = rawPositive },
+				},
+			})
+			V:AssertEqual(bflVerdict, "BFL_NORMALIZATION_MISMATCH", "A positive selected API level should expose a BFL mismatch")
+		end,
+	})
+
+	TS:RegisterTest("integration", "Friends_DefaultInfoIgnoresNonpositiveApiLevel", {
+		description = "The default friend info formatter treats API level zero as unavailable and preserves useful presence text",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			V:AssertNotNil(FriendsList, "FriendsList module should exist")
+
+			local settingsCache = FriendsList.settingsCache
+			local originalPreset = settingsCache.infoFormatPreset
+			local originalHideMaxLevel = settingsCache.hideMaxLevel
+			local originalColorLevel = settingsCache.colorLevelByDifficulty
+			local ok, err = pcall(function()
+				settingsCache.infoFormatPreset = "default"
+				settingsCache.hideMaxLevel = false
+				settingsCache.colorLevelByDifficulty = false
+
+				local friend = {
+					type = "bnet",
+					connected = true,
+					level = 0,
+					areaName = "Venomfall Deeps",
+					gameName = "World of Warcraft",
+					numGameAccounts = 1,
+				}
+				V:AssertEqual(
+					FriendsList:FormatInfoLine(friend),
+					"Venomfall Deeps",
+					"A zero API level should fall back to the available zone"
+				)
+
+				friend.areaName = ""
+				V:AssertEqual(
+					FriendsList:FormatInfoLine(friend),
+					"World of Warcraft",
+					"A zero API level without a zone should fall back to the game name"
+				)
+			end)
+			settingsCache.infoFormatPreset = originalPreset
+			settingsCache.hideMaxLevel = originalHideMaxLevel
+			settingsCache.colorLevelByDifficulty = originalColorLevel
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("integration", "Friends_NameMeasurement_ResetsAfterCompactText", {
 		description = "Friend-name measurement forgets a wrapped Compact label before restoring the normal layout",
 		action = function(V)
@@ -10858,6 +11081,35 @@ local function RegisterBuiltInTests()
 			DB:SetNickname(testUID, nil)
 			local cleared = DB:GetNickname(testUID)
 			V:Assert(cleared == nil, "Nickname should be nil after clearing")
+		end,
+	})
+
+	TS:RegisterTest("bugs", "CustomNames_NumericBattleTag_DoesNotResync", {
+		description = "Known BattleTags must not be rewritten when CustomNames cannot read their stored alias",
+		action = function(V)
+			local DB = BFL:GetModule("DB")
+			local lookupKey = "Example321#2785"
+			local fakeLib = {
+				Get = function(name)
+					return name
+				end,
+				IsInBnetDatabase = function(name)
+					return name == lookupKey
+				end,
+			}
+
+			V:Assert(
+				DB:ShouldPushNicknameToCustomNames(fakeLib, lookupKey) == false,
+				"Known BattleTag aliases must not be pushed again"
+			)
+			V:Assert(
+				DB:ShouldPushNicknameToCustomNames(fakeLib, "New321#1234") == true,
+				"Unknown BattleTag aliases should still be imported"
+			)
+			V:Assert(
+				DB:ShouldPushNicknameToCustomNames(fakeLib, "NewFriend-TestRealm") == true,
+				"Missing character aliases should still be imported"
+			)
 		end,
 	})
 
@@ -14323,7 +14575,7 @@ end
 
 function TestSuite:RegisterLateUITests()
 	self:RegisterTest("integration", "Friends_CompactRowHeight_UsesVisibleContent", {
-		description = "Compact friend cards keep the shared 24px baseline and grow only when their visible name wraps",
+		description = "Compact friend cards grow for visible content while keeping controls in a stable top lane",
 		action = function(V)
 			local FriendsList = BFL:GetModule("FriendsList")
 			if not FriendsList or not FriendsList.CalculateFriendRowHeightForLayout then
@@ -14362,30 +14614,53 @@ function TestSuite:RegisterLateUITests()
 			V:AssertEqual(normal, 40, "a normal Modern card should retain room for its full-size action control")
 			V:AssertEqual(actionAlignedTags, 58, "action-aligned chips may use otherwise empty minimum-height space")
 			V:AssertEqual(fullWidthTags, 65, "separate chips should be added below the complete base friend card")
+			local statusSize, gameIconSize, actionWidth, actionHeight = FriendsList:GetFriendControlSizesForLayout(
+				24,
+				true
+			)
+			V:AssertEqual(statusSize, 14, "Compact status icons should remain clearly visible in the 24px lane")
+			V:AssertEqual(gameIconSize, 19, "Compact Modern game icons should use the shared control geometry")
+			V:AssertEqual(actionWidth, 22, "Compact Modern Invite buttons should be square")
+			V:AssertEqual(actionHeight, 22, "Compact Modern Invite buttons should fit the stable control lane")
 			V:AssertEqual(
-				FriendsList:GetFriendControlTopOffsetForLayout(65, 18, 14, false),
-				-23,
-				"action-aligned controls should continue centering on the complete row"
+				FriendsList:GetFriendTagRowRightInsetForLayout(24, true),
+				55,
+				"Compact tag rows should reserve only the actual Modern controls plus a four-pixel gap"
 			)
 			V:AssertEqual(
-				FriendsList:GetFriendControlTopOffsetForLayout(40, 18, 14, true),
-				-1,
-				"full-width layout controls should align to the friend-name FontString"
+				FriendsList:GetFriendControlTopOffsetForLayout(24, 11, 28, false),
+				-6,
+				"Compact status controls should center in the stable 24px top lane"
+			)
+			V:AssertEqual(
+				FriendsList:GetFriendControlTopOffsetForLayout(24, 11, 28, true),
+				-6,
+				"Wrapped names and full-width tags should not move Compact status controls"
 			)
 			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 			if FriendsUI and FriendsUI.GetFriendCardControlOffsets then
-				local actionOffset, gameIconOffset = FriendsUI:GetFriendCardControlOffsets(40, 34, 20, 14, true)
-				V:AssertEqual(actionOffset, 0, "Full-width Modern Invite should be clamped to the name-content block")
-				V:AssertEqual(gameIconOffset, -1, "Full-width Modern game icon should center on the name FontString")
-				local centeredActionOffset, centeredGameIconOffset = FriendsUI:GetFriendCardControlOffsets(
-					65,
-					34,
-					20,
-					14,
-					false
+				V:AssertEqual(
+					FriendsUI:GetFriendCardActionIconSize(22),
+					18,
+					"Compact Invite artwork should retain a two-pixel inset inside the button"
 				)
-				V:AssertEqual(centeredActionOffset, 0, "Normal Modern Invite should retain center anchoring")
-				V:AssertEqual(centeredGameIconOffset, 1, "Normal Modern game icon should retain its established offset")
+				V:AssertEqual(
+					FriendsUI:GetFriendCardActionIconSize(34),
+					24,
+					"Normal Invite artwork should retain its native 24px cap"
+				)
+				local actionOffset, gameIconOffset = FriendsUI:GetFriendCardControlOffsets(24, 22, 19, 28, false)
+				V:AssertEqual(actionOffset, -1, "Compact Modern Invite should fit its 24px control lane")
+				V:AssertEqual(gameIconOffset, -2, "Compact Modern game icon should fit the same control lane")
+				local fullActionOffset, fullGameIconOffset = FriendsUI:GetFriendCardControlOffsets(
+					24,
+					22,
+					19,
+					28,
+					true
+				)
+				V:AssertEqual(fullActionOffset, actionOffset, "Tag layout should not move the Modern Invite control")
+				V:AssertEqual(fullGameIconOffset, gameIconOffset, "Tag layout should not move the Modern game icon")
 			end
 		end,
 	})
@@ -14401,7 +14676,7 @@ function TestSuite:RegisterLateUITests()
 	})
 
 	self:RegisterTest("ui", "FriendTags_RowChipsAreVisualOnly", {
-		description = "Friend tag row chips should provide nine tag slots plus overflow with mask-free clickthrough pills",
+		description = "Friend tag row chips should provide 20 tag slots plus overflow with mask-free clickthrough pills",
 		action = function(V)
 			local TagChips = BFL:GetModule("TagChips")
 			V:AssertNotNil(TagChips, "TagChips module should exist")
@@ -14410,7 +14685,7 @@ function TestSuite:RegisterLateUITests()
 			local row = TagChips:EnsureRow(owner)
 			local chip = row and row.chips and row.chips[1]
 			V:AssertNotNil(chip, "Tag chip should be created")
-			V:AssertEqual(#row.chips, 10, "Tag rows should provide nine configured chips plus one overflow chip")
+			V:AssertEqual(#row.chips, 21, "Tag rows should provide 20 configured chips plus one overflow chip")
 			V:Assert(row:IsMouseEnabled() == false, "Tag row should be clickthrough")
 			V:Assert(chip:IsMouseEnabled() == false, "Tag chip should be clickthrough")
 			V:AssertNil(chip:GetScript("OnEnter"), "Tag chip should not install a tooltip OnEnter handler")
@@ -14432,6 +14707,44 @@ function TestSuite:RegisterLateUITests()
 			V:Assert(not chip.pillBackground.left:IsShown(), "Bare icons should hide the chip fill")
 			V:Assert(not chip.label:IsShown(), "Bare icons should hide the chip label")
 			V:Assert(chip.icon:IsShown(), "Bare icons should remain visible")
+
+			TagChips:UpdateStandaloneChip(chip, {
+				iconType = "texture",
+				iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+				texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+				iconOnlyChip = true,
+			}, "", 180)
+			V:Assert(chip.bareIcon == false, "Colored icon-only tags should retain normal chip rendering")
+			V:Assert(chip.pillBorder.left:IsShown(), "Colored icon-only tags should show the chip border")
+			V:Assert(chip.pillBackground.left:IsShown(), "Colored icon-only tags should show the chip fill")
+			V:Assert(not chip.label:IsShown(), "Colored icon-only tags should not retain an empty label region")
+			local point, _, relativePoint, xOffset, yOffset = chip.icon:GetPoint(1)
+			V:AssertEqual(point, "CENTER", "Colored icon-only tags should center their icon in the chip")
+			V:AssertEqual(relativePoint, "CENTER", "Colored icon-only tags should use the chip center as their anchor")
+			V:AssertEqual(xOffset, 0, "Colored icon-only tags should have no horizontal icon offset")
+			V:AssertEqual(yOffset, 0, "Colored icon-only tags should have no vertical icon offset")
+
+			TagChips:UpdateStandaloneChip(chip, {
+				iconType = "texture",
+				iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+				texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+				iconOnlyChip = true,
+				chipIconOffsetX = 0.5,
+			}, "", 180)
+			point, _, relativePoint, xOffset, yOffset = chip.icon:GetPoint(1)
+			V:AssertEqual(point, "CENTER", "Default role icons should keep center anchoring")
+			V:AssertEqual(relativePoint, "CENTER", "Default role icons should remain relative to the chip center")
+			V:AssertEqual(xOffset, 0.5, "Default role icons with a chip background should receive optical centering")
+			V:AssertEqual(yOffset, 0, "Default role icon correction should remain horizontal only")
+
+			TagChips:UpdateStandaloneChip(chip, {
+				iconType = "texture",
+				iconValue = "Interface\\Icons\\INV_Misc_QuestionMark",
+				texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+				chipIconOffsetX = 0.5,
+			}, "", 180)
+			_, _, _, xOffset = chip.icon:GetPoint(1)
+			V:AssertEqual(xOffset, 0, "Bare role icons should not receive the background-specific correction")
 
 			TagChips:UpdateStandaloneChip(chip, {
 				iconType = "texture",

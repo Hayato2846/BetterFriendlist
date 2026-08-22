@@ -407,6 +407,8 @@ local MODERN_ROW_MINIMUM = 40 -- 34px Modern action button plus the shared verti
 local FRIEND_TEXT_BASE_RIGHT_PADDING = 25
 local FRIEND_TEXT_RIGHT_ELEMENT_GAP = 24
 local FRIEND_GAME_ICON_RIGHT_OFFSET = 30
+local FRIEND_TAG_CONTROL_GAP = 4
+local MODERN_GAME_ICON_ACTION_OFFSET = 10
 
 local function GetMultiAccountLineHeight(infoSize)
 	local fontSize = infoSize or BASE_FONT_SIZE
@@ -470,21 +472,38 @@ function FriendsList:CalculateFriendRowHeight(
 	)
 end
 
-local function GetFriendControlTopOffset(rowHeight, controlHeight, nameContentHeight, fullWidthTagRows)
-	rowHeight = math.max(1, tonumber(rowHeight) or 1)
+local function GetFriendControlTopOffset(controlLaneHeight, controlHeight)
+	controlLaneHeight = math.max(1, tonumber(controlLaneHeight) or 1)
 	controlHeight = math.max(1, tonumber(controlHeight) or 1)
-	if not fullWidthTagRows then
-		return -math.floor((rowHeight - controlHeight) / 2)
-	end
+	return -math.floor(math.max(0, controlLaneHeight - controlHeight) / 2)
+end
 
-	-- Full-width chips have their own block below the friend content. Keep the
-	-- controls in that upper block and center them on the Name FontString where
-	-- their size permits, clamping larger controls to the card boundary.
-	local resolvedNameHeight = math.max(1, tonumber(nameContentHeight) or 1)
-	local targetTop = FRIEND_ROW_VERTICAL_PADDING + ((resolvedNameHeight - controlHeight) / 2)
-	local maximumTop = math.max(0, rowHeight - controlHeight)
-	local clampedTop = math.max(0, math.min(maximumTop, targetTop))
-	return -math.floor(clampedTop + 0.5)
+local function GetFriendControlSizes(controlLaneHeight, isModern)
+	controlLaneHeight = math.max(1, tonumber(controlLaneHeight) or 1)
+	-- Compact rows need a clearly legible status marker. Cap the normal layout
+	-- at Blizzard's 16px size while retaining a 14px marker in the 24px lane.
+	local statusSize = math.min(controlLaneHeight, math.min(16, math.max(12, math.floor(controlLaneHeight * 0.60))))
+	local gameIconSize = math.floor(controlLaneHeight * 0.82)
+	local actionHeight = math.floor(controlLaneHeight * 0.94)
+	local actionWidth = math.floor(actionHeight * 0.75)
+	if isModern then
+		gameIconSize = math.min(20, gameIconSize)
+		actionHeight = math.min(34, actionHeight)
+		actionWidth = actionHeight
+	end
+	return statusSize, gameIconSize, actionWidth, actionHeight
+end
+
+local function GetFriendTagRowRightInset(controlLaneHeight, isModern)
+	local _, gameIconSize, actionWidth = GetFriendControlSizes(controlLaneHeight, isModern)
+	if isModern then
+		-- Modern cards place the game icon actionSize + 10px from the right.
+		-- Reserve exactly that geometry plus a small chip/control gap.
+		return actionWidth + MODERN_GAME_ICON_ACTION_OFFSET + gameIconSize + FRIEND_TAG_CONTROL_GAP
+	end
+	-- Legacy cards anchor the game icon 30px from the right edge. It is the
+	-- left-most right-side control and therefore defines the usable chip width.
+	return math.max(actionWidth, FRIEND_GAME_ICON_RIGHT_OFFSET + gameIconSize) + FRIEND_TAG_CONTROL_GAP
 end
 
 local function GetFavoriteIconLayout(fontSize, style)
@@ -3507,6 +3526,7 @@ function FriendsList:FormatInfoLine(friend)
 	-- Determine raw data values
 	local isBNet = (friend.type == "bnet")
 	local level = friend.level
+	local hasValidLevel = type(level) == "number" and level > 0
 	local zone = isBNet and friend.areaName or friend.area or ""
 	local className = friend.className or ""
 	local gameName = friend.gameName or ""
@@ -3533,7 +3553,7 @@ function FriendsList:FormatInfoLine(friend)
 
 	-- Level text (respects hideMaxLevel and colorLevelByDifficulty)
 	local levelText = ""
-	if level and level > 0 then
+	if hasValidLevel then
 		if hideMaxLevel and level == maxLevel then
 			levelText = ""
 		else
@@ -3554,13 +3574,13 @@ function FriendsList:FormatInfoLine(friend)
 		if friend.connected then
 			if isBNet then
 				-- BNet friend
-				if level and zone and zone ~= "" then
+				if hasValidLevel and zone and zone ~= "" then
 					if hideMaxLevel and level == maxLevel then
 						return AppendMultiAccountInfo(zone)
 					else
 						return AppendMultiAccountInfo(FormatLevelLine(level, levelText) .. ", " .. zone)
 					end
-				elseif level then
+				elseif hasValidLevel then
 					if hideMaxLevel and level == maxLevel then
 						return AppendMultiAccountInfo(L.FRIEND_MAX_LEVEL or "")
 					else
@@ -3575,13 +3595,13 @@ function FriendsList:FormatInfoLine(friend)
 				end
 			else
 				-- WoW friend
-				if level and zone and zone ~= "" then
+				if hasValidLevel and zone and zone ~= "" then
 					if hideMaxLevel and level == maxLevel then
 						return zone
 					else
 						return FormatLevelLine(level, levelText) .. ", " .. zone
 					end
-				elseif level then
+				elseif hasValidLevel then
 					if hideMaxLevel and level == maxLevel then
 						return L.FRIEND_MAX_LEVEL or ""
 					else
@@ -8761,7 +8781,9 @@ local function SetFriendStatusVisual(button, statusTexture)
 		return
 	end
 	if modern and BFL.SetTextureOrAtlas then
-		BFL.SetTextureOrAtlas(button.status, visual, statusTexture, true)
+		-- The atlas entries have different native dimensions. Preserve the row's
+		-- explicit square so every status remains the same size and alignment.
+		BFL.SetTextureOrAtlas(button.status, visual, statusTexture, false)
 	else
 		button.status:SetTexture(statusTexture)
 	end
@@ -8875,20 +8897,17 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	local fullWidthTagRows = tagChipRowData
 		and tagChipRowData.canRender == true
 		and tagChipRowData.fullWidthTagRows == true
-	local tagExtraHeight = fullWidthTagRows and (tonumber(tagChipRowData.height) or 0) or 0
-	local controlRowHeight = fullWidthTagRows and math.max(1, rowHeight - tagExtraHeight) or rowHeight
 
-	-- Compact mode: actual row height may be smaller than the 2-line fallback used by
-	-- CalculateFriendRowHeight. Clamp icon base so icons never exceed the real row.
-	if iconBaseRowHeight > controlRowHeight then
-		iconBaseRowHeight = controlRowHeight
-	end
+	-- Controls belong to a stable lane at the top of the row. Wrapped names and
+	-- tag lines may grow the card downward, but must never resize or recenter the
+	-- status, game, and invite controls from one friend to the next.
+	local controlLaneHeight = math.max(1, math.min(iconBaseRowHeight, rowHeight))
 
 	-- OPTIMIZATION: Layout Caching (Phase 9.9)
 	-- Update layout if CompactMode changed OR font version changed OR row height changed
 	local infoDisabled = self.settingsCache.infoDisabled or false
 	local nameContentHeight = elementData and elementData._bflNameContentHeight or (nameSize + 2)
-	button.bflControlRowHeight = controlRowHeight
+	button.bflControlRowHeight = controlLaneHeight
 	button.bflNameContentHeight = nameContentHeight
 	local showFavoriteIcon = friend.type == "bnet"
 		and friend.isFavorite
@@ -8970,50 +8989,42 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			button.favoriteIcon:Hide()
 		end
 
-		-- All icons scale proportionally to row height (no artificial min/max limits)
-		-- Status icon: 16px at 34px row height = 47%
-		local statusSize = math.floor(iconBaseRowHeight * 0.47)
+		-- All controls derive from the same stable top lane. Their size therefore
+		-- remains identical across one-line, wrapped, and tag-expanded rows.
+		local statusSize, gameIconSize, actionWidth, actionHeight = GetFriendControlSizes(
+			controlLaneHeight,
+			modern
+		)
 		local statusYOffset = GetFriendControlTopOffset(
-			controlRowHeight,
-			statusSize,
-			nameContentHeight,
-			fullWidthTagRows
+			controlLaneHeight,
+			statusSize
 		)
 		button.status:SetSize(statusSize, statusSize)
 		button.status:ClearAllPoints()
 		button.status:SetPoint("TOPLEFT", 4, statusYOffset)
 
-		-- Game icon: 28px at 34px row height = 82%
-		local gameIconSize = math.floor(iconBaseRowHeight * 0.82)
 		local gameIconYOffset = GetFriendControlTopOffset(
-			controlRowHeight,
-			gameIconSize,
-			nameContentHeight,
-			fullWidthTagRows
+			controlLaneHeight,
+			gameIconSize
 		)
 		button.gameIcon:SetSize(gameIconSize, gameIconSize)
 		button.gameIcon:ClearAllPoints()
 		button.gameIcon:SetPoint("TOPRIGHT", -30, gameIconYOffset)
 
-		-- TravelPass button: 32px height at 34px row height = 94%, aspect ratio 3:4
 		if button.travelPassButton then
-			local tpHeight = math.floor(iconBaseRowHeight * 0.94)
-			local tpWidth = math.floor(tpHeight * 0.75)
 			local tpYOffset = GetFriendControlTopOffset(
-				controlRowHeight,
-				tpHeight,
-				nameContentHeight,
-				fullWidthTagRows
+				controlLaneHeight,
+				actionHeight
 			)
-			button.travelPassButton:SetSize(tpWidth, tpHeight)
+			button.travelPassButton:SetSize(actionWidth, actionHeight)
 			button.travelPassButton:ClearAllPoints()
 			button.travelPassButton:SetPoint("TOPRIGHT", 0, tpYOffset)
 
 			-- Scale textures
-			button.travelPassButton:GetNormalTexture():SetSize(tpWidth, tpHeight)
-			button.travelPassButton:GetPushedTexture():SetSize(tpWidth, tpHeight)
-			button.travelPassButton:GetDisabledTexture():SetSize(tpWidth, tpHeight)
-			button.travelPassButton:GetHighlightTexture():SetSize(tpWidth, tpHeight)
+			button.travelPassButton:GetNormalTexture():SetSize(actionWidth, actionHeight)
+			button.travelPassButton:GetPushedTexture():SetSize(actionWidth, actionHeight)
+			button.travelPassButton:GetDisabledTexture():SetSize(actionWidth, actionHeight)
+			button.travelPassButton:GetHighlightTexture():SetSize(actionWidth, actionHeight)
 		end
 	end
 
@@ -10099,6 +10110,34 @@ end
 
 function FriendsList:GetFriendControlTopOffsetForLayout(rowHeight, controlHeight, nameContentHeight, fullWidthTagRows)
 	return GetFriendControlTopOffset(rowHeight, controlHeight, nameContentHeight, fullWidthTagRows)
+end
+
+function FriendsList:GetFriendControlSizesForLayout(controlLaneHeight, isModern)
+	return GetFriendControlSizes(controlLaneHeight, isModern)
+end
+
+function FriendsList:GetFriendTagRowRightInsetForLayout(controlLaneHeight, isModern)
+	return GetFriendTagRowRightInset(controlLaneHeight, isModern)
+end
+
+function FriendsList:GetFriendTagRowRightInset()
+	local settings = self.settingsCache or EMPTY_TABLE
+	local isCompactMode = settings.compactMode == true
+	local nameSize = self.fontCache and self.fontCache.nameSize or BASE_FONT_SIZE
+	local infoSize = self.fontCache and self.fontCache.infoSize or BASE_FONT_SIZE
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
+	local minimumHeight = isCompactMode and COMPACT_ROW_MINIMUM or (modern and MODERN_ROW_MINIMUM or 34)
+	local controlLaneHeight = CalculateFriendRowHeight(
+		isCompactMode,
+		nameSize,
+		infoSize,
+		settings.infoDisabled == true,
+		false,
+		0,
+		minimumHeight
+	)
+	return GetFriendTagRowRightInset(controlLaneHeight, modern)
 end
 
 -- Expose Drag Handlers for other modules (Broker)

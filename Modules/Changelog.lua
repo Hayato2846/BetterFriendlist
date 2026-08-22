@@ -34,6 +34,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.5]        - 2026-08-22
+
+### Added
+- **Friend Tag Actions** - Friend right-click menus can now select or clear all built-in and custom tags at once.
+- **Icon-Only Tags** - Tags that only show an icon can optionally keep their colored chip background.
+- **Dynamic Tag Groups** - A new option hides all tag chips inside dynamic tag groups. The existing option to hide only the group's own tag remains available.
+
+### Improved
+- **Friend Tag Layout** - Friend rows can now show up to 20 tags and use the available row width before wrapping.
+- **Friend Tag Settings** - The visibility options now explain where each tag is shown: friend rows, tooltips, or Data Broker.
+
+### Fixed
+- **Friend Tag Editor** - Reordering, resetting, or deleting tags now updates friend rows immediately. After deleting a tag, another valid tag stays selected.
+- **Friend Tag Names** - Custom tags can no longer use the name of a built-in tag.
+- **Compact Friend Rows** - Status, game, and Invite icons now stay aligned when rows have different heights. Status markers remain readable and Invite artwork stays inside its button.
+- **Icon-Only Tags** - Icons now stay centered inside colored chips, including the default Tank, Healer, and DPS icons.
+- **Battle.net Levels** - Invalid level 0 values from Battle.net are no longer shown as a real character level. Available zone or game information is shown instead.
+- **Custom Names** - Friends with digits in their BattleTag no longer trigger repeated rename messages after logging in or reloading the UI.
+
+---
+
 ## [2.8.4]        - 2026-08-22
 
 ### Improved

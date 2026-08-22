@@ -57,6 +57,7 @@ local DEFAULT_SETTINGS = {
 	chipsPerLine = 3,
 	fullWidthTagRows = false,
 	hideDynamicGroupTagChip = false,
+	hideAllDynamicGroupTagChips = false,
 	chipIconSize = 11,
 	chipFont = "Friz Quadrata TT",
 	chipFontSize = 10,
@@ -237,6 +238,7 @@ local ROLE_ICON_KEY_BY_TAG_ID = {
 	["blizzard:healer"] = "healer",
 	["blizzard:tank"] = "tank",
 }
+local DEFAULT_ROLE_CHIP_ICON_OFFSET_X = 0.5
 
 local function T(key, fallback)
 	local L = BFL and BFL.L
@@ -839,6 +841,32 @@ local function GetLocalizedTagName(def)
 		end
 	end
 	return T(def.labelKey, def.name or def.fallback or def.id)
+end
+
+local function FindConflictingTagName(self, name, ignoredTagId)
+	name = NormalizeTagName(name)
+	if not name then
+		return nil
+	end
+	local normalizedName = name:lower()
+	local function Matches(value)
+		value = NormalizeTagName(value)
+		return value and value:lower() == normalizedName
+	end
+
+	for _, def in ipairs(BLIZZARD_TAGS) do
+		if def.id ~= ignoredTagId and (Matches(GetLocalizedTagName(def)) or Matches(def.fallback)) then
+			return def.id, SOURCE_BLIZZARD
+		end
+	end
+
+	local db = self:NormalizeDB()
+	for id, def in pairs(db.customFriendTags or {}) do
+		if id ~= ignoredTagId and type(def) == "table" and Matches(def.name) then
+			return id, SOURCE_CUSTOM
+		end
+	end
+	return nil
 end
 
 local function GetRuntimeCache(self)
@@ -1693,6 +1721,8 @@ function FriendTags:GetDefaultChipProfile(tag)
 		texture = defaultIcon.texture,
 		texCoord = CopyTexCoord(defaultIcon.texCoord),
 		iconZoom = NormalizeIconZoom(defaultIcon.iconZoom),
+		chipIconOffsetX = ROLE_ICON_KEY_BY_TAG_ID[tag.id] and DEFAULT_ROLE_CHIP_ICON_OFFSET_X or nil,
+		iconOnlyChip = false,
 		color = CopyColor(tag.color, tag.source == SOURCE_BLIZZARD and { r = 0.50, g = 0.78, b = 1.00, a = 1 } or { r = 0.64, g = 0.86, b = 0.56, a = 1 }),
 		textColor = { r = 1, g = 1, b = 1, a = 1 },
 		visible = true,
@@ -1746,6 +1776,9 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 		if profileIconZoom ~= defaultIconZoom then
 			pruned.iconZoom = profileIconZoom
 		end
+	end
+	if profile.iconOnlyChip == true then
+		pruned.iconOnlyChip = true
 	end
 	if profile.visible == false then
 		pruned.visible = false
@@ -1809,6 +1842,13 @@ function FriendTags:GetChipProfile(tag)
 		texture = nil
 		texCoord = nil
 	end
+	local usesDefaultIcon = iconType == defaultProfile.iconType
+		and iconValue == defaultProfile.iconValue
+		and legacyIcon == defaultProfile.icon
+		and atlas == defaultProfile.atlas
+		and fallbackAtlas == defaultProfile.fallbackAtlas
+		and texture == defaultProfile.texture
+		and SameTexCoord(texCoord, defaultProfile.texCoord)
 
 	local profile = {
 		chipLabel = override.chipLabel,
@@ -1821,6 +1861,8 @@ function FriendTags:GetChipProfile(tag)
 		texture = texture,
 		texCoord = texCoord,
 		iconZoom = iconZoom,
+		chipIconOffsetX = usesDefaultIcon and defaultProfile.chipIconOffsetX or nil,
+		iconOnlyChip = override.iconOnlyChip == true,
 		visible = NormalizeBoolean(override.visible, defaultProfile.visible),
 		rowVisible = NormalizeBoolean(override.rowVisible, defaultProfile.rowVisible),
 		tooltipVisible = NormalizeBoolean(override.tooltipVisible, defaultProfile.tooltipVisible),
@@ -1891,6 +1933,9 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 	end
 	if profilePatch.iconZoom ~= nil then
 		profile.iconZoom = NormalizeIconZoom(profilePatch.iconZoom)
+	end
+	if profilePatch.iconOnlyChip ~= nil then
+		profile.iconOnlyChip = profilePatch.iconOnlyChip == true
 	end
 	if profilePatch.visible ~= nil then
 		profile.visible = profilePatch.visible == true
@@ -2261,13 +2306,15 @@ function FriendTags:CreateCustomTag(name, refreshCallback)
 		return nil, "invalidName"
 	end
 
-	local db = self:NormalizeDB()
-	local normalizedName = name:lower()
-	for id, def in pairs(db.customFriendTags) do
-		if type(def) == "table" and type(def.name) == "string" and def.name:lower() == normalizedName then
-			return id, "exists"
+	local conflictingId, source = FindConflictingTagName(self, name)
+	if conflictingId then
+		if source == SOURCE_CUSTOM then
+			return conflictingId, "exists"
 		end
+		return nil, "reservedName"
 	end
+
+	local db = self:NormalizeDB()
 
 	local id = CUSTOM_PREFIX .. tostring(db.nextCustomFriendTagID)
 	db.nextCustomFriendTagID = db.nextCustomFriendTagID + 1
@@ -2289,6 +2336,19 @@ function FriendTags:CreateCustomTag(name, refreshCallback)
 	return id
 end
 
+function FriendTags:ShowTagNameError(reason)
+	if reason ~= "reservedName" then
+		return false
+	end
+	local message = T("FRIEND_TAGS_NAME_RESERVED_ERROR", "That name is already used by a built-in tag.")
+	if UIErrorsFrame and UIErrorsFrame.AddMessage then
+		UIErrorsFrame:AddMessage(message, 1, 0.2, 0.2, 1)
+	elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		DEFAULT_CHAT_FRAME:AddMessage(message)
+	end
+	return true
+end
+
 function FriendTags:AddCustomTag(name, refreshCallback)
 	return self:CreateCustomTag(name, refreshCallback)
 end
@@ -2301,11 +2361,9 @@ function FriendTags:RenameCustomTag(tagId, name, refreshCallback)
 		return false, "invalidTag"
 	end
 
-	local normalizedName = name:lower()
-	for id, otherDef in pairs(db.customFriendTags) do
-		if id ~= tagId and type(otherDef) == "table" and type(otherDef.name) == "string" and otherDef.name:lower() == normalizedName then
-			return false, "exists"
-		end
+	local conflictingId, source = FindConflictingTagName(self, name, tagId)
+	if conflictingId then
+		return false, source == SOURCE_BLIZZARD and "reservedName" or "exists"
 	end
 
 	def.name = name
@@ -2610,6 +2668,26 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 		return {}
 	end
 	local items = {}
+	local hasBlizzardTags = friend.type == "bnet" and (featureEnabled or nativeBlizzardTagsEnabled)
+	local blizzardTags = hasBlizzardTags and self:GetBlizzardTagDefinitions() or EMPTY_TABLE
+	local customTags = featureEnabled and self:GetCustomTagDefinitions() or EMPTY_TABLE
+	local workingBlizzardSet = hasBlizzardTags
+		and CopySet(self:GetBlizzardTagIdSetForFriend(friend, explicitUID))
+		or {}
+	local workingCustomSet = featureEnabled
+		and CopySet(self:GetCustomTagIdSetForFriend(friend, explicitUID))
+		or {}
+
+	local function ReplaceWorkingSet(target, definitions, selected)
+		for tagId in pairs(target) do
+			target[tagId] = nil
+		end
+		if selected then
+			for _, def in ipairs(definitions) do
+				target[def.id] = true
+			end
+		end
+	end
 
 	if options.showHeader then
 		items[#items + 1] = {
@@ -2618,8 +2696,38 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 		}
 	end
 
-	if friend.type == "bnet" and (featureEnabled or nativeBlizzardTagsEnabled) then
-		local workingBlizzardSet = CopySet(self:GetBlizzardTagIdSetForFriend(friend, explicitUID))
+	local function ApplyBulkSelection(selected)
+		local refreshViaCustomTags = featureEnabled == true
+		if hasBlizzardTags then
+			ReplaceWorkingSet(workingBlizzardSet, blizzardTags, selected)
+			self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
+				refreshCallback = refreshCallback,
+				userInitiated = true,
+				suppressRefresh = refreshViaCustomTags,
+			})
+		end
+		if featureEnabled then
+			ReplaceWorkingSet(workingCustomSet, customTags, selected)
+			self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID)
+		end
+		return MenuResponse and MenuResponse.Refresh
+	end
+
+	items[#items + 1] = {
+		text = T("FRIEND_TAGS_SELECT_ALL", "Select All"),
+		func = function()
+			return ApplyBulkSelection(true)
+		end,
+	}
+	items[#items + 1] = {
+		text = T("FRIEND_TAGS_CLEAR_ALL", "Clear All"),
+		func = function()
+			return ApplyBulkSelection(false)
+		end,
+	}
+	items[#items + 1] = { type = "divider" }
+
+	if hasBlizzardTags then
 		local function CommitBlizzardTags()
 			self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
 				refreshCallback = refreshCallback,
@@ -2643,7 +2751,7 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 
 		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_INTERESTS_SECTION", "Interests") }
 		local rolesTitleCreated = false
-		for _, def in ipairs(self:GetBlizzardTagDefinitions()) do
+		for _, def in ipairs(blizzardTags) do
 			if def.group == "roles" and not rolesTitleCreated then
 				items[#items + 1] = { type = "divider" }
 				items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_ROLES_SECTION", "Roles") }
@@ -2672,7 +2780,6 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 
 	if featureEnabled then
 		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags") }
-		local customTags = self:GetCustomTagDefinitions()
 		if #customTags > 0 then
 			for _, def in ipairs(customTags) do
 				local tagId = def.id
@@ -2681,11 +2788,11 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 					text = def.name,
 					iconProfile = self:GetChipProfile(def),
 					checked = function()
-						return self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
+						return workingCustomSet[tagId] == true
 					end,
 					func = function()
-						local selected = self:GetCustomTagIdSetForFriend(friend, explicitUID)[tagId] == true
-						self:SetCustomTagForFriend(friend, tagId, not selected, refreshCallback)
+						workingCustomSet[tagId] = not workingCustomSet[tagId] or nil
+						self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID)
 						return MenuResponse and MenuResponse.Refresh
 					end,
 				}
@@ -2797,17 +2904,21 @@ function FriendTags:Initialize()
 		end,
 		OnAccept = function(dialog, data)
 			local editBox = GetPopupEditBox(dialog)
-			local tagId = FriendTags:CreateCustomTag(editBox and editBox:GetText())
+			local tagId, reason = FriendTags:CreateCustomTag(editBox and editBox:GetText())
 			if tagId and data and data.friend then
 				FriendTags:SetCustomTagForFriend(data.friend, tagId, true, data.refreshCallback)
+			elseif not tagId then
+				FriendTags:ShowTagNameError(reason)
 			end
 		end,
 		EditBoxOnEnterPressed = function(editBox, data)
 			local dialog = editBox:GetParent()
 			local popupData = data or (dialog and dialog.data)
-			local tagId = FriendTags:CreateCustomTag(editBox:GetText())
+			local tagId, reason = FriendTags:CreateCustomTag(editBox:GetText())
 			if tagId and popupData and popupData.friend then
 				FriendTags:SetCustomTagForFriend(popupData.friend, tagId, true, popupData.refreshCallback)
+			elseif not tagId then
+				FriendTags:ShowTagNameError(reason)
 			end
 			if dialog then
 				dialog:Hide()

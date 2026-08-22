@@ -94,7 +94,7 @@ local function CreateSmallButton(parent, text, width, onClick)
 	return button
 end
 
-local function CreateCheckbox(parent, label, checked, onClick)
+local function CreateCheckbox(parent, label, checked, onClick, tooltipTitle, tooltipDesc)
 	local template = BFL.IsClassic and "InterfaceOptionsCheckButtonTemplate" or "SettingsCheckboxTemplate"
 	local check = CreateFrame("CheckButton", nil, parent, template)
 	check:SetSize(24, 24)
@@ -115,6 +115,25 @@ local function CreateCheckbox(parent, label, checked, onClick)
 	text:SetJustifyH("LEFT")
 	text:SetPoint("LEFT", check, "RIGHT", 4, 0)
 	text:SetPoint("RIGHT", parent, "RIGHT", -4, 0)
+	if tooltipTitle or tooltipDesc then
+		local function ShowTooltip(owner)
+			BFL_Tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+			BFL_Tooltip:ClearLines()
+			BFL_Tooltip:SetText(tooltipTitle or label or "", 1, 1, 1)
+			if tooltipDesc then
+				BFL_Tooltip:AddLine(tooltipDesc, 0.8, 0.8, 0.8, true)
+			end
+			BFL_Tooltip:Show()
+		end
+		local function HideTooltip()
+			BFL_Tooltip:Hide()
+		end
+		check:SetScript("OnEnter", ShowTooltip)
+		check:SetScript("OnLeave", HideTooltip)
+		parent:EnableMouse(true)
+		parent:SetScript("OnEnter", ShowTooltip)
+		parent:SetScript("OnLeave", HideTooltip)
+	end
 	return check, text
 end
 
@@ -303,20 +322,30 @@ function FriendTagEditor:Initialize()
 		OnAccept = function(dialog)
 			local editBox = GetPopupEditBox(dialog)
 			local FriendTags = GetFriendTags()
-			local tagId = FriendTags and FriendTags:CreateCustomTag(editBox and editBox:GetText(), function()
-				FriendTagEditor:Refresh()
-			end)
+			local tagId, reason
+			if FriendTags then
+				tagId, reason = FriendTags:CreateCustomTag(editBox and editBox:GetText(), function()
+					FriendTagEditor:Refresh()
+				end)
+			end
 			if tagId then
 				FriendTagEditor:Show(tagId)
+			elseif FriendTags and FriendTags.ShowTagNameError then
+				FriendTags:ShowTagNameError(reason)
 			end
 		end,
 		EditBoxOnEnterPressed = function(editBox)
 			local FriendTags = GetFriendTags()
-			local tagId = FriendTags and FriendTags:CreateCustomTag(editBox:GetText(), function()
-				FriendTagEditor:Refresh()
-			end)
+			local tagId, reason
+			if FriendTags then
+				tagId, reason = FriendTags:CreateCustomTag(editBox:GetText(), function()
+					FriendTagEditor:Refresh()
+				end)
+			end
 			if tagId then
 				FriendTagEditor:Show(tagId)
+			elseif FriendTags and FriendTags.ShowTagNameError then
+				FriendTags:ShowTagNameError(reason)
 			end
 			editBox:GetParent():Hide()
 		end,
@@ -338,7 +367,7 @@ function FriendTagEditor:Initialize()
 			if FriendTags and data and data.tagId then
 				FriendTags:DeleteCustomTag(data.tagId, function()
 					FriendTagEditor.selectedTagId = nil
-					FriendTagEditor:Refresh()
+					FriendTagEditor:RefreshAfterDefinitionChange("delete")
 				end)
 			end
 		end,
@@ -471,8 +500,21 @@ end
 
 function FriendTagEditor:Refresh()
 	local frame = self:EnsureFrame()
+	if not self:GetSelectedDefinition() then
+		local definitions = self:GetDefinitions()
+		self.selectedTagId = definitions[1] and definitions[1].id or nil
+	end
 	self:RefreshList()
 	self:RefreshEditor()
+end
+
+function FriendTagEditor:RefreshAfterDefinitionChange(reason)
+	if BFL.ScheduleFriendsListRefresh then
+		BFL:ScheduleFriendsListRefresh("friend-tag-editor-" .. tostring(reason or "change"), 0.05)
+	elseif BFL.ForceRefreshFriendsList then
+		BFL:ForceRefreshFriendsList()
+	end
+	self:Refresh()
 end
 
 function FriendTagEditor:RefreshList()
@@ -664,10 +706,10 @@ function FriendTagEditor:EndTagDrag(row)
 		FriendTags:SetTagOrder(tagIds, function()
 			if C_Timer and C_Timer.After then
 				C_Timer.After(0, function()
-					self:Refresh()
+					self:RefreshAfterDefinitionChange("order")
 				end)
 			else
-				self:Refresh()
+				self:RefreshAfterDefinitionChange("order")
 			end
 		end)
 	end
@@ -712,6 +754,7 @@ function FriendTagEditor:LoadState(def)
 		texture = profile.texture,
 		texCoord = CopyTexCoord(profile.texCoord),
 		iconZoom = NormalizeIconZoom(profile.iconZoom),
+		iconOnlyChip = profile.iconOnlyChip == true,
 		color = CopyColor(profile.color),
 		textColor = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 }),
 		visible = profile.visible ~= false,
@@ -742,6 +785,7 @@ function FriendTagEditor:RefreshEditor()
 	local frame = self:EnsureFrame()
 	local editorHost = frame.editorContent
 	ClearChildren(editorHost)
+	self.iconOnlyChipCheckbox = nil
 	local content = CreateFrame("Frame", nil, editorHost)
 	content:SetAllPoints(editorHost)
 	self.dynamicEditorContent = content
@@ -790,6 +834,12 @@ function FriendTagEditor:RefreshEditor()
 		if userInput ~= true then
 			return
 		end
+		if state.labelMode ~= "icon_only" then
+			state.iconOnlyChip = false
+			if self.iconOnlyChipCheckbox then
+				self.iconOnlyChipCheckbox:SetChecked(false)
+			end
+		end
 		self:RefreshPreview()
 		self:QueueAutoSave()
 	end)
@@ -797,6 +847,10 @@ function FriendTagEditor:RefreshEditor()
 
 	local defaultButton = CreateSmallButton(content, L("FRIEND_TAGS_EDITOR_LABEL_DEFAULT", "Default"), 100, function()
 		state.labelMode = "default"
+		state.iconOnlyChip = false
+		if self.iconOnlyChipCheckbox then
+			self.iconOnlyChipCheckbox:SetChecked(false)
+		end
 		state.labelValue = state.name ~= "" and state.name or def.name or ""
 		self.suppressEditorChanges = true
 		SetEditBoxText(self.labelInput, state.labelValue)
@@ -816,7 +870,33 @@ function FriendTagEditor:RefreshEditor()
 		self:CommitState()
 	end)
 	iconOnlyButton:SetPoint("LEFT", defaultButton, "RIGHT", 8, 0)
-	y = y - 38
+	y = y - 34
+
+	local iconOnlyChipHolder = CreateFrame("Frame", nil, content)
+	iconOnlyChipHolder:SetPoint("TOPLEFT", content, "TOPLEFT", 294, y)
+	iconOnlyChipHolder:SetSize(210, 26)
+	local iconOnlyChipCheckbox = CreateCheckbox(
+		iconOnlyChipHolder,
+		L("FRIEND_TAGS_EDITOR_ICON_ONLY_CHIP", "Keep Chip Color"),
+		state.iconOnlyChip,
+		function(checked)
+			state.iconOnlyChip = checked
+			if checked then
+				state.labelMode = "icon_only"
+				state.labelValue = ""
+				self.suppressEditorChanges = true
+				SetEditBoxText(self.labelInput, "")
+				self.suppressEditorChanges = false
+			end
+			self:RefreshPreview()
+			self:CommitState()
+		end,
+		L("FRIEND_TAGS_EDITOR_ICON_ONLY_CHIP", "Keep Chip Color"),
+		L("FRIEND_TAGS_EDITOR_ICON_ONLY_CHIP_DESC", "Keep the colored chip background when this tag uses Icon Only.")
+	)
+	iconOnlyChipCheckbox:SetPoint("LEFT", iconOnlyChipHolder, "LEFT", 0, 0)
+	self.iconOnlyChipCheckbox = iconOnlyChipCheckbox
+	y = y - 30
 
 	y = y - self:CreateIconControls(content, y)
 
@@ -899,6 +979,7 @@ function FriendTagEditor:GetPreviewChipProfile()
 	local profile = self:GetPreviewIconProfile() or { iconType = "none" }
 	profile.color = CopyColor(state.color)
 	profile.textColor = CopyColor(state.textColor, { r = 1, g = 1, b = 1, a = 1 })
+	profile.iconOnlyChip = state.iconOnlyChip == true
 	return profile
 end
 
@@ -1153,10 +1234,32 @@ function FriendTagEditor:CreateVisibilityControls(parent, y)
 	sectionLabel:SetWidth(108)
 	sectionLabel:SetText(L("FRIEND_TAGS_EDITOR_VISIBLE", "Visible"))
 	local labels = {
-		{ key = "visible", text = L("FRIEND_TAGS_EDITOR_VISIBLE", "Visible") },
-		{ key = "rowVisible", text = L("FRIEND_TAGS_EDITOR_ROW_VISIBLE", "Friend Rows") },
-		{ key = "tooltipVisible", text = L("FRIEND_TAGS_EDITOR_TOOLTIP_VISIBLE", "Tooltips") },
-		{ key = "brokerVisible", text = L("FRIEND_TAGS_EDITOR_BROKER_VISIBLE", "Broker") },
+		{
+			key = "visible",
+			text = L("FRIEND_TAGS_EDITOR_VISIBLE", "Visible"),
+			desc = L("FRIEND_TAGS_EDITOR_VISIBLE_DESC", "Master switch for this tag on every display surface."),
+		},
+		{
+			key = "rowVisible",
+			text = L("FRIEND_TAGS_EDITOR_ROW_VISIBLE", "Friend Rows"),
+			desc = L("FRIEND_TAGS_EDITOR_ROW_VISIBLE_DESC", "Show this tag on friend-list rows when Visible is enabled."),
+		},
+		{
+			key = "tooltipVisible",
+			text = L("FRIEND_TAGS_EDITOR_TOOLTIP_VISIBLE", "Tooltips"),
+			desc = L(
+				"FRIEND_TAGS_EDITOR_TOOLTIP_VISIBLE_DESC",
+				"Show this tag in supported friend tooltips when Visible is enabled."
+			),
+		},
+		{
+			key = "brokerVisible",
+			text = L("FRIEND_TAGS_EDITOR_BROKER_VISIBLE", "Broker"),
+			desc = L(
+				"FRIEND_TAGS_EDITOR_BROKER_VISIBLE_DESC",
+				"Show this tag in the Data Broker tooltip when Visible is enabled."
+			),
+		},
 	}
 	for index, entry in ipairs(labels) do
 		local holder = CreateFrame("Frame", nil, parent)
@@ -1168,7 +1271,7 @@ function FriendTagEditor:CreateVisibilityControls(parent, y)
 			state[entry.key] = checked
 			self:RefreshPreview()
 			self:CommitState()
-		end)
+		end, entry.text, entry.desc)
 		check:SetPoint("LEFT", holder, "LEFT", 0, 0)
 	end
 end
@@ -1229,9 +1332,12 @@ function FriendTagEditor:CommitState()
 	if def.source == "custom" and self.nameInput then
 		local name = GetEditBoxText(self.nameInput)
 		if name ~= "" and name ~= def.name then
-			renamed = FriendTags:RenameCustomTag(def.id, name) == true
+			local renameReason
+			renamed, renameReason = FriendTags:RenameCustomTag(def.id, name)
 			if renamed then
 				state.name = name
+			elseif FriendTags.ShowTagNameError then
+				FriendTags:ShowTagNameError(renameReason)
 			end
 		end
 	end
@@ -1287,6 +1393,7 @@ function FriendTagEditor:CommitState()
 		texture = texture,
 		texCoord = texCoord,
 		iconZoom = iconZoom,
+		iconOnlyChip = state.iconOnlyChip,
 		color = state.color,
 		textColor = state.textColor,
 		visible = state.visible,
@@ -1310,7 +1417,7 @@ function FriendTagEditor:Reset()
 	local def = self:GetSelectedDefinition()
 	if FriendTags and def then
 		FriendTags:ResetChipProfile(def.id, function()
-			self:Refresh()
+			self:RefreshAfterDefinitionChange("reset")
 		end)
 	end
 end
