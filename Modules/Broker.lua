@@ -107,22 +107,31 @@ end
 
 local function CountBattleNetOnlineFriends(numTotal)
 	local onlineCount = 0
+	local nonMobileOnlineByAccountID = {}
 	for i = 1, numTotal or 0 do
 		if BNGetFriendInfo then
-			local _, _, _, _, _, _, client, isOnline = BNGetFriendInfo(i)
-			if isOnline and client ~= "BSAp" then
+			local accountID, _, _, _, _, _, client, isOnline = BNGetFriendInfo(i)
+			local isNonMobileOnline = isOnline and client ~= "BSAp" or false
+			if accountID then
+				nonMobileOnlineByAccountID[accountID] = isNonMobileOnline
+			end
+			if isNonMobileOnline then
 				onlineCount = onlineCount + 1
 			end
 		else
 			local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
 			local gameInfo = accountInfo and accountInfo.gameAccountInfo
 			local client = gameInfo and gameInfo.clientProgram or "App"
-			if accountInfo and gameInfo and gameInfo.isOnline and client ~= "BSAp" then
+			local isNonMobileOnline = accountInfo and gameInfo and gameInfo.isOnline and client ~= "BSAp" or false
+			if accountInfo and accountInfo.bnetAccountID then
+				nonMobileOnlineByAccountID[accountInfo.bnetAccountID] = isNonMobileOnline
+			end
+			if isNonMobileOnline then
 				onlineCount = onlineCount + 1
 			end
 		end
 	end
-	return onlineCount
+	return onlineCount, nonMobileOnlineByAccountID
 end
 
 local function ClampBattleNetOnlineCount(onlineCount, numOnline)
@@ -138,13 +147,14 @@ local function ClampBattleNetOnlineCount(onlineCount, numOnline)
 end
 
 local function RefreshBattleNetCountsSnapshot(numTotal, numOnline, now)
-	local filteredOnline = CountBattleNetOnlineFriends(numTotal)
+	local filteredOnline, nonMobileOnlineByAccountID = CountBattleNetOnlineFriends(numTotal)
 	bnetCountsCache = {
 		time = now,
 		numTotal = numTotal,
 		numOnline = numOnline,
 		total = numTotal,
 		online = filteredOnline,
+		nonMobileOnlineByAccountID = nonMobileOnlineByAccountID,
 	}
 	bnetCountsHardInvalidated = false
 	return numTotal, filteredOnline
@@ -193,6 +203,25 @@ local function GetBattleNetCounts(treatMobileAsOffline)
 	bnetCountsCache.numOnline = numOnline
 	bnetCountsCache.total = numTotal
 	return numTotal, ClampBattleNetOnlineCount(bnetCountsCache.online, numOnline)
+end
+
+-- Account online/offline events identify the changed account; companion-app
+-- transitions are excluded by the callers below. Once the initial snapshot
+-- exists, update the permanently visible non-mobile count in O(1) instead of
+-- re-reading every Battle.net friend.
+local function ApplyBattleNetAccountStatusEvent(friendID, isOnline)
+	local states = bnetCountsCache and bnetCountsCache.nonMobileOnlineByAccountID
+	if bnetCountsHardInvalidated or not states or not friendID or states[friendID] == nil then
+		return false
+	end
+
+	local wasOnline = states[friendID] == true
+	if wasOnline ~= isOnline then
+		states[friendID] = isOnline
+		bnetCountsCache.online = math.max(0, (bnetCountsCache.online or 0) + (isOnline and 1 or -1))
+	end
+	bnetCountsCache.time = GetTime and GetTime() or bnetCountsCache.time
+	return true
 end
 
 -- Get class color for friend (returns color table or white fallback)
@@ -2975,16 +3004,24 @@ function Broker:RegisterEvents()
 		return
 	end
 
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(_, isCompanionApp)
-		if not (BetterFriendlistDB.treatMobileAsOffline and isCompanionApp) then
-			Broker:ScheduleBrokerTextUpdate(true)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function(friendID, isCompanionApp)
+		if BetterFriendlistDB.treatMobileAsOffline then
+			if not isCompanionApp then
+				Broker:ScheduleBrokerTextUpdate(not ApplyBattleNetAccountStatusEvent(friendID, true))
+			end
+		else
+			Broker:ScheduleBrokerTextUpdate(false)
 		end
 		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
-	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(_, isCompanionApp)
-		if not (BetterFriendlistDB.treatMobileAsOffline and isCompanionApp) then
-			Broker:ScheduleBrokerTextUpdate(true)
+	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(friendID, isCompanionApp)
+		if BetterFriendlistDB.treatMobileAsOffline then
+			if not isCompanionApp then
+				Broker:ScheduleBrokerTextUpdate(not ApplyBattleNetAccountStatusEvent(friendID, false))
+			end
+		else
+			Broker:ScheduleBrokerTextUpdate(false)
 		end
 		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
