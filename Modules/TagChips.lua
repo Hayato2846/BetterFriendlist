@@ -33,26 +33,53 @@ local function ClampNumber(value, minimum, maximum, fallback)
 	return math.max(minimum, math.min(maximum, value))
 end
 
-local function ResolveChipMetrics(FriendTags)
+local resolvedChipMetrics
+local resolvedChipMetricsFriendTags
+local resolvedChipMetricsDefinitionVersion
+
+local function GetMetricSetting(settings, key, fallback)
+	local value = settings and settings[key]
+	if value == nil then
+		return fallback
+	end
+	return value
+end
+
+local function ResolveChipMetrics(FriendTags, definitionVersion)
 	FriendTags = FriendTags or GetFriendTags()
+	definitionVersion = definitionVersion
+		or (FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion())
+		or BFL.FriendTagsDefinitionVersion
+		or BFL.FriendTagsVersion
+		or 0
+	if
+		resolvedChipMetrics
+		and resolvedChipMetricsFriendTags == FriendTags
+		and resolvedChipMetricsDefinitionVersion == definitionVersion
+	then
+		return resolvedChipMetrics
+	end
+
+	-- Every visual Friend Tag setting bumps the definition version. Resolve the
+	-- immutable metrics table once per version instead of once per rendered row.
+	local settings = FriendTags and FriendTags.GetSettings and FriendTags:GetSettings()
 	local iconSize = ClampNumber(
-		FriendTags and FriendTags:GetSetting("chipIconSize", DEFAULT_CHIP_ICON_SIZE),
+		GetMetricSetting(settings, "chipIconSize", DEFAULT_CHIP_ICON_SIZE),
 		8,
 		24,
 		DEFAULT_CHIP_ICON_SIZE
 	)
 	local fontSize = ClampNumber(
-		FriendTags and FriendTags:GetSetting("chipFontSize", DEFAULT_CHIP_FONT_SIZE),
+		GetMetricSetting(settings, "chipFontSize", DEFAULT_CHIP_FONT_SIZE),
 		8,
 		24,
 		DEFAULT_CHIP_FONT_SIZE
 	)
-	local fontName = FriendTags and FriendTags:GetSetting("chipFont", DEFAULT_CHIP_FONT) or DEFAULT_CHIP_FONT
+	local fontName = GetMetricSetting(settings, "chipFont", DEFAULT_CHIP_FONT)
 	if type(fontName) ~= "string" or fontName == "" then
 		fontName = DEFAULT_CHIP_FONT
 	end
-	local fontFlags = FriendTags and FriendTags:GetSetting("chipFontFlags", DEFAULT_CHIP_FONT_FLAGS)
-		or DEFAULT_CHIP_FONT_FLAGS
+	local fontFlags = GetMetricSetting(settings, "chipFontFlags", DEFAULT_CHIP_FONT_FLAGS) or DEFAULT_CHIP_FONT_FLAGS
 	local fontPath = STANDARD_TEXT_FONT
 	if BFL.FontManager and BFL.FontManager.ResolveFontPath then
 		fontPath = BFL.FontManager:ResolveFontPath(fontName)
@@ -61,7 +88,7 @@ local function ResolveChipMetrics(FriendTags)
 		fontFlags = BFL.FontManager:GetFontFlags(fontFlags)
 	end
 	local height = math.max(iconSize + 3, fontSize + 4)
-	return {
+	resolvedChipMetrics = {
 		iconSize = iconSize,
 		fontName = fontName,
 		fontPath = fontPath,
@@ -77,6 +104,10 @@ local function ResolveChipMetrics(FriendTags)
 		minimumWidth = math.max(26, height),
 		overflowWidth = math.max(30, height),
 	}
+	resolvedChipMetricsFriendTags = FriendTags
+	resolvedChipMetricsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
+		or definitionVersion
+	return resolvedChipMetrics
 end
 
 local function CopyColor(color, fallback)
@@ -180,8 +211,8 @@ local chipFontFlags
 local chipConfiguredFontSize
 local chipFontVersion = 0
 
-local function GetChipFontVersion()
-	local metrics = ResolveChipMetrics()
+local function GetChipFontVersion(metrics)
+	metrics = metrics or ResolveChipMetrics()
 	if
 		metrics.fontPath ~= chipFontPath
 		or metrics.fontFlags ~= chipFontFlags
@@ -200,7 +231,7 @@ end
 
 local function MeasureLabelWidth(labelText, metrics)
 	labelText = tostring(labelText or "")
-	local version = GetChipFontVersion()
+	local version = GetChipFontVersion(metrics)
 	if measuredLabelVersion ~= version then
 		measuredLabelWidths = {}
 		measuredLabelVersion = version
@@ -343,7 +374,8 @@ local function GetRowCacheContext(friendsList, FriendTags)
 	-- Streamer Mode is deliberately tracked separately from SettingsVersion: it
 	-- changes tag visibility without changing definitions and must never reuse a
 	-- previously visible row-chip result.
-	local fontVersion = GetChipFontVersion()
+	local metrics = ResolveChipMetrics(FriendTags, tagsDefinitionVersion)
+	local fontVersion = GetChipFontVersion(metrics)
 	local streamerModeFlag = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive and 1 or 0
 	local settingsVersion = (fontVersion * 2) + streamerModeFlag
 	local compactModeFlag = settingsCache and settingsCache.compactMode and 1 or 0
@@ -355,7 +387,8 @@ local function GetRowCacheContext(friendsList, FriendTags)
 		settingsVersion,
 		compactModeFlag,
 		infoDisabledFlag,
-		availableWidth
+		availableWidth,
+		metrics
 end
 
 local function NormalizeGroupCacheKey(groupId)
@@ -666,7 +699,7 @@ local function UpdateChipVisual(chip, profile, labelText, allowIcon, overflow, m
 	labelText = tostring(labelText or "")
 	allowIcon = allowIcon ~= false
 	overflow = overflow == true
-	local fontVersion = GetChipFontVersion()
+	local fontVersion = GetChipFontVersion(metrics)
 	if chip._bflAppliedFontVersion ~= fontVersion then
 		ApplyFont(chip.label, metrics)
 		chip._bflAppliedFontVersion = fontVersion
@@ -770,7 +803,7 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 	if persistentCacheKey then
 		persistentCacheKey = persistentCacheKey .. "|group:" .. groupCacheKey
 	end
-	local tagsDefinitionVersion, tagsGlobalAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
+	local tagsDefinitionVersion, tagsGlobalAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth, metrics =
 		GetRowCacheContext(friendsList, FriendTags)
 	if self.rowDataCacheDefinitionVersion ~= tagsDefinitionVersion then
 		self.rowDataCacheDefinitionVersion = tagsDefinitionVersion
@@ -906,7 +939,7 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 	local maxChips = tonumber(FriendTags:GetSetting("maxRowChips", 3)) or 3
 	maxChips = math.max(1, math.min(maxChips, MAX_ROW_CHIPS))
 	local chipsPerLine = ClampNumber(FriendTags:GetSetting("chipsPerLine", DEFAULT_CHIPS_PER_LINE), 1, MAX_ROW_CHIPS, DEFAULT_CHIPS_PER_LINE)
-	local metrics = ResolveChipMetrics(FriendTags)
+	metrics = metrics or ResolveChipMetrics(FriendTags, tagsDefinitionVersion)
 	local hiddenGroupTagId = FriendTags:GetSetting("hideDynamicGroupTagChip", false)
 		and dynamicGroupTagId
 		or nil
