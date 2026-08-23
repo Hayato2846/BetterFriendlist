@@ -4,6 +4,7 @@
 local ADDON_NAME, BFL = ...
 
 local AutoRaidAssist = BFL:RegisterModule("AutoRaidAssist", {})
+AutoRaidAssist.friendStatusEventGate = AutoRaidAssist.friendStatusEventGate or { active = false }
 
 local AUTO_RAID_ASSIST_VERSION = 1
 local PROMOTION_COOLDOWN = 2.5
@@ -321,6 +322,7 @@ function AutoRaidAssist:Initialize()
 	self.dbCacheDirty = true
 	self.raidContextActive = IsActiveRaidContext()
 	self:GetDB()
+	self.friendStatusEventGate.active = self.raidContextActive and self:GetEnabledSetting()
 	DebugLog("Initialize enabled=%s targets=%d", DebugValue(self:IsEnabled()), self:GetTargetCount())
 	self:RegisterEvents()
 	self:RegisterWithSettingsDesigner()
@@ -359,15 +361,18 @@ function AutoRaidAssist:RegisterEvents()
 	local function ScheduleRoster(reason)
 		local inRaid = IsActiveRaidContext()
 		if not inRaid then
+			AutoRaidAssist.friendStatusEventGate.active = false
 			if AutoRaidAssist.raidContextActive then
 				AutoRaidAssist:DeactivateRaidContext(reason or "roster")
 			end
 			return
 		end
 		if not AutoRaidAssist:GetEnabledSetting() then
+			AutoRaidAssist.friendStatusEventGate.active = false
 			return
 		end
 		AutoRaidAssist.raidContextActive = true
+		AutoRaidAssist.friendStatusEventGate.active = true
 		AutoRaidAssist:InvalidateCandidateCache()
 		DebugLog("Roster event trigger reason=%s -> ScheduleRosterEvaluate", DebugValue(reason))
 		AutoRaidAssist:ScheduleRosterEvaluate(reason)
@@ -390,16 +395,16 @@ function AutoRaidAssist:RegisterEvents()
 
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
 		Schedule("bnet")
-	end, 80)
+	end, 80, self.friendStatusEventGate)
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", function()
 		Schedule("bnet-online")
-	end, 80)
+	end, 80, self.friendStatusEventGate)
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function()
 		Schedule("bnet-offline")
-	end, 80)
+	end, 80, self.friendStatusEventGate)
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
 		Schedule("friendlist")
-	end, 80)
+	end, 80, self.friendStatusEventGate)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		if AutoRaidAssist.needsCombatRetry then
 			AutoRaidAssist.needsCombatRetry = nil
@@ -416,6 +421,7 @@ end
 
 function AutoRaidAssist:DeactivateRaidContext(reason)
 	self.raidContextActive = false
+	self.friendStatusEventGate.active = false
 	self.needsCombatRetry = nil
 	if self.pendingTimer and self.pendingTimer.Cancel then
 		self.pendingTimer:Cancel()
@@ -520,6 +526,11 @@ function AutoRaidAssist:SetEnabled(enabled)
 		return true
 	end
 	db.enabled = newValue
+	local activeRaid = newValue and IsActiveRaidContext()
+	if activeRaid then
+		self.raidContextActive = true
+	end
+	self.friendStatusEventGate.active = activeRaid == true
 	DebugLog("SetEnabled changed enabled=%s targets=%d", DebugValue(newValue), self:GetTargetCount())
 	NotifySettingsChanged()
 	self:InvalidateCandidateCache()

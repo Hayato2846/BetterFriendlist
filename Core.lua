@@ -2084,7 +2084,8 @@ local eventFrame = CreateFrame("Frame")
 -- @param event: The event name (e.g., "FRIENDLIST_UPDATE")
 -- @param callback: Function to call when event fires
 -- @param priority: Optional priority (lower = called first), default 50
-function BFL:RegisterEventCallback(event, callback, priority)
+-- @param gate: Optional shared state table; callback only runs while gate.active is true
+function BFL:RegisterEventCallback(event, callback, priority, gate)
 	priority = priority or 50
 	if not self.EventCallbacks[event] then
 		local registerEvent = self.Compat and self.Compat.RegisterEvent or eventFrame.RegisterEvent
@@ -2097,6 +2098,7 @@ function BFL:RegisterEventCallback(event, callback, priority)
 	table.insert(self.EventCallbacks[event], {
 		callback = callback,
 		priority = priority,
+		gate = gate,
 	})
 	-- Sort by priority
 	table.sort(self.EventCallbacks[event], function(a, b)
@@ -2136,7 +2138,7 @@ function BFL:FireEventCallbacks(event, ...)
 			local callbacks = self.EventCallbacks[event]
 			if callbacks then
 				for _, entry in ipairs(callbacks) do
-					if entry and entry.callback then
+					if entry and entry.callback and (not entry.gate or entry.gate.active == true) then
 						local success, err = pcall(entry.callback)
 						if not success then
 							BFL:DebugPrint("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
@@ -2166,7 +2168,7 @@ function BFL:FireEventCallbacks(event, ...)
 			local callbacks = self.EventCallbacks[event]
 			if callbacks then
 				for _, entry in ipairs(callbacks) do
-					if entry and entry.callback then
+					if entry and entry.callback and (not entry.gate or entry.gate.active == true) then
 						local success, err = pcall(entry.callback)
 						if not success then
 							BFL:DebugPrint("|cffff0000BFL Error in FRIENDLIST_UPDATE callback:|r " .. tostring(err))
@@ -2179,7 +2181,9 @@ function BFL:FireEventCallbacks(event, ...)
 	end
 
 	for _, entry in ipairs(self.EventCallbacks[event]) do
-		entry.callback(...)
+		if not entry.gate or entry.gate.active == true then
+			entry.callback(...)
+		end
 	end
 end
 

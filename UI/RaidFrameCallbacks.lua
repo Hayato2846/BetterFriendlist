@@ -447,7 +447,14 @@ end
 -- Update Combat Overlay (shows during combat to prevent taint)
 function BetterRaidFrame_UpdateCombatOverlay(inCombat)
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not frame then
+	-- The normal Raid-tab OnShow update derives the current combat state again.
+	-- Do not mutate hidden controls on every combat transition while BFL or the
+	-- Raid tab is closed.
+	if
+		not frame
+		or not BetterFriendsFrame:IsShown()
+		or not frame:IsShown()
+	then
 		return
 	end
 
