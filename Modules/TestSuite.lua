@@ -13877,9 +13877,9 @@ function TestSuite:RegisterFriendUpdateDebounceTest()
 				updateCount = updateCount + 1
 			end
 
-			FriendsList:OnFriendListUpdate(false)
-			FriendsList:OnFriendListUpdate(false)
-			V:AssertEqual(#callbacks, 1, "An event burst should schedule only one timer")
+			FriendsList:OnFriendListUpdate(12345)
+			FriendsList:OnFriendListUpdate(67890)
+			V:AssertEqual(#callbacks, 1, "An event payload burst should schedule only one timer")
 			V:AssertType(FriendsList.updateTimer.Cancel, "function", "Scheduled update should be cancelable")
 
 			callbacks[1]()

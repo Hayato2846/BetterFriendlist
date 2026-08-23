@@ -181,24 +181,24 @@ local hasPendingUpdate = false
 -- These are called 1000s of times per session, closures are expensive!
 -- ========================================
 
-local function EventCallback_FriendListUpdate(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_FriendListUpdate()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetFriendListSizeChanged(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_BNetFriendListSizeChanged()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetAccountOnline(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_BNetAccountOnline()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetAccountOffline(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_BNetAccountOffline()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetFriendInfoChanged(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_BNetFriendInfoChanged()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
 local function RegisterOptionalEventCallback(eventName, callback, priority)
@@ -207,17 +207,17 @@ local function RegisterOptionalEventCallback(eventName, callback, priority)
 	end)
 end
 
-local function EventCallback_BNetConnected(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_BNetConnected()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetDisconnected(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_BNetDisconnected()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
 -- GROUP_ROSTER_UPDATE affects invite button availability - refresh friendlist
-local function EventCallback_GroupRosterUpdate(...)
-	BFL.FriendsList:OnFriendListUpdate(...)
+local function EventCallback_GroupRosterUpdate()
+	BFL.FriendsList:OnFriendListUpdate()
 end
 
 local function EventCallback_BNetInviteListInitialized()
@@ -4418,7 +4418,7 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 
 	-- Phase 2: Allow bypassing throttle for critical UI interactions (Invites)
 	-- Also bypass until BNet data is fully ready (battleTags loaded) for instant population
-	if forceImmediate or not self.bnetDataReady then
+	if forceImmediate == true or not self.bnetDataReady then
 		if self.updateTimer then
 			self.updateTimer:Cancel()
 			self.updateTimer = nil
