@@ -197,7 +197,11 @@ local function EventCallback_BNetAccountOffline()
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetFriendInfoChanged()
+local function EventCallback_BNetFriendInfoChanged(friendIndex)
+	BFL.FriendsList:OnBNetFriendInfoChanged(friendIndex)
+end
+
+local function EventCallback_BNetInfoChanged()
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
@@ -704,6 +708,102 @@ local function CopyFriendTags(friendTags)
 		copy[index] = tag
 	end
 	return copy
+end
+
+local function GetSafeBNetAccountName(accountInfo)
+	local accountName = accountInfo and accountInfo.accountName
+	if BFL:IsSecret(accountName) then
+		return nil
+	end
+	if accountName == nil or accountName == "" or accountName == "???" then
+		return nil
+	end
+	return accountName
+end
+
+local function AreSafeValuesEqual(left, right)
+	if BFL:IsSecret(left) or BFL:IsSecret(right) then
+		return false
+	end
+	return left == right
+end
+
+local function AreFriendTagsEqual(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then
+		return left == right
+	end
+	if #left ~= #right then
+		return false
+	end
+	for index = 1, #left do
+		if left[index] ~= right[index] then
+			return false
+		end
+	end
+	return true
+end
+
+local GAME_ACCOUNT_COMPARE_FIELDS = {
+	"gameAccountID",
+	"clientProgram",
+	"isOnline",
+	"isGameBusy",
+	"isGameAFK",
+	"isAFK",
+	"isDND",
+	"isAppearOffline",
+	"wowProjectID",
+	"characterName",
+	"realmName",
+	"realmDisplayName",
+	"realmID",
+	"factionName",
+	"raceName",
+	"classID",
+	"className",
+	"classFilename",
+	"areaName",
+	"characterLevel",
+	"richPresence",
+	"playerGuid",
+	"canSummon",
+	"hasFocus",
+	"regionID",
+	"isInCurrentRegion",
+	"timerunningSeasonID",
+	"guildName",
+	"inviteRestriction",
+}
+
+local function AreGameAccountInfosEqual(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then
+		return left == right
+	end
+	for _, fieldName in ipairs(GAME_ACCOUNT_COMPARE_FIELDS) do
+		if not AreSafeValuesEqual(left[fieldName], right[fieldName]) then
+			return false
+		end
+	end
+	return true
+end
+
+local function IsVisibleGameAccount(gameAccountInfo)
+	local clientProgram = gameAccountInfo and gameAccountInfo.clientProgram
+	return clientProgram ~= BNET_CLIENT_APP
+		and clientProgram ~= "CLNT"
+		and clientProgram ~= "BSAp"
+end
+
+local function FindGameAccountByID(gameAccounts, gameAccountID)
+	if type(gameAccounts) ~= "table" then
+		return nil
+	end
+	for _, gameAccountInfo in ipairs(gameAccounts) do
+		if gameAccountInfo.gameAccountID == gameAccountID then
+			return gameAccountInfo
+		end
+	end
+	return nil
 end
 
 local function FormatColorCode(r, g, b, a)
@@ -4171,8 +4271,8 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_ONLINE", EventCallback_BNetAccountOnline, 10)
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", EventCallback_BNetAccountOffline, 10)
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", EventCallback_BNetFriendInfoChanged, 10)
-	BFL:RegisterEventCallback("BN_INFO_CHANGED", EventCallback_BNetFriendInfoChanged, 10)
-	RegisterOptionalEventCallback("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", EventCallback_BNetFriendInfoChanged, 10)
+	BFL:RegisterEventCallback("BN_INFO_CHANGED", EventCallback_BNetInfoChanged, 10)
+	RegisterOptionalEventCallback("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", EventCallback_BNetInfoChanged, 10)
 	RegisterOptionalEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", EventCallback_FriendListUpdate, 10)
 
 	-- Additional events from Blizzard's FriendsFrame
@@ -4403,6 +4503,121 @@ function FriendsList:UpdateSettingsCache()
 end
 
 -- Handle friend list update events
+function FriendsList:HasBNetFriendInfoChanged(friendIndex)
+	if type(friendIndex) ~= "number" or friendIndex < 1 then
+		return true
+	end
+
+	local friend = self.bnetFriendsByIndex and self.bnetFriendsByIndex[friendIndex]
+	local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(friendIndex)
+	if not friend or friend.type ~= "bnet" or not accountInfo then
+		return true
+	end
+
+	if
+		friend.bnetAccountID ~= accountInfo.bnetAccountID
+		or not AreSafeValuesEqual(friend.accountName, GetSafeBNetAccountName(accountInfo))
+		or not AreSafeValuesEqual(friend.battleTag, accountInfo.battleTag)
+		or friend.friendLevel ~= accountInfo.friendLevel
+		or friend.lastOnlineTime ~= accountInfo.lastOnlineTime
+		or friend.isAFK ~= accountInfo.isAFK
+		or friend.isDND ~= accountInfo.isDND
+		or friend.isFavorite ~= (accountInfo.isFavorite or false)
+		or not AreSafeValuesEqual(friend.note, accountInfo.note)
+		or not AreSafeValuesEqual(friend.customMessage, accountInfo.customMessage)
+		or friend.customMessageTime ~= accountInfo.customMessageTime
+	then
+		return true
+	end
+
+	local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
+	if friendTagsEnabled and not AreFriendTagsEqual(friend.friendTags, accountInfo.friendTags) then
+		return true
+	end
+
+	local titleFriendCustomNamesEnabled = BFL.AreTitleFriendCustomNamesEnabled
+		and BFL.AreTitleFriendCustomNamesEnabled()
+	if titleFriendCustomNamesEnabled and BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo) then
+		local titleCustomName = BFL.GetCustomTitleFriendName
+			and BFL.GetCustomTitleFriendName(accountInfo.bnetAccountID)
+		if BFL:IsSecret(titleCustomName) then
+			return true
+		end
+		if titleCustomName == "" then
+			titleCustomName = nil
+		end
+		if not AreSafeValuesEqual(friend.titleCustomName, titleCustomName) then
+			return true
+		end
+	elseif friend.titleCustomName ~= nil then
+		return true
+	end
+
+	local focusedGameAccount = friend.originalGameAccountInfo or friend.gameAccountInfo
+	if not AreGameAccountInfosEqual(focusedGameAccount, accountInfo.gameAccountInfo) then
+		return true
+	end
+
+	if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline then
+		if not (C_BattleNet and C_BattleNet.GetFriendNumGameAccounts) then
+			return true
+		end
+		local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(friendIndex) or 0
+		if (friend.totalGameAccounts or 0) ~= numGameAccounts then
+			return true
+		end
+
+		if numGameAccounts > 1 then
+			local visibleGameAccountCount = 0
+			for gameAccountIndex = 1, numGameAccounts do
+				local gameAccountInfo = BFL.GetBNetFriendGameAccountInfo
+					and BFL.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex)
+				if not gameAccountInfo then
+					return true
+				end
+				if IsVisibleGameAccount(gameAccountInfo) then
+					visibleGameAccountCount = visibleGameAccountCount + 1
+					local previousGameAccount = FindGameAccountByID(
+						friend.gameAccounts,
+						gameAccountInfo.gameAccountID
+					)
+					if not previousGameAccount or not AreGameAccountInfosEqual(previousGameAccount, gameAccountInfo) then
+						return true
+					end
+				end
+			end
+			if visibleGameAccountCount ~= (friend.numGameAccounts or 0) then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+function FriendsList:OnBNetFriendInfoChanged(friendIndex)
+	-- Do not query a single account while hidden. The regular visibility gate keeps
+	-- the list dirty and performs one authoritative rebuild on the next open.
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self:OnFriendListUpdate()
+		return
+	end
+
+	-- The optional friendIndex contract is verified for Retail. Keep every Classic
+	-- flavor on the established full-refresh behavior until each live contract is
+	-- independently current and verified.
+	if not BFL.IsRetail then
+		self:OnFriendListUpdate()
+		return
+	end
+
+	-- Retail supplies an optional friendIndex. Nil/invalid payloads, incomplete
+	-- initial data, or real semantic changes keep the conservative full-refresh path.
+	if not self.bnetDataReady or self:HasBNetFriendInfoChanged(friendIndex) then
+		self:OnFriendListUpdate()
+	end
+end
+
 function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Micro-Throttling)
 	-- Instead of updating immediately for every event, we schedule an update for the next frame.
 	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
@@ -4921,12 +5136,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				-- Follow Blizzard's BNet_GetBNetAccountName pattern:
 				-- accountName is a kString (|Kq..|k). Store nil if empty or "???" so display fallback triggers.
 				-- On 12.0.0+, accountName could theoretically be a secret value. Guard comparisons.
-				local accName = accountInfo.accountName
-				if accName == nil or BFL:IsSecret(accName) or accName == "" or accName == "???" then
-					friend.accountName = nil
-				else
-					friend.accountName = accName
-				end
+				friend.accountName = GetSafeBNetAccountName(accountInfo)
 				friend.battleTag = accountInfo.battleTag
 
 				-- PHASE 9.6: Cache UID (Hot Path)
@@ -4947,7 +5157,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				if titleFriendCustomNamesEnabled and BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo) then
 					local customName = BFL.GetCustomTitleFriendName
 						and BFL.GetCustomTitleFriendName(accountInfo.bnetAccountID)
-					if customName and customName ~= "" and not BFL:IsSecret(customName) then
+					if not BFL:IsSecret(customName) and customName and customName ~= "" then
 						friend.titleCustomName = customName
 					end
 				end
@@ -5373,8 +5583,19 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	-- PERFY OPTIMIZATION: Pre-resolve numeric key extractors for inline SortComparator
 	local primaryKeyFn = sortNumericKey[primarySort] or sortNumericKey.status
 	local secondaryKeyFn = sortNumericKey[secondarySort] or sortNumericKey.name
+	local bnetFriendsByIndex = self.bnetFriendsByIndex
+	if not bnetFriendsByIndex then
+		bnetFriendsByIndex = {}
+		self.bnetFriendsByIndex = bnetFriendsByIndex
+	else
+		wipe(bnetFriendsByIndex)
+	end
 
 	for _, friend in ipairs(self.friendsList) do
+		if friend.type == "bnet" and friend.index then
+			bnetFriendsByIndex[friend.index] = friend
+		end
+
 		-- Status Priority (Always used)
 		friend._sort_status = CalculateStatusPriority(friend)
 

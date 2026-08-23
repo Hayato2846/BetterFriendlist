@@ -13628,6 +13628,7 @@ function TestSuite:Initialize()
 	self:RegisterBuiltinQuickFilterMultiAccountTest()
 	self:RegisterMobileOnlyAccountTest()
 	self:RegisterFriendUpdateDebounceTest()
+	self:RegisterBNetFriendInfoNoOpTest()
 	self:RegisterEventCompatibilityTests()
 	self:RegisterLateUITests(); self:RegisterRaidInteractionTest()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
@@ -13897,6 +13898,166 @@ function TestSuite:RegisterFriendUpdateDebounceTest()
 			FriendsList.updateTimer = originalTimer
 			C_Timer = originalCTimer
 			BetterFriendsFrame = originalFrame
+		end,
+	})
+end
+
+function TestSuite:RegisterBNetFriendInfoNoOpTest()
+	self:RegisterTest("events", "FriendsList_BNetInfo_NoOpSkipsFullRefresh", {
+		description = "Indexed BNet info events should rebuild only when the cached friend data changed",
+		condition = function()
+			return BFL.IsRetail
+		end,
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if not FriendsList or not FriendsList.OnBNetFriendInfoChanged then
+				V:Skip("FriendsList indexed BNet event handler not loaded")
+				return
+			end
+
+			local originalFrame = BetterFriendsFrame
+			local originalGetBNetFriendInfo = BFL.GetBNetFriendInfo
+			local originalGetBNetFriendGameAccountInfo = BFL.GetBNetFriendGameAccountInfo
+			local originalFriendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled
+			local originalTitleNamesEnabled = BFL.AreTitleFriendCustomNamesEnabled
+			local originalCBattleNet = C_BattleNet
+			local originalUpdate = FriendsList.OnFriendListUpdate
+			local originalReady = FriendsList.bnetDataReady
+			local originalIndexMap = FriendsList.bnetFriendsByIndex
+			local updateCount = 0
+			local accountQueryCount = 0
+			local accountNote = "unchanged"
+			local secondaryRichPresence = "unchanged presence"
+
+			local gameAccountInfo = {
+				gameAccountID = 9001,
+				clientProgram = BNET_CLIENT_WOW or "WoW",
+				isOnline = true,
+				characterName = "IndexedFriend",
+				realmName = "TestRealm",
+				realmID = 1,
+				wowProjectID = WOW_PROJECT_ID,
+			}
+			local cachedFriend = {
+				type = "bnet",
+				index = 7,
+				bnetAccountID = 1234,
+				accountName = "Account",
+				battleTag = "Account#1234",
+				friendLevel = 1,
+				lastOnlineTime = 42,
+				isAFK = false,
+				isDND = false,
+				isFavorite = false,
+				note = accountNote,
+				customMessage = "Status",
+				customMessageTime = 10,
+				friendTags = { 1, 2 },
+				gameAccountInfo = gameAccountInfo,
+				gameAccounts = {
+					gameAccountInfo,
+					{
+						gameAccountID = 9002,
+						clientProgram = "D4",
+						isOnline = true,
+						richPresence = "unchanged presence",
+					},
+				},
+				totalGameAccounts = 2,
+				numGameAccounts = 2,
+			}
+
+			local ok, err = pcall(function()
+				BetterFriendsFrame = { IsShown = function() return true end }
+				BFL.GetBNetFriendInfo = function()
+					accountQueryCount = accountQueryCount + 1
+					return {
+						bnetAccountID = 1234,
+						accountName = "Account",
+						battleTag = "Account#1234",
+						friendLevel = 1,
+						lastOnlineTime = 42,
+						isAFK = false,
+						isDND = false,
+						isFavorite = false,
+						note = accountNote,
+						customMessage = "Status",
+						customMessageTime = 10,
+						friendTags = { 1, 2 },
+						gameAccountInfo = {
+							gameAccountID = 9001,
+							clientProgram = BNET_CLIENT_WOW or "WoW",
+							isOnline = true,
+							characterName = "IndexedFriend",
+							realmName = "TestRealm",
+							realmID = 1,
+							wowProjectID = WOW_PROJECT_ID,
+						},
+					}
+				end
+				BFL.GetBNetFriendGameAccountInfo = function(_, gameAccountIndex)
+					if gameAccountIndex == 1 then
+						return {
+							gameAccountID = 9001,
+							clientProgram = BNET_CLIENT_WOW or "WoW",
+							isOnline = true,
+							characterName = "IndexedFriend",
+							realmName = "TestRealm",
+							realmID = 1,
+							wowProjectID = WOW_PROJECT_ID,
+						}
+					end
+					return {
+						gameAccountID = 9002,
+						clientProgram = "D4",
+						isOnline = true,
+						richPresence = secondaryRichPresence,
+					}
+				end
+				BFL.AreBattleNetFriendTagsEnabled = function() return true end
+				BFL.AreTitleFriendCustomNamesEnabled = function() return false end
+				C_BattleNet = { GetFriendNumGameAccounts = function() return 2 end }
+				FriendsList.OnFriendListUpdate = function()
+					updateCount = updateCount + 1
+				end
+				FriendsList.bnetDataReady = true
+				FriendsList.bnetFriendsByIndex = { [7] = cachedFriend }
+
+				FriendsList:OnBNetFriendInfoChanged(7)
+				V:AssertEqual(updateCount, 0, "An unchanged indexed friend should not schedule a full refresh")
+				V:AssertEqual(accountQueryCount, 1, "The no-op check should query only the indexed friend")
+
+				secondaryRichPresence = "changed presence"
+				FriendsList:OnBNetFriendInfoChanged(7)
+				V:AssertEqual(updateCount, 1, "A secondary game-account change should preserve the full refresh path")
+				secondaryRichPresence = "unchanged presence"
+
+				accountNote = "changed"
+				FriendsList:OnBNetFriendInfoChanged(7)
+				V:AssertEqual(updateCount, 2, "A changed indexed friend should preserve the full refresh path")
+
+				FriendsList:OnBNetFriendInfoChanged(nil)
+				V:AssertEqual(updateCount, 3, "A nil Retail payload should conservatively refresh")
+				V:AssertEqual(accountQueryCount, 3, "Invalid payloads should not query arbitrary friend indices")
+
+				BetterFriendsFrame = { IsShown = function() return false end }
+				FriendsList:OnBNetFriendInfoChanged(7)
+				V:AssertEqual(updateCount, 4, "Hidden lists should use the regular dirty-on-show gate")
+				V:AssertEqual(accountQueryCount, 3, "Hidden lists should not query indexed BNet data")
+			end)
+
+			BetterFriendsFrame = originalFrame
+			BFL.GetBNetFriendInfo = originalGetBNetFriendInfo
+			BFL.GetBNetFriendGameAccountInfo = originalGetBNetFriendGameAccountInfo
+			BFL.AreBattleNetFriendTagsEnabled = originalFriendTagsEnabled
+			BFL.AreTitleFriendCustomNamesEnabled = originalTitleNamesEnabled
+			C_BattleNet = originalCBattleNet
+			FriendsList.OnFriendListUpdate = originalUpdate
+			FriendsList.bnetDataReady = originalReady
+			FriendsList.bnetFriendsByIndex = originalIndexMap
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 end
