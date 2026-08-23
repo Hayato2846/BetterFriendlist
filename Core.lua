@@ -509,7 +509,7 @@ function BFL:HasGuildRosterBaseAPI()
 		and self.GetGuildRosterInfo ~= nil
 end
 
-function BFL:GetGuildTabCapability()
+function BFL:GetGuildTabCapability(returnCanShowRoster)
 	local clientSupported = self.IsRetail == true
 	local hasBaseRosterAPI = false
 	if clientSupported then
@@ -523,7 +523,7 @@ function BFL:GetGuildTabCapability()
 
 	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 	local settingEnabled = BetterFriendlistDB and BetterFriendlistDB.enableGuildTab == true
-
+	if returnCanShowRoster then return (clientSupported and betaEnabled and settingEnabled and hasBaseRosterAPI) == true end
 	return {
 		betaEnabled = betaEnabled,
 		settingEnabled = settingEnabled,
@@ -535,8 +535,8 @@ function BFL:GetGuildTabCapability()
 end
 
 function BFL:IsGuildTabEnabled()
-	local capability = self:GetGuildTabCapability()
-	return capability and capability.canShowRoster == true
+	local enabled = self:GetGuildTabCapability(true)
+	return enabled
 end
 
 function BFL:UpdateBindingGlobals()
