@@ -840,38 +840,38 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "GuildBroker.lua",
-                         "Line":  1985,
-                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|1985"
+                         "Line":  2004,
+                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|2004"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "GuildBroker.lua",
-                         "Line":  1987,
-                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|1987"
+                         "Line":  2006,
+                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|2006"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "GuildBroker.lua",
-                         "Line":  796,
-                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|796"
+                         "Line":  798,
+                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|798"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "GuildBroker.lua",
-                         "Line":  808,
-                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|808"
+                         "Line":  810,
+                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|810"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "GuildBroker.lua",
-                         "Line":  818,
-                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|818"
+                         "Line":  820,
+                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|820"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "GuildBroker.lua",
-                         "Line":  828,
-                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|828"
+                         "Line":  830,
+                         "Signature":  "DEBUG-PRINT|GuildBroker.lua|830"
                      },
                      {
                          "Type":  "DEBUG-PRINT",

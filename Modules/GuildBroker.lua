@@ -27,6 +27,8 @@ local THROTTLE_INTERVAL = 0.5 -- Guild data changes less frequently than friends
 -- LibQTip tooltip references
 local tooltip = nil
 local tooltipKey = "BetterFriendlistGuildBrokerTT"
+-- Keep tooltip-only event callbacks out of the hidden broker path entirely.
+local guildBrokerTooltipEventGate = { active = false }
 local previewData = nil
 local detailTooltip = nil
 
@@ -843,6 +845,7 @@ local function TooltipCleanup(tt)
 	ReleaseDetailTooltip()
 	if tooltip == tt then
 		tooltip = nil
+		guildBrokerTooltipEventGate.active = false
 	end
 	BFL.BrokerUtils.ScheduleBrokerTooltipRelease(LQT, tt)
 
@@ -1663,6 +1666,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Register as active BFL broker tooltip
 	BFL.BrokerUtils.SetActiveBrokerTooltip(tt, LQT, function() return detailTooltip end)
+	guildBrokerTooltipEventGate.active = true
 
 	return tt
 end
@@ -1903,14 +1907,12 @@ function GuildBroker:RegisterEvents()
 		GuildBroker:InvalidateCache()
 		GuildBroker:RequestApplicantCountUpdate()
 		GuildBroker:UpdateBrokerText()
-		GuildBroker:RefreshTooltip()
 	end, 50)
 
 	BFL:RegisterEventCallback("GUILD_MOTD", function(motd)
 		if BFL.CacheGuildMOTD then
 			BFL.CacheGuildMOTD(motd)
 		end
-		GuildBroker:RefreshTooltip()
 	end, 50)
 
 	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function(unitTarget)
@@ -1927,25 +1929,27 @@ function GuildBroker:RegisterEvents()
 		if SafeIsInGuild() and BFL.GuildRoster then
 			pcall(BFL.GuildRoster)
 		end
-		GuildBroker:RefreshTooltip()
 	end, 50)
+
+	local function IsGuildClubFinderRequest(requestType)
+		return not (
+			Enum
+			and Enum.ClubFinderRequestType
+			and Enum.ClubFinderRequestType.Guild
+			and requestType
+			and requestType ~= Enum.ClubFinderRequestType.Guild
+		)
+	end
 
 	pcall(function()
 		BFL:RegisterEventCallback("CLUB_FINDER_APPLICATIONS_UPDATED", function(requestType)
-			if
-				Enum
-				and Enum.ClubFinderRequestType
-				and Enum.ClubFinderRequestType.Guild
-				and requestType
-				and requestType ~= Enum.ClubFinderRequestType.Guild
-			then
+			if not IsGuildClubFinderRequest(requestType) then
 				return
 			end
 
 			GuildBroker:RefreshApplicantCount(false)
 			lastUpdateTime = 0
 			GuildBroker:UpdateBrokerText()
-			GuildBroker:RefreshTooltip()
 		end, 50)
 	end)
 
@@ -1955,7 +1959,6 @@ function GuildBroker:RegisterEvents()
 			BFL:RegisterEventCallback("GUILD_RANKS_UPDATE", function()
 				GuildBroker:InvalidateCache()
 				GuildBroker:UpdateBrokerText()
-				GuildBroker:RefreshTooltip()
 			end, 50)
 		end)
 
@@ -1964,10 +1967,26 @@ function GuildBroker:RegisterEvents()
 			BFL:RegisterEventCallback("GUILD_RANKS_UPDATE_ACTIVE_PLAYER", function()
 				GuildBroker:InvalidateCache()
 				GuildBroker:UpdateBrokerText()
-				GuildBroker:RefreshTooltip()
 			end, 50)
 		end)
 	end
+
+	local function RegisterObservedTooltipEvent(event, shouldRefresh)
+		BFL:RegisterEventCallback(event, function(...)
+			if not shouldRefresh or shouldRefresh(...) then
+				GuildBroker:RefreshTooltip()
+			end
+		end, 50, guildBrokerTooltipEventGate)
+	end
+
+	RegisterObservedTooltipEvent("GUILD_ROSTER_UPDATE")
+	RegisterObservedTooltipEvent("GUILD_MOTD")
+	RegisterObservedTooltipEvent("PLAYER_GUILD_UPDATE", function(unitTarget)
+		return not unitTarget or unitTarget == "player"
+	end)
+	RegisterObservedTooltipEvent("CLUB_FINDER_APPLICATIONS_UPDATED", IsGuildClubFinderRequest)
+	RegisterObservedTooltipEvent("GUILD_RANKS_UPDATE")
+	RegisterObservedTooltipEvent("GUILD_RANKS_UPDATE_ACTIVE_PLAYER")
 end
 
 -- ========================================
