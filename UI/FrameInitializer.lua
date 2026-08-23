@@ -345,10 +345,23 @@ function FrameInitializer:InitializeStatusDropdown(frame)
 end
 
 function FrameInitializer:RefreshStatusDropdown(frame)
+	-- BN_INFO_CHANGED can fire while BFL is closed. Rebuilding a hidden modern
+	-- dropdown allocates its complete menu even though none of it is observable.
+	-- Remember the change and replay it once when the frame becomes visible.
+	if not (frame and frame.IsShown and frame:IsShown()) then
+		self.statusRefreshPending = true
+		return false
+	end
+
 	local dropdown = frame and frame.FriendsTabHeader and frame.FriendsTabHeader.StatusDropdown
 	if dropdown and dropdown.BFLRefreshStatus then
 		dropdown.BFLRefreshStatus()
+		self.statusRefreshPending = false
+		return true
 	end
+
+	self.statusRefreshPending = true
+	return false
 end
 
 --------------------------------------------------------------------------
@@ -1020,6 +1033,15 @@ function FrameInitializer:Initialize(frame)
 	end
 
 	self:InitializeStatusDropdown(frame)
+	self.statusRefreshPending = false
+	if frame.HookScript and self.statusRefreshHookFrame ~= frame then
+		frame:HookScript("OnShow", function(shownFrame)
+			if FrameInitializer.statusRefreshPending then
+				FrameInitializer:RefreshStatusDropdown(shownFrame)
+			end
+		end)
+		self.statusRefreshHookFrame = frame
+	end
 	self:InitializeSortDropdown(frame)
 	self:InitializeSortDropdowns(frame)
 	self:InitializeTabs(frame)
@@ -1031,6 +1053,7 @@ end
 -- Reset initialization state (for reloads)
 function FrameInitializer:Reset()
 	self.initialized = false
+	self.statusRefreshPending = false
 end
 
 -- Register module with BFL
