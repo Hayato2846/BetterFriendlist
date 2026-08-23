@@ -264,10 +264,39 @@ local function HideRow(row)
 	end
 end
 
-local function GetRowCacheVersions(friend, friendsList, FriendTags, persistentUID)
+local function GetFriendIdentityPart(value)
+	if value == nil then
+		return ""
+	end
+	if BFL.IsSecret and BFL:IsSecret(value) then
+		return "<secret>"
+	end
+	return tostring(value)
+end
+
+local function GetFriendRowIdentityKey(friend, persistentUID)
+	if type(friend) ~= "table" then
+		return table.concat({ type(friend), GetFriendIdentityPart(persistentUID or friend) }, "\31")
+	end
+	local gameAccountInfo = type(friend.gameAccountInfo) == "table" and friend.gameAccountInfo or nil
+	return table.concat({
+		GetFriendIdentityPart(friend.type),
+		GetFriendIdentityPart(persistentUID),
+		GetFriendIdentityPart(friend.uid),
+		GetFriendIdentityPart(friend.battleTag),
+		GetFriendIdentityPart(friend.bnetAccountID),
+		GetFriendIdentityPart(friend.name),
+		GetFriendIdentityPart(friend.characterName),
+		GetFriendIdentityPart(friend.realmName),
+		GetFriendIdentityPart(gameAccountInfo and gameAccountInfo.characterName),
+		GetFriendIdentityPart(gameAccountInfo and gameAccountInfo.realmName),
+	}, "\31")
+end
+
+local function GetRowCacheContext(friend, friendsList, FriendTags, persistentUID)
 	local settingsCache = friendsList and friendsList.settingsCache
 	FriendTags = FriendTags or GetFriendTags()
-	local friendsVersion = BFL.FriendsListVersion or 0
+	local friendIdentityKey = GetFriendRowIdentityKey(friend, persistentUID)
 	local tagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
 		or BFL.FriendTagsVersion
 		or 0
@@ -286,43 +315,9 @@ local function GetRowCacheVersions(friend, friendsList, FriendTags, persistentUI
 	local infoDisabledFlag = settingsCache and settingsCache.infoDisabled and 1 or 0
 	local availableWidth = GetAvailableRowWidth(friendsList, FriendTags)
 
-	if type(friend) == "table" then
-		if
-			friend._bflTagChipsVersionFriendsVersion == friendsVersion
-			and friend._bflTagChipsVersionTagsDefinitionVersion == tagsDefinitionVersion
-			and friend._bflTagChipsVersionGlobalAssignmentVersion == tagsGlobalAssignmentVersion
-			and friend._bflTagChipsVersionSettingsVersion == settingsVersion
-			and friend._bflTagChipsVersionCompactMode == compactModeFlag
-			and friend._bflTagChipsVersionInfoDisabled == infoDisabledFlag
-			and friend._bflTagChipsVersionAvailableWidth == availableWidth
-		then
-			return friendsVersion,
-				tagsDefinitionVersion,
-				friend._bflTagChipsVersionTagsAssignmentVersion or 0,
-				settingsVersion,
-				compactModeFlag,
-				infoDisabledFlag,
-				availableWidth
-		end
-	end
-
-	local tagsAssignmentVersion = FriendTags and FriendTags.GetFriendAssignmentVersion and FriendTags:GetFriendAssignmentVersion(friend, persistentUID)
-		or BFL.FriendTagsVersion
-		or 0
-	if type(friend) == "table" then
-		friend._bflTagChipsVersionFriendsVersion = friendsVersion
-		friend._bflTagChipsVersionTagsDefinitionVersion = tagsDefinitionVersion
-		friend._bflTagChipsVersionGlobalAssignmentVersion = tagsGlobalAssignmentVersion
-		friend._bflTagChipsVersionTagsAssignmentVersion = tagsAssignmentVersion
-		friend._bflTagChipsVersionSettingsVersion = settingsVersion
-		friend._bflTagChipsVersionCompactMode = compactModeFlag
-		friend._bflTagChipsVersionInfoDisabled = infoDisabledFlag
-		friend._bflTagChipsVersionAvailableWidth = availableWidth
-	end
-
-	return friendsVersion,
+	return friendIdentityKey,
 		tagsDefinitionVersion,
-		tagsAssignmentVersion,
+		tagsGlobalAssignmentVersion,
 		settingsVersion,
 		compactModeFlag,
 		infoDisabledFlag,
@@ -333,11 +328,10 @@ local function NormalizeGroupCacheKey(groupId)
 	return groupId == nil and "" or tostring(groupId)
 end
 
-local function RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
+local function RowDataInputsMatch(data, friendIdentityKey, tagsDefinitionVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
 	return data
-		and data.cacheFriendsVersion == friendsVersion
+		and data.cacheFriendIdentityKey == friendIdentityKey
 		and data.cacheTagsDefinitionVersion == tagsDefinitionVersion
-		and data.cacheTagsAssignmentVersion == tagsAssignmentVersion
 		and data.cacheSettingsVersion == settingsVersion
 		and data.cacheCompactMode == compactMode
 		and data.cacheInfoDisabled == infoDisabled
@@ -345,10 +339,55 @@ local function RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsA
 		and data.cacheGroupId == groupCacheKey
 end
 
-local function CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
+local function GetFriendAssignmentVersion(friend, FriendTags, persistentUID)
+	return FriendTags and FriendTags.GetFriendAssignmentVersion and FriendTags:GetFriendAssignmentVersion(friend, persistentUID)
+		or BFL.FriendTagsVersion
+		or 0
+end
+
+local function RowDataMatches(
+	data,
+	friendIdentityKey,
+	tagsDefinitionVersion,
+	tagsGlobalAssignmentVersion,
+	settingsVersion,
+	compactMode,
+	infoDisabled,
+	availableWidth,
+	groupCacheKey,
+	friend,
+	FriendTags,
+	persistentUID
+)
+	if not RowDataInputsMatch(
+		data,
+		friendIdentityKey,
+		tagsDefinitionVersion,
+		settingsVersion,
+		compactMode,
+		infoDisabled,
+		availableWidth,
+		groupCacheKey
+	) then
+		return false
+	end
+	if data.cacheTagsGlobalAssignmentVersion == tagsGlobalAssignmentVersion then
+		return true, data.cacheTagsAssignmentVersion
+	end
+
+	local tagsAssignmentVersion = GetFriendAssignmentVersion(friend, FriendTags, persistentUID)
+	if data.cacheTagsAssignmentVersion == tagsAssignmentVersion then
+		data.cacheTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion
+		return true, tagsAssignmentVersion
+	end
+	return false, tagsAssignmentVersion
+end
+
+local function CreateRowData(friendIdentityKey, tagsDefinitionVersion, tagsGlobalAssignmentVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
 	return {
-		cacheFriendsVersion = friendsVersion,
+		cacheFriendIdentityKey = friendIdentityKey,
 		cacheTagsDefinitionVersion = tagsDefinitionVersion,
+		cacheTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion,
 		cacheTagsAssignmentVersion = tagsAssignmentVersion,
 		cacheSettingsVersion = settingsVersion,
 		cacheCompactMode = compactMode,
@@ -389,11 +428,12 @@ local function ReleaseRenderableTags(data)
 	end
 end
 
-local function ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
-	data = data or CreateRowData(friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
+local function ResetRowData(data, friendIdentityKey, tagsDefinitionVersion, tagsGlobalAssignmentVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
+	data = data or CreateRowData(friendIdentityKey, tagsDefinitionVersion, tagsGlobalAssignmentVersion, tagsAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth, groupCacheKey)
 	ReleaseRenderableTags(data)
-	data.cacheFriendsVersion = friendsVersion
+	data.cacheFriendIdentityKey = friendIdentityKey
 	data.cacheTagsDefinitionVersion = tagsDefinitionVersion
+	data.cacheTagsGlobalAssignmentVersion = tagsGlobalAssignmentVersion
 	data.cacheTagsAssignmentVersion = tagsAssignmentVersion
 	data.cacheSettingsVersion = settingsVersion
 	data.cacheCompactMode = compactMode
@@ -692,8 +732,8 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 	if persistentCacheKey then
 		persistentCacheKey = persistentCacheKey .. "|group:" .. groupCacheKey
 	end
-	local friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
-		GetRowCacheVersions(friend, friendsList, FriendTags, persistentUID)
+	local friendIdentityKey, tagsDefinitionVersion, tagsGlobalAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth =
+		GetRowCacheContext(friend, friendsList, FriendTags, persistentUID)
 	if self.rowDataCacheDefinitionVersion ~= tagsDefinitionVersion then
 		self.rowDataCacheDefinitionVersion = tagsDefinitionVersion
 		self.rowDataByFriend = {}
@@ -701,6 +741,7 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 		self.scalarRowCache = {}
 	end
 	local data
+	local tagsAssignmentVersion
 	local useFriendCache = type(friend) == "table" and persistentCacheKey == nil
 
 	if persistentCacheKey then
@@ -708,13 +749,43 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 			self.rowDataByFriend = {}
 		end
 		data = self.rowDataByFriend[persistentCacheKey]
-		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth, groupCacheKey) then
+		local matches
+		matches, tagsAssignmentVersion = RowDataMatches(
+			data,
+			friendIdentityKey,
+			tagsDefinitionVersion,
+			tagsGlobalAssignmentVersion,
+			settingsVersion,
+			compactModeFlag,
+			infoDisabledFlag,
+			availableWidth,
+			groupCacheKey,
+			friend,
+			FriendTags,
+			persistentUID
+		)
+		if matches then
 			return data
 		end
 	elseif useFriendCache then
 		friend._bflTagChipsRowDataByGroup = friend._bflTagChipsRowDataByGroup or {}
 		data = friend._bflTagChipsRowDataByGroup[groupCacheKey]
-		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth, groupCacheKey) then
+		local matches
+		matches, tagsAssignmentVersion = RowDataMatches(
+			data,
+			friendIdentityKey,
+			tagsDefinitionVersion,
+			tagsGlobalAssignmentVersion,
+			settingsVersion,
+			compactModeFlag,
+			infoDisabledFlag,
+			availableWidth,
+			groupCacheKey,
+			friend,
+			FriendTags,
+			persistentUID
+		)
+		if matches then
 			return data
 		end
 	else
@@ -727,12 +798,39 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 		end
 		cacheKey = tostring(cacheKey) .. "|group:" .. groupCacheKey
 		data = self.scalarRowCache[cacheKey]
-		if RowDataMatches(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth, groupCacheKey) then
+		local matches
+		matches, tagsAssignmentVersion = RowDataMatches(
+			data,
+			friendIdentityKey,
+			tagsDefinitionVersion,
+			tagsGlobalAssignmentVersion,
+			settingsVersion,
+			compactModeFlag,
+			infoDisabledFlag,
+			availableWidth,
+			groupCacheKey,
+			friend,
+			FriendTags,
+			persistentUID
+		)
+		if matches then
 			return data
 		end
 	end
 
-	data = ResetRowData(data, friendsVersion, tagsDefinitionVersion, tagsAssignmentVersion, settingsVersion, compactModeFlag, infoDisabledFlag, availableWidth, groupCacheKey)
+	tagsAssignmentVersion = tagsAssignmentVersion or GetFriendAssignmentVersion(friend, FriendTags, persistentUID)
+	data = ResetRowData(
+		data,
+		friendIdentityKey,
+		tagsDefinitionVersion,
+		tagsGlobalAssignmentVersion,
+		tagsAssignmentVersion,
+		settingsVersion,
+		compactModeFlag,
+		infoDisabledFlag,
+		availableWidth,
+		groupCacheKey
+	)
 	data.fullWidthTagRows = FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true or false
 	if persistentCacheKey then
 		if not self.rowDataByFriend[persistentCacheKey] then
@@ -874,18 +972,21 @@ function TagChips:UpdateRowChips(button, friend, friendsList, groupId, rowData)
 	if rowData then
 		local FriendTags = GetFriendTags()
 		local _, persistentUID = GetPersistentRowCacheKey(friend, FriendTags)
-		local friendsVersion, definitionVersion, assignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth =
-			GetRowCacheVersions(friend, friendsList, FriendTags, persistentUID)
+		local friendIdentityKey, definitionVersion, globalAssignmentVersion, settingsVersion, compactMode, infoDisabled, availableWidth =
+			GetRowCacheContext(friend, friendsList, FriendTags, persistentUID)
 		if not RowDataMatches(
 			rowData,
-			friendsVersion,
+			friendIdentityKey,
 			definitionVersion,
-			assignmentVersion,
+			globalAssignmentVersion,
 			settingsVersion,
 			compactMode,
 			infoDisabled,
 			availableWidth,
-			NormalizeGroupCacheKey(groupId)
+			NormalizeGroupCacheKey(groupId),
+			friend,
+			FriendTags,
+			persistentUID
 		) then
 			rowData = nil
 		end

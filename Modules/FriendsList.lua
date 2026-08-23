@@ -4504,6 +4504,8 @@ end
 
 -- Handle friend list update events
 function FriendsList:HasBNetFriendInfoChanged(friendIndex)
+	self.lastBNetFriendInfoEventIndex = friendIndex
+	self.lastBNetFriendInfoEventTagsChanged = nil
 	if type(friendIndex) ~= "number" or friendIndex < 1 then
 		return true
 	end
@@ -4513,6 +4515,11 @@ function FriendsList:HasBNetFriendInfoChanged(friendIndex)
 	if not friend or friend.type ~= "bnet" or not accountInfo then
 		return true
 	end
+
+	local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
+	self.lastBNetFriendInfoEventTagsChanged = friendTagsEnabled
+		and not AreFriendTagsEqual(friend.friendTags, accountInfo.friendTags)
+		or false
 
 	if
 		friend.bnetAccountID ~= accountInfo.bnetAccountID
@@ -4530,8 +4537,7 @@ function FriendsList:HasBNetFriendInfoChanged(friendIndex)
 		return true
 	end
 
-	local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
-	if friendTagsEnabled and not AreFriendTagsEqual(friend.friendTags, accountInfo.friendTags) then
+	if self.lastBNetFriendInfoEventTagsChanged then
 		return true
 	end
 
@@ -4595,7 +4601,19 @@ function FriendsList:HasBNetFriendInfoChanged(friendIndex)
 	return false
 end
 
+function FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex)
+	if self.lastBNetFriendInfoEventIndex ~= friendIndex then
+		return nil
+	end
+	return self.lastBNetFriendInfoEventTagsChanged
+end
+
 function FriendsList:OnBNetFriendInfoChanged(friendIndex)
+	-- FriendTags consumes this event after FriendsList. Start unknown so hidden,
+	-- Classic, invalid, and incomplete payloads retain its conservative fallback.
+	self.lastBNetFriendInfoEventIndex = friendIndex
+	self.lastBNetFriendInfoEventTagsChanged = nil
+
 	-- Do not query a single account while hidden. The regular visibility gate keeps
 	-- the list dirty and performs one authoritative rebuild on the next open.
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then

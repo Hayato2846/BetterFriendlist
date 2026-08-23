@@ -2958,13 +2958,21 @@ function FriendTags:Initialize()
 				RefreshSurfaces()
 			end, 35)
 		end
-		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
+		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(friendIndex)
 			if type(self.pendingBlizzardTagSets) == "table" then
 				wipe(self.pendingBlizzardTagSets)
 			end
+			local FriendsList = BFL:GetModule("FriendsList")
+			if
+				FriendsList
+				and FriendsList.GetLastBNetFriendInfoEventTagsChanged
+				and FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex) == false
+			then
+				return
+			end
 			-- This synchronous event often arrives once per Battle.net friend. Mark
-			-- the aggregate cache dirty once and clear it lazily when a tag surface is
-			-- next observed instead of replacing six cache tables for every event.
+			-- the aggregate cache dirty only for a real tag change or an unknown event
+			-- payload, then clear it lazily when a tag surface is next observed.
 			DeferAllFriendAssignmentRefresh()
 		end, 85)
 	end
