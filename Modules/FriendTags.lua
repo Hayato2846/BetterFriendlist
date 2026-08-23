@@ -2963,16 +2963,23 @@ function FriendTags:Initialize()
 				wipe(self.pendingBlizzardTagSets)
 			end
 			local FriendsList = BFL:GetModule("FriendsList")
-			if
-				FriendsList
-				and FriendsList.GetLastBNetFriendInfoEventTagsChanged
-				and FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex) == false
-			then
+			local tagsChanged, friend
+			if FriendsList and FriendsList.GetLastBNetFriendInfoEventTagsChanged then
+				tagsChanged, friend = FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex)
+			end
+			if tagsChanged == false then
+				return
+			end
+			if tagsChanged == true and friend then
+				-- FriendsList already scheduled the authoritative list rebuild. Only
+				-- invalidate this account's aliases and runtime tag surfaces; using the
+				-- global fallback here would discard every persistent row-chip cache.
+				RefreshFriendAssignment(nil, friend, nil, true)
 				return
 			end
 			-- This synchronous event often arrives once per Battle.net friend. Mark
-			-- the aggregate cache dirty only for a real tag change or an unknown event
-			-- payload, then clear it lazily when a tag surface is next observed.
+			-- the aggregate cache dirty only for an unknown event payload, then clear
+			-- it lazily when a tag surface is next observed.
 			DeferAllFriendAssignmentRefresh()
 		end, 85)
 	end

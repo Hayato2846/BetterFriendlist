@@ -4605,7 +4605,8 @@ function FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex)
 	if self.lastBNetFriendInfoEventIndex ~= friendIndex then
 		return nil
 	end
-	return self.lastBNetFriendInfoEventTagsChanged
+	local friend = self.bnetFriendsByIndex and self.bnetFriendsByIndex[friendIndex]
+	return self.lastBNetFriendInfoEventTagsChanged, friend
 end
 
 function FriendsList:OnBNetFriendInfoChanged(friendIndex)
