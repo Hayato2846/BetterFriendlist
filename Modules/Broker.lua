@@ -50,6 +50,8 @@ local bnetCountsHardInvalidated = true
 -- LibQTip tooltip reference
 local tooltip = nil
 local tooltipKey = "BetterFriendlistBrokerTT"
+-- Keep tooltip-only event callbacks out of the hidden broker path entirely.
+local brokerTooltipEventGate = { active = false }
 local previewData = nil
 
 -- Detail Tooltip reference (Forward declared for helper access)
@@ -1774,6 +1776,7 @@ local function TooltipCleanup(tt)
 	BFL.BrokerUtils.ClearActiveBrokerTooltip(tt)
 	if tooltip == tt then
 		tooltip = nil
+		brokerTooltipEventGate.active = false
 	end
 	BFL.BrokerUtils.ScheduleBrokerTooltipRelease(LQT, tt)
 
@@ -2666,6 +2669,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 
 	-- Register as active BFL broker tooltip
 	BFL.BrokerUtils.SetActiveBrokerTooltip(tt, LQT, function() return detailTooltip end)
+	brokerTooltipEventGate.active = true
 
 	return tt
 end
@@ -3012,7 +3016,6 @@ function Broker:RegisterEvents()
 		else
 			Broker:ScheduleBrokerTextUpdate(false)
 		end
-		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("BN_FRIEND_ACCOUNT_OFFLINE", function(friendID, isCompanionApp)
@@ -3023,49 +3026,46 @@ function Broker:RegisterEvents()
 		else
 			Broker:ScheduleBrokerTextUpdate(false)
 		end
-		Broker:ScheduleObservedTooltipRefresh(true)
-	end)
-
-	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(...)
-		Broker:ScheduleObservedTooltipRefresh(true)
-	end)
-
-	BFL:RegisterEventCallback("BN_INFO_CHANGED", function(...)
-		Broker:ScheduleObservedTooltipRefresh(true)
-	end)
-
-	pcall(function()
-		BFL:RegisterEventCallback("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", function(...)
-			Broker:ScheduleObservedTooltipRefresh(false)
-		end)
 	end)
 
 	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function(...)
 		Broker:ScheduleBrokerTextUpdate(true)
-		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function(...)
 		Broker:ScheduleBrokerTextUpdate(false)
-		Broker:ScheduleObservedTooltipRefresh(false)
 	end)
 
 	pcall(function()
 		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", function(...)
 			Broker:ScheduleBrokerTextUpdate(false)
-			Broker:ScheduleObservedTooltipRefresh(false)
 		end)
 	end)
 
 	BFL:RegisterEventCallback("BN_CONNECTED", function(...)
 		Broker:ScheduleBrokerTextUpdate(true)
-		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
 
 	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
 		Broker:ScheduleBrokerTextUpdate(true)
-		Broker:ScheduleObservedTooltipRefresh(true)
 	end)
+
+	local function RegisterObservedTooltipEvent(event, invalidateBattleNet)
+		BFL:RegisterEventCallback(event, function()
+			Broker:ScheduleObservedTooltipRefresh(invalidateBattleNet)
+		end, nil, brokerTooltipEventGate)
+	end
+
+	RegisterObservedTooltipEvent("BN_FRIEND_ACCOUNT_ONLINE", true)
+	RegisterObservedTooltipEvent("BN_FRIEND_ACCOUNT_OFFLINE", true)
+	RegisterObservedTooltipEvent("BN_FRIEND_INFO_CHANGED", true)
+	RegisterObservedTooltipEvent("BN_INFO_CHANGED", true)
+	RegisterObservedTooltipEvent("BATTLE_NET_TITLE_FRIEND_CUSTOM_NAME_ENABLED_STATUS_UPDATED", false)
+	RegisterObservedTooltipEvent("BN_FRIEND_LIST_SIZE_CHANGED", true)
+	RegisterObservedTooltipEvent("FRIENDLIST_UPDATE", false)
+	RegisterObservedTooltipEvent("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", false)
+	RegisterObservedTooltipEvent("BN_CONNECTED", true)
+	RegisterObservedTooltipEvent("BN_DISCONNECTED", true)
 end
 
 -- ========================================
