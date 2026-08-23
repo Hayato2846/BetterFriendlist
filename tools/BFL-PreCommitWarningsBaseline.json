@@ -744,14 +744,14 @@
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "FriendsList.lua",
-                         "Line":  10096,
-                         "Signature":  "DEBUG-PRINT|FriendsList.lua|10096"
+                         "Line":  10164,
+                         "Signature":  "DEBUG-PRINT|FriendsList.lua|10164"
                      },
                      {
                          "Type":  "DEBUG-PRINT",
                          "Path":  "FriendsList.lua",
-                         "Line":  10155,
-                         "Signature":  "DEBUG-PRINT|FriendsList.lua|10155"
+                         "Line":  10223,
+                         "Signature":  "DEBUG-PRINT|FriendsList.lua|10223"
                      },
                      {
                          "Type":  "DEBUG-PRINT",

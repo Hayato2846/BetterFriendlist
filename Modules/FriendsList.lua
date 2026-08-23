@@ -699,15 +699,37 @@ function FriendsList:MeasureWrappedFriendNameHeight(nameSize, nameText, nameWidt
 	return MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidth)
 end
 
+local BNET_FRIEND_TAG_BITS = {
+	[0] = 1,
+	[1] = 2,
+	[2] = 4,
+	[3] = 8,
+	[4] = 16,
+	[5] = 32,
+	[6] = 64,
+	[7] = 128,
+	[8] = 256,
+	[9] = 512,
+}
+
 local function CopyFriendTags(friendTags)
 	if type(friendTags) ~= "table" then
-		return nil
+		return nil, nil
 	end
 	local copy = {}
+	local mask = 0
 	for index, tag in ipairs(friendTags) do
 		copy[index] = tag
+		local tagBit = BNET_FRIEND_TAG_BITS[tag]
+		if tagBit then
+			mask = mask and (mask + tagBit) or nil
+		else
+			-- Preserve correctness if Retail adds a new enum before this compact
+			-- snapshot is updated. Unknown masks keep the conservative fallback.
+			mask = nil
+		end
 	end
-	return copy
+	return copy, mask
 end
 
 local function GetSafeBNetAccountName(accountInfo)
@@ -4606,7 +4628,9 @@ function FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex)
 		return nil
 	end
 	local friend = self.bnetFriendsByIndex and self.bnetFriendsByIndex[friendIndex]
-	return self.lastBNetFriendInfoEventTagsChanged, friend
+	return self.lastBNetFriendInfoEventTagsChanged,
+		friend,
+		self.bnetFriendTagSnapshotComplete == true
 end
 
 function FriendsList:OnBNetFriendInfoChanged(friendIndex)
@@ -5143,6 +5167,15 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 			bnetAccountInfos[i] = accountInfo
 		end
 		self.bnetIncompleteRetryAttempts = 0
+		local previousFriendTagMasks = self.bnetFriendTagMasksByAccount
+		local nextFriendTagMasks = self.nextBNetFriendTagMasksByAccount
+		if not nextFriendTagMasks then
+			nextFriendTagMasks = {}
+		else
+			wipe(nextFriendTagMasks)
+		end
+		local friendTagSnapshotComplete = true
+		local FriendTags = friendTagsEnabled and BFL:GetModule("FriendTags") or nil
 
 		for i = 1, numBNetTotal do
 			local accountInfo = bnetAccountInfos[i]
@@ -5180,7 +5213,34 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						friend.titleCustomName = customName
 					end
 				end
-				friend.friendTags = friendTagsEnabled and CopyFriendTags(accountInfo.friendTags) or nil
+				local friendTagMask = 0
+				if friendTagsEnabled then
+					friend.friendTags, friendTagMask = CopyFriendTags(accountInfo.friendTags)
+				end
+				friend.friendTagsMask = friendTagMask
+				local friendTagAssignmentChanged = false
+
+				local friendTagSnapshotKey = accountInfo.bnetAccountID
+				local friendTagSnapshotKeyUsable = friendTagSnapshotKey ~= nil
+					and not BFL:IsSecret(friendTagSnapshotKey)
+				if not friendTagSnapshotKeyUsable then
+					friendTagSnapshotKey = accountInfo.battleTag
+					friendTagSnapshotKeyUsable = friendTagSnapshotKey ~= nil
+						and friendTagSnapshotKey ~= ""
+						and not BFL:IsSecret(friendTagSnapshotKey)
+				end
+				if
+					friendTagMask == nil
+					or not friendTagSnapshotKeyUsable
+				then
+					friendTagSnapshotComplete = false
+				else
+					nextFriendTagMasks[friendTagSnapshotKey] = friendTagMask
+					local previousMask = previousFriendTagMasks and previousFriendTagMasks[friendTagSnapshotKey]
+					friendTagAssignmentChanged = friendTagsEnabled
+						and previousMask ~= nil
+						and previousMask ~= friendTagMask
+				end
 				friend.gameAccountInfo = accountInfo.gameAccountInfo
 				friend.lastOnlineTime = accountInfo.lastOnlineTime
 				friend.isAFK = accountInfo.isAFK
@@ -5524,8 +5584,16 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 						end
 					end
 				end
+
+				if friendTagAssignmentChanged and FriendTags and FriendTags.InvalidateFriendAssignment then
+					FriendTags:InvalidateFriendAssignment(friend)
+				end
 			end
 		end
+
+		self.bnetFriendTagMasksByAccount = nextFriendTagMasks
+		self.nextBNetFriendTagMasksByAccount = previousFriendTagMasks or {}
+		self.bnetFriendTagSnapshotComplete = friendTagSnapshotComplete
 	end
 
 	-- Classic fallback: If BNet APIs don't exist, mark data as ready immediately

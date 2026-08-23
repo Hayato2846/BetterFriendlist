@@ -13924,9 +13924,11 @@ function TestSuite:RegisterBNetFriendInfoNoOpTest()
 			local originalUpdate = FriendsList.OnFriendListUpdate
 			local originalReady = FriendsList.bnetDataReady
 			local originalIndexMap = FriendsList.bnetFriendsByIndex
+			local originalTagSnapshotComplete = FriendsList.bnetFriendTagSnapshotComplete
 			local updateCount = 0
 			local accountQueryCount = 0
 			local accountNote = "unchanged"
+			local accountFriendTags = { 1, 2 }
 			local secondaryRichPresence = "unchanged presence"
 
 			local gameAccountInfo = {
@@ -13983,7 +13985,7 @@ function TestSuite:RegisterBNetFriendInfoNoOpTest()
 						note = accountNote,
 						customMessage = "Status",
 						customMessageTime = 10,
-						friendTags = { 1, 2 },
+						friendTags = accountFriendTags,
 						gameAccountInfo = {
 							gameAccountID = 9001,
 							clientProgram = BNET_CLIENT_WOW or "WoW",
@@ -14022,28 +14024,42 @@ function TestSuite:RegisterBNetFriendInfoNoOpTest()
 				end
 				FriendsList.bnetDataReady = true
 				FriendsList.bnetFriendsByIndex = { [7] = cachedFriend }
+				FriendsList.bnetFriendTagSnapshotComplete = true
 
 				FriendsList:OnBNetFriendInfoChanged(7)
 				V:AssertEqual(updateCount, 0, "An unchanged indexed friend should not schedule a full refresh")
 				V:AssertEqual(accountQueryCount, 1, "The no-op check should query only the indexed friend")
 
+				accountFriendTags = { 1, 3 }
+				FriendsList:OnBNetFriendInfoChanged(7)
+				local tagsChanged, changedFriend = FriendsList:GetLastBNetFriendInfoEventTagsChanged(7)
+				V:Assert(tagsChanged == true, "A changed native tag set should be identified")
+				V:Assert(changedFriend == cachedFriend, "A changed native tag set should retain its targeted friend")
+				V:AssertEqual(updateCount, 1, "A changed native tag set should preserve the full refresh path")
+				accountFriendTags = { 1, 2 }
+
 				secondaryRichPresence = "changed presence"
 				FriendsList:OnBNetFriendInfoChanged(7)
-				V:AssertEqual(updateCount, 1, "A secondary game-account change should preserve the full refresh path")
+				V:AssertEqual(updateCount, 2, "A secondary game-account change should preserve the full refresh path")
 				secondaryRichPresence = "unchanged presence"
 
 				accountNote = "changed"
 				FriendsList:OnBNetFriendInfoChanged(7)
-				V:AssertEqual(updateCount, 2, "A changed indexed friend should preserve the full refresh path")
+				V:AssertEqual(updateCount, 3, "A changed indexed friend should preserve the full refresh path")
 
 				FriendsList:OnBNetFriendInfoChanged(nil)
-				V:AssertEqual(updateCount, 3, "A nil Retail payload should conservatively refresh")
-				V:AssertEqual(accountQueryCount, 3, "Invalid payloads should not query arbitrary friend indices")
+				local unknownTagsChanged, unknownFriend, canReconcileUnknown =
+					FriendsList:GetLastBNetFriendInfoEventTagsChanged(nil)
+				V:AssertNil(unknownTagsChanged, "A nil Retail payload should keep its tag change unknown")
+				V:AssertNil(unknownFriend, "A nil Retail payload should not target an arbitrary friend")
+				V:Assert(canReconcileUnknown == true, "A complete tag snapshot should reconcile nil payloads during rebuild")
+				V:AssertEqual(updateCount, 4, "A nil Retail payload should conservatively refresh")
+				V:AssertEqual(accountQueryCount, 4, "Invalid payloads should not query arbitrary friend indices")
 
 				BetterFriendsFrame = { IsShown = function() return false end }
 				FriendsList:OnBNetFriendInfoChanged(7)
-				V:AssertEqual(updateCount, 4, "Hidden lists should use the regular dirty-on-show gate")
-				V:AssertEqual(accountQueryCount, 3, "Hidden lists should not query indexed BNet data")
+				V:AssertEqual(updateCount, 5, "Hidden lists should use the regular dirty-on-show gate")
+				V:AssertEqual(accountQueryCount, 4, "Hidden lists should not query indexed BNet data")
 			end)
 
 			BetterFriendsFrame = originalFrame
@@ -14055,6 +14071,7 @@ function TestSuite:RegisterBNetFriendInfoNoOpTest()
 			FriendsList.OnFriendListUpdate = originalUpdate
 			FriendsList.bnetDataReady = originalReady
 			FriendsList.bnetFriendsByIndex = originalIndexMap
+			FriendsList.bnetFriendTagSnapshotComplete = originalTagSnapshotComplete
 			if not ok then
 				error(err, 0)
 			end

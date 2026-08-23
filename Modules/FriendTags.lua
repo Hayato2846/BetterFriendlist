@@ -1065,6 +1065,10 @@ local function RefreshFriendAssignment(refreshCallback, friend, explicitUID, sup
 	end
 end
 
+function FriendTags:InvalidateFriendAssignment(friend, explicitUID)
+	RefreshFriendAssignment(nil, friend, explicitUID, true)
+end
+
 local function DeferAllFriendAssignmentRefresh()
 	if runtimeFriendCachesDirty then
 		return
@@ -2963,9 +2967,10 @@ function FriendTags:Initialize()
 				wipe(self.pendingBlizzardTagSets)
 			end
 			local FriendsList = BFL:GetModule("FriendsList")
-			local tagsChanged, friend
+			local tagsChanged, friend, canReconcileUnknownEvent
 			if FriendsList and FriendsList.GetLastBNetFriendInfoEventTagsChanged then
-				tagsChanged, friend = FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex)
+				tagsChanged, friend, canReconcileUnknownEvent =
+					FriendsList:GetLastBNetFriendInfoEventTagsChanged(friendIndex)
 			end
 			if tagsChanged == false then
 				return
@@ -2975,6 +2980,12 @@ function FriendTags:Initialize()
 				-- invalidate this account's aliases and runtime tag surfaces; using the
 				-- global fallback here would discard every persistent row-chip cache.
 				RefreshFriendAssignment(nil, friend, nil, true)
+				return
+			end
+			if canReconcileUnknownEvent then
+				-- A nil Retail payload still requires the authoritative list rebuild,
+				-- but that rebuild compares compact per-account tag masks and targets
+				-- only changed friends. Do not discard every persistent row cache here.
 				return
 			end
 			-- This synchronous event often arrives once per Battle.net friend. Mark
