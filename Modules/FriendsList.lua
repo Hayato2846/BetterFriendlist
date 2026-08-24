@@ -164,6 +164,14 @@ local BUTTON_TYPE_INVITE = 4
 local BUTTON_TYPE_DIVIDER = 5
 local BUTTON_TYPE_SEARCH = 6
 local MAX_MULTI_ACCOUNT_ROW_ENTRIES = 2 -- Info Line Formatting (Phase 22)
+local LARGE_BNET_FRIEND_LIST_THRESHOLD = 100
+local VERY_LARGE_BNET_FRIEND_LIST_THRESHOLD = 300
+local EXTREME_BNET_FRIEND_LIST_THRESHOLD = 600
+local LARGE_FRIENDS_LIST_MAX_BATCH_SIZE = 25
+local VERY_LARGE_FRIENDS_LIST_MAX_BATCH_SIZE = 20
+local EXTREME_FRIENDS_LIST_MAX_BATCH_SIZE = 15
+local FRIENDS_LIST_UPDATE_TIME_BUDGET_MS = 4
+local GetFriendsListProfileTime = debugprofilestop
 
 -- Forward declarations for helpers referenced before their definitions
 local ShouldShowMultiAccountRow
@@ -5062,7 +5070,106 @@ function FriendsList:DeferIncompleteBNetData(ignoreVisibility)
 	end
 end
 
-function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimization:
+local function CanRunChunkedFriendsListUpdate()
+	return coroutine
+		and coroutine.create
+		and coroutine.resume
+		and coroutine.status
+		and coroutine.yield
+		and C_Timer
+		and C_Timer.After
+end
+
+local function ResumeChunkedFriendsListUpdate(self, updateThread)
+	if self.chunkedFriendsListUpdate ~= updateThread then
+		return
+	end
+
+	local ok, errorMessage = coroutine.resume(updateThread)
+	if not ok then
+		self.chunkedFriendsListUpdate = nil
+		isUpdatingFriendsList = false
+		error(errorMessage, 0)
+	end
+
+	if coroutine.status(updateThread) == "dead" then
+		self.chunkedFriendsListUpdate = nil
+		return
+	end
+
+	C_Timer.After(0, function()
+		ResumeChunkedFriendsListUpdate(self, updateThread)
+	end)
+end
+
+function FriendsList:StartChunkedFriendsListUpdate(ignoreVisibility)
+	if self.chunkedFriendsListUpdate then
+		hasPendingUpdate = true
+		return
+	end
+
+	local updateThread = coroutine.create(function()
+		self:UpdateFriendsList(ignoreVisibility, true)
+	end)
+	self.chunkedFriendsListUpdate = updateThread
+	C_Timer.After(0, function()
+		ResumeChunkedFriendsListUpdate(self, updateThread)
+	end)
+end
+
+local function GetChunkedFriendsListUpdateMaxBatchSize(friendCount)
+	if friendCount > EXTREME_BNET_FRIEND_LIST_THRESHOLD then
+		return EXTREME_FRIENDS_LIST_MAX_BATCH_SIZE
+	elseif friendCount > VERY_LARGE_BNET_FRIEND_LIST_THRESHOLD then
+		return VERY_LARGE_FRIENDS_LIST_MAX_BATCH_SIZE
+	end
+	return LARGE_FRIENDS_LIST_MAX_BATCH_SIZE
+end
+
+function FriendsList:GetChunkedFriendsListUpdateMaxBatchSize(friendCount)
+	return GetChunkedFriendsListUpdateMaxBatchSize(friendCount or 0)
+end
+
+local function ResetChunkedFriendsListUpdateBudget(updateBudget)
+	updateBudget.processedCount = 0
+	updateBudget.batchStartedAt = GetFriendsListProfileTime and GetFriendsListProfileTime() or nil
+end
+
+local function CreateChunkedFriendsListUpdateBudget(friendCount)
+	local updateBudget = {
+		maxBatchSize = GetChunkedFriendsListUpdateMaxBatchSize(friendCount),
+	}
+	ResetChunkedFriendsListUpdateBudget(updateBudget)
+	return updateBudget
+end
+
+local function YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
+	if not isChunkedUpdate or not updateBudget then
+		return
+	end
+
+	updateBudget.processedCount = updateBudget.processedCount + 1
+	local countBudgetReached = updateBudget.processedCount >= updateBudget.maxBatchSize
+	local timeBudgetReached = updateBudget.batchStartedAt
+		and GetFriendsListProfileTime
+		and GetFriendsListProfileTime() - updateBudget.batchStartedAt >= FRIENDS_LIST_UPDATE_TIME_BUDGET_MS
+	if not countBudgetReached and not timeBudgetReached then
+		return
+	end
+
+	coroutine.yield()
+	ResetChunkedFriendsListUpdateBudget(updateBudget)
+end
+
+local function YieldChunkedFriendsListUpdatePhase(isChunkedUpdate, updateBudget, forceYield)
+	if not isChunkedUpdate or (not forceYield and updateBudget and updateBudget.processedCount == 0) then
+		return
+	end
+	coroutine.yield()
+	ResetChunkedFriendsListUpdateBudget(updateBudget)
+end
+
+function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Visibility Optimization:
 	-- If the frame is hidden, we don't need to fetch data or rebuild the list.
 	-- Just mark it as dirty so it updates when shown.
 	if (not BetterFriendsFrame or not BetterFriendsFrame:IsShown()) and not ignoreVisibility then
@@ -5078,21 +5185,26 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	end
 
 	isUpdatingFriendsList = true
+	local updateBudget = isChunkedUpdate and CreateChunkedFriendsListUpdateBudget(0) or nil
 
 	-- Update settings cache before processing
 	self:UpdateSettingsCache()
 
-	-- PHASE 9.6: Object Pooling Optimization
-	-- Instead of wipe(self.friendsList), we overwrite existing entries to reduce garbage
+	-- PHASE 9.6: Object Pooling Optimization. Chunked updates build into the previous
+	-- list buffer so the last complete display remains intact until the rebuild finishes.
+	local friendsList = self.friendsList
+	if isChunkedUpdate then
+		friendsList = self.chunkedFriendsListBuffer or {}
+	end
 	local listIndex = 0
 
 	-- Helper to get next recycled object
 	local function GetNextFriendObject()
 		listIndex = listIndex + 1
-		local f = self.friendsList[listIndex]
+		local f = friendsList[listIndex]
 		if not f then
 			f = {}
-			self.friendsList[listIndex] = f
+			friendsList[listIndex] = f
 		else
 			wipe(f)
 		end
@@ -5111,6 +5223,18 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 	-- Classic safeguard: BNGetNumFriends may not exist
 	if bnetFriends and BNGetNumFriends then
 		local numBNetTotal, numBNetOnline, numBNetFavorite = BNGetNumFriends()
+		if updateBudget then
+			updateBudget.maxBatchSize = GetChunkedFriendsListUpdateMaxBatchSize(numBNetTotal)
+		end
+		if
+			not isChunkedUpdate
+			and numBNetTotal > LARGE_BNET_FRIEND_LIST_THRESHOLD
+			and CanRunChunkedFriendsListUpdate()
+		then
+			isUpdatingFriendsList = false
+			self:StartChunkedFriendsListUpdate(ignoreVisibility)
+			return
+		end
 		local friendTagsEnabled = BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
 		local titleFriendCustomNamesEnabled = BFL.AreTitleFriendCustomNamesEnabled
 			and BFL.AreTitleFriendCustomNamesEnabled()
@@ -5165,6 +5289,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				return
 			end
 			bnetAccountInfos[i] = accountInfo
+			YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
 		end
 		self.bnetIncompleteRetryAttempts = 0
 		local previousFriendTagMasks = self.bnetFriendTagMasksByAccount
@@ -5589,6 +5714,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 					FriendTags:InvalidateFriendAssignment(friend)
 				end
 			end
+			YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
 		end
 
 		self.bnetFriendTagMasksByAccount = nextFriendTagMasks
@@ -5644,11 +5770,18 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 				friend.dnd = friendInfo.dnd
 			end
 		end
+		YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
 	end
 
 	-- Clean up excess recycled objects
-	for i = #self.friendsList, listIndex + 1, -1 do
-		self.friendsList[i] = nil
+	for i = #friendsList, listIndex + 1, -1 do
+		friendsList[i] = nil
+	end
+
+	if isChunkedUpdate then
+		local previousFriendsList = self.friendsList
+		self.friendsList = friendsList
+		self.chunkedFriendsListBuffer = previousFriendsList
 	end
 
 	-- PERFY OPTIMIZATION: Pre-calculate sort keys for ALL friends
@@ -5763,11 +5896,14 @@ function FriendsList:UpdateFriendsList(ignoreVisibility) -- Visibility Optimizat
 		-- Eliminates 2 function calls per comparison during N*log(N) sort
 		friend._sort_primaryNumeric = primaryKeyFn(friend)
 		friend._sort_secondaryNumeric = secondaryKeyFn(friend)
+		YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
 	end
 
 	-- Apply filters and sort
+	YieldChunkedFriendsListUpdatePhase(isChunkedUpdate, updateBudget, false)
 	self:ApplyFilters()
 	self:ApplySort()
+	YieldChunkedFriendsListUpdatePhase(isChunkedUpdate, updateBudget, true)
 
 	-- PERFY OPTIMIZATION (Phase 2B): Increment version AFTER data collection to prevent premature cache invalidation
 	-- This ensures BuildDisplayList cache is only invalidated when data actually changed

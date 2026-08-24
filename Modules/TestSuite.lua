@@ -13628,6 +13628,7 @@ function TestSuite:Initialize()
 	self:RegisterBuiltinQuickFilterMultiAccountTest()
 	self:RegisterMobileOnlyAccountTest()
 	self:RegisterFriendUpdateDebounceTest()
+	self:RegisterChunkedFriendsListUpdateTest()
 	self:RegisterBNetFriendInfoNoOpTest()
 	self:RegisterEventCompatibilityTests()
 	self:RegisterLateUITests(); self:RegisterRaidInteractionTest()
@@ -13898,6 +13899,90 @@ function TestSuite:RegisterFriendUpdateDebounceTest()
 			FriendsList.updateTimer = originalTimer
 			C_Timer = originalCTimer
 			BetterFriendsFrame = originalFrame
+		end,
+	})
+end
+
+function TestSuite:RegisterChunkedFriendsListUpdateTest()
+	self:RegisterTest("events", "FriendsList_LargeListUpdate_UsesNextFrameBatches", {
+		description = "Large friend-list rebuilds should resume in next-frame batches without overlapping workers",
+		action = function(V)
+			local FriendsList = BFL:GetModule("FriendsList")
+			if
+				not FriendsList
+				or not FriendsList.StartChunkedFriendsListUpdate
+				or not FriendsList.GetChunkedFriendsListUpdateMaxBatchSize
+			then
+				V:Skip("FriendsList chunked update runner not loaded")
+				return
+			end
+
+			local originalCTimer = C_Timer
+			local originalUpdate = FriendsList.UpdateFriendsList
+			local originalThread = FriendsList.chunkedFriendsListUpdate
+			local callbacks = {}
+			local resumeCount = 0
+			local receivedIgnoreVisibility
+
+			local ok, err = pcall(function()
+				V:AssertEqual(
+					FriendsList:GetChunkedFriendsListUpdateMaxBatchSize(300),
+					25,
+					"Lists up to 300 friends should use at most 25 entries per batch"
+				)
+				V:AssertEqual(
+					FriendsList:GetChunkedFriendsListUpdateMaxBatchSize(301),
+					20,
+					"Lists above 300 friends should use at most 20 entries per batch"
+				)
+				V:AssertEqual(
+					FriendsList:GetChunkedFriendsListUpdateMaxBatchSize(600),
+					20,
+					"Lists up to 600 friends should retain the 20-entry cap"
+				)
+				V:AssertEqual(
+					FriendsList:GetChunkedFriendsListUpdateMaxBatchSize(601),
+					15,
+					"Lists above 600 friends should use at most 15 entries per batch"
+				)
+
+				C_Timer = {
+					After = function(delay, callback)
+						V:AssertEqual(delay, 0, "Chunked updates should resume on the next frame")
+						callbacks[#callbacks + 1] = callback
+					end,
+				}
+				FriendsList.chunkedFriendsListUpdate = nil
+				FriendsList.UpdateFriendsList = function(_, ignoreVisibility, isChunkedUpdate)
+					receivedIgnoreVisibility = ignoreVisibility
+					V:Assert(isChunkedUpdate == true, "The scheduled worker should use the chunked update path")
+					for _ = 1, 3 do
+						resumeCount = resumeCount + 1
+						coroutine.yield()
+					end
+				end
+
+				FriendsList:StartChunkedFriendsListUpdate(true)
+				V:AssertNotNil(FriendsList.chunkedFriendsListUpdate, "The chunked worker should be active")
+				V:AssertEqual(#callbacks, 1, "Starting a chunked update should schedule one callback")
+
+				while #callbacks > 0 do
+					local callback = table.remove(callbacks, 1)
+					callback()
+				end
+
+				V:AssertEqual(resumeCount, 3, "Each yielded batch should be resumed")
+				V:Assert(receivedIgnoreVisibility == true, "The worker should preserve visibility overrides")
+				V:AssertNil(FriendsList.chunkedFriendsListUpdate, "The completed worker should release its state")
+			end)
+
+			FriendsList.UpdateFriendsList = originalUpdate
+			FriendsList.chunkedFriendsListUpdate = originalThread
+			FriendsList:ClearPendingUpdate()
+			C_Timer = originalCTimer
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 end

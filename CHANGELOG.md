@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.7]        - 2026-08-24
+
+### Fixed
+- **Large Friend Lists** - BetterFriendlist has received further optimizations for larger friend lists and is now less likely to run into errors when loading them.
+
+---
+
 ## [2.8.6]        - 2026-08-24
 
 ### Improved
@@ -144,20 +151,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 
 ### Fixed
 - **Who Searches** - Broad Who searches no longer leave an invisible Blizzard window that blocks Escape and disrupts other window positions.
-
----
-
-## [2.6.8]        - 2026-07-14
-
-### Improved
-- **Translations** - Many translations across all supported languages have been updated, corrected, and expanded.
-- **Classic Anniversary** - BetterFriendlist now loads normally with the Classic Anniversary 2.5.6 client update.
-
-### Fixed
-- **Friend Search** - Search now checks a friend's displayed WoW contact name plus every visible character and realm linked to their Battle.net account.
-- **Multi-Account Filters** - The WoW, WoW Online, Retail, and In Game filters, along with matching custom rules, now check every visible game account instead of only the focused one.
-- **Mobile-Only Status** - Treat Mobile as Offline now only marks friends offline when the Battle.net mobile app is their only active session. They stay online while playing another Blizzard game.
-- **Friend List Refreshes** - Rapid friend-status changes no longer cause duplicate refreshes, and BetterFriendlist keeps the last complete list visible while Battle.net data is still loading.
 
 ---
 
