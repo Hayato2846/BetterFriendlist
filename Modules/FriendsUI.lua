@@ -191,12 +191,11 @@ local function SafeShow(frame, shown)
 	end
 end
 
--- Runtime Modern buttons keep the visual/lifecycle handlers supplied by
--- SharedButtonTemplate. UIPanelButtonTemplate uses Left/Middle/Right while
--- Retail 12.1's SharedButtonTemplate uses Left/Center/Right, so copying its
--- OnShow or mouse-state scripts corrupts the ThreeSlice button and errors on
--- the missing Middle region. Only forward BFL's application click handler;
--- hover behavior stays with the concrete template.
+-- Runtime Modern buttons keep the visual/lifecycle handlers supplied by their
+-- concrete template. Text actions use SharedButtonTemplate, while compact
+-- icon-only actions can opt into SquareIconButtonTemplate. Only forward BFL's
+-- application click handler; hover and mouse-state behavior must stay with the
+-- template that owns the button.
 local STYLE_BUTTON_RUNTIME_SCRIPTS = {
 	"OnClick",
 	"OnEnter",
@@ -219,7 +218,7 @@ local function CopyButtonRuntimeState(source, target)
 	target.tooltip = source.tooltip
 end
 
-local function EnsureModernActionButton(owner, key)
+local function EnsureModernActionButton(owner, key, templateName)
 	if not (owner and owner[key]) then
 		return nil
 	end
@@ -231,11 +230,13 @@ local function EnsureModernActionButton(owner, key)
 	local legacyButton = owner[legacyKey]
 	local modernButton = owner[modernKey]
 	if not modernButton then
-		local ok, created = pcall(CreateFrame, "Button", nil, legacyButton:GetParent(), "SharedButtonTemplate")
+		templateName = templateName or "SharedButtonTemplate"
+		local ok, created = pcall(CreateFrame, "Button", nil, legacyButton:GetParent(), templateName)
 		if not ok or not created then
 			return legacyButton
 		end
 		modernButton = created
+		modernButton.BFL_TemplateName = templateName
 		modernButton.BFL_TemplateScripts = {}
 		for _, scriptType in ipairs(STYLE_BUTTON_RUNTIME_SCRIPTS) do
 			modernButton.BFL_TemplateScripts[scriptType] = modernButton:GetScript(scriptType)
@@ -252,9 +253,8 @@ local function EnsureModernActionButton(owner, key)
 	for _, scriptType in ipairs(STYLE_BUTTON_RUNTIME_SCRIPTS) do
 		local legacyScript = legacyButton:GetScript(scriptType)
 		local templateScript = modernButton.BFL_TemplateScripts and modernButton.BFL_TemplateScripts[scriptType]
-		-- UIPanelButtonTemplate and SharedButtonTemplate use incompatible tooltip
-		-- mixins. Only the application click handler belongs to BFL; hover scripts
-		-- must stay with the concrete visual template that owns the button.
+		-- Only the application click handler belongs to BFL; hover scripts must
+		-- stay with the concrete visual template that owns the button.
 		modernButton:SetScript(scriptType, scriptType == "OnClick" and (legacyScript or templateScript) or templateScript)
 	end
 	CopyButtonRuntimeState(owner[key], modernButton)
@@ -309,9 +309,8 @@ local function ConfigureModernReadyCheckButton(button, legacyButton)
 	button.Icon:SetSize(14, 14)
 	button:SetText("")
 
-	-- Keep the SharedButtonTemplate hover animation, then layer the established
-	-- Ready Check tooltip behavior on top without copying SquareIconButton
-	-- lifecycle scripts onto the incompatible ThreeSlice template.
+	-- Keep SquareIconButtonTemplate's native hover behavior, then layer the
+	-- established Ready Check tooltip behavior on top.
 	button.BFL_ReadyCheckTooltipOnEnter = legacyButton and legacyButton:GetScript("OnEnter") or nil
 	button.BFL_ReadyCheckTooltipOnLeave = legacyButton and legacyButton:GetScript("OnLeave") or nil
 	if not button.BFL_ReadyCheckTooltipHooked then
@@ -1444,7 +1443,7 @@ function FriendsUI:ApplyModernActionButtonTemplates()
 	if control then
 		local raidInfo = EnsureModernActionButton(control, "RaidInfoButton")
 		ConfigureModernRaidInfoButton(raidInfo, control.BFL_LegacyRaidInfoButton)
-		local readyCheck = EnsureModernActionButton(control, "ReadyCheckButton")
+		local readyCheck = EnsureModernActionButton(control, "ReadyCheckButton", "SquareIconButtonTemplate")
 		ConfigureModernReadyCheckButton(readyCheck, control.BFL_LegacyReadyCheckButton)
 	end
 	if raid then
@@ -2987,10 +2986,6 @@ function FriendsUI:RestoreLegacyRaidGeometry()
 			helpButton.Icon:SetSize(18, 18)
 		end
 	end
-	local StreamerMode = BFL:GetModule("StreamerMode")
-	if StreamerMode and StreamerMode.UpdateAdjacentButtonAnchors then
-		StreamerMode:UpdateAdjacentButtonAnchors()
-	end
 	SafeShow(control.EveryoneAssistIcon, false)
 	SafeShow(control.TankFrame, false)
 	SafeShow(control.HealerFrame, false)
@@ -3024,6 +3019,83 @@ function FriendsUI:RestoreLegacyRaidGeometry()
 		raid.RaidToolsButton:SetPoint("TOPLEFT", raid.GroupsInset, "BOTTOMLEFT", -2, -1)
 		raid.RaidToolsButton:SetSize(150, 21)
 	end
+end
+
+function FriendsUI:RestoreLegacyHeaderActions()
+	if not BetterFriendsFrame or self.appliedStyle ~= STYLE_LEGACY then
+		return
+	end
+
+	local streamerButton = BetterFriendsFrame.StreamerModeButton
+	local helpButton = BetterFriendsFrame.HelpButton
+	if streamerButton then
+		-- Modern temporarily reparents the XML button into its Battle.net bar.
+		-- Rebuild the stable XML contract explicitly so later theme/layout passes
+		-- cannot leave the shared button attached to Modern's hidden hierarchy.
+		streamerButton:SetParent(BetterFriendsFrame)
+		streamerButton:ClearAllPoints()
+		if BFL.IsClassic then
+			streamerButton:SetPoint("RIGHT", BetterFriendsFrame.CloseButton, "LEFT", -4, 0)
+		else
+			streamerButton:SetPoint("TOPRIGHT", BetterFriendsFrame.CloseButton, "TOPLEFT", 1, 1)
+		end
+		streamerButton:SetSize(24, 24)
+		streamerButton:SetFrameStrata("HIGH")
+		streamerButton:SetFrameLevel(10)
+		streamerButton:SetAlpha(1)
+	end
+	if helpButton then
+		-- Modern places Raid Roster Help inside the raid control row. Legacy owns
+		-- the same XML button in the title bar and must restore that hierarchy
+		-- explicitly after every live style switch.
+		helpButton:SetParent(BetterFriendsFrame)
+		helpButton:SetSize(24, 24)
+		helpButton:SetFrameStrata("HIGH")
+		helpButton:SetFrameLevel(10)
+		helpButton:SetAlpha(1)
+		if helpButton.Icon then
+			helpButton.Icon:SetSize(18, 18)
+			helpButton.Icon:SetAlpha(1)
+		end
+	end
+
+	local StreamerMode = BFL:GetModule("StreamerMode")
+	if StreamerMode then
+		StreamerMode.toggleButton = streamerButton or StreamerMode.toggleButton
+		if StreamerMode.UpdateState then
+			StreamerMode:UpdateState()
+		elseif StreamerMode.UpdateAdjacentButtonAnchors then
+			StreamerMode:UpdateAdjacentButtonAnchors()
+		end
+	end
+	local db = GetDB()
+	if streamerButton then
+		streamerButton:SetShown(not db or db.showStreamerModeButton ~= false)
+	end
+	if helpButton then
+		helpButton:SetShown(self:GetSelectedSection() == "raid")
+	end
+end
+
+function FriendsUI:QueueLegacyHeaderActionRestore()
+	if not (BetterFriendsFrame and BetterFriendsFrame:IsShown() and C_Timer and C_Timer.After) then
+		return
+	end
+
+	-- Theme integrations and Settings Center can finish their live-switch work
+	-- on the next frame. Two bounded callbacks keep Legacy authoritative without
+	-- adding an OnUpdate or any work while the Friendlist is closed.
+	self.legacyHeaderActionRestoreGeneration = (self.legacyHeaderActionRestoreGeneration or 0) + 1
+	local generation = self.legacyHeaderActionRestoreGeneration
+	local function RestoreIfCurrent()
+		if generation == self.legacyHeaderActionRestoreGeneration and self.appliedStyle == STYLE_LEGACY then
+			self:RestoreLegacyHeaderActions()
+		end
+	end
+	C_Timer.After(0, function()
+		RestoreIfCurrent()
+		C_Timer.After(0.05, RestoreIfCurrent)
+	end)
 end
 
 function FriendsUI:ApplyModernQuickJoinGeometry(sectionID)
@@ -4553,6 +4625,8 @@ function FriendsUI:RefreshEffectiveStyleOnShow()
 		if EllesmereUISkin and EllesmereUISkin.RefreshMainFrame then
 			EllesmereUISkin:RefreshMainFrame("friends-ui-show")
 		end
+		self:RestoreLegacyHeaderActions()
+		self:QueueLegacyHeaderActionRestore()
 	end
 	return true
 end
@@ -4630,6 +4704,12 @@ function FriendsUI:ApplyEffectiveStyle(reason)
 	local Settings = BFL:GetModule("Settings")
 	if Settings and Settings.RefreshVisibleWindowAnchor then
 		Settings:RefreshVisibleWindowAnchor()
+	end
+	if effective == STYLE_LEGACY then
+		-- Theme and tab refreshes may run their own visibility pass. Legacy owns
+		-- these title-bar controls, so assert their final state afterwards.
+		self:RestoreLegacyHeaderActions()
+		self:QueueLegacyHeaderActionRestore()
 	end
 	return true
 end
@@ -6521,7 +6601,8 @@ function FriendsUI:RegisterTests()
 				"Modern Raid Info flexes only within its text-safe width range"
 			)
 			V:AssertEqual(control.RaidInfoButton:GetHeight(), 28, "Modern Raid Info uses the compact utility height")
-			V:AssertEqual(control.ReadyCheckButton, control.BFL_ModernReadyCheckButton, "Modern Raid Ready Check uses its runtime Shared button")
+			V:AssertEqual(control.ReadyCheckButton, control.BFL_ModernReadyCheckButton, "Modern Raid Ready Check uses its runtime SquareIcon button")
+			V:AssertEqual(control.ReadyCheckButton.BFL_TemplateName, "SquareIconButtonTemplate", "Modern Raid Ready Check uses Blizzard's icon-button surface")
 			V:AssertEqual(control.ReadyCheckButton:GetWidth(), 28, "Modern Raid Ready Check uses a compact square icon-button width")
 			V:AssertEqual(control.ReadyCheckButton:GetHeight(), control.RaidInfoButton:GetHeight(), "Modern Raid Ready Check matches Raid Info height")
 			local _, controlCenterY = control:GetCenter()
@@ -6970,6 +7051,78 @@ function FriendsUI:RegisterTests()
 			end
 		end,
 	})
+	TestSuite:RegisterTest("ui", "FriendsUI_LegacyHeaderActionsLiveSwitch", {
+		condition = function()
+			return BetterFriendsFrame ~= nil
+				and self:IsSocialUIAvailable()
+				and not (InCombatLockdown and InCombatLockdown())
+		end,
+		setup = function()
+			local db = GetDB()
+			self.testHeaderActionsOriginalStyle = self:GetRequestedStyle()
+			self.testHeaderActionsOriginalSection = self:GetSelectedSection()
+			self.testHeaderActionsOriginalSimpleMode = db and db.simpleMode
+			self.testHeaderActionsOriginalStreamerVisibility = db and db.showStreamerModeButton
+		end,
+		action = function(V)
+			local db = GetDB()
+			V:Assert(db ~= nil, "Legacy header action test requires the database")
+			if not db then
+				return
+			end
+
+			db.showStreamerModeButton = true
+			for _, simpleMode in ipairs({ false, true }) do
+				local modeLabel = simpleMode and "Simple Mode" or "standard mode"
+				db.simpleMode = simpleMode
+				V:Assert(self:SetStyle(STYLE_MODERN), "Modern setup should succeed in " .. modeLabel)
+				self:SelectSection("raid")
+				V:Assert(self:SetStyle(STYLE_LEGACY), "Legacy live switch should succeed in " .. modeLabel)
+
+				local streamerButton = BetterFriendsFrame.StreamerModeButton
+				local helpButton = BetterFriendsFrame.HelpButton
+				V:Assert(streamerButton and streamerButton:IsShown(), "Legacy Streamer Mode is shown in " .. modeLabel)
+				V:AssertEqual(streamerButton and streamerButton:GetParent(), BetterFriendsFrame, "Legacy Streamer Mode returns to the main frame in " .. modeLabel)
+				V:AssertEqual(streamerButton and streamerButton:GetWidth(), 24, "Legacy Streamer Mode restores its XML width in " .. modeLabel)
+				V:AssertEqual(streamerButton and streamerButton:GetHeight(), 24, "Legacy Streamer Mode restores its XML height in " .. modeLabel)
+				V:AssertEqual(streamerButton and streamerButton:GetFrameStrata(), "HIGH", "Legacy Streamer Mode restores its XML strata in " .. modeLabel)
+				V:Assert(helpButton and helpButton:IsShown(), "Legacy Raid Roster Help is shown in " .. modeLabel)
+				V:AssertEqual(helpButton and helpButton:GetParent(), BetterFriendsFrame, "Legacy Raid Roster Help returns to the main frame in " .. modeLabel)
+				V:AssertEqual(helpButton and helpButton:GetWidth(), 24, "Legacy Raid Roster Help restores its XML width in " .. modeLabel)
+				V:AssertEqual(helpButton and helpButton:GetHeight(), 24, "Legacy Raid Roster Help restores its XML height in " .. modeLabel)
+				V:AssertEqual(helpButton and helpButton:GetFrameStrata(), "HIGH", "Legacy Raid Roster Help restores its XML strata in " .. modeLabel)
+				local helpPoint, helpRelativeTo, helpRelativePoint = helpButton and helpButton:GetPoint(1)
+				V:Assert(
+					helpPoint == "TOPRIGHT"
+						and helpRelativeTo == streamerButton
+						and helpRelativePoint == "TOPLEFT",
+					"Legacy Raid Roster Help returns beside Streamer Mode in " .. modeLabel
+				)
+
+				if BetterFriendsFrame:IsShown() then
+					V:Assert(streamerButton:IsVisible(), "Legacy Streamer Mode is effectively visible in " .. modeLabel)
+					V:Assert(helpButton:IsVisible(), "Legacy Raid Roster Help is effectively visible in " .. modeLabel)
+				end
+			end
+		end,
+		teardown = function()
+			local db = GetDB()
+			if db then
+				db.simpleMode = self.testHeaderActionsOriginalSimpleMode
+				db.showStreamerModeButton = self.testHeaderActionsOriginalStreamerVisibility
+			end
+			self:SetStyle(self.testHeaderActionsOriginalStyle or self:GetDefaultRequestedStyle())
+			self:SelectSection(self.testHeaderActionsOriginalSection or "friends")
+			local StreamerMode = BFL:GetModule("StreamerMode")
+			if StreamerMode and StreamerMode.UpdateState then
+				StreamerMode:UpdateState()
+			end
+			self.testHeaderActionsOriginalStyle = nil
+			self.testHeaderActionsOriginalSection = nil
+			self.testHeaderActionsOriginalSimpleMode = nil
+			self.testHeaderActionsOriginalStreamerVisibility = nil
+		end,
+	})
 	TestSuite:RegisterTest("ui", "FriendsUI_LiveStyleSwitch", {
 		condition = function()
 			return BetterFriendsFrame ~= nil
@@ -6996,6 +7149,10 @@ function FriendsUI:RegisterTests()
 			end
 		end,
 		action = function(V)
+			V:Assert(self:SetStyle(STYLE_MODERN), "Modern setup for the live style switch should succeed")
+			V:AssertEqual(self:GetAppliedStyle(), STYLE_MODERN, "Live style switch test starts from Modern")
+			self:SelectSection("raid")
+
 			V:Assert(self:SetStyle(STYLE_LEGACY), "Legacy style switch should succeed")
 			V:AssertEqual(self:GetAppliedStyle(), STYLE_LEGACY, "Legacy applies without reload")
 
@@ -7161,6 +7318,15 @@ function FriendsUI:RegisterTests()
 				V:AssertEqual(control.ReadyCheckButton:GetHeight(), 22, "Legacy Ready Check keeps the v2.7.0 height")
 				V:AssertEqual(raid.RaidToolsButton:GetHeight(), 21, "Legacy Raid Tools keeps the v2.7.0 height")
 				V:AssertEqual(raid.ConvertToRaidButton:GetHeight(), 21, "Legacy Raid conversion keeps the v2.7.0 height")
+				local streamerButton = BetterFriendsFrame.StreamerModeButton
+				if streamerButton and BetterFriendlistDB and BetterFriendlistDB.showStreamerModeButton then
+					V:Assert(streamerButton:IsShown(), "Legacy Streamer Mode is visible immediately after a live style switch")
+					V:AssertEqual(streamerButton:GetParent(), BetterFriendsFrame, "Legacy Streamer Mode returns to the main frame header")
+					V:AssertEqual(streamerButton:GetWidth(), 24, "Legacy Streamer Mode restores its header size")
+				end
+				local helpButton = BetterFriendsFrame.HelpButton
+				V:Assert(helpButton and helpButton:IsShown(), "Legacy Raid Roster Help is visible immediately after a live style switch")
+				V:AssertEqual(helpButton and helpButton:GetParent(), BetterFriendsFrame, "Legacy Raid Roster Help returns to the title bar")
 				if control.ReadyCheckButton and control.EveryoneAssistLabel then
 					control.ReadyCheckButton:Show()
 					local RaidFrame = BFL:GetModule("RaidFrame")
@@ -7168,6 +7334,24 @@ function FriendsUI:RegisterTests()
 						RaidFrame:UpdateControlPanelLayout()
 					end
 					V:Assert(control.EveryoneAssistLabel:IsShown(), "Retail Legacy keeps Assist All visible beside Ready Check")
+					local assistPoint, assistRelativeTo, assistRelativePoint = control.EveryoneAssistCheckbox:GetPoint(1)
+					local assistLeft = control.EveryoneAssistCheckbox:GetLeft()
+					local insetLeft = raid.GroupsInset and raid.GroupsInset:GetLeft()
+					V:Assert(
+						assistPoint == "TOPLEFT"
+							and assistRelativeTo == control
+							and assistRelativePoint == "TOPLEFT"
+							and assistLeft
+							and insetLeft
+							and math.abs(assistLeft - insetLeft) < 0.5,
+						"Retail Legacy aligns Assist All to the left inset edge"
+					)
+					local raidInfoRight = control.RaidInfoButton:GetRight()
+					local insetRight = raid.GroupsInset and raid.GroupsInset:GetRight()
+					V:Assert(
+						raidInfoRight and insetRight and math.abs(raidInfoRight - insetRight) < 0.5,
+						"Retail Legacy aligns Raid Info to the right inset edge"
+					)
 					local readyPoint, readyRelativeTo, readyRelativePoint, readyX = control.ReadyCheckButton:GetPoint(1)
 					V:Assert(
 						readyPoint == "RIGHT"
@@ -7180,10 +7364,22 @@ function FriendsUI:RegisterTests()
 						local countPoint, countRelativeTo, countRelativePoint, countX = control.MemberCount:GetPoint(1)
 						V:Assert(
 							countPoint == "LEFT"
-								and countRelativeTo == control.RoleSummary
+								and countRelativeTo == control.RoleSummary.DamagerIcon
 								and countRelativePoint == "RIGHT"
-								and countX == -3,
-							"Retail Legacy shifts the member count left of the Ready Check slot"
+								and countX == 2,
+							"Retail Legacy packs the member count after the final visible role icon"
+						)
+						local assistRight = control.EveryoneAssistLabel:GetRight()
+						local roleLeft = control.RoleSummary:GetLeft()
+						V:Assert(
+							assistRight and roleLeft and (roleLeft - assistRight) >= 5,
+							"Retail Legacy leaves a visible gap between Assist All and the role counters"
+						)
+						local memberRight = control.MemberCount:GetRight()
+						local readyLeft = control.ReadyCheckButton:GetLeft()
+						V:Assert(
+							memberRight and readyLeft and (readyLeft - memberRight) >= 4,
+							"Retail Legacy role and member counters do not clip into Ready Check"
 						)
 					end
 					control.ReadyCheckButton:SetShown(self.testReadyCheckWasShown == true)
@@ -7254,7 +7450,7 @@ function FriendsUI:RegisterTests()
 			end
 			if raid and control then
 				V:AssertEqual(control.RaidInfoButton, control.BFL_ModernRaidInfoButton, "Modern Raid Info keeps its runtime Shared button")
-				V:AssertEqual(control.ReadyCheckButton, control.BFL_ModernReadyCheckButton, "Modern Raid Ready Check keeps its runtime Shared button")
+				V:AssertEqual(control.ReadyCheckButton, control.BFL_ModernReadyCheckButton, "Modern Raid Ready Check keeps its runtime SquareIcon button")
 				V:AssertEqual(raid.RaidToolsButton, raid.BFL_ModernRaidToolsButton, "Modern Raid Tools keeps its runtime Shared button")
 				V:AssertEqual(raid.ConvertToRaidButton, raid.BFL_ModernConvertToRaidButton, "Modern Raid conversion keeps its runtime Shared button")
 			end

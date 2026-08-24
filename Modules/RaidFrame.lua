@@ -394,8 +394,8 @@ function RaidFrame:UpdateGroupLayout()
 	if not frame or not frame.RaidFrame then
 		return
 	end
-
 	local raidFrame = frame.RaidFrame
+	self:UpdateEmptyStateLayout()
 	local groupsContainer = raidFrame.GroupsInset and raidFrame.GroupsInset.GroupsContainer
 	if not groupsContainer then
 		return
@@ -692,11 +692,14 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- BFL:DebugPrint(string.format("  ControlPanel size: %.1f x %.1f", panelWidth, panelHeight))
 
 	-- Define layout constants
-	local checkboxStartX = 35 -- Avatar clearance
-	local checkboxLabelGap = 2 -- Gap between checkbox and label
-	local buttonRightPadding = 3 -- Padding from right edge
+	-- Retail Legacy aligns both control sequences to GroupsInset's outer edges:
+	-- its left edge is 4 px before ControlPanel and its right edge 12 px beyond it.
+	-- Classic retains its established portrait clearance and button geometry.
+	local checkboxStartX = BFL.IsRetail and -4 or 35
+	local checkboxLabelGap = BFL.IsRetail and 0 or 2
+	local buttonRightInset = BFL.IsRetail and -12 or 3
 	local centerElementGap = 5 -- Gap between RoleSummary and MemberCount
-	local memberCountLeftShift = BFL.IsRetail and 8 or 0
+	local memberCountGap = BFL.IsRetail and 2 or centerElementGap
 	local utilityButtonGap = 5
 	local utilitySlotWidth = 22
 
@@ -729,7 +732,7 @@ function RaidFrame:UpdateControlPanelLayout()
 
 	-- Calculate section boundaries with actual positions
 	local leftSectionEnd = checkboxStartX + checkboxWidth + checkboxLabelGap + labelTextWidth
-	local rightSectionStart = panelWidth - rightReservedWidth - buttonRightPadding
+	local rightSectionStart = panelWidth - rightReservedWidth - buttonRightInset
 	local availableCenter = rightSectionStart - leftSectionEnd
 
 	-- Auto-hide Assist Label if space is too tight (Classic fix)
@@ -743,7 +746,7 @@ function RaidFrame:UpdateControlPanelLayout()
 
 	-- BFL:DebugPrint(string.format("  Layout boundaries:"))
 	-- BFL:DebugPrint(string.format("    Left section: %.1f to %.1f", checkboxStartX, leftSectionEnd))
-	-- BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (reserved width=%.1f)", rightSectionStart, panelWidth - buttonRightPadding, rightReservedWidth))
+	-- BFL:DebugPrint(string.format("    Right section: %.1f to %.1f (reserved width=%.1f)", rightSectionStart, panelWidth - buttonRightInset, rightReservedWidth))
 	-- BFL:DebugPrint(string.format("    Available center: %.1f (need %.1f) - %s",
 	--     availableCenter, centerSectionWidth,
 	--     availableCenter >= centerSectionWidth and "|cff00ff00OK|r" or "|cffff0000TIGHT|r"))
@@ -751,8 +754,11 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- Calculate center position (true center of available space)
 	local centerStart = leftSectionEnd + math.max(5, (availableCenter - centerSectionWidth) / 2)
 
-	-- Shift -3px for Classic per user request
-	if not BFL.IsRetail then
+	-- Retail packs the visible role cells after Assist All; centering the template's
+	-- transparent trailing space pushed both counters toward Ready Check.
+	if BFL.IsRetail then
+		centerStart = leftSectionEnd + 5
+	else
 		centerStart = centerStart - 5
 	end
 
@@ -776,17 +782,23 @@ function RaidFrame:UpdateControlPanelLayout()
 	-- Reposition EveryoneAssistLabel (right of checkbox)
 	if controlPanel.EveryoneAssistLabel then
 		controlPanel.EveryoneAssistLabel:ClearAllPoints()
-		controlPanel.EveryoneAssistLabel:SetPoint("LEFT", controlPanel.EveryoneAssistCheckbox, "RIGHT", 2, 0)
+		controlPanel.EveryoneAssistLabel:SetPoint(
+			"LEFT",
+			controlPanel.EveryoneAssistCheckbox,
+			"RIGHT",
+			checkboxLabelGap,
+			0
+		)
 		controlPanel.EveryoneAssistLabel:SetJustifyH("LEFT")
 		local actualText = controlPanel.EveryoneAssistLabel:GetText()
-		-- BFL:DebugPrint(string.format("  ✓ EveryoneAssistLabel: Anchored to checkbox+2, Text='%s'",
+		-- BFL:DebugPrint(string.format("  ✓ EveryoneAssistLabel: Anchored to checkbox, Text='%s'",
 		--     actualText or "nil"))
 	end
 
 	-- Reposition RaidInfoButton (right side with reduced width)
 	if controlPanel.RaidInfoButton then
 		controlPanel.RaidInfoButton:ClearAllPoints()
-		controlPanel.RaidInfoButton:SetPoint("TOPRIGHT", controlPanel, "TOPRIGHT", -buttonRightPadding, -13)
+		controlPanel.RaidInfoButton:SetPoint("TOPRIGHT", controlPanel, "TOPRIGHT", -buttonRightInset, -13)
 		if not BFL.IsRetail then
 			controlPanel.RaidInfoButton:SetPoint("TOPRIGHT", controlPanel, "TOPRIGHT", 2, -13)
 		end
@@ -794,7 +806,7 @@ function RaidFrame:UpdateControlPanelLayout()
 		local actualX = controlPanel.RaidInfoButton:GetLeft()
 		local actualWidth = controlPanel.RaidInfoButton:GetWidth()
 		-- BFL:DebugPrint(string.format("  ✓ RaidInfoButton: Width=%.1f (optimized), x=-%.1f from right, Left edge=%.1f",
-		--     actualWidth or -1, buttonRightPadding, actualX or -1))
+		--     actualWidth or -1, buttonRightInset, actualX or -1))
 	end
 
 	if controlPanel.ReadyCheckButton then
@@ -818,9 +830,9 @@ function RaidFrame:UpdateControlPanelLayout()
 		controlPanel.MemberCount:ClearAllPoints()
 		controlPanel.MemberCount:SetPoint(
 			"LEFT",
-			controlPanel.RoleSummary,
+			BFL.IsRetail and controlPanel.RoleSummary.DamagerIcon or controlPanel.RoleSummary,
 			"RIGHT",
-			centerElementGap - memberCountLeftShift,
+			memberCountGap,
 			0
 		)
 		controlPanel.MemberCount:SetJustifyH("LEFT")
@@ -2200,7 +2212,7 @@ end
 
 --- Check if player can control raid
 function RaidFrame:CanControlRaid()
-	return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+	return UnitIsGroupLeader("player") or (IsInRaid() and UnitIsGroupAssistant("player"))
 end
 
 --- Check if player is raid leader
@@ -2247,12 +2259,12 @@ function RaidFrame:DoReadyCheck()
 	if BFL:IsActionRestricted() then
 		return false
 	end
-	if not self:CanControlRaid() then
+	if not IsInGroup() or not self:CanControlRaid() then
 		return false
 	end
 
-	BFL.DoReadyCheck()
-	return true
+	local started = BFL.DoReadyCheck()
+	return started == true
 end
 
 --- Initiate role poll
@@ -3689,6 +3701,28 @@ function RaidFrame:ResolveMemberButton(frame)
 	return nil
 end
 
+function RaidFrame:UpdateEmptyStateLayout()
+	local raidFrame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+	local emptyState = raidFrame and raidFrame.NotInRaid
+	local groupsInset = raidFrame and raidFrame.GroupsInset
+	if not (emptyState and groupsInset) then
+		return false
+	end
+
+	-- RAID_DESCRIPTION is substantially longer than BFL's previous placeholder.
+	-- Two inset-relative anchors give it a real wrap width in Retail Modern,
+	-- Retail Legacy, and every Classic layout instead of its natural text width.
+	emptyState:ClearAllPoints()
+	emptyState:SetPoint("TOPLEFT", groupsInset, "TOPLEFT", 20, -20)
+	emptyState:SetPoint("BOTTOMRIGHT", groupsInset, "BOTTOMRIGHT", -20, 20)
+	emptyState:SetJustifyH("LEFT")
+	emptyState:SetJustifyV("TOP")
+	if emptyState.SetWordWrap then
+		emptyState:SetWordWrap(true)
+	end
+	return true
+end
+
 -- ========================================
 -- PUBLIC API SUMMARY
 -- ========================================
@@ -3727,5 +3761,12 @@ end
     - RaidFrame:CreateMockRaidData()
     - /bflmock raid - Slash command
 ]]
+
+function RaidFrame:ResolveReadyCheckButtonState(enabled, inGroup, inRaid, isLeader, isAssistant, inCombat)
+	local shown = enabled == true
+	local canControl = isLeader == true or (inRaid == true and isAssistant == true)
+	local available = shown and inGroup == true and canControl and inCombat ~= true
+	return shown, available
+end
 
 return RaidFrame

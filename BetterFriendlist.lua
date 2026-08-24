@@ -4371,7 +4371,9 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	HideChildFrame(frame.RecruitAFriendFrame)
 	HideChildFrame(frame.ScrollFrame)
 	HideChildFrame(frame.MinimalScrollBar)
-	BFL:CloseTaintFreeWhisper()
+	if BFL.IsInlineTaintFreeWhisperShown and BFL:IsInlineTaintFreeWhisperShown() then
+		BFL:CloseTaintFreeWhisper()
+	end
 	HideChildFrame(frame.AddFriendButton)
 	HideChildFrame(frame.SendMessageButton)
 	HideChildFrame(frame.RecruitmentButton)
@@ -5943,7 +5945,9 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	-- Use hybrid helper functions
 	HideChildFrame(frame.ScrollFrame)
 	HideChildFrame(frame.MinimalScrollBar)
-	BFL:CloseTaintFreeWhisper()
+	if BFL.IsInlineTaintFreeWhisperShown and BFL:IsInlineTaintFreeWhisperShown() then
+		BFL:CloseTaintFreeWhisper()
+	end
 	HideChildFrame(frame.AddFriendButton)
 	HideChildFrame(frame.SendMessageButton)
 	HideChildFrame(frame.RecruitmentButton)

@@ -4330,7 +4330,7 @@ local function RegisterPrivacyPages()
 
 	RegisterPage({ id = "privacy.whisper", category = "privacy", title = T("SETTINGS_CENTER_PAGE_PRIVACY_WHISPER", "Whisper"), iconKey = "bfl-privacy-whisper", mainToggleID = "taintFreeWhisper", order = 110, newTagID = "privacy.whisper" })
 	AddGroup("privacy.whisper", "whisper", T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), 100)
-	AddToggle("privacy.whisper", { key = "taintFreeWhisper", group = "whisper", label = T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), desc = T("SETTINGS_TAINT_FREE_WHISPER_DESC", "Use a custom whisper box to avoid tainting Blizzard chat."), default = false, order = 100, newTagID = "taintFreeWhisper" })
+	AddToggle("privacy.whisper", { key = "taintFreeWhisper", group = "whisper", label = T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), desc = T("SETTINGS_TAINT_FREE_WHISPER_DESC", "Use a BFL-owned whisper box without changing Blizzard chat."), default = false, order = 100, newTagID = "taintFreeWhisper", after = function(value) if not value and BFL.CloseTaintFreeWhisper then BFL:CloseTaintFreeWhisper(true) end end })
 end
 
 local function RegisterAdvancedPages()

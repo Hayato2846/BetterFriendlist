@@ -341,12 +341,14 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 	local controlPanel = frame.ControlPanel
 	local isLeader = UnitIsGroupLeader("player")
 	local isAssistant = UnitIsGroupAssistant("player")
-	local canControl = isLeader or isAssistant
 	local isInGroup = IsInGroup()
 	local inRaid = IsInRaid()
+	local canControl = isLeader or (inRaid and isAssistant)
 	local inCombat = BFL:IsActionRestricted()
+	local readyCheckInCombat = InCombatLockdown and InCombatLockdown() or false
 	local DB = BFL:GetModule("DB")
 	local readyCheckEnabled = BetterFriendlistDB and DB and DB:Get("enableReadyCheckButton", false)
+	local RaidFrame = BFL:GetModule("RaidFrame")
 
 	-- Everyone is Assistant checkbox: Only Raid Leader can toggle
 	-- Must be in a real raid AND be leader (Blizzard only checks leader because
@@ -374,11 +376,17 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 		end
 	end
 
-	-- Ready Check: Only Leader or Assistant, and only in a group
+	-- Ready Check: Party leaders and raid leaders/assistants can start it.
 	-- 12.0.1: DoReadyCheck is combat-restricted
 	if controlPanel.ReadyCheckButton then
-		local showReadyCheck = readyCheckEnabled and not inCombat
-		local canReadyCheck = showReadyCheck and isInGroup and canControl
+		local showReadyCheck, canReadyCheck = RaidFrame:ResolveReadyCheckButtonState(
+			readyCheckEnabled,
+			isInGroup,
+			inRaid,
+			isLeader,
+			isAssistant,
+			readyCheckInCombat
+		)
 		controlPanel.ReadyCheckButton:SetShown(showReadyCheck)
 		controlPanel.ReadyCheckButton.tooltip = nil
 
@@ -387,7 +395,9 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 		else
 			controlPanel.ReadyCheckButton:Disable()
 			if showReadyCheck then
-				if not isInGroup then
+				if readyCheckInCombat then
+					controlPanel.ReadyCheckButton.tooltip = ERR_AFFECTING_COMBAT
+				elseif not isInGroup then
 					controlPanel.ReadyCheckButton.tooltip = L.RAID_ERR_NOT_IN_GROUP or "You are not in a group"
 				elseif not canControl then
 					controlPanel.ReadyCheckButton.tooltip = L.RAID_ERROR_READY_CHECK_PERMISSION
@@ -438,7 +448,6 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 		end
 	end
 
-	local RaidFrame = BFL:GetModule("RaidFrame")
 	if RaidFrame and RaidFrame.UpdateControlPanelLayout then
 		RaidFrame:UpdateControlPanelLayout()
 	end
@@ -491,7 +500,7 @@ end -- ========================================
 
 -- Ready Check Button
 function BetterRaidFrame_DoReadyCheck()
-	if BFL:IsActionRestricted() then
+	if InCombatLockdown and InCombatLockdown() then
 		UIErrorsFrame:AddMessage(ERR_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
 		return
 	end
@@ -499,7 +508,7 @@ function BetterRaidFrame_DoReadyCheck()
 		UIErrorsFrame:AddMessage(L.RAID_ERR_NOT_IN_GROUP or "You are not in a group", 1.0, 0.1, 0.1, 1.0)
 		return
 	end
-	if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
+	if UnitIsGroupLeader("player") or (IsInRaid() and UnitIsGroupAssistant("player")) then
 		BFL.DoReadyCheck()
 	else
 		UIErrorsFrame:AddMessage(L.RAID_ERROR_READY_CHECK_PERMISSION, 1.0, 0.1, 0.1, 1.0)

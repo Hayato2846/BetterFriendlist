@@ -2850,6 +2850,14 @@ local function InstallGuildMOTDChatHooks()
 		return
 	end
 
+	-- These callbacks run inside Blizzard's chat event pipeline. On clients with
+	-- secret chat values, entering an AddOn callback here taints the remaining
+	-- dispatch and can make later ChatHistory string/table operations fail. The
+	-- separate GUILD_MOTD event callback below still maintains the BFL cache.
+	if BFL.HasSecretValues or issecretvalue then
+		return
+	end
+
 	if not guildMOTDChatUtilHookInstalled and ChatFrameUtil and ChatFrameUtil.DisplayGMOTD then
 		local ok = pcall(hooksecurefunc, ChatFrameUtil, "DisplayGMOTD", CacheGuildMOTDFromChatFrame)
 		guildMOTDChatUtilHookInstalled = ok or guildMOTDChatUtilHookInstalled

@@ -1857,9 +1857,9 @@ BFL:RegisterLocale("deDE", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Taint-freies Fluestern"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Verwendet eine integrierte Nachrichtenleiste am unteren Rand der Freundesliste zum Fluestern, anstatt den Standard-Chat zu oeffnen. Dadurch wird verhindert, dass BetterFriendlist das Chat-System beeinflusst, was bei anderen Addons oder Blizzard-Code zu Lua-Fehlern fuehren kann. Aktiviere diese Option, wenn du Chat-bezogene Fehler erhaeltst, die BetterFriendlist erwaehnen. Die Leiste schliesst sich nach dem Senden. Starte erneut ein Fluesterfenster, um sie wieder zu verwenden. Klicke das X, um das Ziel zu vergessen."
+		"Verwendet ein BFL-eigenes Fluesterfeld an der Position der Chat-Eingabe, anstatt Blizzards Chat-Editor zu oeffnen. BFL veraendert weder das native Chat-Eingabefeld noch den Chat-Zustand. Druecke Enter zum Senden oder Escape zum Abbrechen. In Classic oder wenn die Chat-Position nicht ermittelt werden kann, bleibt die Nachrichtenleiste in der Freundesliste."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
-		"Verhindert Chat-Taint-Fehler, die durch das Oeffnen der Blizzard-Fluesterfunktion durch BetterFriendlist verursacht werden. Verwendet stattdessen eine integrierte Nachrichtenleiste."
+		"Verhindert Chat-Taint, indem die Fluester-Eingabe von Blizzards Chat-Eingabefeld getrennt bleibt. In Retail erscheint sie an der nativen Chat-Eingabeposition."
 	L.TAINT_FREE_WHISPER_TITLE = "Fluestern an %s"
 	L.TAINT_FREE_WHISPER_SEND = "Senden"
 	L.TAINT_FREE_WHISPER_CANCEL = "Abbrechen"

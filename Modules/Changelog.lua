@@ -34,6 +34,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.6]        - 2026-08-24
+
+### Improved
+- **Background Performance** - BetterFriendlist now avoids more work while the Friendlist, guild list, raid tools, and Broker tooltips are closed.
+- **Large Friend Lists** - Friend and tag updates are now smoother, especially for players with many Battle.net friends.
+- **Taint-Free Whisper** - On Retail, the optional whisper box now opens where you normally type chat messages.
+- **Ready Check** - Party leaders can now start a Ready Check from the Raid tab without converting the group to a raid.
+
+### Fixed
+- **Guild Message of the Day** - Fixed a Retail chat error that could occur when the guild message of the day was displayed.
+- **Raid Tab** - Long raid information now stays inside the window, and the Legacy controls no longer overlap.
+- **Interface Switching** - Raid Roster Help and Streamer Mode now reappear immediately after switching from Modern to Legacy.
+- **Modern Ready Check** - Removed a small visual artifact from the Ready Check button.
+
+---
+
 ## [2.8.5]        - 2026-08-22
 
 ### Added
@@ -169,22 +185,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 - **Multi-Account Filters** - The WoW, WoW Online, Retail, and In Game filters, along with matching custom rules, now check every visible game account instead of only the focused one.
 - **Mobile-Only Status** - Treat Mobile as Offline now only marks friends offline when the Battle.net mobile app is their only active session. They stay online while playing another Blizzard game.
 - **Friend List Refreshes** - Rapid friend-status changes no longer cause duplicate refreshes, and BetterFriendlist keeps the last complete list visible while Battle.net data is still loading.
-
----
-
-## [2.6.7]        - 2026-07-12
-
-### Added
-- **WoW Contact Custom Names (Retail 12.1)** - Once Blizzard enables the new WoW-only Battle.net contacts and their custom names, BetterFriendlist displays those names in the friends list and Broker tooltip. They can also be edited from the right-click menu.
-- **Appear Offline (Retail 12.1)** - Once Blizzard enables the new Battle.net presence option, BetterFriendlist's existing status menu includes Appear Offline alongside Online, Away, and Busy.
-
-### Improved
-- **Retail 12.1 Compatibility** - BetterFriendlist now adapts when Blizzard enables the new friends system or disables older character-friend features. Friend counts, notes, adding or removing friends, and related friend actions continue to work through the transition.
-- **Retail 12.1 Social Updates** - Once Blizzard enables the new social features, changes to your Battle.net status, WoW contact names, and available friend functions are reflected in BetterFriendlist immediately.
-- **Localization** - Completed and corrected all supported locale files, including recently added settings and social features, while removing stale keys, duplicate assignments, English fallback text, and encoding damage.
-
-### Fixed
-- **Static Friend Groups** - Assigning a friend to a custom group now removes them from "No Group" as expected. Dropping a friend onto "No Group" removes their custom-group assignments cleanly.
 
 ---
 

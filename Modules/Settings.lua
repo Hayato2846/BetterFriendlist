@@ -7079,7 +7079,7 @@ function Settings:RefreshAdvancedTab()
 		Components:CreateLabel(
 			tab,
 			L.SETTINGS_TAINT_FREE_WHISPER_DESC
-				or "Uses a built-in message box for whispering friends instead of opening the default chat.",
+				or "Uses a BFL-owned whisper box in the chat input location instead of opening Blizzard's chat editor.",
 			true
 		)
 	)
@@ -7107,7 +7107,7 @@ function Settings:RefreshAdvancedTab()
 	taintFreeToggle:SetTooltip(
 		L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper",
 		L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP
-			or "Prevents chat taint errors caused by BetterFriendlist opening the Blizzard whisper box."
+			or "Prevents chat taint by keeping whisper input separate from Blizzard's chat edit box."
 	)
 	table.insert(allFrames, taintFreeToggle)
 

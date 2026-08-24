@@ -15168,6 +15168,63 @@ function TestSuite:RegisterLateUITests()
 end
 
 function TestSuite:RegisterRaidInteractionTest()
+	self:RegisterTest("data", "RaidFrame_ReadyCheckPartyVisibility", {
+		description = "Ready Check remains visible and available to party leaders outside combat",
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+
+			local shown, available = RaidFrame:ResolveReadyCheckButtonState(true, true, false, true, false, false)
+			V:Assert(shown, "Enabled Ready Check is visible in a party")
+			V:Assert(available, "Party leaders can start Ready Check outside combat")
+
+			shown, available = RaidFrame:ResolveReadyCheckButtonState(true, true, false, false, false, false)
+			V:Assert(shown, "Ready Check remains visible to party members")
+			V:Assert(not available, "Party members cannot start Ready Check")
+
+			shown, available = RaidFrame:ResolveReadyCheckButtonState(true, true, false, true, false, true)
+			V:Assert(shown, "Ready Check remains visible during combat")
+			V:Assert(not available, "Ready Check is disabled during combat")
+
+			shown, available = RaidFrame:ResolveReadyCheckButtonState(false, true, false, true, false, false)
+			V:Assert(not shown and not available, "Disabled Ready Check stays hidden")
+		end,
+	})
+
+	self:RegisterTest("ui", "RaidFrame_EmptyStateLayoutContract", {
+		description = "The long raid description remains bounded to the raid inset in every UI layout",
+		condition = function()
+			local raid = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+			return raid and raid.NotInRaid and raid.GroupsInset and BFL:GetModule("RaidFrame")
+		end,
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			local raid = BetterFriendsFrame.RaidFrame
+			V:Assert(RaidFrame:UpdateEmptyStateLayout(), "Raid empty-state geometry should be applicable")
+			V:AssertEqual(raid.NotInRaid:GetNumPoints(), 2, "Raid description should have a bounded two-anchor extent")
+			local topPoint, topRelativeTo, topRelativePoint, topX, topY = raid.NotInRaid:GetPoint(1)
+			local bottomPoint, bottomRelativeTo, bottomRelativePoint, bottomX, bottomY = raid.NotInRaid:GetPoint(2)
+			V:Assert(
+				topPoint == "TOPLEFT"
+					and topRelativeTo == raid.GroupsInset
+					and topRelativePoint == "TOPLEFT"
+					and topX == 20
+					and topY == -20,
+				"Raid description should begin inside the inset"
+			)
+			V:Assert(
+				bottomPoint == "BOTTOMRIGHT"
+					and bottomRelativeTo == raid.GroupsInset
+					and bottomRelativePoint == "BOTTOMRIGHT"
+					and bottomX == -20
+					and bottomY == 20,
+				"Raid description should end inside the inset"
+			)
+			V:AssertEqual(raid.NotInRaid:GetJustifyH(), "LEFT", "Raid description should align with Blizzard's layout")
+			V:AssertEqual(raid.NotInRaid:GetJustifyV(), "TOP", "Raid description should start at the top of its bounds")
+		end,
+	})
+
 	self:RegisterTest("integration", "RaidFrame_ModernInteractionContract", {
 		description = "Modern raid rows keep Blizzard's Raid menu and resolve child overlays back to their member button",
 		condition = function()

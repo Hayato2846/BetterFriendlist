@@ -1632,11 +1632,12 @@
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontNormalMed3" text="Raid roster is only available when in a raid group" hidden="true" wordwrap="true" justifyH="CENTER" justifyV="MIDDLE">
+						<!-- Keep Blizzard's longer raid explanation bounded to the visible raid inset. -->
+						<FontString parentKey="NotInRaid" inherits="BetterFriendlistFontNormal" text="RAID_DESCRIPTION" hidden="true" wordwrap="true" justifyH="LEFT" justifyV="TOP">
 							<Anchors>
-								<Anchor point="CENTER" relativeKey="$parent.GroupsInset" x="0" y="0"/>
+								<Anchor point="TOPLEFT" relativeKey="$parent.GroupsInset" x="20" y="-20"/>
+								<Anchor point="BOTTOMRIGHT" relativeKey="$parent.GroupsInset" x="-20" y="20"/>
 							</Anchors>
-							<Color r="0.5" g="0.5" b="0.5"/>
 						</FontString>
 					</Layer>
 				</Layers>

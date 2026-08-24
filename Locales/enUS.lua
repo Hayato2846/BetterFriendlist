@@ -1889,9 +1889,9 @@ local function LoadEnUS()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Taint-Free Whisper"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Uses an inline message bar at the bottom of the friend list for whispering friends instead of opening the default chat. This prevents BetterFriendlist from interfering with the chat system, which can cause Lua errors when other addons or Blizzard code processes messages. Enable this if you experience chat-related errors mentioning BetterFriendlist. The bar closes after sending a message. Open another whisper to use it again. Click the X button to close and forget the target."
+		"Uses a BFL-owned whisper box in the chat input location instead of opening Blizzard's chat editor. BFL never changes the native chat edit box or chat state. Press Enter to send or Escape to cancel. On Classic or when the chat position cannot be determined, the message bar remains in the friend list."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
-		"Prevents chat taint errors caused by BetterFriendlist opening the Blizzard whisper box. Uses an inline message bar instead."
+		"Prevents chat taint by keeping whisper input separate from Blizzard's chat edit box. On Retail it appears in the native chat input location."
 	L.TAINT_FREE_WHISPER_TITLE = "Whisper to %s"
 	L.TAINT_FREE_WHISPER_SEND = "Send"
 	L.TAINT_FREE_WHISPER_CANCEL = "Cancel"

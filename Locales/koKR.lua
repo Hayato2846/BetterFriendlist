@@ -1861,9 +1861,9 @@ BFL:RegisterLocale("koKR", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "테인트 없는 귀솏말"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"기본 채팅을 여는 대신 친구 목록 하단에 내장된 메시지 바를 사용하여 귀속말을 보냅니다. BetterFriendlist가 채팅 시스템을 방해하여 Lua 오류를 발생시키는 것을 방지합니다. BetterFriendlist을 언급하는 채팅 오류가 발생하면 활성화하세요. 메시지 바는 전송 후 닫힙니다. 다시 사용하려면 새 귓속말을 여세요. X를 클릭하면 대상을 잊고 닫습니다."
+		"Blizzard 채팅 편집기를 여는 대신 채팅 입력 위치에 BFL 전용 귓속말 입력창을 사용합니다. BFL은 기본 채팅 입력창이나 채팅 상태를 변경하지 않습니다. Enter로 보내고 Escape로 취소합니다. 클래식 또는 채팅 위치를 확인할 수 없는 경우 메시지 바는 친구 목록에 표시됩니다."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
-		"BetterFriendlist로 인한 채팅 테인트 오류를 방지합니다. 내장 메시지 바를 사용합니다."
+		"귓속말 입력을 Blizzard 채팅 입력창과 분리하여 채팅 테인트를 방지합니다. 리테일에서는 기본 채팅 입력 위치에 표시됩니다."
 	L.TAINT_FREE_WHISPER_TITLE = "%s에게 귀속말"
 	L.TAINT_FREE_WHISPER_SEND = "보내기"
 	L.TAINT_FREE_WHISPER_CANCEL = "취소"

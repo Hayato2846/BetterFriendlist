@@ -1895,9 +1895,9 @@ BFL:RegisterLocale("frFR", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Chuchotement sans Taint"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Utilise une barre de message integree en bas de la liste d'amis pour chuchoter au lieu d'ouvrir le chat par defaut. Cela empeche BetterFriendlist d'interferer avec le systeme de chat, ce qui peut provoquer des erreurs Lua. Activez cette option si vous rencontrez des erreurs de chat mentionnant BetterFriendlist. La barre se ferme apres l'envoi. Ouvrez un autre chuchotement pour la reutiliser. Cliquez sur le X pour fermer et oublier le destinataire."
+		"Utilise une zone de chuchotement propre à BFL à l'emplacement de saisie du chat au lieu d'ouvrir l'éditeur de chat de Blizzard. BFL ne modifie ni la zone de saisie native ni l'état du chat. Appuyez sur Entrée pour envoyer ou sur Échap pour annuler. Dans Classic ou si la position du chat ne peut pas être déterminée, la barre reste dans la liste d'amis."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
-		"Empeche les erreurs de taint de chat causees par BetterFriendlist. Utilise une barre de message integree."
+		"Évite le taint du chat en séparant la saisie des chuchotements de la zone de chat de Blizzard. Dans Retail, elle apparaît à l'emplacement de saisie natif."
 	L.TAINT_FREE_WHISPER_TITLE = "Chuchoter a %s"
 	L.TAINT_FREE_WHISPER_SEND = "Envoyer"
 	L.TAINT_FREE_WHISPER_CANCEL = "Annuler"

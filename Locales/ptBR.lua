@@ -1888,9 +1888,9 @@ BFL:RegisterLocale("ptBR", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "Sussurro sem Taint"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"Usa uma barra de mensagem integrada na parte inferior da lista de amigos para sussurrar em vez de abrir o chat padrao. Isso impede que BetterFriendlist interfira no sistema de chat, o que pode causar erros Lua. Ative isso se voce tiver erros de chat mencionando BetterFriendlist. A barra fecha apos o envio. Abra outro sussurro para usa-la novamente. Clique no X para fechar e esquecer o destinatario."
+		"Usa uma caixa de sussurro própria do BFL no local de entrada do chat em vez de abrir o editor de chat da Blizzard. O BFL não altera a caixa de entrada nativa nem o estado do chat. Pressione Enter para enviar ou Escape para cancelar. No Classic ou quando a posição do chat não puder ser determinada, a barra permanece na lista de amigos."
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
-		"Previne erros de taint do chat causados pelo BetterFriendlist. Usa uma barra de mensagem integrada."
+		"Evita taint no chat mantendo a entrada de sussurros separada da caixa de chat da Blizzard. No Retail, ela aparece no local de entrada nativo."
 	L.TAINT_FREE_WHISPER_TITLE = "Sussurrar para %s"
 	L.TAINT_FREE_WHISPER_SEND = "Enviar"
 	L.TAINT_FREE_WHISPER_CANCEL = "Cancelar"

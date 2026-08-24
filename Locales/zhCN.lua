@@ -1743,9 +1743,9 @@ BFL:RegisterLocale("zhCN", function()
 	-- Taint-Free Whisper
 	L.SETTINGS_TAINT_FREE_WHISPER = "无污染密语"
 	L.SETTINGS_TAINT_FREE_WHISPER_DESC =
-		"使用好友列表底部的内置消息栏发送密语，而不是打开默认聊天窗口。这可以防止 BetterFriendlist 干扰聊天系统导致 Lua 错误。如果您遇到提及 BetterFriendlist 的聊天错误，请启用此选项。消息栏在发送后关闭。再次打开密语即可继续使用。点击 X 关闭并清除目标。"
+		"使用位于聊天输入位置的 BFL 专用密语框，而不打开 Blizzard 的聊天编辑框。BFL 不会修改原生聊天输入框或聊天状态。按 Enter 发送，按 Escape 取消。在经典版或无法确定聊天位置时，消息栏仍显示在好友列表中。"
 	L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP =
-		"防止 BetterFriendlist 导致的聊天污染错误。使用内置消息栏。"
+		"将密语输入与 Blizzard 聊天输入框分离，以避免聊天污染。在正式服中，它会显示在原生聊天输入位置。"
 	L.TAINT_FREE_WHISPER_TITLE = "密语 %s"
 	L.TAINT_FREE_WHISPER_SEND = "发送"
 	L.TAINT_FREE_WHISPER_CANCEL = "取消"
