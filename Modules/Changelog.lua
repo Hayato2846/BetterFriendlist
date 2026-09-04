@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Fixed
+- **Raid Member Context Menus** - Right-clicking raid members now uses the secure Raid Player menu again in both Modern and Legacy. Left-clicks, configured shortcuts, multi-selection, and drag-and-drop stay connected to the matching player row.
+- **Raid Counts** - Member and role counts now refresh when returning to the Raid tab after the roster changed while it was hidden.
+
+---
+
 ## [2.8.7]        - 2026-08-24
 
 ### Fixed
@@ -171,15 +179,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 
 ### Fixed
 - **Legacy Font Dropdowns** - Font lists in the legacy settings now stay on-screen and scroll through all available fonts. Dark and Custom themes no longer show an overlapping second dropdown.
-
----
-
-## [2.6.9]        - 2026-07-22
-
-### Fixed
-- **Who Searches** - Broad Who searches no longer leave an invisible Blizzard window that blocks Escape and disrupts other window positions.
-
----
 
 ---
 

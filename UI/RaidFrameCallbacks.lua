@@ -225,15 +225,9 @@ function BetterRaidFrame_OnShow(self)
 	-- Request raid info (for saved instances)
 	RequestRaidInfo()
 
-	-- Update raid roster
-	RaidFrame:UpdateRaidMembers()
-	RaidFrame:BuildDisplayList()
-
-	-- Update member buttons (using XML-defined slots)
-	RaidFrame:UpdateAllMemberButtons()
-
-	-- Ensure layout matches Mock (responsive sizing)
-	RaidFrame:UpdateGroupLayout()
+	-- Consume roster changes deferred while the Raid tab was hidden. Keep member
+	-- and role counts in the same refresh as the roster rows in both UI layouts.
+	RaidFrame:RefreshRosterView()
 
 	-- Update Raid Info button state
 	BetterRaidFrame_UpdateRaidInfoButton()
@@ -775,6 +769,11 @@ function BetterRaidMemberButton_OnEnter(self)
 		return
 	end
 
+	local RaidFrame = GetRaidFrame()
+	if RaidFrame and RaidFrame.ShowSecureProxyForButton and RaidFrame:ShowSecureProxyForButton(self) then
+		return
+	end
+
 	-- Show tooltip only while the raid token is still valid. Roster moves can
 	-- briefly leave buttons with stale raidN tokens while Blizzard refreshes.
 	if self.unit and UnitExists(self.unit) then
@@ -837,13 +836,10 @@ function BetterRaidMemberButton_PostClick(self, button)
 			ClearAllSelections()
 		end
 	elseif button == "RightButton" then
-		-- RightButton: Context menu is handled by the secure menu attribute.
+		-- RightButton: Context menu is handled by the secure "togglemenu" action.
 		-- PostClick still runs after the secure action; on Retail SecretValues builds,
 		-- reopening UnitPopup from addon Lua taints protected entries like Set Focus.
 		if not IsModifierKeyDown() and self.unit then
-			if self.BFL_RaidContextMenuType == "RAID" then
-				return
-			end
 			if BFL.HasSecretValues then
 				return
 			end

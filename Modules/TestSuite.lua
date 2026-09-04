@@ -15310,8 +15310,48 @@ function TestSuite:RegisterRaidInteractionTest()
 		end,
 	})
 
-	self:RegisterTest("integration", "RaidFrame_ModernInteractionContract", {
-		description = "Modern raid rows keep Blizzard's Raid menu and resolve child overlays back to their member button",
+	self:RegisterTest("integration", "RaidFrame_VisibleRefresh_UpdatesRosterAndCounts", {
+		description = "Raid tab refreshes deferred roster data and its member and role counters together",
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+
+			local methodNames = {
+				"UpdateRaidMembers",
+				"BuildDisplayList",
+				"UpdateControlPanel",
+				"UpdateGroupLayout",
+				"UpdateConvertButton",
+			}
+			local originals = {}
+			local calls = {}
+			for _, methodName in ipairs(methodNames) do
+				originals[methodName] = RaidFrame[methodName]
+				local recordedName = methodName
+				RaidFrame[methodName] = function()
+					table.insert(calls, recordedName)
+				end
+			end
+
+			local ok, result = pcall(RaidFrame.RefreshRosterView, RaidFrame)
+			for _, methodName in ipairs(methodNames) do
+				RaidFrame[methodName] = originals[methodName]
+			end
+			if not ok then
+				error(result, 0)
+			end
+
+			V:Assert(result, "visible roster refresh should complete")
+			V:AssertEqual(
+				table.concat(calls, ","),
+				table.concat(methodNames, ","),
+				"visible roster refresh should update roster, counters, layout, and controls in order"
+			)
+		end,
+	})
+
+	self:RegisterTest("integration", "RaidFrame_RaidPlayerProxyInteractionContract", {
+		description = "Modern and Legacy raid rows route RAID_PLAYER through the secure proxy without breaking child overlays",
 		condition = function()
 			return BFL.IsRetail
 		end,
@@ -15326,6 +15366,7 @@ function TestSuite:RegisterRaidInteractionTest()
 			V:AssertNotNil(FriendsUI, "FriendsUI module should exist")
 
 			local originalIsModernActive = FriendsUI.IsModernActive
+			local originalHasSecretValues = BFL.HasSecretValues
 			local attributes = {}
 			local fakeButton = {
 				memberData = {},
@@ -15339,21 +15380,30 @@ function TestSuite:RegisterRaidInteractionTest()
 			}
 			local childOverlay = { GetParent = function() return fakeButton end }
 			local ok, err = pcall(function()
+				BFL.HasSecretValues = true
 				FriendsUI.IsModernActive = function() return true end
 				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
-				V:AssertEqual(attributes.type2, "menu", "Modern Raid uses an explicit menu action")
-				V:AssertType(attributes["menu-function"], "function", "Modern Raid supplies its explicit context-menu handler")
-				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID", "Modern Raid uses Blizzard's Raid-tab menu")
+				V:AssertEqual(attributes.type2, nil, "Modern Raid leaves right-click to the secure proxy")
+				V:AssertEqual(attributes["menu-function"], nil, "Modern Raid does not install an insecure menu callback")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Modern Raid uses the Raid Player menu")
+				V:AssertType(RaidFrame.ShowSecureProxyForButton, "function", "Retail exposes the raid secure proxy path")
 				V:AssertEqual(RaidFrame:ResolveMemberButton(childOverlay), fakeButton, "Child tooltip overlays resolve to their raid member row")
 
 				attributes = {}
 				FriendsUI.IsModernActive = function() return false end
 				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
-				V:AssertEqual(attributes.type2, "togglemenu", "Legacy Raid keeps its established unit-menu action")
-				V:AssertEqual(attributes["menu-function"], nil, "Legacy Raid clears the Modern menu handler")
-				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Legacy Raid keeps its established Raid Player menu")
+				V:AssertEqual(attributes.type2, nil, "Legacy Raid also leaves right-click to the secure proxy")
+				V:AssertEqual(attributes["menu-function"], nil, "Legacy Raid does not install an insecure menu callback")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Legacy Raid uses the Raid Player menu")
+
+				attributes = {}
+				BFL.HasSecretValues = false
+				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
+				V:AssertEqual(attributes.type2, "togglemenu", "Pre-secret clients keep the visual secure menu fallback")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "The fallback also resolves Raid Player")
 			end)
 			FriendsUI.IsModernActive = originalIsModernActive
+			BFL.HasSecretValues = originalHasSecretValues
 			if not ok then
 				error(err, 0)
 			end

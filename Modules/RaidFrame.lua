@@ -858,9 +858,9 @@ end
 -- ========================================
 -- SECURE ATTRIBUTES SYSTEM
 -- ========================================
--- Attributes stay on the visual InsecureActionButtonTemplate buttons. That
--- template performs secure actions outside combat without protecting the parent
--- BFL frame or requiring a protected hover proxy to anchor to an insecure slot.
+-- SecretValues builds route raid member interactions through a UIParent proxy.
+-- Its secure "togglemenu" action resolves raid units to RAID_PLAYER in both UI
+-- layouts. Pre-secret clients keep the visual button fallback.
 
 local RAID_SHORTCUT_MODIFIERS = {
 	["SHIFT"] = "shift-",
@@ -964,8 +964,8 @@ function RaidFrame:UpdateSecureAttributesForButton(button)
 	button:SetAttribute("*type1", nil)
 	button:SetAttribute("type1", nil)
 
-	-- Modern mirrors Blizzard's explicit RAID menu; Legacy keeps RAID_PLAYER.
-	-- Both styles retain their shortcuts on this same visual interaction button.
+	-- SecretValues clients use the UIParent proxy for unmodified right-click.
+	-- Pre-secret clients keep the visual button's secure togglemenu fallback.
 	self:ApplyMemberContextMenuAttributes(button)
 
 	-- Apply ONLY MainTank/MainAssist shortcuts (have native secure types)
@@ -1014,7 +1014,7 @@ function RaidFrame:HandleShortcutClick(button, clickedButton, modifier)
 	return false
 end
 
---- OLD PROXY SYSTEM (DEPRECATED)
+--- Legacy monolithic proxy attribute updater (disabled)
 function RaidFrame:UpdateSecureAttributes_OLD_DISABLED()
 	local proxy = self.SecureProxy
 	if not proxy then
@@ -1179,8 +1179,8 @@ function RaidFrame:Initialize()
 	-- Initialize member buttons (XML templates)
 	self:InitializeMemberButtons()
 
-	-- Secure Attributes applied directly to buttons (InsecureActionButtonTemplate)
-	-- See: UpdateSecureAttributesForButton()
+	-- Visual rows own pass-through interactions; SecretValues right-clicks use
+	-- the SecureActionButton proxy prepared by UpdateSecureAttributesForButton().
 
 	-- Localize Static UI Elements
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
@@ -1208,7 +1208,7 @@ function RaidFrame:Initialize()
 			if needsRenderOnShow or #self.raidMembers == 0 then
 				-- BFL:DebugPrint("|cff00ffffRaidFrame:|r Frame shown - triggering refresh")
 				self:OnRaidRosterUpdate()
-				needsRenderOnShow = false
+				-- RefreshRosterView clears the dirty flag only after the Raid tab is visible.
 			end
 		end)
 	end
@@ -2041,7 +2041,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		end
 	end
 
-	-- Update Secure Attributes (shortcuts via InsecureActionButtonTemplate)
+	-- Update visual-row attributes and the data consumed by the secure hover proxy.
 	self:UpdateSecureAttributesForButton(button)
 end
 
@@ -2422,15 +2422,15 @@ function RaidFrame:OnRaidRosterUpdate(...)
 			return
 		end
 
-		-- Immediate update for crisp UI response
-		self:UpdateRaidMembers()
-		self:BuildDisplayList()
-
-		-- Update UI
-		-- Note: UpdateGroupLayout calls UpdateAllMemberButtons internally
-		self:UpdateControlPanel()
-		self:UpdateGroupLayout()
-		self:UpdateConvertButton()
+		-- Keep every roster-derived surface on the same current snapshot:
+		-- UpdateRaidMembers refreshes the source data,
+		-- BuildDisplayList refreshes the sorted rows,
+		-- UpdateControlPanel refreshes role and member counts,
+		-- UpdateGroupLayout paints the refreshed rows,
+		-- UpdateConvertButton refreshes the group action state, and
+		-- RefreshRosterView clears the hidden-tab dirty flag only after all of them.
+		-- The Raid frame OnShow callback uses this exact same refresh contract.
+		self:RefreshRosterView()
 
 		-- Central Update Logic (Restored)
 		if BetterRaidFrame_Update then
@@ -3665,30 +3665,142 @@ function RaidFrame:CreateMockRaidData()
 	self:CreateMockPreset_Standard()
 end
 
-function RaidFrame.OpenModernRaidMemberContextMenu(owner, unit)
-	if not (owner and unit and owner.name and UnitExists(unit)) then
-		return
+--- Rebuild the visible raid roster and every UI value derived from it.
+--- The caller is responsible for ensuring the Raid frame is visible.
+function RaidFrame:RefreshRosterView()
+	self:UpdateRaidMembers()
+	self:BuildDisplayList()
+	self:UpdateControlPanel()
+	self:UpdateGroupLayout()
+	self:UpdateConvertButton()
+	needsRenderOnShow = false
+	return true
+end
+
+function RaidFrame:CreateSecureProxy()
+	if self.SecureProxy then
+		return self.SecureProxy
 	end
-	if owner.pendingName or IsPendingRaidRosterName(owner.name) then
-		return
+
+	local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "SecureActionButtonTemplate")
+	proxy:SetFrameStrata("DIALOG")
+	proxy:SetFrameLevel(9999)
+	proxy:SetAttribute("useOnKeyDown", false)
+	proxy:Hide()
+
+	local highlight = proxy:CreateTexture(nil, "HIGHLIGHT")
+	highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	highlight:SetBlendMode("ADD")
+	highlight:SetAllPoints(proxy)
+	proxy:SetHighlightTexture(highlight)
+
+	proxy:RegisterForClicks("AnyUp")
+	if proxy.SetPassThroughButtons then
+		-- The visual row continues to own selection, drag-and-drop, and shortcuts
+		-- assigned to buttons other than RightButton.
+		proxy:SetPassThroughButtons("LeftButton", "Button3", "Button4", "Button5")
 	end
-	if BFL.Compat and BFL.Compat.OpenUnitPopupMenu then
-		BFL.Compat.OpenUnitPopupMenu("RAID", {
-			unit = unit,
-			name = owner.name,
-		})
+
+	proxy:SetScript("OnEnter", function(self)
+		local visualButton = self.visualButton
+		if visualButton then
+			self.unit = visualButton.unit
+			self.name = visualButton.name
+			self.id = tonumber(string.match(self.unit or "", "raid(%d+)"))
+			self.groupIndex = visualButton.groupIndex
+			self.slotIndex = visualButton.slotIndex
+			if visualButton.Highlight then
+				visualButton.Highlight:Show()
+			end
+		end
+
+		if self.unit then
+			pcall(UnitFrame_UpdateTooltip, self)
+		end
+	end)
+
+	proxy:SetScript("OnLeave", function(self)
+		local visualButton = self.visualButton
+		if visualButton and visualButton.Highlight then
+			visualButton.Highlight:Hide()
+		end
+		if GameTooltip and GameTooltip:GetOwner() == self then
+			GameTooltip:Hide()
+		end
+		self:Hide()
+		self:ClearAllPoints()
+		self.visualButton = nil
+		self.unit = nil
+		self.name = nil
+		self.id = nil
+		self.groupIndex = nil
+		self.slotIndex = nil
+	end)
+
+	proxy:RegisterEvent("PLAYER_REGEN_DISABLED")
+	proxy:SetScript("OnEvent", function(self, event)
+		if event == "PLAYER_REGEN_DISABLED" then
+			self:Hide()
+			self:ClearAllPoints()
+			self.visualButton = nil
+		end
+	end)
+
+	proxy:SetScript("PostClick", function(self, button)
+		local visualButton = self.visualButton
+		if visualButton and BetterRaidMemberButton_PostClick then
+			BetterRaidMemberButton_PostClick(visualButton, button)
+		end
+	end)
+
+	self.SecureProxy = proxy
+	return proxy
+end
+
+function RaidFrame:ShowSecureProxyForButton(button)
+	if not BFL.HasSecretValues then
+		return false
 	end
+	if InCombatLockdown() then
+		return false
+	end
+	if not button or not button.unit or button.pendingName or IsPendingRaidRosterName(button.name) then
+		return false
+	end
+	if not UnitExists(button.unit) then
+		return false
+	end
+
+	local proxy = self:CreateSecureProxy()
+	if not proxy then
+		return false
+	end
+
+	ClearRaidButtonAttributes(proxy)
+	proxy.visualButton = button
+	proxy.unit = button.unit
+	proxy.name = button.name
+	proxy.groupIndex = button.groupIndex
+	proxy.slotIndex = button.slotIndex
+
+	proxy:SetAttribute("unit", button.unit)
+	proxy:SetAttribute("*type1", nil)
+	proxy:SetAttribute("type1", nil)
+	proxy:SetAttribute("type2", "togglemenu")
+	proxy.BFL_RaidContextMenuType = "RAID_PLAYER"
+
+	local DB = BFL and BFL:GetModule("DB")
+	ApplyRaidShortcutAttributes(proxy, DB and DB:Get("raidShortcuts") or {})
+
+	proxy:ClearAllPoints()
+	proxy:SetAllPoints(button)
+	proxy:Show()
+	return true
 end
 
 function RaidFrame:ApplyMemberContextMenuAttributes(button)
-	if IsModernRaidLayout() then
-		button.BFL_RaidContextMenuType = "RAID"
-		button:SetAttribute("type2", "menu")
-		button:SetAttribute("menu-function", RaidFrame.OpenModernRaidMemberContextMenu)
-	else
-		button.BFL_RaidContextMenuType = "RAID_PLAYER"
-		button:SetAttribute("type2", "togglemenu")
-	end
+	button.BFL_RaidContextMenuType = "RAID_PLAYER"
+	button:SetAttribute("type2", BFL.HasSecretValues and nil or "togglemenu")
 end
 
 function RaidFrame:ResolveMemberButton(frame)
