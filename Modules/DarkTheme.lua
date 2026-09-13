@@ -508,6 +508,7 @@ local function RestoreClassicRaidRoleIcons(engine, raid)
 					RestoreRaidTexture(engine, slot, slot.RoleIcon)
 					RestoreRaidTexture(engine, slot, slot.MainTankIcon)
 					RestoreRaidTexture(engine, slot, slot.MainAssistIcon)
+					RestoreRaidTexture(engine, slot, slot.MasterLooterIcon)
 				end
 			end
 		end

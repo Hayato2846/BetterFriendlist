@@ -24,6 +24,20 @@ local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	return fallbackR or 1, fallbackG or 0.82, fallbackB or 0, fallbackA or 1
 end
 
+local function GetSecondaryAccentColor()
+	local accentR, accentG, accentB, accentA = GetAccentColor(1, 0.82, 0, 1)
+	local tint = 0.32
+	return accentR + (1 - accentR) * tint,
+		accentG + (1 - accentG) * tint,
+		accentB + (1 - accentB) * tint,
+		accentA
+end
+
+local function FormatSecondaryHeading(content)
+	local r, g, b = GetSecondaryAccentColor()
+	return string.format("|cff%02x%02x%02x%s|r", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5), content)
+end
+
 -- Changelog content
 local CHANGELOG_TEXT = [[# Changelog
 
@@ -34,11 +48,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.8.8]        - 2026-09-13
 
-### Fixed
-- **Raid Member Context Menus** - Right-clicking raid members now uses the secure Raid Player menu again in both Modern and Legacy. Left-clicks, configured shortcuts, multi-selection, and drag-and-drop stay connected to the matching player row.
-- **Raid Counts** - Member and role counts now refresh when returning to the Raid tab after the roster changed while it was hidden.
+### Retail Live & Classic
+
+#### Added
+- **Master Looter** - Classic raid and party lists now show who is Master Looter. The icon also works with both Retail raid layouts if the client provides that flag.
+
+#### Improved
+- **Addon Window Spacing** - EnhanceQoL, GlobalIgnoreList, and NorthernSkyRaidTools now leave room for the Modern side tabs. Their Legacy positions stay as they were.
+
+#### Fixed
+- **Story Mode Raid Tab** - The Raid tab is now disabled during a Story raid and shows Blizzard's reason when hovered.
+- **ElvUI Broker Tooltips** - Friends and Guild Broker tooltips use the selected ElvUI tooltip style again.
+- **Broker Tooltip Scrolling** - Friend updates no longer jump a scrolled Friends Broker tooltip back to the top.
+- **Raid Member Right-Click** - The Raid Player menu works again in both Retail layouts. Regular clicks, shortcuts, selection, and drag-and-drop keep working on the same row.
+- **Raid Counts** - Member and role counts update after returning to a Raid tab that changed while it was hidden.
+
+### WoW 12.1.5 PTR
+
+#### Added
+- **Friend Search and Sorting** - On 12.1.5, BFL can use Blizzard's new locale-aware text APIs for local friends, tags, groups, realms, and Recent Allies. Other clients keep the existing search behavior.
+
+#### Compatibility
+- **New Client APIs** - Added checks for the new internationalization, LFG, and timer APIs so they are only used when the client provides them.
+- **Raid Updates** - Repeated raid and LFG events now share one pending refresh on 12.1.5. Older clients keep the existing timer path.
+- **Matchmade Raid Markers** - Main Tank and Main Assist markers are hidden when 12.1.5 reports a matchmade raid without manual role requirements.
 
 ---
 
@@ -356,7 +391,7 @@ local function ConvertBlockToInfoEntry(block)
 	if block.type == "h3" then
 		return { type = "text", text = "|cffffd100" .. content .. "|r" }
 	elseif block.type == "h4" then
-		return { type = "text", text = "|cffcccccc" .. content .. "|r" }
+		return { type = "text", text = FormatSecondaryHeading(content) }
 	elseif block.type == "list_item" then
 		return { type = "text", text = "- " .. content }
 	end
@@ -724,6 +759,7 @@ function Changelog:RefreshAccentColors()
 	end
 
 	local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0, 1)
+	local secondaryAccentR, secondaryAccentG, secondaryAccentB = GetSecondaryAccentColor()
 	if changelogFrame.BFL_AccentTextures then
 		for _, texture in ipairs(changelogFrame.BFL_AccentTextures) do
 			if texture and texture.SetColorTexture then
@@ -737,6 +773,13 @@ function Changelog:RefreshAccentColors()
 		for _, fontString in ipairs(changelogFrame.BFL_AccentFontStrings) do
 			if fontString and fontString.SetTextColor then
 				fontString:SetTextColor(accentR, accentG, accentB)
+			end
+		end
+	end
+	if changelogFrame.BFL_SecondaryAccentFontStrings then
+		for _, fontString in ipairs(changelogFrame.BFL_SecondaryAccentFontStrings) do
+			if fontString and fontString.SetTextColor then
+				fontString:SetTextColor(secondaryAccentR, secondaryAccentG, secondaryAccentB)
 			end
 		end
 	end
@@ -767,6 +810,7 @@ function Changelog:CreateChangelogWindow()
 	local frame = CreateFrame("Frame", "BetterFriendlistChangelogFrame", UIParent, "ButtonFrameTemplate")
 	frame.BFL_AccentTextures = {}
 	frame.BFL_AccentFontStrings = {}
+	frame.BFL_SecondaryAccentFontStrings = {}
 	frame:SetSize(600, 500)
 	frame:SetPoint("CENTER")
 	frame:SetFrameStrata("DIALOG")
@@ -1007,7 +1051,8 @@ function Changelog:CreateChangelogWindow()
 				fs:SetWidth(510)
 				fs:SetJustifyH("LEFT")
 				fs:SetText(block.content)
-				fs:SetTextColor(0.8, 0.8, 0.8) -- Light Gray
+				fs:SetTextColor(GetSecondaryAccentColor())
+				table.insert(frame.BFL_SecondaryAccentFontStrings, fs)
 				currentY = currentY - fs:GetStringHeight() - 5
 			elseif block.type == "separator" then
 				local tex = entryContent:CreateTexture(nil, "ARTWORK")

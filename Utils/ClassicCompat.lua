@@ -1905,6 +1905,30 @@ function Compat.TemplateExists(templateName)
 end
 
 ------------------------------------------------------------
+-- LFG Compatibility
+------------------------------------------------------------
+
+local function GetLFGInfoAPI()
+	if Compat._testLFGInfo ~= nil then
+		return Compat._testLFGInfo or nil
+	end
+	return C_LFGInfo
+end
+
+function Compat.ShouldDisplayMainTankAndAssist()
+	local lfgInfo = GetLFGInfoAPI()
+	local api = lfgInfo and lfgInfo.IsInMatchmadeRaidWithoutRoleRequirements
+	if type(api) ~= "function" then
+		return true
+	end
+	local ok, isRestrictedMatchmadeRaid = pcall(api)
+	if not ok or (BFL.IsSecret and BFL:IsSecret(isRestrictedMatchmadeRaid)) then
+		return true
+	end
+	return isRestrictedMatchmadeRaid ~= true
+end
+
+------------------------------------------------------------
 -- Event Compatibility
 ------------------------------------------------------------
 -- Some events only exist in certain versions

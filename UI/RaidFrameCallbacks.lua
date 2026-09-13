@@ -703,6 +703,20 @@ function BetterRaidFrame_RaidInfoButton_OnClick(self)
 	end
 end
 
+function BetterRaidFrame_RaidInfoButton_OnEnter(self)
+	local raidFrame = GetRaidFrame()
+	if raidFrame and raidFrame.ShowRaidInfoTooltip then
+		raidFrame:ShowRaidInfoTooltip(self)
+	end
+end
+
+function BetterRaidFrame_RaidInfoButton_OnLeave(self)
+	local raidFrame = GetRaidFrame()
+	if raidFrame and raidFrame.HideRaidInfoTooltip then
+		raidFrame:HideRaidInfoTooltip()
+	end
+end
+
 -- Update Raid Info Button (Enable/Disable based on saved instances)
 function BetterRaidFrame_UpdateRaidInfoButton()
 	local raidFrame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame

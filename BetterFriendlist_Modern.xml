@@ -1,6 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<!-- Retail 12.1 visual layer. Runtime capability checks live in Modules/FriendsUI.lua. -->
-	<Button name="BFLModernSideTabTemplate" inherits="LargeSideTabButtonTemplate" virtual="true">
+	<Button name="BFLModernSideTabTemplate" inherits="LargeSideTabButtonTemplate" motionScriptsWhileDisabled="true" virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND" textureSubLevel="7">
 				<Texture parentKey="ThemeGlow" setAllPoints="true" hidden="true" alphaMode="ADD">

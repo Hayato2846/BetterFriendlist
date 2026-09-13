@@ -6741,6 +6741,64 @@ local function RegisterBuiltInTests()
 			end)
 		end,
 	})
+
+	TS:RegisterTest("data", "BrokerUtils_ElvUIInitializationCompatibility", {
+		description = "Broker tooltip skinning recognizes current, legacy, and Skins-module ElvUI initialization states",
+		action = function(V)
+			local originalElvUI = _G.ElvUI
+			local ok, err = pcall(function()
+				local currentEngine = {
+					Initialized = true,
+					GetModule = function() end,
+				}
+				_G.ElvUI = { currentEngine }
+				V:AssertEqual(
+					BFL:GetElvUIEngine(true),
+					currentEngine,
+					"Current ElvUI's uppercase initialization flag should enable broker skinning"
+				)
+
+				local legacyEngine = {
+					initialized = true,
+					GetModule = function() end,
+				}
+				_G.ElvUI = { legacyEngine }
+				V:AssertEqual(
+					BFL:GetElvUIEngine(true),
+					legacyEngine,
+					"Legacy ElvUI's lowercase initialization flag should remain supported"
+				)
+
+				local moduleEngine = {
+					GetModule = function(_, name)
+						return name == "Skins" and { Initialized = true } or nil
+					end,
+				}
+				_G.ElvUI = { moduleEngine }
+				V:AssertEqual(
+					BFL:GetElvUIEngine(true),
+					moduleEngine,
+					"An initialized ElvUI Skins module should enable broker skinning"
+				)
+
+				local pendingEngine = {
+					GetModule = function()
+						return {}
+					end,
+				}
+				_G.ElvUI = { pendingEngine }
+				V:AssertNil(
+					BFL:GetElvUIEngine(true),
+					"Broker skinning should still wait while ElvUI is not initialized"
+				)
+			end)
+			_G.ElvUI = originalElvUI
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("data", "ThemePalette_CopiedCustomAccentMigrationDerivesIndependentDefault", {
 		description = "Copied Dark accent defaults should migrate to an independent Custom accent",
 		action = function(V)
@@ -8165,6 +8223,43 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
+	TS:RegisterTest("data", "Preview_RaidMock_IncludesMasterLooter", {
+		description = "The Raid preview keeps one Master Looter fixture for the shared row renderer",
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+			local originalRaidMembers = RaidFrame.raidMembers
+			local originalDisplayList = RaidFrame.displayList
+			local originalMockEnabled = RaidFrame.mockEnabled
+			local originalClearMockData = RaidFrame.ClearMockData
+			local ok, err = pcall(function()
+				RaidFrame.ClearMockData = function(self)
+					self.raidMembers = {}
+					self.displayList = {}
+				end
+				RaidFrame:CreateMockPreset_Standard({
+					deferApply = true,
+					deferDynamicUpdates = true,
+				})
+				local masterLooterCount = 0
+				for _, member in ipairs(RaidFrame.raidMembers) do
+					if member.isML == true then
+						masterLooterCount = masterLooterCount + 1
+						V:Assert(member._isMock == true, "Master Looter fixture should remain marked as preview data")
+					end
+				end
+				V:AssertEqual(masterLooterCount, 1, "Raid preview should contain exactly one Master Looter")
+			end)
+			RaidFrame.ClearMockData = originalClearMockData
+			RaidFrame.raidMembers = originalRaidMembers
+			RaidFrame.displayList = originalDisplayList
+			RaidFrame.mockEnabled = originalMockEnabled
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	TS:RegisterTest("integration", "RaidFrame_MemberRefresh_UsesSecureSafeRenderer", {
 		description = "Legacy refresh entry points delegate to the mock-safe per-slot renderer",
 		action = function(V)
@@ -9368,6 +9463,50 @@ local function RegisterBuiltInTests()
 			end
 			Broker:UpdateBrokerText()
 			V:Assert(true, "Broker:UpdateBrokerText completed")
+		end,
+	})
+
+	TS:RegisterTest("data", "Broker_TooltipRefreshPreservesScrollOffset", {
+		description = "Event-driven broker tooltip rebuilds retain the visible scroll offset and clamp it to the new range",
+		action = function(V)
+			local Broker = BFL:GetModule("Broker")
+			V:AssertNotNil(Broker, "Broker module should exist")
+
+			local function CreateSlider(value, minValue, maxValue, shown)
+				return {
+					value = value,
+					GetValue = function(self)
+						return self.value
+					end,
+					GetMinMaxValues = function()
+						return minValue, maxValue
+					end,
+					IsShown = function()
+						return shown
+					end,
+					SetValue = function(self, newValue)
+						self.value = newValue
+					end,
+				}
+			end
+
+			local originalSlider = CreateSlider(240, 0, 600, true)
+			local offset = Broker:GetTooltipScrollOffset({ Slider = originalSlider })
+			V:AssertEqual(offset, 240, "Visible scroll position should be captured before a refresh")
+
+			local rebuiltSlider = CreateSlider(0, 0, 180, true)
+			V:Assert(
+				Broker:RestoreTooltipScrollOffset({ Slider = rebuiltSlider }, offset),
+				"A rebuilt scrollable tooltip should accept the previous offset"
+			)
+			V:AssertEqual(rebuiltSlider.value, 180, "Restored offsets should clamp to a shortened tooltip range")
+
+			local hiddenSlider = CreateSlider(0, 0, 600, false)
+			V:Assert(
+				not Broker:RestoreTooltipScrollOffset({ Slider = hiddenSlider }, offset),
+				"A tooltip that no longer scrolls should remain at the top"
+			)
+			V:AssertEqual(hiddenSlider.value, 0, "Hidden sliders should not move their scroll child")
 		end,
 	})
 
@@ -13631,8 +13770,342 @@ function TestSuite:Initialize()
 	self:RegisterChunkedFriendsListUpdateTest()
 	self:RegisterBNetFriendInfoNoOpTest()
 	self:RegisterEventCompatibilityTests()
-	self:RegisterLateUITests(); self:RegisterRaidInteractionTest()
+	self:Register1215CompatibilityTests()
+	self:RegisterLateUITests(); self:RegisterRaidInteractionTest(); self:RegisterPreviewFriendTagsTest()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
+end
+
+function TestSuite:Register1215CompatibilityTests()
+	self:RegisterTest("data", "IntlCompat_CapabilityAndFallbackContract", {
+		description = "12.1.5 internationalization helpers reject secret values, use C_Intl when safe, and preserve older-client fallbacks",
+		action = function(V)
+			local compat = BFL.IntlCompat
+			V:AssertNotNil(compat, "Intl compatibility helper should exist")
+			local originalAPI = compat._testAPI
+			local originalStrengths = compat._testStrengths
+			local originalIsSecret = BFL.IsSecret
+			local calls = {}
+			local ok, err = pcall(function()
+				compat._testStrengths = { Primary = 0, Tertiary = 2 }
+				compat._testAPI = false
+				V:Assert(not compat.CanUseIntl(), "Older clients should use the compatibility path")
+				V:Assert(compat.Contains("Élodie", "elodie"), "Fallback search should remain accent-insensitive")
+				V:AssertEqual(compat.GetSortKey("Änne"), BFL:StripAccents("Änne"), "Fallback sort key should retain existing normalization")
+
+				compat._testAPI = {
+					FindStringMatches = function(text, pattern, strength)
+						calls.nativeCallCount = (calls.nativeCallCount or 0) + 1
+						calls.searchStrength = strength
+						return text == "Unicode haystack" and pattern == "needle" and { 9 } or {}
+					end,
+					CompareStrings = function(left, right, strength)
+						calls.nativeCallCount = (calls.nativeCallCount or 0) + 1
+						calls.compareStrength = strength
+						return left == "Straße" and right == "strasse" and 0 or 1
+					end,
+					GetSortKey = function(text, strength)
+						calls.nativeCallCount = (calls.nativeCallCount or 0) + 1
+						calls.sortStrength = strength
+						return "sort:" .. text
+					end,
+					FoldCase = function(text)
+						calls.nativeCallCount = (calls.nativeCallCount or 0) + 1
+						return "fold:" .. text
+					end,
+				}
+				V:Assert(compat.CanUseIntl(), "Complete 12.1.5 C_Intl should activate the native path")
+				V:Assert(compat.Contains("Unicode haystack", "needle"), "Native search result should be honored")
+				V:Assert(compat.Equals("Straße", "strasse"), "Native primary-strength equality should be honored")
+				V:AssertEqual(compat.GetSortKey("Änne"), "sort:Änne", "Native locale sort key should be returned unchanged")
+				V:AssertEqual(compat.NormalizeForSearch("Mixed"), "fold:Mixed", "Native case folding should be used when available")
+				V:AssertEqual(calls.searchStrength, 0, "Search should use primary collation strength")
+				V:AssertEqual(calls.compareStrength, 0, "Equality should use primary collation strength")
+				V:AssertEqual(calls.sortStrength, 2, "Sorting should use tertiary collation strength")
+				V:Assert(compat.Contains(nil, ""), "Nil text should retain empty-string search semantics")
+				V:Assert(compat.Equals(nil, nil), "Nil values should retain empty-string equality semantics")
+
+				local secretValue = {}
+				BFL.IsSecret = function(_, value)
+					return value == secretValue
+				end
+				local callsBeforeSecretInputs = calls.nativeCallCount
+				V:AssertEqual(compat.NormalizeForSearch(secretValue), "", "Secret search text should be discarded")
+				V:Assert(not compat.Contains(secretValue, "needle"), "Secret haystacks should not be searched")
+				V:Assert(not compat.Contains("haystack", secretValue), "Secret patterns should not be searched")
+				V:Assert(not compat.Equals(secretValue, secretValue), "Secret values should never compare equal")
+				V:AssertEqual(compat.GetSortKey(secretValue), "", "Secret values should not produce sort keys")
+				V:AssertEqual(
+					calls.nativeCallCount,
+					callsBeforeSecretInputs,
+					"Secret values must be rejected before reaching C_Intl"
+				)
+
+				local function Fail()
+					error("simulated unavailable native result")
+				end
+				compat._testAPI = {
+					FindStringMatches = Fail,
+					CompareStrings = Fail,
+					GetSortKey = Fail,
+					FoldCase = Fail,
+				}
+				V:Assert(compat.Contains("Élodie", "elodie"), "Native search errors should fall back safely")
+				V:AssertEqual(compat.GetSortKey("Änne"), BFL:StripAccents("Änne"), "Native sort errors should fall back safely")
+			end)
+			compat._testAPI = originalAPI
+			compat._testStrengths = originalStrengths
+			BFL.IsSecret = originalIsSecret
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "TimerCompat_KeyedRescheduleContract", {
+		description = "TimedSignalMap reschedules one key while the legacy timer path suppresses stale callbacks",
+		action = function(V)
+			local compat = BFL.TimerCompat
+			V:AssertNotNil(compat, "Timer compatibility helper should exist")
+			local originalAPI = compat._testAPI
+			local ok, err = pcall(function()
+				local scheduled = {}
+				local signalCallback
+				local signalMap = {
+					SignalAfter = function(self, key, delay)
+						scheduled[key] = delay
+					end,
+					CancelSignal = function(self, key)
+						scheduled[key] = nil
+					end,
+					HasSignal = function(self, key)
+						return scheduled[key] ~= nil
+					end,
+				}
+				compat._testAPI = {
+					NewTimedSignalMap = function(callback)
+						signalCallback = callback
+						return signalMap
+					end,
+				}
+				local nativeCount = 0
+				local native = compat.CreateKeyedDebouncer(function(key)
+					V:AssertEqual(key, 7, "TimedSignalMap callback should preserve its key")
+					nativeCount = nativeCount + 1
+				end)
+				V:Assert(native:UsesTimedSignalMap(), "12.1.5 should use TimedSignalMap")
+				V:Assert(native:Schedule(7, 0.1), "Native schedule should report TimedSignalMap usage")
+				V:Assert(native:Schedule(7, 0.25), "Native reschedule should stay on TimedSignalMap")
+				V:AssertEqual(scheduled[7], 0.25, "The same key should retain only its latest deadline")
+				scheduled[7] = nil -- Native maps remove due signals before invoking the callback.
+				signalCallback(7)
+				V:AssertEqual(nativeCount, 1, "The rescheduled native key should fire once")
+				V:Assert(not native:IsPending(7), "A fired native key should no longer be pending")
+
+				local callbacks = {}
+				compat._testAPI = {
+					After = function(delay, callback)
+						table.insert(callbacks, callback)
+					end,
+				}
+				local fallbackCount = 0
+				local fallback = compat.CreateKeyedDebouncer(function()
+					fallbackCount = fallbackCount + 1
+				end)
+				V:Assert(not fallback:UsesTimedSignalMap(), "Older clients should use the timer fallback")
+				fallback:Schedule(3, 0.1)
+				fallback:Schedule(3, 0.2)
+				callbacks[1]()
+				V:AssertEqual(fallbackCount, 0, "A superseded fallback timer must be ignored")
+				callbacks[2]()
+				V:AssertEqual(fallbackCount, 1, "Only the newest fallback timer should fire")
+				V:Assert(not fallback:IsPending(3), "A fired fallback key should no longer be pending")
+
+				compat._testAPI = false
+				local immediateCount = 0
+				compat.CreateKeyedDebouncer(function()
+					immediateCount = immediateCount + 1
+				end):Schedule(1, 0)
+				V:AssertEqual(immediateCount, 1, "A missing timer API should degrade to immediate execution")
+			end)
+			compat._testAPI = originalAPI
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "LFGInfo_AssignmentVisibilityContract", {
+		description = "12.1.5 LFG assignment visibility is capability-gated and fails open",
+		action = function(V)
+			local compat = BFL.Compat
+			V:AssertNotNil(compat, "Client compatibility helper should exist")
+			local originalAPI = compat._testLFGInfo
+			local ok, err = pcall(function()
+				compat._testLFGInfo = false
+				V:Assert(compat.ShouldDisplayMainTankAndAssist(), "Missing API should preserve older-client assignment icons")
+
+				compat._testLFGInfo = {
+					IsInMatchmadeRaidWithoutRoleRequirements = function()
+						return true
+					end,
+				}
+				V:Assert(not compat.ShouldDisplayMainTankAndAssist(), "Matchmade unrestricted raids should hide manual assignments")
+
+				compat._testLFGInfo = {
+					IsInMatchmadeRaidWithoutRoleRequirements = function()
+						error("simulated API error")
+					end,
+				}
+				V:Assert(compat.ShouldDisplayMainTankAndAssist(), "Assignment visibility should fail open on API errors")
+			end)
+			compat._testLFGInfo = originalAPI
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("ui", "RaidFrame_AssignmentAndMasterLooterIconVisibility", {
+		description = "Raid assignments and the Preview-compatible Master Looter marker follow independent visibility rules",
+		condition = function()
+			return CreateFrame and UIParent and BFL:GetModule("RaidFrame")
+		end,
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			local button = CreateFrame("Frame", nil, UIParent)
+			button:SetSize(180, 20)
+			button.RankIcon = button:CreateTexture(nil, "ARTWORK")
+			button.RankIcon:SetSize(16, 16)
+			button.RoleIcon = button:CreateTexture(nil, "ARTWORK")
+			button.RoleIcon:SetSize(16, 16)
+			button.MainTankIcon = button:CreateTexture(nil, "ARTWORK")
+			button.MainTankIcon:SetSize(12, 12)
+			button.MainAssistIcon = button:CreateTexture(nil, "ARTWORK")
+			button.MainAssistIcon:SetSize(12, 12)
+			button.MasterLooterIcon = button:CreateTexture(nil, "ARTWORK")
+			button.MasterLooterIcon:SetSize(12, 12)
+
+			RaidFrame.UpdateRaidAssignmentIcons(button, 2, "MAINTANK", false, false)
+			V:Assert(button.RankIcon:IsShown(), "Leadership icon should remain independent of LFG restrictions")
+			V:Assert(not button.MainTankIcon:IsShown(), "Main-tank icon should hide in the restricted LFG context")
+			V:Assert(not button._bflMainTankTooltip:IsShown(), "Hidden assignment icon should not retain a tooltip hitbox")
+
+			RaidFrame.UpdateRaidAssignmentIcons(button, 0, "MAINTANK", false, true)
+			V:Assert(button.MainTankIcon:IsShown(), "Main-tank icon should remain on clients and groups that support it")
+			V:Assert(button._bflMainTankTooltip:IsShown(), "Visible assignment icon should expose its tooltip hitbox")
+			RaidFrame.UpdateRaidAssignmentIcons(button, 0, "MAINASSIST", false, false)
+			V:Assert(not button.MainAssistIcon:IsShown(), "Main-assist icon should obey the same restriction")
+
+			RaidFrame.UpdateRaidAssignmentIcons(button, 0, nil, false, false, true)
+			V:Assert(button.MasterLooterIcon:IsShown(), "Master Looter should remain visible independently of LFG assignments")
+			V:Assert(button._bflMasterLooterTooltip:IsShown(), "Master Looter should expose its localized tooltip hitbox")
+			RaidFrame.UpdateRaidAssignmentIcons(button, 0, nil, false, true, false)
+			V:Assert(not button.MasterLooterIcon:IsShown(), "Master Looter should clear when the roster flag clears")
+			V:Assert(not button._bflMasterLooterTooltip:IsShown(), "A cleared Master Looter should not retain a tooltip hitbox")
+			button:Hide()
+		end,
+	})
+
+	self:RegisterTest("data", "RaidFrame_PartyMasterLooterMapping", {
+		description = "Classic party loot IDs support legacy strings and current LootMethod enums without leaking other methods",
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertEqual(
+				RaidFrame.GetPartyMasterLooterID(function()
+					return "master", 0
+				end),
+				0,
+				"Party Master Looter ID zero should identify the player"
+			)
+			V:AssertEqual(
+				RaidFrame.GetPartyMasterLooterID(function()
+					return "master", 3
+				end),
+				3,
+				"Positive party Master Looter IDs should preserve Blizzard layout indices"
+			)
+			local masterLooterMethod = Enum and Enum.LootMethod and Enum.LootMethod.Masterlooter
+			if masterLooterMethod ~= nil then
+				V:AssertEqual(
+					RaidFrame.GetPartyMasterLooterID(function()
+						return masterLooterMethod, 4
+					end),
+					4,
+					"Current C_PartyInfo LootMethod enums should identify the Master Looter"
+				)
+			end
+			V:AssertNil(RaidFrame.GetPartyMasterLooterID(function()
+				return "group", 2
+			end), "Non-master loot methods should not mark a member")
+			V:AssertNil(RaidFrame.GetPartyMasterLooterID(function()
+				error("simulated API error")
+			end), "Loot-method API errors should fail closed")
+		end,
+	})
+end
+
+function TestSuite:RegisterPreviewFriendTagsTest()
+	self:RegisterTest("data", "PreviewMode_FriendTagsUseSyntheticFixtures", {
+		description = "Preview friend tags remain available without the live Blizzard tag rollout",
+		action = function(V)
+			local FriendTags = BFL:GetModule("FriendTags")
+			V:AssertNotNil(FriendTags, "FriendTags module should exist")
+
+			local originalAreBlizzardTagsEnabled = FriendTags.AreBlizzardTagsEnabled
+			local ok, err = pcall(function()
+				FriendTags.AreBlizzardTagsEnabled = function()
+					return false
+				end
+				FriendTags:ClearCaches()
+
+				local previewFriend = {
+					type = "bnet",
+					battleTag = "PreviewTags#1234",
+					bnetAccountID = 987654321,
+					friendTags = { 2, 8 },
+					_isMock = true,
+				}
+				local tagIds = FriendTags:GetBlizzardTagIdSetForFriend(previewFriend)
+				V:Assert(tagIds["blizzard:raiding"] == true, "Preview rows should resolve their Raiding fixture")
+				V:Assert(tagIds["blizzard:healer"] == true, "Preview rows should resolve their Healer fixture")
+
+				local liveShapedFriend = {
+					type = "bnet",
+					battleTag = "NotPreviewTags#1234",
+					bnetAccountID = 987654322,
+					friendTags = { 2, 8 },
+				}
+				local liveTagIds = FriendTags:GetNativeBlizzardTagIdSet(liveShapedFriend)
+				V:Assert(
+					liveTagIds["blizzard:raiding"] ~= true and liveTagIds["blizzard:healer"] ~= true,
+					"Only explicit Preview fixtures may bypass live tag availability"
+				)
+			end)
+			FriendTags.AreBlizzardTagsEnabled = originalAreBlizzardTagsEnabled
+			FriendTags:ClearCaches()
+			if not ok then
+				error(err, 0)
+			end
+
+			local PreviewMode = BFL:GetModule("PreviewMode")
+			local profileID, profile = PreviewMode:GetProfileDefinition("friends_tags")
+			local fakePreview = setmetatable({
+				enabled = true,
+				activeProfile = profileID,
+				activeComponents = profile.components,
+				mockData = { friends = {} },
+			}, { __index = PreviewMode })
+			local steps = fakePreview:BuildProfileActivationSteps(profileID, profile)
+			local hasTagInvalidationStep = false
+			for _, step in ipairs(steps) do
+				if step.id == "friends.tags.invalidate" then
+					hasTagInvalidationStep = true
+					break
+				end
+			end
+			V:Assert(hasTagInvalidationStep, "Preview tag profiles should invalidate deterministic mock UID caches")
+		end,
+	})
 end
 
 function TestSuite:RegisterSearchIdentityTest()
@@ -15317,6 +15790,7 @@ function TestSuite:RegisterRaidInteractionTest()
 			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
 
 			local methodNames = {
+				"ShouldDisplayMainTankAndAssist",
 				"UpdateRaidMembers",
 				"BuildDisplayList",
 				"UpdateControlPanel",

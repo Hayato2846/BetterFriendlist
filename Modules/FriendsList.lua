@@ -28,6 +28,17 @@ local function GetFilterSortRegistry()
 	return BFL:GetModule("FilterSortRegistry")
 end
 
+local function GetLocaleSortKey(value)
+	if BFL.IsSecret and BFL:IsSecret(value) then
+		return ""
+	end
+	local compat = BFL.IntlCompat
+	if compat and compat.GetSortKey then
+		return compat.GetSortKey(value)
+	end
+	return BFL:StripAccents(value or "")
+end
+
 local IsModernDropdown = BFL.IsModernDropdown
 
 local function SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize)
@@ -5826,7 +5837,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		-- Reuse for sorting (forSorting=true uses BattleTag short form for BNet)
 		local nameForSort = (friend.type == "bnet" and friend.battleTag) and friend.battleTag:match("([^#]+)")
 			or displayName
-		friend._sort_name = nameForSort:lower()
+		friend._sort_name = GetLocaleSortKey(nameForSort)
+		friend._sort_displayName = GetLocaleSortKey(displayName)
 		friend._sort_level = friend.level or 0
 		friend._sort_accountCount = friend.numGameAccounts or 0
 
@@ -5848,7 +5860,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		if needGuild then
 			local gp, gName = CalculateGuildPriority(friend)
 			friend._sort_guildPriority = gp
-			friend._sort_guildName = gName and gName:lower() or ""
+			friend._sort_guildName = GetLocaleSortKey(gName)
 		else
 			friend._sort_guildPriority = nil
 			friend._sort_guildName = nil
@@ -5858,7 +5870,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		if needClass then
 			local cp, cName = CalculateClassPriority(friend)
 			friend._sort_classPriority = cp
-			friend._sort_className = cName -- Already file string (WARRIOR etc)
+			friend._sort_className = GetLocaleSortKey(cName)
 		else
 			friend._sort_classPriority = nil
 			friend._sort_className = nil
@@ -5868,7 +5880,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		if needRealm then
 			local rp, rName = CalculateRealmPriority(friend)
 			friend._sort_realmPriority = rp
-			friend._sort_realmName = rName and rName:lower() or ""
+			friend._sort_realmName = GetLocaleSortKey(rName)
 		else
 			friend._sort_realmPriority = nil
 			friend._sort_realmName = nil
@@ -5883,7 +5895,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 			local zoneName = (friend.areaName or friend.area or "")
 			local hasZone = isOnline and zoneName ~= ""
 			friend._sort_hasZone = hasZone
-			friend._sort_zoneName = zoneName:lower()
+			friend._sort_zoneName = GetLocaleSortKey(zoneName)
 		else
 			friend._sort_hasZone = nil
 			friend._sort_zoneName = nil
@@ -6184,12 +6196,16 @@ function FriendsList:CompareFriends(a, b, sortMode)
 end
 
 local function NormalizeSearchValue(text)
+	if BFL.IsSecret and BFL:IsSecret(text) then
+		return nil
+	end
 	if text and text ~= "" and text ~= "???" then
 		text = tostring(text)
 		if text:sub(1, 2) == "|K" then
 			return nil
 		end
-		return BFL:StripAccents(text)
+		local compat = BFL.IntlCompat
+		return compat and compat.NormalizeForSearch and compat.NormalizeForSearch(text) or BFL:StripAccents(text)
 	end
 	return nil
 end
@@ -6217,6 +6233,13 @@ local function GetGameAccountSearchText(gameAccounts)
 end
 
 local function SearchCacheContains(normalizedText, searchNormalized)
+	if BFL.IsSecret and (BFL:IsSecret(normalizedText) or BFL:IsSecret(searchNormalized)) then
+		return false
+	end
+	local compat = BFL.IntlCompat
+	if compat and compat.Contains then
+		return normalizedText ~= nil and compat.Contains(normalizedText, searchNormalized)
+	end
 	return normalizedText and normalizedText:find(searchNormalized, 1, true) ~= nil
 end
 
@@ -6224,7 +6247,9 @@ local function GetNormalizedSearchText(self)
 	local searchText = self.searchText or ""
 	if self._normalizedSearchTextRaw ~= searchText then
 		self._normalizedSearchTextRaw = searchText
-		self._normalizedSearchText = BFL:StripAccents(searchText)
+		local compat = BFL.IntlCompat
+		self._normalizedSearchText = compat and compat.NormalizeForSearch and compat.NormalizeForSearch(searchText)
+			or BFL:StripAccents(searchText)
 	end
 	return self._normalizedSearchText
 end

@@ -1743,7 +1743,16 @@ local function IsInStoryRaid()
 	if not DifficultyUtil or not DifficultyUtil.InStoryRaid then
 		return false
 	end
-	return DifficultyUtil.InStoryRaid()
+	local ok, inStoryRaid = pcall(DifficultyUtil.InStoryRaid)
+	return ok and inStoryRaid == true
+end
+
+local function IsStoryRaidTabRestricted()
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.IsStoryRaidTabRestricted then
+		return FriendsUI:IsStoryRaidTabRestricted()
+	end
+	return IsInStoryRaid()
 end
 
 -- Update Raid tab state (enable/disable based on Story Mode)
@@ -1763,40 +1772,50 @@ function BetterFriendsFrame_UpdateRaidTabState()
 		return
 	end
 
-	local inStoryRaid = IsInStoryRaid()
-	local enableRaidTab = not inStoryRaid
+	local storyRaidRestricted = IsStoryRaidTabRestricted()
+	local enableRaidTab = not storyRaidRestricted
+	if raidTab.SetMotionScriptsWhileDisabled then
+		raidTab:SetMotionScriptsWhileDisabled(true)
+	end
+	if not raidTab.BFL_StoryRaidTooltipHooked then
+		raidTab:HookScript("OnEnter", function(self)
+			local reason = self.BFL_StoryRaidDisabledReason
+			if not reason then
+				return
+			end
+			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
+			BFL_Tooltip:ClearLines()
+			local coloredReason = RED_FONT_COLOR and RED_FONT_COLOR.WrapTextInColorCode
+				and RED_FONT_COLOR:WrapTextInColorCode(reason)
+				or reason
+			BFL_Tooltip:SetText(coloredReason)
+			BFL_Tooltip:Show()
+		end)
+		raidTab:HookScript("OnLeave", function(self)
+			if BFL_Tooltip.GetOwner and BFL_Tooltip:GetOwner() == self then
+				BFL_Tooltip:Hide()
+			end
+		end)
+		raidTab.BFL_StoryRaidTooltipHooked = true
+	end
 
 	-- Manual tab enable/disable (mirroring PanelTemplates_SetTabEnabled behavior)
 	-- Since our tabs are named "BottomTabX" instead of "TabX", we must do this manually
 	if enableRaidTab then
 		-- Enable the tab
 		raidTab.isDisabled = nil
+		raidTab.BFL_StoryRaidDisabledReason = nil
 		raidTab:Enable()
-		-- Reset to normal visual state (deselected by default, UpdateTabs will correct if selected)
-		PanelTemplates_DeselectTab(raidTab)
-		-- Remove tooltip handlers
-		raidTab:SetScript("OnEnter", nil)
-		raidTab:SetScript("OnLeave", nil)
 	else
 		-- Disable the tab
 		raidTab.isDisabled = true
+		raidTab.BFL_StoryRaidDisabledReason = DIFFICULTY_LOCKED_REASON_STORY_RAID or "Unavailable in Story Raid"
 		raidTab:Disable()
-		-- Apply disabled visual state
-		PanelTemplates_SetDisabledTabState(raidTab)
-		-- Add tooltip explaining why tab is disabled
-		raidTab:SetScript("OnEnter", function(self)
-			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0)
-			-- Use Blizzard's global string (available in Retail)
-			local reason = DIFFICULTY_LOCKED_REASON_STORY_RAID or "Unavailable in Story Raid"
-			BFL_Tooltip:SetText(RED_FONT_COLOR:WrapTextInColorCode(reason))
-			BFL_Tooltip:Show()
-		end)
-		raidTab:SetScript("OnLeave", function(self)
-			BFL_Tooltip:Hide()
-		end)
 	end
+	local selectedTab = PanelTemplates_GetSelectedTab(BetterFriendsFrame) or BetterFriendsFrame.selectedTab or 1
+	BFL:ApplyTabVisualState(raidTab, enableRaidTab and selectedTab == 3, not enableRaidTab)
 
-	return inStoryRaid
+	return storyRaidRestricted
 end
 
 -- Show the friends frame

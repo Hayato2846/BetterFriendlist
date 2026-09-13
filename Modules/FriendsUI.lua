@@ -698,7 +698,7 @@ local function ApplyModernSideTabTheme(tab, palette, themed, selected)
 			tab.SelectedTexture:SetShown(selected == true)
 		end
 		if tab.HighlightTexture then
-			tab.HighlightTexture:SetShown(BFL:IsRegionMouseOver(tab))
+			tab.HighlightTexture:SetShown(tab:IsEnabled() and BFL:IsRegionMouseOver(tab))
 		end
 		ApplyModernAtlasColor(tab.Background, palette.control, false)
 		ApplyModernAtlasColor(tab.SelectedTexture, palette.control, false)
@@ -868,6 +868,8 @@ local function ApplySectionIcon(texture, definition, selected)
 		return
 	end
 	local palette, themed = FriendsUI:GetModernThemeColors()
+	local tabIcon = definition.tab and (definition.tab.Icon == texture or definition.tab.icon == texture)
+	local disabled = tabIcon and definition.tab.IsEnabled and not definition.tab:IsEnabled()
 	if definition.customTexture then
 		texture:SetTexture(definition.customTexture)
 		texture:SetSize(32, 32)
@@ -876,17 +878,19 @@ local function ApplySectionIcon(texture, definition, selected)
 		-- have separate active/inactive atlases. Recreate that luminance step after
 		-- desaturation so EUI's accent remains pure instead of mixing with the
 		-- source artwork's baked gold.
-		texture:SetDesaturated(themed)
+		texture:SetDesaturated(themed or disabled)
 		local color = themed and palette.accent
 			or (selected and CUSTOM_TAB_ICON_ACTIVE_COLOR or CUSTOM_TAB_ICON_INACTIVE_COLOR)
 		local multiplier = themed and not selected and (tonumber(palette.customTabInactiveMultiplier) or 1) or 1
 		texture:SetVertexColor(color[1] * multiplier, color[2] * multiplier, color[3] * multiplier, 1)
+		texture:SetAlpha(disabled and 0.5 or 1)
 		return
 	end
 	ApplyAtlasTexture(texture, selected and definition.activeAtlas or definition.inactiveAtlas, definition.fallback)
-	texture:SetDesaturated(themed)
+	texture:SetDesaturated(themed or disabled)
 	local color = themed and palette.accent or MODERN_BLIZZARD_THEME_COLORS.control
 	texture:SetVertexColor(color[1], color[2], color[3], 1)
+	texture:SetAlpha(disabled and 0.5 or 1)
 end
 
 function FriendsUI:ApplyFriendTabIcon(texture, sectionID, selected)
@@ -1636,13 +1640,17 @@ function FriendsUI:CreateNavigationTabs()
 		end
 		tab:SetScript("OnEnter", function(button)
 			local _, themed = self:GetModernThemeColors()
-			if not themed and button.HighlightTexture then
+			if button:IsEnabled() and not themed and button.HighlightTexture then
 				button.HighlightTexture:Show()
 			end
 			GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
 			GameTooltip:SetText(button.tooltipText or button.sectionID)
 			if button.disabledReason then
-				GameTooltip:AddLine(button.disabledReason, 1, 0.82, 0, true)
+				if GameTooltip_AddErrorLine then
+					GameTooltip_AddErrorLine(GameTooltip, button.disabledReason)
+				else
+					GameTooltip:AddLine(button.disabledReason, 1, 0.1, 0.1, true)
+				end
 			end
 			GameTooltip:Show()
 		end)
@@ -1664,6 +1672,40 @@ function FriendsUI:IsStoryRaidActive()
 	end
 	local ok, active = pcall(DifficultyUtil.InStoryRaid)
 	return ok and active == true
+end
+
+function FriendsUI:IsStoryRaidTabOverrideEnabled()
+	return self.storyRaidTabOverrideEnabled == true
+end
+
+function FriendsUI:IsStoryRaidTabRestricted()
+	return self:IsStoryRaidActive() and not self:IsStoryRaidTabOverrideEnabled()
+end
+
+function FriendsUI:RefreshStoryRaidTabState()
+	local restricted = self:IsStoryRaidTabRestricted()
+	if BetterFriendsFrame_UpdateRaidTabState then
+		BetterFriendsFrame_UpdateRaidTabState()
+	end
+
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self.navigationDirty = true
+		return restricted
+	end
+
+	if restricted and self:GetSelectedSection() == "raid" then
+		local fallbackSection = self:BuildAvailableSectionIDs()[1] or "friends"
+		self:SelectSection(fallbackSection ~= "raid" and fallbackSection or "friends")
+	else
+		self:RefreshNavigation()
+	end
+	return restricted
+end
+
+function FriendsUI:SetStoryRaidTabOverrideEnabled(enabled)
+	self.storyRaidTabOverrideEnabled = enabled == true
+	self:RefreshStoryRaidTabState()
+	return self.storyRaidTabOverrideEnabled
 end
 
 function FriendsUI:GetQuickJoinCount()
@@ -1762,19 +1804,30 @@ function FriendsUI:RefreshNavigation()
 		visibleSections[sectionID] = true
 	end
 	local L = GetL()
+	local storyRaidRestricted = self:IsStoryRaidTabRestricted()
 	for _, definition in ipairs(SECTION_DEFINITIONS) do
 		local tab = definition.tab
 		local available = visibleSections[definition.id] == true
+		local disabledByStoryRaid = definition.id == "raid" and available and storyRaidRestricted
+		local enabled = available and not disabledByStoryRaid
 		tab.tooltipText = L[definition.labelKey] or definition.id
-		tab.disabledReason = nil
-		tab:SetEnabled(available)
+		tab.disabledReason = disabledByStoryRaid
+			and (DIFFICULTY_LOCKED_REASON_STORY_RAID or L.FRIENDS_UI_RAID_STORY_DISABLED or "Unavailable during a Story raid.")
+			or nil
+		tab:SetEnabled(enabled)
 		tab:SetShown(available)
-		local selected = self.selectedSection == definition.id
+		local selected = enabled and self.selectedSection == definition.id
 		if tab.SelectedTexture then
 			tab.SelectedTexture:SetShown(selected)
 		end
 		local icon = tab.Icon or tab.icon
 		ApplySectionIcon(icon, definition, selected)
+		if icon then
+			icon:SetAlpha(enabled and 1 or 0.5)
+			if disabledByStoryRaid then
+				icon:SetDesaturated(true)
+			end
+		end
 		if tab.Count then
 			local count = counts[definition.id] or 0
 			tab.Count:SetShown(count > 0)
@@ -1783,10 +1836,6 @@ function FriendsUI:RefreshNavigation()
 				tab.Icon:ClearAllPoints()
 				tab.Icon:SetPoint("CENTER", tab, "CENTER", definition.iconOffsetX or -2, count > 0 and 5 or 0)
 			end
-		end
-		if definition.id == "raid" and available and self:IsStoryRaidActive() then
-			tab:SetEnabled(false)
-			tab.disabledReason = L.FRIENDS_UI_RAID_STORY_DISABLED or "Unavailable during a Story raid."
 		end
 	end
 	local palette, themed = self:GetModernThemeColors()
@@ -1831,12 +1880,12 @@ function FriendsUI:RefreshModernSideTabSelection()
 	for _, definition in ipairs(SECTION_DEFINITIONS) do
 		local tab = definition.tab
 		if tab then
-			local selected = self.selectedSection == definition.id
+			local selected = tab:IsEnabled() and self.selectedSection == definition.id
 			if tab.SelectedTexture then
 				tab.SelectedTexture:SetShown(selected)
 			end
 			if tab.HighlightTexture then
-				tab.HighlightTexture:SetShown(BFL:IsRegionMouseOver(tab))
+				tab.HighlightTexture:SetShown(tab:IsEnabled() and BFL:IsRegionMouseOver(tab))
 			end
 			if useSkinEngine then
 				tab.BFL_DarkManagedSelection = selected
@@ -3237,12 +3286,12 @@ function FriendsUI:HasVisibleModernSideTabs()
 	return false
 end
 
-function FriendsUI:GetAuxiliaryWindowOffset()
+function FriendsUI:GetAuxiliaryWindowOffset(legacyOffset)
 	-- LargeSideTabButtonTemplate protrudes from the main frame's right edge.
 	-- The visible rail is authoritative here: during Blizzard's side-window
 	-- callback the stored style can briefly lag behind the already applied layout.
 	local hasModernRail = self:IsModernActive() or self:HasVisibleModernSideTabs()
-	return hasModernRail and 68 or 5
+	return hasModernRail and 68 or (legacyOffset or 5)
 end
 
 function FriendsUI:GetRaidInfoMoverRuntimeState(window)
@@ -4319,7 +4368,7 @@ function FriendsUI:SelectSection(sectionID)
 	if not SECTION_BY_ID[sectionID] then
 		sectionID = "friends"
 	end
-	if not self:IsSectionAvailable(sectionID) or (sectionID == "raid" and self:IsStoryRaidActive()) then
+	if not self:IsSectionAvailable(sectionID) or (sectionID == "raid" and self:IsStoryRaidTabRestricted()) then
 		sectionID = self:BuildAvailableSectionIDs()[1] or "friends"
 	end
 	if not self:IsModernActive() and sectionID == "friend_requests" then
@@ -6362,6 +6411,14 @@ function FriendsUI:RegisterTests()
 			self.sideTabs = originalSideTabs
 			self.IsModernActive = originalIsModernActive
 			V:AssertEqual(transitionOffset, 68, "Visible Modern side tabs remain authoritative during style transitions")
+			self.sideTabs = nil
+			self.IsModernActive = function()
+				return false
+			end
+			local customLegacyOffset = self:GetAuxiliaryWindowOffset(12)
+			self.sideTabs = originalSideTabs
+			self.IsModernActive = originalIsModernActive
+			V:AssertEqual(customLegacyOffset, 12, "Auxiliary integrations preserve their Legacy spacing")
 			local anchor
 			local shown = false
 			local moverState = { isApplying = false }
@@ -6964,6 +7021,35 @@ function FriendsUI:RegisterTests()
 				BFL.IsRetail == true and not self:AreRaidGroupsDisabled(),
 				"Raid availability follows the Retail DisableRaidGroups game rule"
 			)
+		end,
+	})
+	TestSuite:RegisterTest("ui", "FriendsUI_StoryRaidTabRestriction", {
+		action = function(V)
+			local originalIsStoryRaidActive = self.IsStoryRaidActive
+			local originalOverride = self.storyRaidTabOverrideEnabled
+			local raidTab = SECTION_BY_ID.raid and SECTION_BY_ID.raid.tab
+			local ok, err = pcall(function()
+				self.IsStoryRaidActive = function()
+					return true
+				end
+				self.storyRaidTabOverrideEnabled = nil
+				V:Assert(self:IsStoryRaidTabRestricted(), "Story raids restrict the Raid tab by default")
+				self.storyRaidTabOverrideEnabled = true
+				V:Assert(not self:IsStoryRaidTabRestricted(), "The internal session override bypasses the Story raid restriction")
+				self.IsStoryRaidActive = function()
+					return false
+				end
+				self.storyRaidTabOverrideEnabled = nil
+				V:Assert(not self:IsStoryRaidTabRestricted(), "Normal instances leave the Raid tab available")
+				if raidTab and raidTab.GetMotionScriptsWhileDisabled then
+					V:Assert(raidTab:GetMotionScriptsWhileDisabled(), "Disabled Modern tabs keep hover scripts for the restriction tooltip")
+				end
+			end)
+			self.IsStoryRaidActive = originalIsStoryRaidActive
+			self.storyRaidTabOverrideEnabled = originalOverride
+			if not ok then
+				error(err)
+			end
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_SocialTabMapping", {
@@ -7652,8 +7738,13 @@ function FriendsUI:Initialize()
 		self:RefreshBattleTag()
 	end, 20)
 	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function()
-		self:RefreshNavigation()
+		self:RefreshStoryRaidTabState()
 	end, 80)
+	for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_DIFFICULTY_CHANGED", "UPDATE_INSTANCE_INFO" }) do
+		BFL:RegisterEventCallback(event, function()
+			self:RefreshStoryRaidTabState()
+		end, 80)
+	end
 	if EventRegistry and EventRegistry.RegisterCallback and not self.textScaleCallbackRegistered then
 		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", self.OnTextScaleUpdated, self)
 		self.textScaleCallbackRegistered = true

@@ -706,8 +706,15 @@ function BFL:GetElvUIEngine(requireInitialized)
 	if not ok or type(E) ~= "table" or type(E.GetModule) ~= "function" then
 		return nil
 	end
-	if requireInitialized and not E.initialized then
-		return nil
+	if requireInitialized then
+		local initialized = E.Initialized == true or E.initialized == true
+		if not initialized then
+			local moduleOk, skins = pcall(E.GetModule, E, "Skins")
+			initialized = moduleOk and type(skins) == "table" and skins.Initialized == true
+		end
+		if not initialized then
+			return nil
+		end
 	end
 	return E
 end

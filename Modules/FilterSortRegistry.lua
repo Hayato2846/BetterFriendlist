@@ -5,6 +5,7 @@ local ADDON_NAME, BFL = ...
 
 local Registry = BFL:RegisterModule("FilterSortRegistry", {})
 local L = BFL.L or {}
+local IntlCompat = BFL.IntlCompat
 
 Registry.FALLBACK_FILTER = "all"
 Registry.FALLBACK_PRIMARY_SORT = "game"
@@ -89,15 +90,19 @@ local function AddUnique(list, id)
 	table.insert(list, id)
 end
 
+local function IsSecretValue(value)
+	return BFL.IsSecret and BFL:IsSecret(value) or false
+end
+
 local function SafeString(value)
+	if IsSecretValue(value) then
+		return ""
+	end
 	if value == nil then
 		return ""
 	end
-	if BFL.IsSecret and BFL:IsSecret(value) then
-		return ""
-	end
-	local str = tostring(value)
-	if str:sub(1, 2) == "|K" then
+	local ok, str = pcall(tostring, value)
+	if not ok or IsSecretValue(str) or type(str) ~= "string" or str:sub(1, 2) == "|K" then
 		return ""
 	end
 	return str
@@ -626,13 +631,22 @@ local function HasValue(list, value)
 end
 
 local function CompareScalar(actual, expected)
+	if IsSecretValue(actual) or IsSecretValue(expected) then
+		return false
+	end
 	if type(actual) == "boolean" or type(expected) == "boolean" then
 		return (actual and true or false) == (expected == true or expected == "true" or expected == 1 or expected == "1")
+	end
+	if IntlCompat and IntlCompat.Equals then
+		return IntlCompat.Equals(actual, expected)
 	end
 	return NormalizeString(actual) == NormalizeString(expected)
 end
 
 local function MatchesConditionValue(actual, op, expected)
+	if IsSecretValue(actual) or IsSecretValue(expected) then
+		return false
+	end
 	if op == "empty" then
 		return IsEmptyValue(actual)
 	elseif op == "notempty" then
@@ -665,6 +679,8 @@ local function MatchesConditionValue(actual, op, expected)
 			found = expectedText == "" or actualText:sub(1, #expectedText) == expectedText
 		elseif op == "ends" then
 			found = expectedText == "" or actualText:sub(-#expectedText) == expectedText
+		elseif IntlCompat and IntlCompat.Contains then
+			found = IntlCompat.Contains(actual, expected)
 		else
 			found = actualText:find(expectedText, 1, true) ~= nil
 		end
@@ -1584,6 +1600,15 @@ function Registry:EvaluateQuickFilter(id, friend)
 	return plan.evaluator(friend)
 end
 
+local STRING_SORT_CACHE_FIELDS = {
+	name = "_sort_name",
+	displayName = "_sort_displayName",
+	zone = "_sort_zoneName",
+	guild = "_sort_guildName",
+	class = "_sort_className",
+	realm = "_sort_realmName",
+}
+
 local function GetSortValue(friend, field)
 	if field == "status" then
 		return friend._sort_status or GetStatusPriority(friend)
@@ -1591,18 +1616,8 @@ local function GetSortValue(friend, field)
 		return friend._sort_game or GetGamePriority(friend)
 	elseif field == "faction" then
 		return friend._sort_faction or GetFactionPriority(friend)
-	elseif field == "name" then
-		return friend._sort_name or NormalizeString(GetFieldValue(friend, "name"))
-	elseif field == "displayName" then
-		return NormalizeString(GetFieldValue(friend, "displayName"))
-	elseif field == "zone" then
-		return friend._sort_zoneName or NormalizeString(GetFieldValue(friend, "zone"))
-	elseif field == "guild" then
-		return friend._sort_guildName or NormalizeString(GetFieldValue(friend, "guild"))
-	elseif field == "class" then
-		return friend._sort_className or NormalizeString(GetFieldValue(friend, "class"))
-	elseif field == "realm" then
-		return friend._sort_realmName or NormalizeString(GetFieldValue(friend, "realm"))
+	elseif STRING_SORT_CACHE_FIELDS[field] then
+		return friend[STRING_SORT_CACHE_FIELDS[field]] or NormalizeString(GetFieldValue(friend, field))
 	elseif field == "level" then
 		return friend._sort_level or tonumber(GetFieldValue(friend, "level")) or nil
 	elseif field == "favorite" then
@@ -1613,6 +1628,8 @@ local function GetSortValue(friend, field)
 		return GetRecentlyAddedAgeDays(friend)
 	elseif field == "accountCount" then
 		return tonumber(GetFieldValue(friend, "accountCount")) or 0
+	elseif field == "type" then
+		return NormalizeString(GetFieldValue(friend, field))
 	end
 	return GetFieldValue(friend, field)
 end
@@ -1625,8 +1642,10 @@ local function CompareRawValues(aValue, bValue, fieldDef)
 		aValue = aValue and 1 or 0
 		bValue = bValue and 1 or 0
 	else
-		aValue = NormalizeString(aValue)
-		bValue = NormalizeString(bValue)
+		-- String sort values are prepared before table.sort. On 12.1.5 this is
+		-- the binary C_Intl sort key; older clients retain normalized text.
+		aValue = SafeString(aValue)
+		bValue = SafeString(bValue)
 	end
 	if aValue == bValue then
 		return nil

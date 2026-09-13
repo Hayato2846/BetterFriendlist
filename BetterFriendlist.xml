@@ -1120,6 +1120,15 @@
 							x="-2" y="0" />
 					</Anchors>
 				</Texture>
+				<!-- Master Looter Icon (left of raid assignment icon) -->
+				<Texture parentKey="MasterLooterIcon" hidden="true"
+					file="Interface\GroupFrame\UI-Group-MasterLooter">
+					<Size x="12" y="12" />
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.MainTankIcon" relativePoint="LEFT"
+							x="-2" y="0" />
+					</Anchors>
+				</Texture>
 				<!-- Ready Check Icon (center overlay) -->
 				<Texture parentKey="ReadyCheckIcon" hidden="true">
 					<Size x="20" y="20" />
@@ -2911,7 +2920,7 @@
 						<Frames>
 							<!-- Raid Info Button (top right) -->
 							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate"
-								text="RAID_INFO">
+								text="RAID_INFO" motionScriptsWhileDisabled="true">
 								<NormalFont style="BetterFriendlistFontNormal" />
 								<HighlightFont style="BetterFriendlistFontHighlight" />
 								<DisabledFont style="BetterFriendlistFontDisable" />
@@ -2923,6 +2932,12 @@
 									<OnClick>
 										BetterRaidFrame_RaidInfoButton_OnClick(self);
 									</OnClick>
+									<OnEnter>
+										BetterRaidFrame_RaidInfoButton_OnEnter(self);
+									</OnEnter>
+									<OnLeave>
+										BetterRaidFrame_RaidInfoButton_OnLeave(self);
+									</OnLeave>
 								</Scripts>
 							</Button>
 							<Button parentKey="ReadyCheckButton" inherits="SquareIconButtonTemplate"
@@ -3920,9 +3935,9 @@
 				end
 				-- Fix #43: Update Raid tab state (disable if in Story Mode)
 				if BetterFriendsFrame_UpdateRaidTabState then
-				local inStoryRaid = BetterFriendsFrame_UpdateRaidTabState()
+				local raidTabRestricted = BetterFriendsFrame_UpdateRaidTabState()
 				-- If in Story Mode and currently on Raid tab, redirect to Friends tab
-				if inStoryRaid and (self.selectedTab or 1) == 3 then
+				if raidTabRestricted and (self.selectedTab or 1) == 3 then
 				self.selectedTab = 1
 				end
 				end

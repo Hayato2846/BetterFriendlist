@@ -7,11 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.8.8]        - 2026-09-13
 
-### Fixed
-- **Raid Member Context Menus** - Right-clicking raid members now uses the secure Raid Player menu again in both Modern and Legacy. Left-clicks, configured shortcuts, multi-selection, and drag-and-drop stay connected to the matching player row.
-- **Raid Counts** - Member and role counts now refresh when returning to the Raid tab after the roster changed while it was hidden.
+### Retail Live & Classic
+
+#### Added
+- **Master Looter** - Classic raid and party lists now show who is Master Looter. The icon also works with both Retail raid layouts if the client provides that flag.
+
+#### Improved
+- **Addon Window Spacing** - EnhanceQoL, GlobalIgnoreList, and NorthernSkyRaidTools now leave room for the Modern side tabs. Their Legacy positions stay as they were.
+
+#### Fixed
+- **Story Mode Raid Tab** - The Raid tab is now disabled during a Story raid and shows Blizzard's reason when hovered.
+- **ElvUI Broker Tooltips** - Friends and Guild Broker tooltips use the selected ElvUI tooltip style again.
+- **Broker Tooltip Scrolling** - Friend updates no longer jump a scrolled Friends Broker tooltip back to the top.
+- **Raid Member Right-Click** - The Raid Player menu works again in both Retail layouts. Regular clicks, shortcuts, selection, and drag-and-drop keep working on the same row.
+- **Raid Counts** - Member and role counts update after returning to a Raid tab that changed while it was hidden.
+
+### WoW 12.1.5 PTR
+
+#### Added
+- **Friend Search and Sorting** - On 12.1.5, BFL can use Blizzard's new locale-aware text APIs for local friends, tags, groups, realms, and Recent Allies. Other clients keep the existing search behavior.
+
+#### Compatibility
+- **New Client APIs** - Added checks for the new internationalization, LFG, and timer APIs so they are only used when the client provides them.
+- **Raid Updates** - Repeated raid and LFG events now share one pending refresh on 12.1.5. Older clients keep the existing timer path.
+- **Matchmade Raid Markers** - Main Tank and Main Assist markers are hidden when 12.1.5 reports a matchmade raid without manual role requirements.
 
 ---
 

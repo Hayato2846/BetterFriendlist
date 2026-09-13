@@ -65,8 +65,13 @@ function Compat:ApplyPanelLayout()
 		return
 	end
 
+	local xOffset = PANEL_FRAME_X_OFFSET
+	local FriendsUI = BFL.FriendsUI
+	if FriendsUI and FriendsUI.GetAuxiliaryWindowOffset then
+		xOffset = FriendsUI:GetAuxiliaryWindowOffset(xOffset)
+	end
 	panel:ClearAllPoints()
-	panel:SetPoint("TOPLEFT", _G.BetterFriendsFrame, "TOPRIGHT", PANEL_FRAME_X_OFFSET, PANEL_TOP_OFFSET)
+	panel:SetPoint("TOPLEFT", _G.BetterFriendsFrame, "TOPRIGHT", xOffset, PANEL_TOP_OFFSET)
 
 	local height = GetPanelHeight(parent)
 	if height and height > 0 then

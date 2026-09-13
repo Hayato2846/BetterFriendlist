@@ -2014,14 +2014,32 @@ function FriendTags:ResetChipProfile(tagId, refreshCallback)
 	return self:SetChipProfile(tagId, { reset = true }, refreshCallback)
 end
 
+local function HasPreviewBlizzardTagFixture(friend)
+	return type(friend) == "table"
+		and friend._isMock == true
+		and friend.type == "bnet"
+		and type(friend.friendTags) == "table"
+end
+
 function FriendTags:GetNativeBlizzardTagIdSet(friend)
 	local result = {}
-	if type(friend) ~= "table" or friend.type ~= "bnet" or not self:AreBlizzardTagsEnabled() then
+	local hasPreviewFixture = HasPreviewBlizzardTagFixture(friend)
+	if
+		type(friend) ~= "table"
+		or friend.type ~= "bnet"
+		or (not hasPreviewFixture and not self:AreBlizzardTagsEnabled())
+	then
 		return result
 	end
 
 	local nativeTags = friend.friendTags
-	if type(nativeTags) ~= "table" and friend.bnetAccountID and C_BattleNet and C_BattleNet.GetAccountInfoByID then
+	if
+		not hasPreviewFixture
+		and type(nativeTags) ~= "table"
+		and friend.bnetAccountID
+		and C_BattleNet
+		and C_BattleNet.GetAccountInfoByID
+	then
 		local ok, accountInfo = pcall(C_BattleNet.GetAccountInfoByID, friend.bnetAccountID)
 		if ok and type(accountInfo) == "table" then
 			nativeTags = accountInfo.friendTags
@@ -2099,6 +2117,11 @@ function FriendTags:GetBlizzardTagIdSetForFriend(friend, explicitUID, runtimeCac
 	local result
 	if type(friend) ~= "table" or friend.type ~= "bnet" then
 		result = EMPTY_TABLE
+	elseif HasPreviewBlizzardTagFixture(friend) then
+		-- Preview fixtures are local, deterministic data. They must remain visible
+		-- even when the live Retail tag rollout is unavailable, and must never fall
+		-- through to an account lookup for their synthetic Battle.net IDs.
+		result = self:GetNativeBlizzardTagIdSet(friend)
 	elseif self:AreBlizzardTagsEnabled(cache) then
 		local nativeSet = self:GetNativeBlizzardTagIdSet(friend)
 		local uid = self:GetFriendUID(friend, explicitUID)

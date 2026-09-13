@@ -224,8 +224,13 @@ function Compat:UpdateAnchor()
 	end
 
 	-- Apply Anchor
+	local xOffset = 12
+	local FriendsUI = BFL.FriendsUI
+	if anchor == BetterFriendsFrame and FriendsUI and FriendsUI.GetAuxiliaryWindowOffset then
+		xOffset = FriendsUI:GetAuxiliaryWindowOffset(xOffset)
+	end
 	eqolFrame:ClearAllPoints()
-	eqolFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 12, -10)
+	eqolFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", xOffset, -10)
 end
 
 function Compat:OnFriendsShow()

@@ -1520,6 +1520,17 @@ function PreviewMode:BuildProfileActivationSteps(normalizedID, profile)
 				end
 			end)
 		end
+		AddActivationStep(steps, "friends.tags.invalidate", "Refresh preview tag assignments", function()
+			local FriendTags = BFL:GetModule("FriendTags")
+			if FriendTags and FriendTags.InvalidateFriendAssignment then
+				-- Mock accounts reuse deterministic UIDs across profiles. Advance the
+				-- assignment generation once so friends-tags cannot inherit the empty
+				-- chip rows cached by friends-plain (and vice versa).
+				FriendTags:InvalidateFriendAssignment()
+			elseif FriendTags and FriendTags.ClearCaches then
+				FriendTags:ClearCaches()
+			end
+		end)
 		if self:IsComponentEnabled("groups") then
 			AddActivationStep(steps, "friends.groups.generate", "Generate custom group headers", function()
 				self:GenerateMockGroupsData(profile.groupFixture)

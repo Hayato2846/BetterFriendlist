@@ -2679,10 +2679,43 @@ function Broker:SetPreviewData(data)
 	InvalidateFriendCountsCache()
 end
 
+function Broker:GetTooltipScrollOffset(tt)
+	local slider = tt and tt.Slider
+	if not (slider and slider.IsShown and slider:IsShown() and slider.GetValue) then
+		return nil
+	end
+
+	local offset = tonumber(slider:GetValue())
+	return offset and offset > 0 and offset or nil
+end
+
+function Broker:RestoreTooltipScrollOffset(tt, offset)
+	offset = tonumber(offset)
+	local slider = tt and tt.Slider
+	if
+		not offset
+		or offset <= 0
+		or not (slider and slider.IsShown and slider:IsShown() and slider.GetMinMaxValues and slider.SetValue)
+	then
+		return false
+	end
+
+	local minValue, maxValue = slider:GetMinMaxValues()
+	minValue = tonumber(minValue)
+	maxValue = tonumber(maxValue)
+	if not minValue or not maxValue or maxValue <= minValue then
+		return false
+	end
+
+	slider:SetValue(math.max(minValue, math.min(offset, maxValue)))
+	return true
+end
+
 -- Refresh the tooltip (re-create it) to update content
 function Broker:RefreshTooltip()
 	if LQT and tooltip and tooltip:IsShown() then
 		local anchor = tooltip.anchorFrame
+		local scrollOffset = self:GetTooltipScrollOffset(tooltip)
 
 		-- Don't re-create if nobody is looking (prevents event-driven refreshes
 		-- from resetting the auto-hide timer after the user moved away)
@@ -2700,6 +2733,7 @@ function Broker:RefreshTooltip()
 		tooltip = nil
 		if anchor then
 			tooltip = CreateLibQTipTooltip(anchor)
+			self:RestoreTooltipScrollOffset(tooltip, scrollOffset)
 		end
 	end
 end

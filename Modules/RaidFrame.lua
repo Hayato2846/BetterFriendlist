@@ -87,6 +87,7 @@ end
 -- Tab modes
 local TAB_MODE_ROSTER = 1 -- Raid roster view
 local TAB_MODE_INFO = 2 -- Saved instances info
+local RAID_REFRESH_SIGNAL_KEY = 1
 
 -- ========================================
 -- STATE
@@ -107,6 +108,42 @@ local isUpdatingRaid = false
 local function IsRaidFrameVisible()
 	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
 	return BetterFriendsFrame and BetterFriendsFrame:IsShown() and frame and frame:IsShown()
+end
+
+function RaidFrame:ShouldDisplayMainTankAndAssist()
+	local compat = BFL.Compat
+	return not compat or not compat.ShouldDisplayMainTankAndAssist or compat.ShouldDisplayMainTankAndAssist()
+end
+
+function RaidFrame:ShowRaidInfoTooltip(owner)
+	if not (owner and BFL_Tooltip) then
+		return false
+	end
+	if not (owner.IsEnabled and not owner:IsEnabled()) then
+		return false
+	end
+	BFL_Tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	BFL_Tooltip:SetText(RAID_INFO or L.RAID_INFO or "Raid Info", 1, 0.82, 0)
+	if L.RAID_ERROR_NO_SAVED_INSTANCES then
+		BFL_Tooltip:AddLine(L.RAID_ERROR_NO_SAVED_INSTANCES, 0.7, 0.7, 0.7, true)
+	end
+	BFL_Tooltip:Show()
+	return true
+end
+
+function RaidFrame:HideRaidInfoTooltip()
+	if BFL_Tooltip then
+		BFL_Tooltip:Hide()
+	end
+end
+
+function RaidFrame:GetRefreshDebouncer()
+	if not self.refreshDebouncer and BFL.TimerCompat and BFL.TimerCompat.CreateKeyedDebouncer then
+		self.refreshDebouncer = BFL.TimerCompat.CreateKeyedDebouncer(function()
+			self:RunScheduledRosterRefresh()
+		end)
+	end
+	return self.refreshDebouncer
 end
 
 -- Difficulty constants (from Blizzard)
@@ -255,13 +292,19 @@ local RAID_ASSIGNMENT_ICON_DATA = {
 			return MAIN_ASSIST
 		end,
 	},
+	masterLooter = {
+		fallback = "Interface\\GroupFrame\\UI-Group-MasterLooter",
+		tooltip = function()
+			return MASTER_LOOTER or LOOT_MASTER_LOOTER
+		end,
+	},
 }
 
 local function SetRaidAssignmentTexture(texture, iconData)
 	if not (texture and iconData) then
 		return
 	end
-	if IsModernRaidLayout() and BFL.SetTextureOrAtlas then
+	if IsModernRaidLayout() and iconData.atlas and BFL.SetTextureOrAtlas then
 		BFL.SetTextureOrAtlas(texture, iconData.atlas, iconData.fallback, false)
 		return
 	end
@@ -279,8 +322,11 @@ local function PositionRaidAssignmentTooltipHitboxes(button)
 	local mainTankHeight = button.MainTankIcon and button.MainTankIcon:GetHeight() or 12
 	local mainAssistWidth = button.MainAssistIcon and button.MainAssistIcon:GetWidth() or 12
 	local mainAssistHeight = button.MainAssistIcon and button.MainAssistIcon:GetHeight() or 12
+	local masterLooterWidth = button.MasterLooterIcon and button.MasterLooterIcon:GetWidth() or 12
+	local masterLooterHeight = button.MasterLooterIcon and button.MasterLooterIcon:GetHeight() or 12
 	local rankRightOffset = -(2 + roleWidth + 5)
 	local assignmentRightOffset = rankRightOffset - rankWidth - 2
+	local masterLooterRightOffset = assignmentRightOffset - math.max(mainTankWidth, mainAssistWidth) - 2
 
 	if button._bflRankTooltip then
 		button._bflRankTooltip:ClearAllPoints()
@@ -296,6 +342,11 @@ local function PositionRaidAssignmentTooltipHitboxes(button)
 		button._bflMainAssistTooltip:ClearAllPoints()
 		button._bflMainAssistTooltip:SetSize(mainAssistWidth, mainAssistHeight)
 		button._bflMainAssistTooltip:SetPoint("RIGHT", button, "RIGHT", assignmentRightOffset, 0)
+	end
+	if button._bflMasterLooterTooltip then
+		button._bflMasterLooterTooltip:ClearAllPoints()
+		button._bflMasterLooterTooltip:SetSize(masterLooterWidth, masterLooterHeight)
+		button._bflMasterLooterTooltip:SetPoint("RIGHT", button, "RIGHT", masterLooterRightOffset, 0)
 	end
 end
 
@@ -327,7 +378,14 @@ local function EnsureRaidAssignmentTooltip(button, texture, storageKey)
 	return hitBox
 end
 
-local function UpdateRaidAssignmentIcons(button, rank, raidRole, everyoneIsAssistant)
+local function UpdateRaidAssignmentIcons(
+	button,
+	rank,
+	raidRole,
+	everyoneIsAssistant,
+	displayMainTankAndAssist,
+	isMasterLooter
+)
 	if not button then
 		return
 	end
@@ -346,7 +404,8 @@ local function UpdateRaidAssignmentIcons(button, rank, raidRole, everyoneIsAssis
 		end
 	end
 
-	local mainTankData = raidRole == "MAINTANK" and RAID_ASSIGNMENT_ICON_DATA.mainTank or nil
+	local showAssignments = displayMainTankAndAssist ~= false
+	local mainTankData = showAssignments and raidRole == "MAINTANK" and RAID_ASSIGNMENT_ICON_DATA.mainTank or nil
 	if button.MainTankIcon then
 		if mainTankData then
 			SetRaidAssignmentTexture(button.MainTankIcon, mainTankData)
@@ -356,7 +415,7 @@ local function UpdateRaidAssignmentIcons(button, rank, raidRole, everyoneIsAssis
 		end
 	end
 
-	local mainAssistData = raidRole == "MAINASSIST" and RAID_ASSIGNMENT_ICON_DATA.mainAssist or nil
+	local mainAssistData = showAssignments and raidRole == "MAINASSIST" and RAID_ASSIGNMENT_ICON_DATA.mainAssist or nil
 	if button.MainAssistIcon then
 		if mainAssistData then
 			SetRaidAssignmentTexture(button.MainAssistIcon, mainAssistData)
@@ -366,14 +425,27 @@ local function UpdateRaidAssignmentIcons(button, rank, raidRole, everyoneIsAssis
 		end
 	end
 
+	local masterLooterData = isMasterLooter and RAID_ASSIGNMENT_ICON_DATA.masterLooter or nil
+	if button.MasterLooterIcon then
+		if masterLooterData then
+			SetRaidAssignmentTexture(button.MasterLooterIcon, masterLooterData)
+			button.MasterLooterIcon:Show()
+		else
+			button.MasterLooterIcon:Hide()
+		end
+	end
+
 	local rankTooltip = EnsureRaidAssignmentTooltip(button, button.RankIcon, "_bflRankTooltip")
 	local tankTooltip = EnsureRaidAssignmentTooltip(button, button.MainTankIcon, "_bflMainTankTooltip")
 	local assistTooltip = EnsureRaidAssignmentTooltip(button, button.MainAssistIcon, "_bflMainAssistTooltip")
+	local masterLooterTooltip =
+		EnsureRaidAssignmentTooltip(button, button.MasterLooterIcon, "_bflMasterLooterTooltip")
 	PositionRaidAssignmentTooltipHitboxes(button)
 	for _, entry in ipairs({
 		{ rankTooltip, rankData },
 		{ tankTooltip, mainTankData },
 		{ assistTooltip, mainAssistData },
+		{ masterLooterTooltip, masterLooterData },
 	}) do
 		local hitBox, iconData = entry[1], entry[2]
 		if hitBox then
@@ -1168,6 +1240,9 @@ function RaidFrame:Initialize()
 	self.sortMode = SORT_MODE_GROUP
 	self.currentTab = TAB_MODE_ROSTER
 	self.savedInstances = {}
+	self.displayMainTankAndAssist = true
+	self.refreshDebouncer = nil
+	self:GetRefreshDebouncer()
 
 	-- Button pool for 8 groups × 5 members
 	self.memberButtons = {}
@@ -1322,6 +1397,17 @@ function RaidFrame:RegisterEvents()
 		RaidFrame:OnGroupLeft(...)
 	end, 50)
 
+	-- LFG context controls automatic raid-assignment visibility. The core event
+	-- path safely rejects an unknown event on clients that do not expose it and
+	-- leaves the older-client assignment behavior unchanged.
+	BFL:RegisterEventCallback("LFG_UPDATE", function(...)
+		RaidFrame:OnLFGContextUpdate(...)
+	end, 50)
+
+	BFL:RegisterEventCallback("PLAYER_ENTERING_WORLD", function(...)
+		RaidFrame:OnLFGContextUpdate(...)
+	end, 50)
+
 	-- Role assignment events
 	BFL:RegisterEventCallback("PLAYER_ROLES_ASSIGNED", function(...)
 		RaidFrame:OnRaidRosterUpdate(...)
@@ -1336,6 +1422,12 @@ function RaidFrame:RegisterEvents()
 			RaidFrame:OnRaidRosterUpdate(...)
 		end, 50)
 	end
+
+	-- Blizzard refreshes group leadership visuals when the loot method changes.
+	-- This keeps the Master Looter marker current without waiting for a roster event.
+	BFL:RegisterEventCallback("PARTY_LOOT_METHOD_CHANGED", function(...)
+		RaidFrame:OnRaidRosterUpdate(...)
+	end, 50)
 
 	-- Instance info events
 	BFL:RegisterEventCallback("UPDATE_INSTANCE_INFO", function(...)
@@ -1425,8 +1517,26 @@ function RaidFrame:UpdateRaidMembers()
 	end
 end
 
+local function GetPartyMasterLooterID(getLootMethod)
+	getLootMethod = getLootMethod or (C_PartyInfo and C_PartyInfo.GetLootMethod)
+	if type(getLootMethod) ~= "function" then
+		return nil
+	end
+
+	local ok, lootMethod, masterLooterPartyID = pcall(getLootMethod)
+	local masterLooterMethod = Enum and Enum.LootMethod and Enum.LootMethod.Masterlooter
+	local isMasterLoot = lootMethod == "master"
+		or (masterLooterMethod ~= nil and lootMethod == masterLooterMethod)
+	if not ok or not isMasterLoot then
+		return nil
+	end
+	return masterLooterPartyID
+end
+
 --- Update party members (when in party, not raid)
 function RaidFrame:UpdatePartyMembers()
+	local masterLooterPartyID = GetPartyMasterLooterID()
+
 	-- Player
 	local playerName = UnitName("player")
 	local playerLevel = UnitLevel("player")
@@ -1445,7 +1555,7 @@ function RaidFrame:UpdatePartyMembers()
 		online = true,
 		isDead = UnitIsDead("player"),
 		role = playerRole,
-		isML = false,
+		isML = masterLooterPartyID == 0,
 		unit = "player",
 		readyStatus = GetReadyCheckStatus and GetReadyCheckStatus("player") or nil,
 	})
@@ -1471,7 +1581,7 @@ function RaidFrame:UpdatePartyMembers()
 				online = UnitIsConnected(unit),
 				isDead = UnitIsDead(unit),
 				role = role,
-				isML = false,
+				isML = masterLooterPartyID == i,
 				unit = unit,
 				readyStatus = GetReadyCheckStatus and GetReadyCheckStatus(unit) or nil,
 			})
@@ -1672,6 +1782,7 @@ function RaidFrame:InitializeMemberButtons()
 					EnsureRaidAssignmentTooltip(button, button.RankIcon, "_bflRankTooltip")
 					EnsureRaidAssignmentTooltip(button, button.MainTankIcon, "_bflMainTankTooltip")
 					EnsureRaidAssignmentTooltip(button, button.MainAssistIcon, "_bflMainAssistTooltip")
+					EnsureRaidAssignmentTooltip(button, button.MasterLooterIcon, "_bflMasterLooterTooltip")
 
 					-- Note: Secure Proxy Link is handled by BetterRaidMemberButton_OnEnter in RaidFrameCallbacks.lua
 					-- We don't need to hook it here anymore.
@@ -1852,6 +1963,9 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		if button.MainAssistIcon then
 			button.MainAssistIcon:Hide()
 		end
+		if button.MasterLooterIcon then
+			button.MasterLooterIcon:Hide()
+		end
 		if button.ReadyCheckIcon then
 			button.ReadyCheckIcon:Hide()
 		end
@@ -1901,6 +2015,9 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 	end
 	if button.MainAssistIcon then
 		button.MainAssistIcon:Hide()
+	end
+	if button.MasterLooterIcon then
+		button.MasterLooterIcon:Hide()
 	end
 	if button.ReadyCheckIcon then
 		button.ReadyCheckIcon:Hide()
@@ -1993,7 +2110,14 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 	end
 
 	local isEveryoneAssist = self.everyoneIsAssistant
-	UpdateRaidAssignmentIcons(button, memberData.rank, memberData.role, isEveryoneAssist)
+	UpdateRaidAssignmentIcons(
+		button,
+		memberData.rank,
+		memberData.role,
+		isEveryoneAssist,
+		self.displayMainTankAndAssist ~= false,
+		memberData.isML == true
+	)
 
 	-- Update Role Icon (Tank/Healer/DPS)
 	-- FIX: Always fetch fresh from API if unit available, but keep stored roles for mock preview data
@@ -2408,35 +2532,29 @@ function RaidFrame:OnRaidRosterUpdate(...)
 	end
 	needsRenderOnShow = false
 
-	-- Event Coalescing (Micro-Throttling)
-	if self.updateTimer then
+	-- The 12.1.5 TimedSignalMap path reschedules one keyed callback across event
+	-- bursts. Classic and older Retail clients use the generation-based fallback.
+	local debouncer = self:GetRefreshDebouncer()
+	if debouncer then
+		debouncer:Schedule(RAID_REFRESH_SIGNAL_KEY, 0.1)
+	else
+		self:RunScheduledRosterRefresh()
+	end
+end
+
+RaidFrame.UpdateRaidAssignmentIcons = UpdateRaidAssignmentIcons
+RaidFrame.GetPartyMasterLooterID = GetPartyMasterLooterID
+
+function RaidFrame:RunScheduledRosterRefresh()
+	if not IsRaidFrameVisible() then
+		needsRenderOnShow = true
 		return
 	end
 
-	-- Increase delay to 0.1s to ensure WoW API has updated data
-	-- This fixes issues where new members aren't visible immediately
-	self.updateTimer = C_Timer.After(0.1, function()
-		self.updateTimer = nil
-		if not IsRaidFrameVisible() then
-			needsRenderOnShow = true
-			return
-		end
-
-		-- Keep every roster-derived surface on the same current snapshot:
-		-- UpdateRaidMembers refreshes the source data,
-		-- BuildDisplayList refreshes the sorted rows,
-		-- UpdateControlPanel refreshes role and member counts,
-		-- UpdateGroupLayout paints the refreshed rows,
-		-- UpdateConvertButton refreshes the group action state, and
-		-- RefreshRosterView clears the hidden-tab dirty flag only after all of them.
-		-- The Raid frame OnShow callback uses this exact same refresh contract.
-		self:RefreshRosterView()
-
-		-- Central Update Logic (Restored)
-		if BetterRaidFrame_Update then
-			BetterRaidFrame_Update()
-		end
-	end)
+	self:RefreshRosterView()
+	if BetterRaidFrame_Update then
+		BetterRaidFrame_Update()
+	end
 end
 
 function RaidFrame:OnGroupJoined(...)
@@ -2463,6 +2581,10 @@ function RaidFrame:OnGroupLeft(...)
 	if BetterRaidFrame_Update then
 		BetterRaidFrame_Update()
 	end
+end
+
+function RaidFrame:OnLFGContextUpdate(...)
+	self:OnRaidRosterUpdate(...)
 end
 
 function RaidFrame:OnInstanceInfoUpdate(...)
@@ -2858,7 +2980,7 @@ local function GenerateRaidComposition(numMembers)
 		local rank = (i == 1) and 2 or 0 -- First tank is leader
 
 		members[index] = CreateMockMember(index, name, classInfo, 1, "TANK", rank, {
-			isML = (i == 1), -- Leader is master looter
+			isML = (i == 1), -- Preview the Master Looter marker on the raid leader
 			raidRole = (i == 1) and "MAINTANK" or ((i == 2) and "MAINASSIST" or nil), -- First tank = MT, second = MA
 		})
 		index = index + 1
@@ -3218,6 +3340,9 @@ function RaidFrame:FixMockButtonVisuals()
 						if button.MainAssistIcon then
 							button.MainAssistIcon:Hide()
 						end
+						if button.MasterLooterIcon then
+							button.MasterLooterIcon:Hide()
+						end
 						if button.ClassColorTint then
 							button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.3)
 						end
@@ -3547,7 +3672,24 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 
 	local cmd = args[1] and args[1]:lower() or "help"
 
-	if cmd == "mock" then
+	if cmd == "storyoverride" then
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		if not (FriendsUI and FriendsUI.SetStoryRaidTabOverrideEnabled) then
+			if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[BFL Internal]|r Story raid override is unavailable on this client.")
+			end
+			return
+		end
+		local enabled = not FriendsUI:IsStoryRaidTabOverrideEnabled()
+		FriendsUI:SetStoryRaidTabOverrideEnabled(enabled)
+		if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage(
+				"|cff00ccff[BFL Internal]|r Story raid tab override "
+					.. (enabled and "|cff00ff00enabled|r" or "|cffff0000disabled|r")
+					.. " for this session."
+			)
+		end
+	elseif cmd == "mock" then
 		local subCmd = args[2] and args[2]:lower() or "standard"
 
 		if subCmd == "full" or subCmd == "40" then
@@ -3571,10 +3713,10 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		elseif eventType == "move" or eventType == "shuffle" then
 			RaidFrame:SimulateGroupMoves()
 		else
-			print(BFL.L.RAID_EVENT_COMMANDS)
-			print("  |cffffcc00/bfl raid event readycheck|r - Simulate ready check")
-			print("  |cffffcc00/bfl raid event rolechange|r - Simulate role changes")
-			print("  |cffffcc00/bfl raid event move|r - Shuffle players between groups")
+			BFL:DebugPrint(BFL.L.RAID_EVENT_COMMANDS)
+			BFL:DebugPrint("  |cffffcc00/bfl raid event readycheck|r - Simulate ready check")
+			BFL:DebugPrint("  |cffffcc00/bfl raid event rolechange|r - Simulate role changes")
+			BFL:DebugPrint("  |cffffcc00/bfl raid event move|r - Shuffle players between groups")
 		end
 	elseif cmd == "config" then
 		local setting = args[2] and args[2]:lower()
@@ -3639,24 +3781,24 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 		end
 	else
 		-- Help
-		print(BFL.L.CORE_HELP_RAID_COMMANDS)
-		print("")
-		print(BFL.L.CORE_HELP_MOCK_COMMANDS)
-		print(BFL.L.CORE_HELP_RAID_MOCK)
-		print(BFL.L.CORE_HELP_RAID_FULL)
-		print(BFL.L.CORE_HELP_RAID_SMALL)
-		print(BFL.L.CORE_HELP_RAID_MYTHIC)
-		print(BFL.L.RAID_CMD_STRESS)
-		print("")
-		print(BFL.L.RAID_HELP_EVENTS)
-		print(BFL.L.CORE_HELP_RAID_READY)
-		print(BFL.L.CORE_HELP_RAID_ROLE)
-		print(BFL.L.CORE_HELP_RAID_MOVE)
-		print("")
-		print(BFL.L.RAID_HELP_MANAGEMENT)
-		print(BFL.L.RAID_CMD_CONFIG)
-		print(BFL.L.RAID_CMD_LIST)
-		print(BFL.L.CORE_HELP_RAID_CLEAR)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_COMMANDS)
+		BFL:DebugPrint("")
+		BFL:DebugPrint(BFL.L.CORE_HELP_MOCK_COMMANDS)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_MOCK)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_FULL)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_SMALL)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_MYTHIC)
+		BFL:DebugPrint(BFL.L.RAID_CMD_STRESS)
+		BFL:DebugPrint("")
+		BFL:DebugPrint(BFL.L.RAID_HELP_EVENTS)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_READY)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_ROLE)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_MOVE)
+		BFL:DebugPrint("")
+		BFL:DebugPrint(BFL.L.RAID_HELP_MANAGEMENT)
+		BFL:DebugPrint(BFL.L.RAID_CMD_CONFIG)
+		BFL:DebugPrint(BFL.L.RAID_CMD_LIST)
+		BFL:DebugPrint(BFL.L.CORE_HELP_RAID_CLEAR)
 	end
 end
 
@@ -3668,6 +3810,7 @@ end
 --- Rebuild the visible raid roster and every UI value derived from it.
 --- The caller is responsible for ensuring the Raid frame is visible.
 function RaidFrame:RefreshRosterView()
+	self.displayMainTankAndAssist = self:ShouldDisplayMainTankAndAssist()
 	self:UpdateRaidMembers()
 	self:BuildDisplayList()
 	self:UpdateControlPanel()

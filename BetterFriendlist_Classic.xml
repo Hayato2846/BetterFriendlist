@@ -577,6 +577,12 @@
 						<Anchor point="RIGHT" relativeKey="$parent.RankIcon" relativePoint="LEFT" x="-2" y="0"/>
 					</Anchors>
 				</Texture>
+				<Texture parentKey="MasterLooterIcon" hidden="true" file="Interface\GroupFrame\UI-Group-MasterLooter">
+					<Size x="10" y="10"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.MainTankIcon" relativePoint="LEFT" x="-2" y="0"/>
+					</Anchors>
+				</Texture>
 				<Texture parentKey="ReadyCheckIcon" hidden="true">
 					<Size x="14" y="14"/>
 					<Anchors>
@@ -1388,7 +1394,7 @@
 							<Anchor point="TOPRIGHT" x="-14" y="-8"/>
 						</Anchors>
 						<Frames>
-							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate" text="Raid Info">
+							<Button parentKey="RaidInfoButton" inherits="UIPanelButtonTemplate" text="Raid Info" motionScriptsWhileDisabled="true">
 								<Size x="90" y="22"/>
 								<Anchors>
 									<Anchor point="TOPRIGHT" x="10" y="-15"/>
@@ -1397,6 +1403,12 @@
 									<OnClick>
 										BetterRaidFrame_RaidInfoButton_OnClick(self);
 									</OnClick>
+									<OnEnter>
+										BetterRaidFrame_RaidInfoButton_OnEnter(self);
+									</OnEnter>
+									<OnLeave>
+										BetterRaidFrame_RaidInfoButton_OnLeave(self);
+									</OnLeave>
 								</Scripts>
 							</Button>
 							<Button parentKey="ReadyCheckButton" inherits="UIPanelButtonTemplate" hidden="true">

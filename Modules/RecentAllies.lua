@@ -622,7 +622,9 @@ function RecentAllies:BuildDataProvider()
 	-- Older clients retain BFL's accent-insensitive local fallback. Native 12.1
 	-- search is authoritative for interests, which are absent from RecentAllyData.
 	if not usedNativeSearch and (self.searchText ~= "" or self:HasActiveFilters()) then
-		local searchNormalized = BFL:StripAccents(self.searchText)
+		local compat = BFL.IntlCompat
+		local searchNormalized = compat and compat.NormalizeForSearch and compat.NormalizeForSearch(self.searchText)
+			or BFL:StripAccents(self.searchText)
 		local filtered = {}
 		for _, ally in ipairs(recentAllies) do
 			local matchesText = self.searchText == "" or self:MatchesSearch(ally, searchNormalized)
@@ -670,15 +672,22 @@ function RecentAllies:BuildDataProvider()
 	return dataProvider
 end
 
--- Check if a recent ally matches the search text (accent-insensitive)
+-- Check if a recent ally matches the search text (locale-aware on 12.1.5).
 function RecentAllies:MatchesSearch(ally, searchNormalized)
 	local characterData = ally.characterData
 	local stateData = ally.stateData
 	local interactionData = ally.interactionData
 
-	-- Helper: check if field contains the search (accent-insensitive)
+	-- Helper: use C_Intl when available and retain the accent-insensitive fallback.
 	local function contains(text)
+		if BFL.IsSecret and BFL:IsSecret(text) then
+			return false
+		end
 		if text and text ~= "" then
+			local compat = BFL.IntlCompat
+			if compat and compat.Contains then
+				return compat.Contains(text, searchNormalized)
+			end
 			return BFL:StripAccents(text):find(searchNormalized, 1, true) ~= nil
 		end
 		return false
