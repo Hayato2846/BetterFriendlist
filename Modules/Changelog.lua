@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### Retail
+
+#### Fixed
+- **Raid Member Right-Click** - Hovering raid members no longer causes a protected-frame anchor error. The normal Blizzard menu, including protected actions, still opens through the secure proxy in both Retail layouts.
+
+---
+
 ## [2.8.8]        - 2026-09-13
 
 ### Retail Live & Classic
@@ -209,11 +218,6 @@ BetterFriendlist 2.8.0 is one of the biggest updates the addon has received so f
 - **WHO Double-Click** - WHO actions now expose only the supported Whisper and Invite options; stale unsupported Inspect selections fall back safely to Whisper.
 
 ---
-
-## [2.7.0]        - 2026-07-29
-
-### Fixed
-- **Legacy Font Dropdowns** - Font lists in the legacy settings now stay on-screen and scroll through all available fonts. Dark and Custom themes no longer show an overlapping second dropdown.
 
 ---
 

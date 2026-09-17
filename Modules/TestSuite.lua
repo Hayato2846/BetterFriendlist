@@ -15842,6 +15842,7 @@ function TestSuite:RegisterRaidInteractionTest()
 			local originalIsModernActive = FriendsUI.IsModernActive
 			local originalHasSecretValues = BFL.HasSecretValues
 			local attributes = {}
+			local proxyGeometry = {}
 			local fakeButton = {
 				memberData = {},
 				unit = "raid1",
@@ -15850,6 +15851,31 @@ function TestSuite:RegisterRaidInteractionTest()
 				slotIndex = 1,
 				SetAttribute = function(self, key, value)
 					attributes[key] = value
+				end,
+			}
+			local fakeProxy = {
+				ClearAllPoints = function()
+					proxyGeometry.cleared = true
+				end,
+				SetPoint = function(self, point, relativeTo, relativePoint, x, y)
+					proxyGeometry.point = point
+					proxyGeometry.relativeTo = relativeTo
+					proxyGeometry.relativePoint = relativePoint
+					proxyGeometry.x = x
+					proxyGeometry.y = y
+				end,
+				SetSize = function(self, width, height)
+					proxyGeometry.width = width
+					proxyGeometry.height = height
+				end,
+				SetAllPoints = function()
+					proxyGeometry.usedSetAllPoints = true
+				end,
+			}
+			local sourceLeft, sourceBottom, sourceWidth, sourceHeight = 317, 241, 180, 20
+			local fakeGeometryButton = {
+				GetScaledRect = function()
+					return sourceLeft, sourceBottom, sourceWidth, sourceHeight
 				end,
 			}
 			local childOverlay = { GetParent = function() return fakeButton end }
@@ -15861,7 +15887,20 @@ function TestSuite:RegisterRaidInteractionTest()
 				V:AssertEqual(attributes["menu-function"], nil, "Modern Raid does not install an insecure menu callback")
 				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Modern Raid uses the Raid Player menu")
 				V:AssertType(RaidFrame.ShowSecureProxyForButton, "function", "Retail exposes the raid secure proxy path")
+				V:AssertType(RaidFrame.PositionSecureProxyForButton, "function", "Retail exposes safe proxy positioning")
 				V:AssertEqual(RaidFrame:ResolveMemberButton(childOverlay), fakeButton, "Child tooltip overlays resolve to their raid member row")
+
+				local rootScale = UIParent:GetEffectiveScale()
+				V:Assert(RaidFrame:PositionSecureProxyForButton(fakeProxy, fakeGeometryButton), "Secure proxy geometry should resolve")
+				V:Assert(proxyGeometry.cleared, "Secure proxy should clear its previous UIParent anchor")
+				V:Assert(not proxyGeometry.usedSetAllPoints, "Secure proxy must not anchor to the insecure visual row")
+				V:AssertEqual(proxyGeometry.point, "BOTTOMLEFT", "Secure proxy should use a stable root point")
+				V:AssertEqual(proxyGeometry.relativeTo, UIParent, "Secure proxy should only anchor to UIParent")
+				V:AssertEqual(proxyGeometry.relativePoint, "BOTTOMLEFT", "Secure proxy should use the matching UIParent point")
+				V:AssertEqual(proxyGeometry.x, sourceLeft / rootScale, "Secure proxy should preserve the row's screen X")
+				V:AssertEqual(proxyGeometry.y, sourceBottom / rootScale, "Secure proxy should preserve the row's screen Y")
+				V:AssertEqual(proxyGeometry.width, sourceWidth / rootScale, "Secure proxy should preserve the row width")
+				V:AssertEqual(proxyGeometry.height, sourceHeight / rootScale, "Secure proxy should preserve the row height")
 
 				attributes = {}
 				FriendsUI.IsModernActive = function() return false end

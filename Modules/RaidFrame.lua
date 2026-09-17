@@ -3820,6 +3820,30 @@ function RaidFrame:RefreshRosterView()
 	return true
 end
 
+function RaidFrame:PositionSecureProxyForButton(proxy, button)
+	if not (proxy and button and button.GetScaledRect and UIParent) then
+		return false
+	end
+
+	local rootScale = UIParent:GetEffectiveScale()
+	if not rootScale or rootScale <= 0 then
+		return false
+	end
+
+	local left, bottom, width, height = button:GetScaledRect()
+	if not (left and bottom and width and height) or width <= 0 or height <= 0 then
+		return false
+	end
+
+	-- Secure frames cannot anchor to BFL's intentionally insecure visual rows.
+	-- Copy the row's screen rectangle instead, keeping the protected proxy
+	-- anchored only to UIParent while preserving the same hit area.
+	proxy:ClearAllPoints()
+	proxy:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left / rootScale, bottom / rootScale)
+	proxy:SetSize(width / rootScale, height / rootScale)
+	return true
+end
+
 function RaidFrame:CreateSecureProxy()
 	if self.SecureProxy then
 		return self.SecureProxy
@@ -3935,8 +3959,11 @@ function RaidFrame:ShowSecureProxyForButton(button)
 	local DB = BFL and BFL:GetModule("DB")
 	ApplyRaidShortcutAttributes(proxy, DB and DB:Get("raidShortcuts") or {})
 
-	proxy:ClearAllPoints()
-	proxy:SetAllPoints(button)
+	if not self:PositionSecureProxyForButton(proxy, button) then
+		proxy:Hide()
+		proxy.visualButton = nil
+		return false
+	end
 	proxy:Show()
 	return true
 end
