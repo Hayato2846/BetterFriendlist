@@ -34,7 +34,33 @@ jobs:
         run: |
           import os
           import json
+          import re
           import urllib.request
+
+          def format_discord_markdown(markdown):
+              formatted_lines = []
+              in_code_block = False
+
+              for line in markdown.splitlines():
+                  stripped = line.strip()
+                  if stripped.startswith("```"):
+                      in_code_block = not in_code_block
+                      formatted_lines.append(line)
+                      continue
+
+                  if not in_code_block:
+                      if stripped == "---":
+                          continue
+
+                      # Discord supports Markdown headings only through level 3.
+                      # Preserve those and render deeper changelog headings as bold labels.
+                      heading = re.fullmatch(r"#{4,6}\s+(.+?)(?:\s+#+)?", stripped)
+                      if heading:
+                          line = f"**{heading.group(1)}**"
+
+                  formatted_lines.append(line)
+
+              return "\n".join(formatted_lines)
 
           webhook_url = os.environ.get('DISCORD_WEBHOOK')
           if not webhook_url:
@@ -80,12 +106,9 @@ jobs:
           except Exception as e:
               print(f"Error reading CHANGELOG.md: {e}")
 
-          # Strip Markdown horizontal rules (---) that Discord renders as plain text
+          # Normalize changelog Markdown for Discord's supported heading levels.
           if changelog_body:
-              changelog_body = '\n'.join(
-                  line for line in changelog_body.split('\n')
-                  if line.strip() != '---'
-              )
+              changelog_body = format_discord_markdown(changelog_body)
 
           # Use changelog body if found, otherwise fallback to release body
           fallback_body = "New beta version available for testing!" if is_beta else "New version released!"
