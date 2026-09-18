@@ -71,6 +71,55 @@ function GuildRosterData:HasBaseRosterAPI()
 		and BFL.GuildRoster ~= nil
 end
 
+function GuildRosterData:HasPreferredPlaySettingsAPI()
+	return BFL.IsMainline == true
+		and not BFL:IsGameRuleActive("GuildsDisabled")
+		and type(C_GuildInfo) == "table"
+		and type(C_GuildInfo.GetPreferredPlaySettings) == "function"
+		and type(C_GuildInfo.GetPreferredPlaySettingsFeatures) == "function"
+end
+
+-- Read-only compatibility surface. BFL intentionally does not duplicate
+-- Blizzard's mutation UI until there is a concrete friend-list workflow.
+function GuildRosterData:GetPreferredPlaySettingsSnapshot()
+	if not self:HasPreferredPlaySettingsAPI() then
+		return { available = false }
+	end
+	local okSettings, loaded, localeID, localityID, localeChangedAt, localityChangedAt, cooldownDays =
+		pcall(C_GuildInfo.GetPreferredPlaySettings)
+	local okFeatures, canChangeLocale, canChangeLocality = pcall(C_GuildInfo.GetPreferredPlaySettingsFeatures)
+	if not okSettings or not okFeatures
+		or IsSecretValue(loaded)
+		or IsSecretValue(localeID)
+		or IsSecretValue(localityID)
+	then
+		return { available = true, readable = false }
+	end
+	return {
+		available = true,
+		readable = true,
+		loaded = loaded == true,
+		preferredLocaleID = SafeNumber(localeID, 0),
+		preferredDatacenterLocalityID = SafeNumber(localityID, 0),
+		lastPreferredLocaleChangeDate = SafeNumber(localeChangedAt, 0),
+		lastPreferredDatacenterLocalityChangeDate = SafeNumber(localityChangedAt, 0),
+		changeCooldownDays = SafeNumber(cooldownDays, 0),
+		canChangeLocale = SafeBoolean(canChangeLocale),
+		canChangeDatacenterLocality = SafeBoolean(canChangeLocality),
+	}
+end
+
+function GuildRosterData:Initialize()
+	if not self:HasPreferredPlaySettingsAPI() then
+		return
+	end
+	pcall(function()
+		BFL:RegisterEventCallback("GUILD_PREFERRED_PLAY_SETTINGS_UPDATED", function()
+			self.preferredPlaySettingsVersion = (self.preferredPlaySettingsVersion or 0) + 1
+		end, 20)
+	end)
+end
+
 function GuildRosterData:IsInGuild()
 	if self:GetPreviewData() then
 		return true

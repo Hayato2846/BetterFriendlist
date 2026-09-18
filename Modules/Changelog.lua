@@ -11,11 +11,26 @@ local SUPPORT_LINKS = {
 	{ id = "github", url = "https://github.com/Hayato2846/BetterFriendlist/issues" },
 	{ id = "kofi", url = "https://ko-fi.com/hayato2846" },
 }
-local PORTRAIT_GLOW_TEXTURES = {
-	circle = "Interface\\AddOns\\BetterFriendlist\\Icons\\circle",
-	square = "Interface\\AddOns\\BetterFriendlist\\Icons\\square",
-}
-local PORTRAIT_GLOW_PADDING = 5
+local PORTRAIT_NOTICE_MIN_ALPHA = 0.35
+local PORTRAIT_NOTICE_MAX_ALPHA = 1
+local PORTRAIT_NOTICE_FADE_DURATION = 1.2
+local PORTRAIT_NOTICE_WIDTH = 64
+local PORTRAIT_NOTICE_HEIGHT = 48
+
+local function ApplyPortraitNoticeTexture(texture)
+	if not texture then
+		return
+	end
+
+	local atlas = BFL.IsClassic and "communities-icon-invitemail" or "CharacterCreate-NewLabel"
+	local fallback = BFL.IsClassic and "Interface\\AddOns\\BetterFriendlist\\Icons\\mail"
+		or "Interface\\AddOns\\BetterFriendlist\\Icons\\star"
+	if BFL.SetTextureOrAtlas then
+		BFL.SetTextureOrAtlas(texture, atlas, fallback)
+	else
+		texture:SetTexture(fallback)
+	end
+end
 
 local function GetAccentColor(fallbackR, fallbackG, fallbackB, fallbackA)
 	if BFL.GetThemeAccentColor then
@@ -48,9 +63,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [2.9.0]        - 2026-09-18
 
-### Retail
+BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the Menu Bridge without changing the existing Retail Midnight and Classic experiences.
+
+### All WoW Versions
+
+#### Improved
+- **Changelog Notice** - The BFL avatar now uses the same pulsing glow animation as the Friend Requests tab when a new changelog is available.
+- **Who Search Builder** - Opening the Search Builder now imports the current Who query, including name, guild, zone, class, race, and level filters. Additional free-form search terms are preserved.
+- **Who Search Feedback** - Who searches now show the same loading spinner used by Recent Allies while waiting for the server. “No players found” appears only after a completed empty response, while a timeout keeps its separate retry message.
+
+### WoW Forever
+
+#### Added
+- **WoW Forever Support** - BetterFriendlist and the Menu Bridge now recognize Forever as a modern Mainline client despite its `1.60.1` version. Available social views and features—including Forever's Recent Allies categories—follow the APIs and live game rules provided by the client, while unsupported Midnight-only features remain hidden. Retail Midnight and every supported Classic flavor retain their existing behavior.
+
+#### Fixed
+- **Forever Who Routing** - `/who` now opens BetterFriendlist directly on its Who tab and performs the search there without also opening Forever's separate LFG Who window. The native Group Finder remains available through its own UI.
+- **Forever Keybindings** - The Social shortcut is now migrated only after Forever has loaded a writable binding profile, preventing a Lua error during login.
+
+### Retail Midnight
 
 #### Fixed
 - **Raid Member Right-Click** - Hovering raid members no longer causes a protected-frame anchor error. The normal Blizzard menu, including protected actions, still opens through the secure proxy in both Retail layouts.
@@ -639,55 +672,82 @@ function Changelog:GetPortraitButton()
 	return BetterFriendsFrame and BetterFriendsFrame.PortraitButton
 end
 
-function Changelog:GetPortraitGlowShape(theme)
-	theme = theme or (BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()) or "blizzard"
-	return theme == "blizzard" and "circle" or "square"
-end
-
-function Changelog:ApplyPortraitGlowStyle(button, accentR, accentG, accentB, accentA)
+function Changelog:HidePortraitFrameGlow(button)
 	local glow = button and button.Glow
 	if not glow then
-		return nil
+		return
 	end
 
-	local shape = self:GetPortraitGlowShape()
-	glow:SetTexture(PORTRAIT_GLOW_TEXTURES[shape])
-	glow:SetTexCoord(0, 1, 0, 1)
-	glow:SetBlendMode("ADD")
-	glow:ClearAllPoints()
-	glow:SetPoint("TOPLEFT", button, "TOPLEFT", -PORTRAIT_GLOW_PADDING, PORTRAIT_GLOW_PADDING)
-	glow:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", PORTRAIT_GLOW_PADDING, -PORTRAIT_GLOW_PADDING)
-	glow:SetDrawLayer("OVERLAY", 1)
-	glow:SetVertexColor(accentR, accentG, accentB, (accentA or 1) * 0.9)
-	return shape
+	glow:SetAlpha(0)
+	glow:Hide()
+end
+
+function Changelog:EnsurePortraitNoticeAnimation(button)
+	local notice = button and button.NewLabel
+	if not notice then
+		return nil
+	end
+	if button.ChangelogNoticeAnimation then
+		return button.ChangelogNoticeAnimation
+	end
+
+	local animation = notice:CreateAnimationGroup()
+	animation:SetLooping("REPEAT")
+	if animation.SetToFinalAlpha then
+		animation:SetToFinalAlpha(true)
+	end
+
+	local fadeIn = animation:CreateAnimation("Alpha")
+	fadeIn:SetDuration(PORTRAIT_NOTICE_FADE_DURATION)
+	fadeIn:SetOrder(1)
+	fadeIn:SetFromAlpha(PORTRAIT_NOTICE_MIN_ALPHA)
+	fadeIn:SetToAlpha(PORTRAIT_NOTICE_MAX_ALPHA)
+
+	local fadeOut = animation:CreateAnimation("Alpha")
+	fadeOut:SetDuration(PORTRAIT_NOTICE_FADE_DURATION)
+	fadeOut:SetOrder(2)
+	fadeOut:SetFromAlpha(PORTRAIT_NOTICE_MAX_ALPHA)
+	fadeOut:SetToAlpha(PORTRAIT_NOTICE_MIN_ALPHA)
+
+	animation.FadeIn = fadeIn
+	animation.FadeOut = fadeOut
+	button.ChangelogNoticeAnimation = animation
+	return animation
+end
+
+function Changelog:SetPortraitNoticeAnimationPlaying(button, playing)
+	local notice = button and button.NewLabel
+	local animation = self:EnsurePortraitNoticeAnimation(button)
+	if not (notice and animation) then
+		return
+	end
+
+	if playing then
+		notice:SetAlpha(PORTRAIT_NOTICE_MIN_ALPHA)
+		notice:Show()
+		if not animation:IsPlaying() then
+			animation:Play()
+		end
+	else
+		animation:Stop()
+		notice:SetAlpha(0)
+		notice:Hide()
+	end
 end
 
 function Changelog:ShowGlow(show)
 	local button = self:GetPortraitButton()
 	if button then
 		local accentR, accentG, accentB, accentA = GetAccentColor(1, 0.82, 0, 1)
-		self:ApplyPortraitGlowStyle(button, accentR, accentG, accentB, accentA)
+		self:HidePortraitFrameGlow(button)
 
 		-- Create NewLabel texture if it doesn't exist
 		if not button.NewLabel then
 			button.NewLabel = button:CreateTexture(nil, "OVERLAY")
 			button.NewLabel:SetDrawLayer("OVERLAY", 2)
 			button.NewLabel:SetPoint("CENTER", button, "CENTER", 0, 0)
-			if BFL.IsClassic then
-				if BFL.SetTextureOrAtlas then
-					BFL.SetTextureOrAtlas(button.NewLabel, "communities-icon-invitemail", "Interface\\AddOns\\BetterFriendlist\\Icons\\mail")
-				else
-					button.NewLabel:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\mail")
-				end
-				button.NewLabel:SetSize(64, 48)
-			else
-				if BFL.SetTextureOrAtlas then
-					BFL.SetTextureOrAtlas(button.NewLabel, "CharacterCreate-NewLabel", "Interface\\AddOns\\BetterFriendlist\\Icons\\star")
-				else
-					button.NewLabel:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
-				end
-				button.NewLabel:SetSize(64, 48)
-			end
+			ApplyPortraitNoticeTexture(button.NewLabel)
+			button.NewLabel:SetSize(PORTRAIT_NOTICE_WIDTH, PORTRAIT_NOTICE_HEIGHT)
 			-- Desaturate to remove the native color, then color it with the active accent.
 			button.NewLabel:SetDesaturated(true)
 		end
@@ -696,19 +756,9 @@ function Changelog:ShowGlow(show)
 		end
 
 		if show then
-			if button.Glow then
-				button.Glow:Show()
-			end
-			if button.NewLabel then
-				button.NewLabel:Show()
-			end
+			self:SetPortraitNoticeAnimationPlaying(button, true)
 		else
-			if button.Glow then
-				button.Glow:Hide()
-			end
-			if button.NewLabel then
-				button.NewLabel:Hide()
-			end
+			self:SetPortraitNoticeAnimationPlaying(button, false)
 		end
 	end
 end
@@ -799,12 +849,25 @@ function Changelog:RegisterTests()
 	end
 	self.testsRegistered = true
 
-	TestSuite:RegisterTest("ui", "Changelog_PortraitGlowShape", {
+	TestSuite:RegisterTest("ui", "Changelog_PortraitNoticeAnimation", {
+		condition = function()
+			return CreateFrame ~= nil and UIParent ~= nil
+		end,
 		action = function(V)
-			V:AssertEqual(self:GetPortraitGlowShape("blizzard"), "circle", "Blizzard avatars keep a circular update glow")
-			for _, theme in ipairs({ "dark", "custom", "elvui", "ellesmereui" }) do
-				V:AssertEqual(self:GetPortraitGlowShape(theme), "square", theme .. " avatars use a square update glow")
-			end
+			local owner = CreateFrame("Frame", nil, UIParent)
+			owner.NewLabel = owner:CreateTexture(nil, "OVERLAY")
+			local animation = self:EnsurePortraitNoticeAnimation(owner)
+			V:Assert(animation ~= nil, "Changelog creates an avatar notice animation")
+			V:AssertEqual(animation:GetLooping(), "REPEAT", "Changelog notice repeats like the Friend Requests glow")
+			V:AssertEqual(animation.FadeIn:GetDuration(), PORTRAIT_NOTICE_FADE_DURATION, "Changelog notice uses the Friend Requests fade-in duration")
+			V:AssertEqual(animation.FadeOut:GetDuration(), PORTRAIT_NOTICE_FADE_DURATION, "Changelog notice uses the Friend Requests fade-out duration")
+
+			self:SetPortraitNoticeAnimationPlaying(owner, true)
+			V:Assert(animation:IsPlaying(), "Changelog notice starts when a changelog is unread")
+			self:SetPortraitNoticeAnimationPlaying(owner, false)
+			V:Assert(not animation:IsPlaying(), "Changelog notice stops after the changelog is read")
+			V:Assert(not owner.NewLabel:IsShown(), "Changelog notice is hidden after the changelog is read")
+			owner:Hide()
 		end,
 	})
 end

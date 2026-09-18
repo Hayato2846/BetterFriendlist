@@ -83,6 +83,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 
 		-- BNet friends need full contextData like BetterFriendsList_ShowBNDropdown
 		contextData = {
+			ownerFrame = extraData.ownerFrame or button,
 			name = extraData.name or "",
 			friendsList = extraData.index, -- Use numeric index if available (restores behavior from BetterFriendlist.lua)
 			bnetIDAccount = friendID,
@@ -106,6 +107,7 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 		end
 
 		contextData = {
+			ownerFrame = extraData.ownerFrame or button,
 			name = name or "",
 			friendsList = (type(friendID) == "number") and friendID or true, -- RIO Fix
 			uid = name, -- For Nickname (WoW friends use name as UID)
@@ -174,6 +176,7 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 	end
 
 	local contextData = {
+		ownerFrame = button,
 		name = cleanName or cleanShortName,
 		server = serverName, -- Only set if cross-realm, otherwise nil
 		guid = whoInfo.guid,

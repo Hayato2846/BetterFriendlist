@@ -138,6 +138,17 @@ local function CopySafeFields(source, keys)
 	return copy
 end
 
+local function IsFrameLike(value)
+	local valueType = type(value)
+	if valueType ~= "table" and valueType ~= "userdata" then
+		return false
+	end
+	local ok, objectType = pcall(function()
+		return value.GetObjectType
+	end)
+	return ok and type(objectType) == "function"
+end
+
 local function ResolveBNetAccountInfo(accountID)
 	if type(accountID) ~= "number" then
 		accountID = tonumber(accountID)
@@ -322,7 +333,7 @@ function MenuBridge:RegisterProvider(provider)
 	return true
 end
 
-function MenuBridge:CreateSafeContext(contextData, menuType)
+function MenuBridge:CreateSafeContext(contextData, menuType, ownerFrame)
 	local normalizedMenuType = NormalizeMenuType(menuType)
 	local safeContext = {
 		menuType = normalizedMenuType,
@@ -363,6 +374,12 @@ function MenuBridge:CreateSafeContext(contextData, menuType)
 		if valueType == "string" or valueType == "number" or valueType == "boolean" then
 			safeContext[key] = value
 		end
+	end
+	local contextOwner = SafeValue(contextData, "ownerFrame")
+	if IsFrameLike(contextOwner) then
+		safeContext.ownerFrame = contextOwner
+	elseif IsFrameLike(ownerFrame) then
+		safeContext.ownerFrame = ownerFrame
 	end
 
 	safeContext.accountInfo = BuildSafeAccountInfo(contextData, safeContext.bnetIDAccount)
@@ -570,7 +587,7 @@ function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType)
 
 	self:ImportEarlyCaptures()
 
-	local safeContext = self:CreateSafeContext(contextData, menuType)
+	local safeContext = self:CreateSafeContext(contextData, menuType, owner)
 	if not safeContext.menuType then
 		return false
 	end

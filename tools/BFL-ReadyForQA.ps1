@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('none', 'retail', 'ptr', 'xptr', 'beta', 'classic', 'classic_ptr', 'classic_era', 'anniversary', 'all')]
+    [ValidateSet('none', 'retail', 'ptr', 'xptr', 'beta', 'forever', 'classic_beta', 'classic', 'classic_ptr', 'classic_era', 'anniversary', 'all')]
     [string]$DeployClient = 'none',
 
     [string]$BaseRef = $env:BFL_REVIEW_BASE,

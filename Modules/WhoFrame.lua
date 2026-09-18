@@ -94,6 +94,82 @@ local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
 local WHO_SCROLLBAR_RESERVE = 18
 local LEGACY_SEARCH_BOTTOM_OFFSET = 15
 
+local WHO_QUERY_FIELDS = {
+	n = "name",
+	g = "guild",
+	z = "zone",
+	c = "class",
+	r = "race",
+}
+
+local WHO_QUERY_GLOBAL_TAGS = {
+	WHO_TAG_NAME = "name",
+	WHO_TAG_GUILD = "guild",
+	WHO_TAG_ZONE = "zone",
+	WHO_TAG_CLASS = "class",
+	WHO_TAG_RACE = "race",
+}
+
+local function TokenizeWhoQuery(query)
+	local tokens = {}
+	local position = 1
+	local length = #query
+
+	while position <= length do
+		while position <= length and query:sub(position, position):match("%s") do
+			position = position + 1
+		end
+		if position > length then
+			break
+		end
+
+		local startPosition = position
+		local insideQuotes = false
+		while position <= length do
+			local character = query:sub(position, position)
+			if character == '"' then
+				insideQuotes = not insideQuotes
+			elseif not insideQuotes and character:match("%s") then
+				break
+			end
+			position = position + 1
+		end
+		tokens[#tokens + 1] = query:sub(startPosition, position - 1)
+	end
+
+	return tokens
+end
+
+local function GetWhoQueryFieldMap()
+	local fields = {}
+	for tag, field in pairs(WHO_QUERY_FIELDS) do
+		fields[tag] = field
+	end
+	for globalName, field in pairs(WHO_QUERY_GLOBAL_TAGS) do
+		local localizedTag = _G[globalName]
+		if type(localizedTag) == "string" then
+			local tag = localizedTag:match("^%s*(.-)%-%s*$")
+			if tag and tag ~= "" then
+				fields[tag:lower()] = field
+			end
+		end
+	end
+	return fields
+end
+
+local function DecodeWhoQueryValue(rawValue)
+	if rawValue:sub(1, 1) == '"' then
+		if #rawValue < 2 or rawValue:sub(-1) ~= '"' then
+			return nil
+		end
+		return rawValue:sub(2, -2)
+	end
+	if rawValue:find('"', 1, true) then
+		return nil
+	end
+	return rawValue
+end
+
 local function GetWhoResultCounts()
 	return C_FriendList.GetNumWhoResults()
 end
@@ -181,12 +257,64 @@ local DOUBLE_CLICK_THRESHOLD = 0.4
 -- WHO throttle constants
 local WHO_COOLDOWN = 5 -- seconds between WHO queries
 local WHO_TIMEOUT = 8 -- seconds to wait for WHO_LIST_UPDATE before showing timeout
+local WHO_LIST_UPDATE_EVENT = "WHO_LIST_UPDATE"
 
 -- ========================================
 -- Module Lifecycle
 -- ========================================
 
+function WhoFrame:IsAvailable()
+	if BFL:IsGameRuleActive("IngameWhoListDisabled") then
+		return false
+	end
+	return type(C_FriendList) == "table"
+		and type(C_FriendList.GetNumWhoResults) == "function"
+		and type(C_FriendList.GetWhoInfo) == "function"
+		and type(C_FriendList.SetWhoToUi) == "function"
+		and type(C_FriendList.SendWho) == "function"
+end
+
+-- Forever's LFGWhoListFrame opens LFGParentFrame from its WHO_LIST_UPDATE
+-- handler when the Social UI is disabled. Temporarily suspend only that
+-- listener while BFL owns the request; manual/native Who routing stays intact.
+function WhoFrame:SuspendNativeWhoListUpdates(nativeWhoFrame)
+	self:RestoreNativeWhoListUpdates()
+
+	local frame = nativeWhoFrame or _G.LFGWhoListFrame
+	if not frame or type(frame.UnregisterEvent) ~= "function" then
+		return false
+	end
+
+	if type(frame.IsEventRegistered) == "function" then
+		local ok, isRegistered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
+		if not ok or isRegistered ~= true then
+			return false
+		end
+	end
+
+	local ok = pcall(frame.UnregisterEvent, frame, WHO_LIST_UPDATE_EVENT)
+	if not ok then
+		return false
+	end
+
+	self.suspendedNativeWhoListFrame = frame
+	return true
+end
+
+function WhoFrame:RestoreNativeWhoListUpdates()
+	local frame = self.suspendedNativeWhoListFrame
+	self.suspendedNativeWhoListFrame = nil
+	if not frame or type(frame.RegisterEvent) ~= "function" then
+		return false
+	end
+
+	return pcall(frame.RegisterEvent, frame, WHO_LIST_UPDATE_EVENT)
+end
+
 function WhoFrame:Initialize()
+	if not self:IsAvailable() then
+		return
+	end
 	-- Register event callback for WHO list updates
 	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
 		self:OnWhoListUpdate(...)
@@ -448,6 +576,9 @@ function WhoFrame:EnsureSearchBuilderForCurrentStyle()
 		zone = previous.zoneInput and previous.zoneInput:GetText() or "",
 		levelMin = previous.levelMin and previous.levelMin:GetText() or "",
 		levelMax = previous.levelMax and previous.levelMax:GetText() or "",
+		selectedClass = previous.selectedClass or "",
+		selectedRace = previous.selectedRace or "",
+		extraQuery = previous.extraQuery or "",
 	} or nil
 	local wasShown = self.builderFlyout and self.builderFlyout:IsShown() or false
 	if self.builderFlyout then
@@ -479,6 +610,11 @@ function WhoFrame:EnsureSearchBuilderForCurrentStyle()
 		if self.builder.zoneInput then self.builder.zoneInput:SetText(previousValues.zone) end
 		if self.builder.levelMin then self.builder.levelMin:SetText(previousValues.levelMin) end
 		if self.builder.levelMax then self.builder.levelMax:SetText(previousValues.levelMax) end
+		self.builder.selectedClass = previousValues.selectedClass
+		self.builder.selectedRace = previousValues.selectedRace
+		self.builder.extraQuery = previousValues.extraQuery
+		if self.builder.RebuildClassDropdown then self.builder.RebuildClassDropdown() end
+		if self.builder.RebuildRaceDropdown then self.builder.RebuildRaceDropdown() end
 	end
 	if expectedStyle == "legacy" then
 		local DB = BFL:GetModule("DB")
@@ -791,6 +927,17 @@ end
 
 -- Handle WHO_LIST_UPDATE event
 function WhoFrame:OnWhoListUpdate(...)
+	-- Re-register after the current event dispatch so the native Forever frame
+	-- cannot receive the BFL-owned result that triggered this callback.
+	local suspendedFrame = self.suspendedNativeWhoListFrame
+	if suspendedFrame then
+		C_Timer.After(0, function()
+			if self.suspendedNativeWhoListFrame == suspendedFrame then
+				self:RestoreNativeWhoListUpdates()
+			end
+		end)
+	end
+
 	-- Clear pending state - results arrived successfully
 	self.whoPending = false
 	if self.whoTimeoutTimer then
@@ -1500,7 +1647,10 @@ function WhoFrame:IsOnCooldown()
 end
 
 -- Send Who request
-function WhoFrame:SendWhoRequest(text)
+function WhoFrame:SendWhoRequest(text, origin)
+	if not self:IsAvailable() then
+		return
+	end
 	-- Throttle: Prevent queries faster than the server allows
 	local now = GetTime()
 	if self.lastWhoSendTime and (now - self.lastWhoSendTime < WHO_COOLDOWN) then
@@ -1537,6 +1687,7 @@ function WhoFrame:SendWhoRequest(text)
 		self.whoTimeoutTimer = nil
 		if self.whoPending then
 			self.whoPending = false
+			self:RestoreNativeWhoListUpdates()
 			self:ShowThrottleHint()
 		end
 	end)
@@ -1557,28 +1708,31 @@ function WhoFrame:SendWhoRequest(text)
 		end
 	end
 
+	-- Forever's LFG Who surface has its own WHO_LIST_UPDATE listener which
+	-- opens LFGParentFrame. Suspend it only for this BFL-owned request.
+	self:SuspendNativeWhoListUpdates()
+
 	-- CRITICAL: Set Who routing IMMEDIATELY before each SendWho call
 	C_FriendList.SetWhoToUi(true)
 
-	C_FriendList.SendWho(text)
+	C_FriendList.SendWho(text, origin)
 end
 
 -- Show "Searching..." in the totals area while waiting for results
 -- Also clears old result rows so they don't remain visible underneath
 function WhoFrame:ShowPendingState()
-	local totalsElement = BetterFriendsFrame
-		and BetterFriendsFrame.WhoFrame
-		and BetterFriendsFrame.WhoFrame.ListInset
-		and BetterFriendsFrame.WhoFrame.ListInset.Totals
-	if not totalsElement then
+	local frame = BetterFriendsFrame and BetterFriendsFrame.WhoFrame
+	if not frame then
 		return
 	end
+	self:SetLoadingSpinnerShown(frame, true)
 
 	local L = BFL.L
 	local pendingText = L and L.WHO_SEARCH_PENDING or "Searching..."
-	if totalsElement.Text then
+	local totalsElement = frame.ListInset and frame.ListInset.Totals or frame.Totals
+	if totalsElement and totalsElement.Text then
 		totalsElement.Text:SetText(pendingText)
-	elseif totalsElement.SetText then
+	elseif totalsElement and totalsElement.SetText then
 		totalsElement:SetText(pendingText)
 	end
 
@@ -1599,24 +1753,25 @@ end
 
 -- Show a brief hint that the search may have been throttled
 function WhoFrame:ShowThrottleHint()
-	local totalsElement = BetterFriendsFrame
-		and BetterFriendsFrame.WhoFrame
-		and BetterFriendsFrame.WhoFrame.ListInset
-		and BetterFriendsFrame.WhoFrame.ListInset.Totals
-	if not totalsElement then
+	local frame = BetterFriendsFrame and BetterFriendsFrame.WhoFrame
+	if not frame then
 		return
 	end
+	self:SetLoadingSpinnerShown(frame, false)
 
 	local L = BFL.L
 	local timeoutText = L and L.WHO_SEARCH_TIMEOUT or "No response. Try again."
-	if totalsElement.Text then
+	local totalsElement = frame.ListInset and frame.ListInset.Totals or frame.Totals
+	if totalsElement and totalsElement.Text then
 		totalsElement.Text:SetText(timeoutText)
-	elseif totalsElement.SetText then
+	elseif totalsElement and totalsElement.SetText then
 		totalsElement:SetText(timeoutText)
 	end
 
-	-- Show empty state since results were cleared during pending
-	self:UpdateEmptyState(0)
+	-- A timeout is not a completed empty result, so keep the empty-state text hidden.
+	if self.emptyStateText then
+		self.emptyStateText:Hide()
+	end
 end
 
 -- Start the Refresh button cooldown with countdown text
@@ -1744,6 +1899,7 @@ function WhoFrame:Update(forceRebuild)
 	if not BetterFriendsFrame or not BetterFriendsFrame.WhoFrame then
 		return
 	end
+	local frame = BetterFriendsFrame.WhoFrame
 
 	-- Classic: Check if using Classic mode
 	local isClassicMode = not BFL.HasModernScrollBox
@@ -1753,8 +1909,14 @@ function WhoFrame:Update(forceRebuild)
 		return
 	end
 
+	if self.whoPending then
+		self:SetLoadingSpinnerShown(frame, true)
+		return
+	end
+	self:SetLoadingSpinnerShown(frame, false)
+
 	-- Visibility Optimization:
-	if not BetterFriendsFrame:IsShown() or not BetterFriendsFrame.WhoFrame:IsShown() then
+	if not BetterFriendsFrame:IsShown() or not frame:IsShown() then
 		needsRenderOnShow = true
 		return
 	end
@@ -1774,7 +1936,7 @@ function WhoFrame:Update(forceRebuild)
 
 	-- Classic: Totals is a Frame with a Text FontString child
 	-- Retail: Totals is a FontString directly
-	local totalsElement = BetterFriendsFrame.WhoFrame.ListInset.Totals
+	local totalsElement = frame.ListInset and frame.ListInset.Totals or frame.Totals
 	if totalsElement then
 		if totalsElement.Text then
 			totalsElement.Text:SetText(totalsText)
@@ -2112,9 +2274,42 @@ function WhoFrame:CreateEmptyState(frame)
 	self.emptyStateText = emptyText
 end
 
+-- Mirror Recent Allies' loading behavior while waiting for WHO_LIST_UPDATE.
+function WhoFrame:SetLoadingSpinnerShown(frame, shown)
+	frame = frame or (BetterFriendsFrame and BetterFriendsFrame.WhoFrame)
+	if not frame then
+		return false
+	end
+
+	if frame.LoadingSpinner then
+		frame.LoadingSpinner:SetShown(shown)
+	end
+	if frame.ScrollBox then
+		frame.ScrollBox:SetShown(not shown)
+	end
+	if frame.ScrollBar then
+		frame.ScrollBar:SetShown(not shown)
+	end
+	if frame.ClassicScrollBar then
+		if shown then
+			frame.ClassicScrollBar:Hide()
+		else
+			self:RenderClassicWhoButtons()
+		end
+	end
+	if shown and self.emptyStateText then
+		self.emptyStateText:Hide()
+	end
+	return true
+end
+
 -- Show/hide empty state based on result count
 function WhoFrame:UpdateEmptyState(numWhos)
 	if not self.emptyStateText then
+		return
+	end
+	if self.whoPending then
+		self.emptyStateText:Hide()
 		return
 	end
 	if numWhos == 0 then
@@ -4153,6 +4348,9 @@ function WhoFrame:ToggleSearchBuilder(show)
 	end
 
 	if show then
+		local whoFrame = self.builderWhoFrame or (BetterFriendsFrame and BetterFriendsFrame.WhoFrame)
+		local query = whoFrame and whoFrame.EditBox and whoFrame.EditBox:GetText() or ""
+		self:ApplyQueryToBuilder(query)
 		-- In docked mode, also show the container
 		if self.builderDocked and self.builderDockedContainer then
 			self.builderDockedContainer:Show()
@@ -4214,6 +4412,90 @@ function WhoFrame:RefreshAccentColors()
 	end
 end
 
+-- Parse the search syntax accepted by Blizzard's Who API. Unknown terms are
+-- retained separately so opening the builder never discards a valid free-form
+-- part of the current query.
+function WhoFrame:ParseWhoQuery(query)
+	local parsed = {
+		name = "",
+		guild = "",
+		zone = "",
+		class = "",
+		race = "",
+		levelMin = "",
+		levelMax = "",
+		extraQuery = "",
+	}
+	if type(query) ~= "string" or (BFL.IsSecret and BFL:IsSecret(query)) then
+		return parsed
+	end
+
+	local fieldsByTag = GetWhoQueryFieldMap()
+	local seenFields = {}
+	local seenLevel = false
+	local extraTerms = {}
+
+	for _, token in ipairs(TokenizeWhoQuery(query)) do
+		local minLevel, maxLevel = token:match("^(%d+)%-(%d+)$")
+		if minLevel and not seenLevel then
+			parsed.levelMin = minLevel
+			parsed.levelMax = maxLevel
+			seenLevel = true
+		else
+			local exactLevel = token:match("^(%d+)$")
+			if exactLevel and not seenLevel then
+				parsed.levelMin = exactLevel
+				parsed.levelMax = exactLevel
+				seenLevel = true
+			else
+				local rawTag, rawValue = token:match("^([^%-]+)%-(.+)$")
+				local field = rawTag and fieldsByTag[rawTag:lower()] or nil
+				local value = field and DecodeWhoQueryValue(rawValue) or nil
+				if field and value ~= nil and not seenFields[field] then
+					parsed[field] = value
+					seenFields[field] = true
+				else
+					extraTerms[#extraTerms + 1] = token
+				end
+			end
+		end
+	end
+
+	parsed.extraQuery = table.concat(extraTerms, " ")
+	return parsed
+end
+
+-- Import the current search into the builder without submitting a new request.
+function WhoFrame:ApplyQueryToBuilder(query)
+	if not self.builder then
+		return false
+	end
+	if type(query) ~= "string" or (BFL.IsSecret and BFL:IsSecret(query)) then
+		return false
+	end
+
+	local parsed = self:ParseWhoQuery(query)
+	self.applyingBuilderQuery = true
+	if self.builder.nameInput then self.builder.nameInput:SetText(parsed.name) end
+	if self.builder.guildInput then self.builder.guildInput:SetText(parsed.guild) end
+	if self.builder.zoneInput then self.builder.zoneInput:SetText(parsed.zone) end
+	if self.builder.levelMin then self.builder.levelMin:SetText(parsed.levelMin) end
+	if self.builder.levelMax then self.builder.levelMax:SetText(parsed.levelMax) end
+	self.builder.selectedClass = parsed.class
+	self.builder.selectedRace = parsed.race
+	self.builder.extraQuery = parsed.extraQuery
+
+	if self.builder.RebuildClassDropdown then
+		self.builder.RebuildClassDropdown()
+	end
+	if self.builder.RebuildRaceDropdown then
+		self.builder.RebuildRaceDropdown()
+	end
+	self.applyingBuilderQuery = false
+	self:UpdateBuilderPreview()
+	return true
+end
+
 -- Compose the WHO query string from builder fields
 function WhoFrame:ComposeBuilderQuery()
 	if not self.builder then
@@ -4257,12 +4539,17 @@ function WhoFrame:ComposeBuilderQuery()
 		table.insert(parts, "1-" .. maxLvl)
 	end
 
+	local extraQuery = self.builder.extraQuery or ""
+	if extraQuery ~= "" then
+		table.insert(parts, extraQuery)
+	end
+
 	return table.concat(parts, " ")
 end
 
 -- Update the live preview text (or live-update EditBox in docked mode)
 function WhoFrame:UpdateBuilderPreview()
-	if not self.builder then
+	if not self.builder or self.applyingBuilderQuery then
 		return
 	end
 
@@ -4345,6 +4632,7 @@ function WhoFrame:ResetBuilder()
 
 	self.builder.selectedClass = ""
 	self.builder.selectedRace = ""
+	self.builder.extraQuery = ""
 
 	-- Rebuild dropdowns to show full lists (no filtering)
 	if self.builder.RebuildClassDropdown then

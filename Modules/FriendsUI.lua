@@ -977,7 +977,7 @@ function FriendsUI:ComputeEffectiveStyle(requestedStyle, isRetail, socialUIAvail
 end
 
 function FriendsUI:IsSocialUIAvailable()
-	return BFL.IsRetail == true
+	return BFL.IsMainline == true
 		and C_SocialUI ~= nil
 		and type(C_SocialUI.IsSystemEnabled) == "function"
 end
@@ -987,7 +987,7 @@ function FriendsUI:IsSocialUIEnabled()
 		return false
 	end
 	local ok, enabled = pcall(C_SocialUI.IsSystemEnabled)
-	return ok and enabled == true
+	return ok and not BFL:IsSecret(enabled) and enabled == true
 end
 
 function FriendsUI:IsModernForceEnabled()
@@ -1212,16 +1212,17 @@ function FriendsUI:GetSocialTabForSection(sectionID)
 end
 
 function FriendsUI:GetCapabilities()
+	local friendsDisabled = BFL:IsGameRuleActive("IngameFriendsListDisabled")
 	local bnetSupported = not BFL.IsBattleNetFriendsListSupported or BFL.IsBattleNetFriendsListSupported()
 	local bnetEnabled = not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()
 	local recentEnabled = false
-	if BFL.IsRetail and C_RecentAllies then
+	if BFL.IsMainline and C_RecentAllies and not friendsDisabled then
 		if C_RecentAllies.IsSystemEnabled then
 			local ok, enabled = pcall(C_RecentAllies.IsSystemEnabled)
-			recentEnabled = ok and enabled == true
+			recentEnabled = ok and not BFL:IsSecret(enabled) and enabled == true
 		elseif C_RecentAllies.IsRecentAlliesEnabled then
 			local ok, enabled = pcall(C_RecentAllies.IsRecentAlliesEnabled)
-			recentEnabled = ok and enabled == true
+			recentEnabled = ok and not BFL:IsSecret(enabled) and enabled == true
 		end
 	end
 	local quickJoinEnabled = BFL.IsSocialQueueSupported and BFL.IsSocialQueueSupported()
@@ -1233,27 +1234,58 @@ function FriendsUI:GetCapabilities()
 		rafEnabled = BFL.IsRAFSystemEnabled()
 	end
 	local rafPreviewEnabled = BFL.IsRAFPreviewActive and BFL:IsRAFPreviewActive()
+	local WhoFrame = BFL:GetModule("WhoFrame")
+	local whoEnabled = WhoFrame and WhoFrame.IsAvailable and WhoFrame:IsAvailable()
 	return {
 		-- The Friends section also contains character friends and must remain
 		-- reachable when Battle.net friends are unavailable.
-		friends = true,
+		friends = not friendsDisabled,
 		recent_allies = recentEnabled,
-		quick_join = quickJoinEnabled == true,
-		friend_requests = bnetSupported and bnetEnabled,
-		recruit_a_friend = rafPreviewEnabled == true or rafEnabled == true,
-		raid = BFL.IsRetail == true and not self:AreRaidGroupsDisabled(),
-		guild = BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() or false,
-		who = true,
+		quick_join = not friendsDisabled
+			and not BFL:IsGameRuleActive("DisableQuickJoin")
+			and quickJoinEnabled == true,
+		friend_requests = not friendsDisabled and bnetSupported and bnetEnabled,
+		recruit_a_friend = not friendsDisabled and (rafPreviewEnabled == true or rafEnabled == true),
+		raid = BFL.IsMainline == true and not friendsDisabled and not self:AreRaidGroupsDisabled(),
+		guild = not friendsDisabled and (BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() or false),
+		who = not friendsDisabled and whoEnabled == true,
 	}
 end
 
 function FriendsUI:AreRaidGroupsDisabled()
-	local gameRule = Enum and Enum.GameRule and Enum.GameRule.DisableRaidGroups
-	if not (gameRule and C_GameRules and C_GameRules.IsGameRuleActive) then
-		return false
+	return BFL:IsGameRuleActive("DisableRaidGroups")
+end
+
+function FriendsUI:OnGameRulesChanged()
+	self.navigationDirty = true
+	if BFL:IsGameRuleActive("IngameFriendsListDisabled")
+		and BetterFriendsFrame
+		and BetterFriendsFrame:IsShown()
+	then
+		BetterFriendsFrame:Hide()
 	end
-	local ok, disabled = pcall(C_GameRules.IsGameRuleActive, gameRule)
-	return ok and disabled == true
+	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+		self:RefreshNavigation()
+		local selected = self:GetSelectedSection()
+		if not self:IsSectionAvailable(selected) then
+			self:SelectSection(self:BuildAvailableSectionIDs()[1] or "friends")
+		end
+	end
+
+	local Settings = BFL:GetModule("Settings")
+	if Settings and Settings.RefreshGuildTabVisibility then
+		Settings:RefreshGuildTabVisibility()
+	end
+	local RecentAllies = BFL:GetModule("RecentAllies")
+	if RecentAllies and RecentAllies.Refresh and BetterFriendsFrame
+		and BetterFriendsFrame.RecentAlliesFrame
+		and BetterFriendsFrame.RecentAlliesFrame:IsShown()
+	then
+		RecentAllies:Refresh(
+			BetterFriendsFrame.RecentAlliesFrame,
+			ScrollBoxConstants and ScrollBoxConstants.RetainScrollPosition
+		)
+	end
 end
 
 function FriendsUI:ShouldShowSection(sectionID, capabilities, counts)
@@ -1666,6 +1698,22 @@ function FriendsUI:CreateNavigationTabs()
 	end
 end
 
+function FriendsUI:GetSideTabIconAnchorOffsets(tab, definition, hasCount)
+	local offsetX = definition and definition.iconOffsetX or -2
+	local offsetY = 0
+	if tab and type(tab.GetIconAnchorOffsetsForTabArt) == "function" then
+		local ok, nativeX, nativeY = pcall(tab.GetIconAnchorOffsetsForTabArt, tab)
+		if ok and type(nativeX) == "number" and type(nativeY) == "number" then
+			offsetX = nativeX
+			offsetY = nativeY
+		end
+	end
+	if hasCount then
+		offsetY = offsetY + 5
+	end
+	return offsetX, offsetY
+end
+
 function FriendsUI:IsStoryRaidActive()
 	if not (DifficultyUtil and DifficultyUtil.InStoryRaid) then
 		return false
@@ -1833,8 +1881,9 @@ function FriendsUI:RefreshNavigation()
 			tab.Count:SetShown(count > 0)
 			tab.Count:SetText(count > 0 and count or "")
 			if tab.Icon then
+				local iconOffsetX, iconOffsetY = self:GetSideTabIconAnchorOffsets(tab, definition, count > 0)
 				tab.Icon:ClearAllPoints()
-				tab.Icon:SetPoint("CENTER", tab, "CENTER", definition.iconOffsetX or -2, count > 0 and 5 or 0)
+				tab.Icon:SetPoint("CENTER", tab, "CENTER", iconOffsetX, iconOffsetY)
 			end
 		end
 	end
@@ -4399,6 +4448,9 @@ end
 function FriendsUI:ToggleSection(sectionID)
 	if not BetterFriendsFrame then
 		return
+	end
+	if not self:IsSectionAvailable(sectionID) then
+		return false
 	end
 	if BetterFriendsFrame:IsShown() and self:GetSelectedSection() == sectionID then
 		BetterFriendsFrame:Hide()
@@ -6989,8 +7041,10 @@ function FriendsUI:RegisterTests()
 				local info = RecentAllies:BuildSearchInfo()
 				V:AssertEqual(info.searchText, "ally", "Recent Allies forwards the search text")
 				V:Assert(info.isOnline and not info.isAFK and not info.isDND and not info.isOffline, "Recent Allies supplies every required status field")
-				local rolePlaying = Enum and Enum.RecentAlliesFriendTag and Enum.RecentAlliesFriendTag.RolePlaying
-				V:AssertEqual(#info.interests, rolePlaying ~= nil and 1 or 0, "Missing PTR enum values are not forwarded")
+				local schema = RecentAllies:GetSearchSchema()
+				local rolePlaying = schema and schema.enum and schema.enum.RolePlaying
+				local categoryValues = schema and info[schema.field] or {}
+				V:AssertEqual(#categoryValues, rolePlaying ~= nil and 1 or 0, "Missing game-type enum values are not forwarded")
 				if rolePlaying == nil then
 					for _, option in ipairs(RecentAllies:GetAvailableInterestOptions()) do
 						V:Assert(option.id ~= "roleplaying", "Missing PTR enum values are not offered in the menu")
@@ -7018,8 +7072,10 @@ function FriendsUI:RegisterTests()
 			V:AssertEqual(table.concat(sections, ","), "friends,friend_requests,raid,who", "Unavailable systems must be omitted without changing order")
 			V:AssertEqual(
 				self:GetCapabilities().raid,
-				BFL.IsRetail == true and not self:AreRaidGroupsDisabled(),
-				"Raid availability follows the Retail DisableRaidGroups game rule"
+				BFL.IsMainline == true
+					and not BFL:IsGameRuleActive("IngameFriendsListDisabled")
+					and not self:AreRaidGroupsDisabled(),
+				"Raid availability follows Mainline friends and raid game rules"
 			)
 		end,
 	})
@@ -7694,7 +7750,7 @@ function FriendsUI:RegisterTests()
 end
 
 function FriendsUI:Initialize()
-	if not BFL.IsRetail then
+	if not BFL.IsMainline then
 		self.appliedStyle = STYLE_LEGACY
 		return
 	end
@@ -7714,6 +7770,11 @@ function FriendsUI:Initialize()
 			if SettingsDesigner and SettingsDesigner.RefreshFriendsUIAvailability then
 				SettingsDesigner:RefreshFriendsUIAvailability()
 			end
+		end, 10)
+	end)
+	pcall(function()
+		BFL:RegisterEventCallback("GAME_RULES_CHANGED", function()
+			self:OnGameRulesChanged()
 		end, 10)
 	end)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()

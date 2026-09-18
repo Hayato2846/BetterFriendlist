@@ -738,7 +738,7 @@ function TestSuite:ShowStatus()
 	print("")
 	print("  Framework Version:  1.0")
 	print("  Is Running:         " .. (self.isRunning and "|cff00ff00Yes|r" or "|cff888888No|r"))
-	print("  WoW Version:        " .. (BFL.IsRetail and "Retail" or "Classic") .. " (" .. BFL.TOCVersion .. ")")
+	self.Reporter:Info("WoW Family: " .. (BFL.IsMainline and "Mainline" or "Classic") .. " (" .. BFL.TOCVersion .. ")")
 	print(
 		"  Preview Mode:       "
 			.. (
@@ -7474,11 +7474,11 @@ local function RegisterBuiltInTests()
 			if BFL.Compat and BFL.Compat.IsRecentAlliesAvailable then
 				compatAvailable = BFL.Compat.IsRecentAlliesAvailable()
 			end
-			local expected = ((BFL.IsTWW or BFL.IsMidnight) and BFL.HasModernScrollBox and compatAvailable) == true
+			local expected = (BFL.IsMainline and BFL.HasModernScrollBox and compatAvailable) == true
 			V:AssertEqual(
 				BFL.HasRecentAllies == true,
 				expected,
-				"HasRecentAllies should require supported build, ScrollBox, and API availability"
+				"HasRecentAllies should require Mainline, ScrollBox, and API availability"
 			)
 		end,
 	})
@@ -13770,9 +13770,345 @@ function TestSuite:Initialize()
 	self:RegisterChunkedFriendsListUpdateTest()
 	self:RegisterBNetFriendInfoNoOpTest()
 	self:RegisterEventCompatibilityTests()
+	self:RegisterForeverCompatibilityTests()
 	self:Register1215CompatibilityTests()
 	self:RegisterLateUITests(); self:RegisterRaidInteractionTest(); self:RegisterPreviewFriendTagsTest()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
+end
+
+function TestSuite:RegisterForeverCompatibilityTests()
+	self:RegisterTest("data", "Forever_ClientFamilyMatrix", {
+		description = "Forever remains Mainline despite its 1.60 interface number while Classic families keep their existing routing",
+		action = function(V)
+			local forever = BFL.ResolveClientFlavor(16001, 1, 1, 2)
+			V:Assert(forever.isMainline and not forever.isClassic, "Forever project identity resolves to Mainline")
+			local fallbackForever = BFL.ResolveClientFlavor(16001, nil, nil, nil)
+			V:Assert(fallbackForever.isMainline and not fallbackForever.isClassic, "Forever fallback never resolves as Classic")
+			local midnight = BFL.ResolveClientFlavor(120105, 1, 1, 2)
+			V:Assert(midnight.isMainline and midnight.isMidnight, "Midnight Standard resolves as Mainline")
+			local era = BFL.ResolveClientFlavor(11509, 2, 1, 2)
+			V:Assert(era.isClassic and era.isClassicEra and not era.isMainline, "Classic Era remains Classic")
+			local anniversary = BFL.ResolveClientFlavor(20506, 2, 1, 2)
+			V:Assert(anniversary.isClassic and anniversary.isTBCClassic, "Anniversary remains in the Classic 2.x family")
+			local mists = BFL.ResolveClientFlavor(50504, 2, 1, 2)
+			V:Assert(mists.isClassic and mists.isMoPClassic, "Mists Classic remains Classic")
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_SocialKeybindUsesWritableBindingSet", {
+		description = "Forever never passes a transient or secret binding-set value to SaveBindings",
+		condition = function()
+			return BFL.ResolveWritableBindingSet ~= nil
+		end,
+		action = function(V)
+			local bindingSetEnum = { Default = 0, Account = 1, Character = 2, Current = 3 }
+			V:AssertEqual(
+				BFL.ResolveWritableBindingSet(bindingSetEnum.Account, bindingSetEnum),
+				bindingSetEnum.Account,
+				"Account bindings remain writable"
+			)
+			V:AssertEqual(
+				BFL.ResolveWritableBindingSet(bindingSetEnum.Character, bindingSetEnum),
+				bindingSetEnum.Character,
+				"Character bindings remain writable"
+			)
+			V:AssertEqual(
+				BFL.ResolveWritableBindingSet(bindingSetEnum.Default, bindingSetEnum),
+				nil,
+				"Default bindings are never passed to SaveBindings"
+			)
+			V:AssertEqual(
+				BFL.ResolveWritableBindingSet(bindingSetEnum.Current, bindingSetEnum),
+				nil,
+				"The transient Current binding set is never passed to SaveBindings"
+			)
+			local secretBindingSet = {}
+			V:AssertEqual(
+				BFL.ResolveWritableBindingSet(secretBindingSet, bindingSetEnum, function(value)
+					return value == secretBindingSet
+				end),
+				nil,
+				"Secret binding-set values are rejected before comparison"
+			)
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_GameRuleSafety", {
+		description = "Game rules fail closed and never inspect secret values",
+		action = function(V)
+			V:Assert(BFL.ResolveGameRuleState(7, function(value) return value == 7 end, function() return false end), "Active rules resolve true")
+			V:Assert(not BFL.ResolveGameRuleState(7, function() error("unavailable") end, nil, false), "Rule API errors use the safe fallback")
+			local secret = {}
+			V:Assert(not BFL.ResolveGameRuleState(7, function() return secret end, function(value) return value == secret end, false), "Secret rule results use the safe fallback")
+			V:Assert(BFL.ResolveNativeWhoInterception(false, true), "BFL intercepts Who while its owned surface is available")
+			V:Assert(not BFL.ResolveNativeWhoInterception(true, true), "Explicit native-frame access bypasses BFL interception")
+			V:Assert(not BFL.ResolveNativeWhoInterception(false, false), "Disabled Who systems are not intercepted")
+			V:AssertEqual(
+				BFL.ResolveFriendsFrameRedirectTab(2, true, 1, nil, 2, 3),
+				2,
+				"BFL's internal Who tab bypasses Forever's native Raid index"
+			)
+			V:AssertEqual(
+				BFL.ResolveFriendsFrameRedirectTab(2, false, 1, nil, 2, 3),
+				3,
+				"Forever's native tab 2 still maps to BFL Raid"
+			)
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_BFLWhoSuppressesNativeLFGWindow", {
+		description = "BFL Who requests temporarily suspend Forever's native LFG Who event without changing manual routing",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module and module.SuspendNativeWhoListUpdates and module.RestoreNativeWhoListUpdates
+		end,
+		action = function(V)
+			if BFL.IsMainline then
+				V:Assert(BFL.whoSlashRedirectInstalled, "Mainline's /who slash handler is redirected to BFL")
+			end
+
+			local module = BFL:GetModule("WhoFrame")
+			local subject = setmetatable({}, { __index = module })
+			local nativeFrame = {
+				registered = true,
+				unregisterCount = 0,
+				registerCount = 0,
+				IsEventRegistered = function(self, event)
+					return self.registered and event == "WHO_LIST_UPDATE"
+				end,
+				UnregisterEvent = function(self, event)
+					if event == "WHO_LIST_UPDATE" then
+						self.registered = false
+						self.unregisterCount = self.unregisterCount + 1
+					end
+				end,
+				RegisterEvent = function(self, event)
+					if event == "WHO_LIST_UPDATE" then
+						self.registered = true
+						self.registerCount = self.registerCount + 1
+					end
+				end,
+			}
+
+			V:Assert(subject:SuspendNativeWhoListUpdates(nativeFrame), "Forever's native Who listener is suspended")
+			V:Assert(not nativeFrame.registered, "The native frame cannot consume BFL's Who result")
+			V:AssertEqual(nativeFrame.unregisterCount, 1, "The native listener is removed exactly once")
+			V:Assert(subject:RestoreNativeWhoListUpdates(), "The native Who listener is restored")
+			V:Assert(nativeFrame.registered, "Manual native Who routing remains available")
+			V:AssertEqual(nativeFrame.registerCount, 1, "The native listener is restored exactly once")
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_WhoPendingUsesLoadingSpinner", {
+		description = "Who requests show a spinner and reserve the empty state for completed responses",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module and module.SetLoadingSpinnerShown and module.UpdateEmptyState
+		end,
+		action = function(V)
+			local module = BFL:GetModule("WhoFrame")
+			local function NewVisibilityState(initialState)
+				return {
+					shown = initialState,
+					SetShown = function(self, shown) self.shown = shown end,
+					Show = function(self) self.shown = true end,
+					Hide = function(self) self.shown = false end,
+					IsShown = function(self) return self.shown end,
+				}
+			end
+
+			local frame = {
+				LoadingSpinner = NewVisibilityState(false),
+				ScrollBox = NewVisibilityState(true),
+				ScrollBar = NewVisibilityState(true),
+			}
+			local subject = setmetatable({
+				emptyStateText = NewVisibilityState(true),
+				whoPending = true,
+			}, { __index = module })
+
+			V:Assert(subject:SetLoadingSpinnerShown(frame, true), "The pending state is applied")
+			V:Assert(frame.LoadingSpinner:IsShown(), "The Who loading spinner is visible while pending")
+			V:Assert(not frame.ScrollBox:IsShown(), "The incomplete result list is hidden while pending")
+			V:Assert(not frame.ScrollBar:IsShown(), "The incomplete result scrollbar is hidden while pending")
+			V:Assert(not subject.emptyStateText:IsShown(), "The empty-result message is hidden while pending")
+
+			subject:UpdateEmptyState(0)
+			V:Assert(not subject.emptyStateText:IsShown(), "Pending requests cannot show an empty result")
+
+			subject.whoPending = false
+			subject:SetLoadingSpinnerShown(frame, false)
+			subject:UpdateEmptyState(0)
+			V:Assert(not frame.LoadingSpinner:IsShown(), "The spinner stops after the response")
+			V:Assert(frame.ScrollBox:IsShown(), "The result list returns after the response")
+			V:Assert(subject.emptyStateText:IsShown(), "A completed empty response shows the empty state")
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_WhoSearchBuilderImportsCurrentQuery", {
+		description = "Opening the Search Builder imports slash-populated Who filters without submitting another request",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module and module.ParseWhoQuery and module.ApplyQueryToBuilder
+		end,
+		action = function(V)
+			local module = BFL:GetModule("WhoFrame")
+			local parsed = module:ParseWhoQuery('z-"Zephras Isle" 1-4')
+			V:AssertEqual(parsed.zone, "Zephras Isle", "Forever's default zone is imported")
+			V:AssertEqual(parsed.levelMin, "1", "Forever's default minimum level is imported")
+			V:AssertEqual(parsed.levelMax, "4", "Forever's default maximum level is imported")
+			V:AssertEqual(parsed.extraQuery, "", "The native default query is fully understood")
+
+			local function NewInput()
+				return {
+					value = "",
+					SetText = function(self, value) self.value = value end,
+					GetText = function(self) return self.value end,
+				}
+			end
+
+			local previewCount = 0
+			local classRebuildCount = 0
+			local raceRebuildCount = 0
+			local subject = setmetatable({
+				builder = {
+					nameInput = NewInput(),
+					guildInput = NewInput(),
+					zoneInput = NewInput(),
+					levelMin = NewInput(),
+					levelMax = NewInput(),
+					RebuildClassDropdown = function() classRebuildCount = classRebuildCount + 1 end,
+					RebuildRaceDropdown = function() raceRebuildCount = raceRebuildCount + 1 end,
+				},
+				UpdateBuilderPreview = function() previewCount = previewCount + 1 end,
+				SendWhoRequest = function() error("Builder import must not submit a Who request") end,
+			}, { __index = module })
+
+			V:Assert(subject:ApplyQueryToBuilder('n-"Hayato" g-"Codex Crew" z-"Zephras Isle" c-"Druid" r-"Night Elf" 1-4 unmapped'), "The current query is applied")
+			V:AssertEqual(subject.builder.nameInput:GetText(), "Hayato", "Name filters are imported")
+			V:AssertEqual(subject.builder.guildInput:GetText(), "Codex Crew", "Guild filters are imported")
+			V:AssertEqual(subject.builder.zoneInput:GetText(), "Zephras Isle", "Zone filters are imported")
+			V:AssertEqual(subject.builder.selectedClass, "Druid", "Class filters are imported")
+			V:AssertEqual(subject.builder.selectedRace, "Night Elf", "Race filters are imported")
+			V:AssertEqual(subject.builder.levelMin:GetText(), "1", "Minimum levels are imported")
+			V:AssertEqual(subject.builder.levelMax:GetText(), "4", "Maximum levels are imported")
+			V:AssertEqual(subject.builder.extraQuery, "unmapped", "Free-form terms remain lossless")
+			V:AssertEqual(classRebuildCount, 1, "The class dropdown refreshes after import")
+			V:AssertEqual(raceRebuildCount, 1, "The race dropdown refreshes after import")
+			V:AssertEqual(previewCount, 1, "The completed import refreshes the preview once")
+			V:AssertEqual(
+				subject:ComposeBuilderQuery(),
+				'n-"Hayato" g-"Codex Crew" z-"Zephras Isle" c-"Druid" r-"Night Elf" 1-4 unmapped',
+				"Builder output retains every imported filter and free-form term"
+			)
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_RecentAlliesDualSchema", {
+		description = "Recent Allies builds the exact Midnight or Forever search structure and filters unsupported categories",
+		condition = function()
+			local module = BFL:GetModule("RecentAllies")
+			return module and module.ResolveSearchSchema and module.BuildSearchInfo
+		end,
+		action = function(V)
+			local module = BFL:GetModule("RecentAllies")
+			local originalFilters = module.selectedFilters
+			local originalSearch = module.searchText
+			local ok, err = pcall(function()
+				module.selectedFilters = { online = true, pvp = true, questing = true }
+				module.searchText = "ally"
+				local foreverSchema = module.ResolveSearchSchema({
+					RecentAlliesInteractionCategoryFilter = { PvP = 1, Questing = 5 },
+				}, {
+					IsInteractionCategoryFilterSupportedForCurrentGameType = function(value)
+						return value == 1
+					end,
+				})
+				local foreverInfo = module:BuildSearchInfo(foreverSchema)
+				V:AssertEqual(foreverInfo.searchText, "ally", "Forever keeps the search text")
+				V:Assert(foreverInfo.isOnline, "Forever keeps status filters")
+				V:AssertEqual(#foreverInfo.interactionCategoryFilters, 1, "Forever sends only supported interaction categories")
+				V:Assert(foreverInfo.interests == nil, "Forever never sends Midnight's interests field")
+
+				local midnightSchema = module.ResolveSearchSchema({
+					RecentAlliesFriendTag = { PvP = 1, Questing = 5 },
+				}, {})
+				local midnightInfo = module:BuildSearchInfo(midnightSchema)
+				V:AssertEqual(#midnightInfo.interests, 2, "Midnight sends its friend-tag interests")
+				V:Assert(midnightInfo.interactionCategoryFilters == nil, "Midnight never sends Forever's category field")
+			end)
+			module.selectedFilters = originalFilters
+			module.searchText = originalSearch
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_FriendTagSupportFilter", {
+		description = "Battle.net tag support is checked before tags are offered or sent",
+		condition = function()
+			local module = BFL:GetModule("FriendTags")
+			return module and module.IsBlizzardTagSupported and module.BLIZZARD_TAGS
+		end,
+		action = function(V)
+			local module = BFL:GetModule("FriendTags")
+			local first = module.BLIZZARD_TAGS[1]
+			local second = module.BLIZZARD_TAGS[2]
+			V:Assert(module:IsBlizzardTagSupported(first, {}), "Older clients without the support API preserve existing tags")
+			V:Assert(module:IsBlizzardTagSupported(first, {
+				IsFriendTagSupportedForCurrentGameType = function(value)
+					return value == first.enumFallback
+				end,
+			}), "Supported game-type tags remain available")
+			V:Assert(not module:IsBlizzardTagSupported(first, {
+				IsFriendTagSupportedForCurrentGameType = function() return false end,
+			}), "Unsupported game-type tags are rejected")
+			V:Assert(not module:IsBlizzardTagSupported(first, {
+				IsFriendTagSupportedForCurrentGameType = function() error("unavailable") end,
+			}), "Tag support API errors fail closed")
+			local desired, payload = module:BuildSupportedBlizzardTagPayload({
+				[first.id] = true,
+				[second.id] = true,
+			}, {
+				IsFriendTagSupportedForCurrentGameType = function(value)
+					return value == first.enumFallback
+				end,
+			})
+			V:Assert(desired[first.id] and not desired[second.id], "Unsupported native tags are removed from desired state")
+			V:AssertEqual(#payload, 1, "Mutation payload contains only supported native tags")
+			V:AssertEqual(payload[1], first.enumFallback, "Mutation payload preserves the supported enum value")
+		end,
+	})
+
+	self:RegisterTest("integration", "Forever_MenuOwnershipAndNativeTabArt", {
+		description = "The menu bridge preserves its owner and side tabs honor the active game-type mixin offsets",
+		action = function(V)
+			local owner = { GetObjectType = function() return "Button" end }
+			local bridge = BFL:GetModule("MenuBridge")
+			if bridge and bridge.CreateSafeContext then
+				local context = bridge:CreateSafeContext({ ownerFrame = owner, name = "Test" }, "FRIEND", owner)
+				V:AssertEqual(context.ownerFrame, owner, "Menu Bridge preserves ownerFrame")
+			end
+			local friendsUI = BFL:GetModule("FriendsUI")
+			if friendsUI and friendsUI.GetSideTabIconAnchorOffsets then
+				local x, y = friendsUI:GetSideTabIconAnchorOffsets({
+					GetIconAnchorOffsetsForTabArt = function() return -4, 0 end,
+				}, {}, true)
+				V:AssertEqual(x, -4, "Forever's native side-tab horizontal offset is honored")
+				V:AssertEqual(y, 5, "BFL's count offset composes with the native game-type offset")
+			end
+		end,
+	})
+
+	self:RegisterTest("integration", "Forever_CapabilityDiagnostics", {
+		description = "Compatibility diagnostics expose project family, rules, and capability state without a version-only decision",
+		action = function(V)
+			local diagnostics = BFL:GetCompatibilityDiagnostics()
+			V:Assert(type(diagnostics) == "table", "Compatibility diagnostics are available")
+			V:AssertEqual(diagnostics.isMainline, BFL.IsMainline == true, "Diagnostics report the resolved Mainline family")
+			V:Assert(type(diagnostics.gameRules) == "table", "Diagnostics report game-rule state")
+			V:Assert(type(diagnostics.capabilities) == "table", "Diagnostics report capability state")
+		end,
+	})
 end
 
 function TestSuite:Register1215CompatibilityTests()

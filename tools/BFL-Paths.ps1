@@ -9,6 +9,8 @@ function Get-BFLClientMap {
         ptr = '_ptr_'
         xptr = '_xptr_'
         beta = '_beta_'
+        forever = '_forever_'
+        classic_beta = '_classic_beta_'
         classic = '_classic_'
         classic_ptr = '_classic_ptr_'
         classic_era = '_classic_era_'

@@ -20,6 +20,8 @@ C:\Users\hofer\Documents\BFL\
     ptr\BetterFriendlist\
     xptr\BetterFriendlist\
     beta\BetterFriendlist\
+    classic_beta\BetterFriendlist\
+    forever\BetterFriendlist\
   releases\BetterFriendlist\
   savedvariables\BetterFriendlist\
 ```
@@ -70,6 +72,14 @@ Default target is Retail:
 Use `-Client all` when the change affects cross-flavor loading, TOC/XML structure,
 compatibility code, or release packaging.
 
+The WoW Forever beta currently uses the `classic_beta` client key, which resolves to
+the Blizzard installation folder `_classic_beta_`. The `forever` key remains available
+for a future standalone `_forever_` installation.
+
+The `forever` target resolves to the conventional `_forever_` WoW client folder. If that
+client is not installed yet, `-Client all` reports it as skipped without affecting the
+detected Retail, PTR, Beta, or Classic clients.
+
 ## CleanCopy Troubleshooting
 
 `BFL-Deploy.ps1` uses `robocopy` for `CleanCopy` mirrors. Keep robocopy retries bounded:
@@ -108,6 +118,12 @@ Deploy the current checkout to every detected client:
 
 ```powershell
 .\tools\BFL-Deploy.ps1 -Mode CleanCopy -Client all -Source .
+```
+
+Deploy specifically to WoW Forever:
+
+```powershell
+.\tools\BFL-Deploy.ps1 -Mode CleanCopy -Client forever -Source .
 ```
 
 Install a release ZIP for exact package testing:

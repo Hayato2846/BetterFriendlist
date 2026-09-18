@@ -1260,6 +1260,13 @@
 							</OnLoad>
 						</Scripts>
 					</Frame>
+					<!-- Visible while a Who request is waiting for the server response. -->
+					<Frame parentKey="LoadingSpinner" hidden="true" inherits="SpinnerTemplate">
+						<Size x="60" y="60"/>
+						<Anchors>
+							<Anchor point="CENTER" relativeKey="$parent.ListInset"/>
+						</Anchors>
+					</Frame>
 				</Frames>
 				<Scripts>
 					<OnLoad>

@@ -2,7 +2,7 @@ param(
     [ValidateSet('Backup', 'Restore', 'List')]
     [string]$Action = 'List',
 
-    [ValidateSet('retail', 'ptr', 'xptr', 'beta', 'classic', 'classic_ptr', 'classic_era', 'anniversary')]
+    [ValidateSet('retail', 'ptr', 'xptr', 'beta', 'forever', 'classic_beta', 'classic', 'classic_ptr', 'classic_era', 'anniversary')]
     [string]$Client = 'retail',
 
     [string]$ProfileName,

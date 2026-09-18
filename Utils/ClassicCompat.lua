@@ -1227,12 +1227,23 @@ function Compat.GetBNetFriendGameAccountInfo(friendIndex, gameAccountIndex)
 	return nil
 end
 
+local function SafeBooleanAPICall(apiFunction, fallback, ...)
+	if type(apiFunction) ~= "function" then
+		return fallback == true
+	end
+	local ok, value = pcall(apiFunction, ...)
+	if not ok or (BFL.IsSecret and BFL:IsSecret(value)) then
+		return fallback == true
+	end
+	return value == true
+end
+
 function Compat.IsBattleNetFriendsListSupported()
 	if not (C_BattleNet and C_BattleNet.GetFriendAccountInfo) then
 		return false
 	end
 	if C_BattleNet.IsBattleNetFriendsListSupported then
-		return C_BattleNet.IsBattleNetFriendsListSupported()
+		return SafeBooleanAPICall(C_BattleNet.IsBattleNetFriendsListSupported, false)
 	end
 	return true
 end
@@ -1242,13 +1253,13 @@ function Compat.IsBattleNetFriendsListEnabled()
 		return false
 	end
 	if C_BattleNet.IsBattleNetFriendsListEnabled then
-		return C_BattleNet.IsBattleNetFriendsListEnabled()
+		return SafeBooleanAPICall(C_BattleNet.IsBattleNetFriendsListEnabled, false)
 	end
 	return true
 end
 
 function Compat.CanSearchBattleNetFriends()
-	return BFL.IsRetail == true
+	return BFL.IsMainline == true
 		and C_BattleNet ~= nil
 		and type(C_BattleNet.SearchFriends) == "function"
 end
@@ -1268,11 +1279,10 @@ function Compat.AreBattleNetFriendTagsEnabled()
 	if not Compat.IsBattleNetFriendsListEnabled() then
 		return false
 	end
-	if not (BFL.IsRetail == true and C_BattleNet and type(C_BattleNet.AreFriendTagsEnabled) == "function") then
+	if not (BFL.IsMainline == true and C_BattleNet and type(C_BattleNet.AreFriendTagsEnabled) == "function") then
 		return false
 	end
-	local ok, enabled = pcall(C_BattleNet.AreFriendTagsEnabled)
-	return ok and enabled == true or false
+	return SafeBooleanAPICall(C_BattleNet.AreFriendTagsEnabled, false)
 end
 
 function Compat.GetBNetFriendInviteInfo(inviteIndex)
@@ -1292,32 +1302,37 @@ function Compat.GetBNetFriendInviteInfo(inviteIndex)
 end
 
 ------------------------------------------------------------
--- C_RecentAllies Compatibility (TWW-only!)
+-- C_RecentAllies Compatibility (capability-gated Mainline)
 ------------------------------------------------------------
--- This API exists ONLY in TWW (11.0.7+)
--- In Classic/MoP: Return empty/disabled
+-- Midnight Standard and Forever may expose different search schemas.
+-- Classic clients return empty/disabled values.
 
 function Compat.IsRecentAlliesAvailable()
-	return C_RecentAllies ~= nil and C_RecentAllies.IsSystemEnabled ~= nil
+	return BFL.IsMainline == true
+		and C_RecentAllies ~= nil
+		and type(C_RecentAllies.IsSystemEnabled or C_RecentAllies.IsRecentAlliesEnabled) == "function"
 end
 
 function Compat.IsRecentAlliesSystemEnabled()
 	if Compat.IsRecentAlliesAvailable() then
-		return C_RecentAllies.IsSystemEnabled()
+		return SafeBooleanAPICall(C_RecentAllies.IsSystemEnabled or C_RecentAllies.IsRecentAlliesEnabled, false)
 	end
 	return false
 end
 
 function Compat.GetRecentAllies()
 	if Compat.IsRecentAlliesAvailable() and C_RecentAllies.GetRecentAllies then
-		return C_RecentAllies.GetRecentAllies()
+		local ok, result = pcall(C_RecentAllies.GetRecentAllies)
+		if ok and not (BFL.IsSecret and BFL:IsSecret(result)) and type(result) == "table" then
+			return result
+		end
 	end
 	return {} -- Empty in Classic
 end
 
 function Compat.IsRecentAllyDataReady()
 	if Compat.IsRecentAlliesAvailable() and C_RecentAllies.IsRecentAllyDataReady then
-		return C_RecentAllies.IsRecentAllyDataReady()
+		return SafeBooleanAPICall(C_RecentAllies.IsRecentAllyDataReady, true)
 	end
 	return true -- Return true so we don't show loading spinner forever
 end
@@ -1329,24 +1344,24 @@ end
 -- 12.1+:  C_RecruitAFriend.IsSystemSupported() / IsSystemEnabled()
 
 function Compat.IsRAFSystemSupported()
-	if not BFL.IsRetail or not C_RecruitAFriend then
+	if not BFL.IsMainline or not C_RecruitAFriend then
 		return false
 	end
 	if C_RecruitAFriend.IsSystemSupported then
-		return C_RecruitAFriend.IsSystemSupported()
+		return SafeBooleanAPICall(C_RecruitAFriend.IsSystemSupported, false)
 	end
 	return C_RecruitAFriend.IsEnabled ~= nil
 end
 
 function Compat.IsRAFSystemEnabled()
-	if not BFL.IsRetail or not C_RecruitAFriend then
+	if not BFL.IsMainline or not C_RecruitAFriend then
 		return false
 	end
 	if C_RecruitAFriend.IsSystemEnabled then
-		return C_RecruitAFriend.IsSystemEnabled()
+		return SafeBooleanAPICall(C_RecruitAFriend.IsSystemEnabled, false)
 	end
 	if C_RecruitAFriend.IsEnabled then
-		return C_RecruitAFriend.IsEnabled()
+		return SafeBooleanAPICall(C_RecruitAFriend.IsEnabled, false)
 	end
 	return false
 end
@@ -1366,11 +1381,11 @@ end
 -- 12.1+: use explicit system support/enabled checks.
 
 function Compat.IsSocialQueueSupported()
-	if not BFL.IsRetail or not C_SocialQueue then
+	if not BFL.IsMainline or not C_SocialQueue then
 		return false
 	end
 	if C_SocialQueue.IsSystemSupported then
-		return C_SocialQueue.IsSystemSupported()
+		return SafeBooleanAPICall(C_SocialQueue.IsSystemSupported, false)
 	end
 	return C_SocialQueue.GetAllGroups ~= nil
 end
@@ -1380,7 +1395,7 @@ function Compat.IsSocialQueueEnabled()
 		return false
 	end
 	if C_SocialQueue.IsSystemEnabled then
-		return C_SocialQueue.IsSystemEnabled()
+		return SafeBooleanAPICall(C_SocialQueue.IsSystemEnabled, false)
 	end
 	return true
 end
@@ -2738,14 +2753,23 @@ end
 function Compat.GetMaxLevel()
 	-- Retail / Modern API
 	if GetMaxLevelForPlayerExpansion then
-		return GetMaxLevelForPlayerExpansion()
+		local ok, level = pcall(GetMaxLevelForPlayerExpansion)
+		if ok and type(level) == "number" and level > 0 then
+			return level
+		end
+	end
+	if GetMaxPlayerLevel then
+		local ok, level = pcall(GetMaxPlayerLevel)
+		if ok and type(level) == "number" and level > 0 then
+			return level
+		end
 	end
 
 	-- Fallbacks based on game version flags (defined in Core.lua)
 	if BFL.IsTWW then
 		return 80
 	end
-	if BFL.IsRetail then
+	if BFL.IsMainline then
 		return 70
 	end -- Dragonflight fallback
 	if BFL.IsMoPClassic then
@@ -2922,6 +2946,7 @@ BFL.CreateContextMenu = Compat.CreateContextMenu
 BFL.OpenContextMenu = function(button, menuType, contextData, name)
 	if contextData then
 		contextData.bflOrigin = ADDON_NAME
+		contextData.ownerFrame = contextData.ownerFrame or button
 	end
 	if BFL.HasSecretValues and BFL.OpenBetterFriendlistContextMenu then
 		if BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name) then

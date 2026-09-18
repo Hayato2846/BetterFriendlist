@@ -593,11 +593,9 @@ function RegressionTests:RegisterBuiltInTests()
             V:AssertNotNil(tocVersion, "TOC version should be available")
             V:AssertType(tocVersion, "number", "TOC version should be number")
             
-            -- Detect flavor based on TOC
-            local isClassic = tocVersion < 100000
-            local isRetail = tocVersion >= 100000
-            
-            V:Assert(isClassic or isRetail, "Should detect either Classic or Retail")
+            local flavor = BFL.ResolveClientFlavor(tocVersion, WOW_PROJECT_ID, WOW_PROJECT_MAINLINE, WOW_PROJECT_CLASSIC)
+            V:Assert(flavor.isClassic or flavor.isMainline, "Should detect either Classic or Mainline")
+            V:Assert(not (flavor.isClassic and flavor.isMainline), "Classic and Mainline must be mutually exclusive")
         end,
     })
     

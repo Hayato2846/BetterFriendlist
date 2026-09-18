@@ -1821,6 +1821,12 @@ end
 -- Show the friends frame
 -- tabIndex: Optional tab to show (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
 function ShowBetterFriendsFrame(tabIndex) -- Clear search box
+	if BFL.IsGameRuleActive and BFL:IsGameRuleActive("IngameFriendsListDisabled") then
+		if BetterFriendsFrame:IsShown() then
+			BetterFriendsFrame:Hide()
+		end
+		return false
+	end
 	ClearTopTabSearchState(BetterFriendsFrame, 1)
 
 	-- Use UI Panel system if enabled (for auto-repositioning)
@@ -1850,6 +1856,9 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 	-- Fix #81: Do NOT remember the last selected tab - always open Friends tab when
 	-- no explicit tab is requested (prevents Who/Quick Join tab stickiness)
 	local targetTab = tabIndex or 1
+	if BFL.IsFriendsTabAllowed and not BFL:IsFriendsTabAllowed(targetTab) then
+		targetTab = 1
+	end
 
 	-- Fix #43: Update Raid tab state (disable if in Story Mode)
 	local inStoryRaid = BetterFriendsFrame_UpdateRaidTabState()
@@ -1909,6 +1918,15 @@ end
 -- Toggle the friends frame
 -- tabIndex: Optional tab to show when opening (1=Friends, 2=Who, 3=Raid, 4=Quick Join)
 function ToggleBetterFriendsFrame(tabIndex) -- BFL:DebugPrint("[BFL] ToggleBetterFriendsFrame() called - Frame shown: " .. tostring(BetterFriendsFrame:IsShown()) .. ", tabIndex: " .. tostring(tabIndex))
+	if BFL.IsGameRuleActive and BFL:IsGameRuleActive("IngameFriendsListDisabled") then
+		if BetterFriendsFrame:IsShown() then
+			HideBetterFriendsFrame()
+		end
+		return false
+	end
+	if tabIndex and BFL.IsFriendsTabAllowed and not BFL:IsFriendsTabAllowed(tabIndex) then
+		tabIndex = 1
+	end
 	if BetterFriendsFrame:IsShown() then
 		-- If already shown and same tab (or no tab specified), close it
 		-- If different tab requested, switch to that tab instead of closing

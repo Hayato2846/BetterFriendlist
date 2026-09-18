@@ -2,7 +2,7 @@ param(
     [ValidateSet('CleanCopy', 'Link', 'Zip')]
     [string]$Mode = 'CleanCopy',
 
-    [ValidateSet('retail', 'ptr', 'xptr', 'beta', 'classic', 'classic_ptr', 'classic_era', 'anniversary', 'all')]
+    [ValidateSet('retail', 'ptr', 'xptr', 'beta', 'forever', 'classic_beta', 'classic', 'classic_ptr', 'classic_era', 'anniversary', 'all')]
     [string[]]$Client = @('retail'),
 
     [string]$Source = (Get-Location).Path,

@@ -13,23 +13,122 @@ BFL.VERSION = "Unknown"
 _G.BFL = BFL
 
 --------------------------------------------------------------------------
--- Version Detection (Retail & Classic)
+-- Client-family detection
 --------------------------------------------------------------------------
-local tocVersion = select(4, GetBuildInfo()) -- Returns TOC version (e.g., 110205)
+local tocVersion = select(4, GetBuildInfo()) -- Interface number (for example 120105 or 16001)
 BFL.TOCVersion = tocVersion
 
--- Classic Versions (check first - more specific)
-BFL.IsClassicEra = (tocVersion < 20000) -- Classic Era (1.x)
-BFL.IsTBCClassic = (tocVersion >= 20000 and tocVersion < 30000) -- TBC Classic (2.x) - legacy
-BFL.IsWrathClassic = (tocVersion >= 30000 and tocVersion < 40000) -- Wrath Classic (3.x) - legacy
-BFL.IsCataClassic = (tocVersion >= 40000 and tocVersion < 50000) -- Cata Classic (4.x) - legacy
-BFL.IsMoPClassic = (tocVersion >= 50000 and tocVersion < 60000) -- MoP Classic (5.x)
-BFL.IsClassic = BFL.IsClassicEra or BFL.IsMoPClassic or BFL.IsCataClassic or BFL.IsWrathClassic or BFL.IsTBCClassic
+function BFL.ResolveClientFlavor(interfaceVersion, projectID, mainlineProjectID, classicProjectID)
+	local interfaceNumber = tonumber(interfaceVersion) or 0
+	local hasProjectIdentity = projectID ~= nil and mainlineProjectID ~= nil
+	local isMainline = hasProjectIdentity and projectID == mainlineProjectID
+	if not hasProjectIdentity then
+		-- Compatibility fallback for test harnesses and unusually early loading only.
+		isMainline = interfaceNumber >= 100000
+			or (interfaceNumber >= 16000 and interfaceNumber < 17000) -- Forever 1.60.x
+	end
 
--- Retail Expansions
-BFL.IsRetail = (tocVersion >= 100000) -- Dragonflight+ (10.x+)
-BFL.IsTWW = (tocVersion >= 110200 and tocVersion < 120000) -- The War Within (11.x)
-BFL.IsMidnight = (tocVersion >= 120000) -- Midnight (12.x+)
+	local isExplicitClassic = classicProjectID ~= nil and projectID == classicProjectID
+	local isClassic = not isMainline and (isExplicitClassic or interfaceNumber < 100000)
+	return {
+		isMainline = isMainline,
+		isClassic = isClassic,
+		isClassicEra = isClassic and interfaceNumber < 20000,
+		isTBCClassic = isClassic and interfaceNumber >= 20000 and interfaceNumber < 30000,
+		isWrathClassic = isClassic and interfaceNumber >= 30000 and interfaceNumber < 40000,
+		isCataClassic = isClassic and interfaceNumber >= 40000 and interfaceNumber < 50000,
+		isMoPClassic = isClassic and interfaceNumber >= 50000 and interfaceNumber < 60000,
+		isTWW = isMainline and interfaceNumber >= 110200 and interfaceNumber < 120000,
+		isMidnight = isMainline and interfaceNumber >= 120000,
+	}
+end
+
+local clientFlavor = BFL.ResolveClientFlavor(
+	tocVersion,
+	WOW_PROJECT_ID,
+	WOW_PROJECT_MAINLINE,
+	WOW_PROJECT_CLASSIC
+)
+BFL.IsMainline = clientFlavor.isMainline
+BFL.IsClassic = clientFlavor.isClassic
+BFL.IsClassicEra = clientFlavor.isClassicEra
+BFL.IsTBCClassic = clientFlavor.isTBCClassic
+BFL.IsWrathClassic = clientFlavor.isWrathClassic
+BFL.IsCataClassic = clientFlavor.isCataClassic
+BFL.IsMoPClassic = clientFlavor.isMoPClassic
+BFL.IsTWW = clientFlavor.isTWW
+BFL.IsMidnight = clientFlavor.isMidnight
+-- Kept as a compatibility alias for modules and third-party integrations.
+BFL.IsRetail = BFL.IsMainline
+
+local function IsSecretValue(value)
+	if type(issecretvalue) ~= "function" then
+		return false
+	end
+	local ok, result = pcall(issecretvalue, value)
+	return ok and result == true
+end
+
+function BFL.ResolveGameRuleState(ruleValue, evaluator, secretEvaluator, fallback)
+	if ruleValue == nil or type(evaluator) ~= "function" then
+		return fallback == true
+	end
+	local ok, active = pcall(evaluator, ruleValue)
+	if not ok then
+		return fallback == true
+	end
+	local isSecret = secretEvaluator or IsSecretValue
+	if type(isSecret) == "function" then
+		local secretOK, secret = pcall(isSecret, active)
+		if not secretOK or secret == true then
+			return fallback == true
+		end
+	end
+	return active == true
+end
+
+function BFL:IsGameRuleActive(ruleOrName, fallback)
+	local ruleValue = ruleOrName
+	if type(ruleOrName) == "string" then
+		ruleValue = Enum and Enum.GameRule and Enum.GameRule[ruleOrName]
+	end
+	local evaluator = C_GameRules and C_GameRules.IsGameRuleActive
+	return self.ResolveGameRuleState(ruleValue, evaluator, IsSecretValue, fallback)
+end
+
+function BFL:GetGameTypeStandardState()
+	local evaluator = C_GameRules and C_GameRules.IsStandard
+	if type(evaluator) ~= "function" then
+		return nil
+	end
+	local ok, isStandard = pcall(evaluator)
+	if not ok or IsSecretValue(isStandard) then
+		return nil
+	end
+	return isStandard == true
+end
+
+function BFL.ResolveNativeWhoInterception(allowBlizzardFriendsFrame, isWhoAllowed)
+	return allowBlizzardFriendsFrame ~= true and isWhoAllowed == true
+end
+
+function BFL:ShouldInterceptNativeWhoPanel()
+	return self.ResolveNativeWhoInterception(self.AllowBlizzardFriendsFrame, self:IsFriendsTabAllowed(2))
+end
+
+function BFL:IsFriendsTabAllowed(tabIndex)
+	if self:IsGameRuleActive("IngameFriendsListDisabled") then
+		return false
+	end
+	if tabIndex == 2 then
+		return not self:IsGameRuleActive("IngameWhoListDisabled")
+	elseif tabIndex == 3 then
+		return not self:IsGameRuleActive("DisableRaidGroups")
+	elseif tabIndex == 4 then
+		return not self:IsGameRuleActive("DisableQuickJoin")
+	end
+	return true
+end
 
 local function HasGlobalFunction(name)
 	return type(_G[name]) == "function"
@@ -48,7 +147,7 @@ local function DetectUICapabilities()
 		ModernMenu = HasNamespaceFunction("MenuUtil", "CreateContextMenu")
 			or HasNamespaceFunction("Menu", "ModifyMenu"),
 		RecentAllies = HasNamespaceFunction("C_RecentAllies", "IsSystemEnabled"),
-		EditMode = BFL.IsRetail
+		EditMode = BFL.IsMainline
 			and (HasNamespaceFunction("C_EditMode", "GetLayouts") or type(EditModeManagerFrame) == "table"),
 		ModernDropdown = type(DropdownButtonMixin) == "table"
 			and type(DropdownButtonMixin.SetupMenu) == "function",
@@ -62,12 +161,48 @@ BFL.Capabilities = DetectUICapabilities()
 -- Public feature flags prefer real client capabilities where the API is self-contained.
 -- ScrollBox remains a validated-default flag because some BFL frames still need
 -- frame-level parent/anchor checks before Classic can safely use the modern path.
-BFL.HasModernScrollBox = BFL.IsRetail and BFL.Capabilities.ModernScrollBox -- ScrollBox API (Retail 10.0+)
+BFL.HasModernScrollBox = BFL.IsMainline and BFL.Capabilities.ModernScrollBox -- Mainline ScrollBox API
 BFL.HasModernMenu = BFL.Capabilities.ModernMenu -- MenuUtil, Menu.ModifyMenu
-BFL.HasRecentAllies = (BFL.IsTWW or BFL.IsMidnight) and BFL.HasModernScrollBox and BFL.Capabilities.RecentAllies -- C_RecentAllies (TWW 11.0.7+)
-BFL.HasEditMode = BFL.IsRetail and BFL.Capabilities.EditMode -- Edit Mode API (Retail 10.0+)
+BFL.HasRecentAllies = BFL.IsMainline and BFL.HasModernScrollBox and BFL.Capabilities.RecentAllies
+BFL.HasEditMode = BFL.IsMainline and BFL.Capabilities.EditMode
 BFL.HasModernDropdown = BFL.Capabilities.ModernDropdown -- WowStyle1DropdownTemplate
 BFL.HasModernColorPicker = true -- ColorPickerFrame:SetupColorPickerAndShow on supported Retail and Classic clients
+
+function BFL:GetCompatibilityDiagnostics()
+	local gameRules = {}
+	for _, ruleName in ipairs({
+		"IngameFriendsListDisabled",
+		"IngameWhoListDisabled",
+		"DisableQuickJoin",
+		"DisableRaidGroups",
+		"GuildsDisabled",
+	}) do
+		gameRules[ruleName] = self:IsGameRuleActive(ruleName)
+	end
+
+	local guildRosterData = self.GetModule and self:GetModule("GuildRosterData")
+	local preferredPlaySettingsAvailable = guildRosterData
+		and guildRosterData.HasPreferredPlaySettingsAPI
+		and guildRosterData:HasPreferredPlaySettingsAPI()
+		or false
+	return {
+		interfaceVersion = self.TOCVersion,
+		projectID = WOW_PROJECT_ID,
+		mainlineProjectID = WOW_PROJECT_MAINLINE,
+		isMainline = self.IsMainline == true,
+		isClassic = self.IsClassic == true,
+		isStandardGameType = self:GetGameTypeStandardState(),
+		interceptsNativeWhoPanel = self:ShouldInterceptNativeWhoPanel(),
+		gameRules = gameRules,
+		capabilities = {
+			modernScrollBox = self.HasModernScrollBox == true,
+			modernMenu = self.HasModernMenu == true,
+			recentAllies = self.HasRecentAllies == true,
+			editMode = self.HasEditMode == true,
+			guildPreferredPlaySettings = preferredPlaySettingsAvailable == true,
+		},
+	}
+end
 
 BFL.CanUseModernScrollBox = BFL.Capabilities.ModernScrollBox
 BFL.CanUseModernMenu = BFL.Capabilities.ModernMenu
@@ -339,7 +474,7 @@ local function DetectOptionalFeatures()
 	end
 
 	-- Print version info (only if debug enabled)
-	local versionName = BFL.IsMidnight and "Midnight (12.x)" or "The War Within (11.x)"
+	local versionName = BFL.IsMidnight and "Midnight (12.x)" or (BFL.IsMainline and "Mainline" or "Classic")
 	-- BFL:DebugPrint(string.format("|cff00ff00BetterFriendlist:|r TOC %d (%s)", tocVersion, versionName))
 
 	if BFL.UseClassID then
@@ -510,9 +645,10 @@ function BFL:HasGuildRosterBaseAPI()
 end
 
 function BFL:GetGuildTabCapability(returnCanShowRoster)
-	local clientSupported = self.IsRetail == true
+	local clientSupported = self.IsMainline == true
+	local gameRuleAllowed = not self:IsGameRuleActive("GuildsDisabled")
 	local hasBaseRosterAPI = false
-	if clientSupported then
+	if clientSupported and gameRuleAllowed then
 		local provider = self.GetModule and self:GetModule("GuildRosterData")
 		if provider and provider.HasBaseRosterAPI then
 			hasBaseRosterAPI = provider:HasBaseRosterAPI() == true
@@ -523,14 +659,18 @@ function BFL:GetGuildTabCapability(returnCanShowRoster)
 
 	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 	local settingEnabled = BetterFriendlistDB and BetterFriendlistDB.enableGuildTab == true
-	if returnCanShowRoster then return (clientSupported and betaEnabled and settingEnabled and hasBaseRosterAPI) == true end
+	if returnCanShowRoster then
+		return (clientSupported and gameRuleAllowed and betaEnabled and settingEnabled and hasBaseRosterAPI) == true
+	end
 	return {
 		betaEnabled = betaEnabled,
 		settingEnabled = settingEnabled,
 		clientSupported = clientSupported,
+		gameRuleAllowed = gameRuleAllowed,
+		disabledByGameRule = not gameRuleAllowed,
 		hasBaseRosterAPI = hasBaseRosterAPI,
-		canShowSetting = clientSupported and hasBaseRosterAPI,
-		canShowRoster = clientSupported and betaEnabled and settingEnabled and hasBaseRosterAPI,
+		canShowSetting = clientSupported and gameRuleAllowed and hasBaseRosterAPI,
+		canShowRoster = clientSupported and gameRuleAllowed and betaEnabled and settingEnabled and hasBaseRosterAPI,
 	}
 end
 
@@ -581,6 +721,32 @@ local function AddUniqueBindingKey(keys, key)
 	end
 end
 
+local function ResolveWritableBindingSet(bindingSet, bindingSetEnum, secretValuePredicate)
+	if secretValuePredicate then
+		local ok, isSecret = pcall(secretValuePredicate, bindingSet)
+		if not ok or isSecret then
+			return nil
+		end
+	end
+
+	local accountSet = bindingSetEnum and bindingSetEnum.Account or 1
+	local characterSet = bindingSetEnum and bindingSetEnum.Character or 2
+	if bindingSet == accountSet or bindingSet == characterSet then
+		return bindingSet
+	end
+	return nil
+end
+
+BFL.ResolveWritableBindingSet = ResolveWritableBindingSet
+
+local function GetWritableBindingSet()
+	local ok, bindingSet = pcall(GetCurrentBindingSet)
+	if not ok then
+		return nil
+	end
+	return ResolveWritableBindingSet(bindingSet, Enum and Enum.BindingSet, issecretvalue)
+end
+
 local function IsBetterFriendlistEnabledForCurrentCharacter()
 	if not (C_AddOns and C_AddOns.GetAddOnEnableState and Enum and Enum.AddOnEnableState) then
 		return true
@@ -611,6 +777,10 @@ function BFL:RestoreMigratedSocialKeybindsForAddonDisable()
 		return
 	end
 	if not (GetBindingKey and SetBinding and SaveBindings and GetCurrentBindingSet) then
+		return
+	end
+	local bindingSet = GetWritableBindingSet()
+	if not bindingSet then
 		return
 	end
 
@@ -649,7 +819,7 @@ function BFL:RestoreMigratedSocialKeybindsForAddonDisable()
 	end
 
 	if restored then
-		local ok = pcall(SaveBindings, GetCurrentBindingSet())
+		local ok = pcall(SaveBindings, bindingSet)
 		if not ok then
 			return
 		end
@@ -677,6 +847,10 @@ function BFL:MigrateSocialKeybindToNativeBinding()
 		return
 	end
 	if not (GetBindingKey and SetBinding and SaveBindings and GetCurrentBindingSet) then
+		return
+	end
+	local bindingSet = GetWritableBindingSet()
+	if not bindingSet then
 		return
 	end
 
@@ -720,7 +894,10 @@ function BFL:MigrateSocialKeybindToNativeBinding()
 	end
 
 	if #migratedKeys > 0 then
-		SaveBindings(GetCurrentBindingSet())
+		local ok = pcall(SaveBindings, bindingSet)
+		if not ok then
+			return
+		end
 	end
 
 	BetterFriendlistDB.socialKeybindMigrated = true
@@ -808,19 +985,29 @@ function BFL:InstallBetterFriendsFrameEscapeHandler()
 	self:AddUniqueUISpecialFrame("BetterFriendsFrame")
 end
 
-local function NormalizeFriendsFrameTab(tabIndex)
+function BFL.ResolveFriendsFrameRedirectTab(
+	tabIndex,
+	tabIndexIsBFL,
+	friendTabFriends,
+	friendTabWho,
+	friendTabRaid,
+	friendTabQuickJoin
+)
 	local tab = tonumber(tabIndex) or 1
+	if tabIndexIsBFL then
+		return tab >= 1 and tab <= 4 and tab or 1
+	end
 
-	if FRIEND_TAB_FRIENDS and tab == FRIEND_TAB_FRIENDS then
+	if friendTabFriends and tab == friendTabFriends then
 		return 1
 	end
-	if FRIEND_TAB_WHO and tab == FRIEND_TAB_WHO then
+	if friendTabWho and tab == friendTabWho then
 		return 2
 	end
-	if FRIEND_TAB_RAID and tab == FRIEND_TAB_RAID then
+	if friendTabRaid and tab == friendTabRaid then
 		return 3
 	end
-	if FRIEND_TAB_QUICK_JOIN and tab == FRIEND_TAB_QUICK_JOIN then
+	if friendTabQuickJoin and tab == friendTabQuickJoin then
 		return 4
 	end
 
@@ -829,6 +1016,17 @@ local function NormalizeFriendsFrameTab(tabIndex)
 	end
 
 	return 1
+end
+
+local function NormalizeFriendsFrameTab(tabIndex)
+	return BFL.ResolveFriendsFrameRedirectTab(
+		tabIndex,
+		false,
+		FRIEND_TAB_FRIENDS,
+		FRIEND_TAB_WHO,
+		FRIEND_TAB_RAID,
+		FRIEND_TAB_QUICK_JOIN
+	)
 end
 
 local function NormalizeFriendsSubPanel(panelIndex)
@@ -962,9 +1160,12 @@ function BFL:ShowBetterFriendsFrameIgnoreList()
 	end
 end
 
-function BFL:HandleFriendsFrameRedirect(action, tabIndex, topTabIndex)
+function BFL:HandleFriendsFrameRedirect(action, tabIndex, topTabIndex, tabIndexIsBFL)
 	if self.AllowBlizzardFriendsFrame then
 		return false
+	end
+	if self:IsGameRuleActive("IngameFriendsListDisabled") then
+		return true
 	end
 
 	if FriendsFrame and FriendsFrame:IsShown() then
@@ -991,8 +1192,14 @@ function BFL:HandleFriendsFrameRedirect(action, tabIndex, topTabIndex)
 		return true
 	end
 
-	local targetTab = NormalizeFriendsFrameTab(tabIndex)
+	local targetTab = tabIndexIsBFL
+		and self.ResolveFriendsFrameRedirectTab(tabIndex, true)
+		or NormalizeFriendsFrameTab(tabIndex)
 	local targetTopTab = topTabIndex and NormalizeFriendsSubPanel(topTabIndex) or nil
+	if not self:IsFriendsTabAllowed(targetTab) then
+		targetTab = 1
+		targetTopTab = nil
+	end
 
 	if action == "toggle" and self:IsBetterFriendsRedirectTargetShown(targetTab, targetTopTab) then
 		self:HideBetterFriendsFrameForRedirect()
@@ -1082,6 +1289,58 @@ function BFL:QueueFriendsFrameRedirect(action, tabIndex, topTabIndex)
 	end)
 end
 
+function BFL:InstallWhoSlashRedirect()
+	if self.whoSlashRedirectInstalled then
+		return true
+	end
+	if not self.IsMainline then
+		return false
+	end
+
+	local commandKey = SLASH_COMMAND and SLASH_COMMAND.WHO or "WHO"
+	local original = SlashCmdList and SlashCmdList[commandKey]
+	if type(original) ~= "function" then
+		return false
+	end
+
+	self.OriginalWhoSlashCommand = self.OriginalWhoSlashCommand or original
+	SlashCmdList[commandKey] = function(message, ...)
+		local originalHandler = BFL.OriginalWhoSlashCommand
+		if BFL.AllowBlizzardFriendsFrame then
+			return originalHandler(message, ...)
+		end
+		if Kiosk and type(Kiosk.IsEnabled) == "function" and Kiosk.IsEnabled() then
+			return originalHandler(message, ...)
+		end
+
+		local whoModule = BFL:GetModule("WhoFrame")
+		if not (whoModule and whoModule.IsAvailable and whoModule:IsAvailable()) then
+			return originalHandler(message, ...)
+		end
+
+		BFL:HandleFriendsFrameRedirect("show", 2, nil, true)
+
+		local query = message or ""
+		if query == "" and type(_G.WhoFrame_GetDefaultWhoCommand) == "function" then
+			local ok, defaultQuery = pcall(_G.WhoFrame_GetDefaultWhoCommand)
+			if ok and type(defaultQuery) == "string" then
+				query = defaultQuery
+			end
+		end
+
+		local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
+		if editBox and type(editBox.SetText) == "function" then
+			editBox:SetText(query)
+		end
+
+		local origin = Enum and Enum.SocialWhoOrigin and Enum.SocialWhoOrigin.Chat
+		return whoModule:SendWhoRequest(query, origin)
+	end
+
+	self.whoSlashRedirectInstalled = true
+	return true
+end
+
 function BFL:InstallFriendsFrameRedirects()
 	if self.friendsFrameRedirectsInstalled then
 		return
@@ -1133,9 +1392,14 @@ function BFL:InstallFriendsFrameRedirects()
 	installRedirect("ShowFriends", function()
 		return directShow(1)
 	end)
-	installRedirect("ShowWhoPanel", function()
-		return directShow(2)
-	end)
+	-- BFL owns the Who entry point while it replaces the Friends frame, including
+	-- Forever where Blizzard otherwise routes ShowWhoPanel to LFGWhoListFrame.
+	if self:ShouldInterceptNativeWhoPanel() then
+		installRedirect("ShowWhoPanel", function()
+			return BFL:HandleFriendsFrameRedirect("show", 2, nil, true)
+		end)
+	end
+	self:InstallWhoSlashRedirect()
 	installRedirect("ToggleFriendsSubPanel", function(panelIndex)
 		return directToggle(1, NormalizeFriendsSubPanel(panelIndex))
 	end)
@@ -1597,7 +1861,7 @@ end
 -- Check if a value is a "secret" (cannot be inspected, compared, or iterated by tainted code)
 -- Returns false on Classic and pre-12.0 clients where issecretvalue does not exist
 function BFL:IsSecret(value)
-	return issecretvalue ~= nil and issecretvalue(value)
+	return IsSecretValue(value)
 end
 
 function BFL:IsPendingRaidRosterName(name)
@@ -2257,13 +2521,16 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			-- Version-aware success message
-			local versionSuffix = BFL.IsMidnight and " (Midnight)"
+			local standardGameType = BFL:GetGameTypeStandardState()
+			local versionSuffix = (BFL.IsMainline and standardGameType == false and " (WoW Forever)")
+				or (BFL.IsMidnight and " (Midnight)")
 				or (BFL.IsClassicEra and " (Classic Era)")
 				or (BFL.IsMoPClassic and " (MoP Classic)")
 				or (BFL.IsCataClassic and " (Cata Classic)")
 				or (BFL.IsWrathClassic and " (Wrath Classic)")
 				or (BFL.IsTBCClassic and " (TBC Classic)")
-				or " (TWW)"
+				or (BFL.IsMainline and " (Mainline)")
+				or ""
 
 			-- Check if welcome message is enabled (default: true)
 			local showWelcome = true
@@ -2290,7 +2557,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
 		EnsureSeparateClassicGuildWindow()
 		BFL:InstallSocialKeybindOverride()
-		BFL:MigrateSocialKeybindToNativeBinding()
+		if BFL.bindingsLoaded then
+			BFL:MigrateSocialKeybindToNativeBinding()
+		end
 		BFL:InstallFriendsFrameRedirects()
 		BFL:InstallBetterFriendsFrameEscapeHandler()
 
@@ -2338,6 +2607,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 	elseif event == "UPDATE_BINDINGS" then
 		BFL:InstallSocialKeybindOverride()
 	elseif event == "BINDINGS_LOADED" then
+		BFL.bindingsLoaded = true
 		BFL:MigrateSocialKeybindToNativeBinding()
 	elseif event == "ADDONS_UNLOADING" then
 		BFL:RestoreMigratedSocialKeybindsForAddonDisable()

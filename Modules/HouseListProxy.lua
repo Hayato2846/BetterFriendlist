@@ -28,9 +28,31 @@ end
 -- Initialization
 -- ========================================
 
+function HouseListProxy:IsSupported(addOnsAPI, createFrameAPI)
+	if not BFL.IsMainline then
+		return false
+	end
+	addOnsAPI = addOnsAPI or C_AddOns
+	createFrameAPI = createFrameAPI or CreateFrame
+	if type(addOnsAPI) ~= "table" or type(createFrameAPI) ~= "function" then
+		return false
+	end
+
+	if type(addOnsAPI.DoesAddOnExist) == "function" then
+		local ok, exists = pcall(addOnsAPI.DoesAddOnExist, TARGET_ADDON)
+		return ok and not BFL:IsSecret(exists) and exists == true
+	end
+	if type(addOnsAPI.GetAddOnInfo) == "function" then
+		local ok, info = pcall(addOnsAPI.GetAddOnInfo, TARGET_ADDON)
+		return ok and not BFL:IsSecret(info) and info ~= nil
+	end
+	return false
+end
+
 function HouseListProxy:Initialize()
-	-- Only needed on Retail 12.0.0+ (Midnight) where C_Housing is secure
-	if not BFL.IsRetail then
+	-- The proxy follows the concrete Blizzard_HouseList capability, not a
+	-- version or expansion label. Forever and Standard can evolve independently.
+	if not self:IsSupported() then
 		return
 	end
 
@@ -64,7 +86,12 @@ function HouseListProxy:Initialize()
 	end)
 
 	-- Check if already loaded
-	if C_AddOns and C_AddOns.IsAddOnLoaded(TARGET_ADDON) then
+	local loaded = false
+	if C_AddOns and type(C_AddOns.IsAddOnLoaded) == "function" then
+		local ok, result = pcall(C_AddOns.IsAddOnLoaded, TARGET_ADDON)
+		loaded = ok and not BFL:IsSecret(result) and result == true
+	end
+	if loaded then
 		self:SetupScrollBoxCallback()
 	end
 end

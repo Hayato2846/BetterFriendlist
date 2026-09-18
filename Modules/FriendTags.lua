@@ -821,13 +821,55 @@ local function GetEnumValue(def)
 	return def.enumFallback
 end
 
+function FriendTags:IsBlizzardTagSupported(tagOrDefinition, battleNetAPI)
+	local def = type(tagOrDefinition) == "table" and tagOrDefinition or BLIZZARD_TAG_BY_ID[tagOrDefinition]
+	if not def then
+		return false
+	end
+	battleNetAPI = battleNetAPI or C_BattleNet
+	local evaluator = battleNetAPI and battleNetAPI.IsFriendTagSupportedForCurrentGameType
+	if type(evaluator) ~= "function" then
+		return true
+	end
+	local ok, supported = pcall(evaluator, GetEnumValue(def))
+	return ok and not IsSecret(supported) and supported == true
+end
+
+function FriendTags:BuildSupportedBlizzardTagPayload(tagIds, battleNetAPI)
+	local desired = CopySet(tagIds)
+	local enumTags = {}
+	for tagId in pairs(desired) do
+		if not self:IsBlizzardTagSupported(tagId, battleNetAPI) then
+			desired[tagId] = nil
+		end
+	end
+	for _, def in ipairs(BLIZZARD_TAGS) do
+		if desired[def.id] and self:IsBlizzardTagSupported(def, battleNetAPI) then
+			enumTags[#enumTags + 1] = GetEnumValue(def)
+		end
+	end
+	return desired, enumTags
+end
+
+local function FilterSupportedBlizzardTagSet(set)
+	local filtered = {}
+	for tagId, enabled in pairs(type(set) == "table" and set or {}) do
+		if enabled and FriendTags:IsBlizzardTagSupported(tagId) then
+			filtered[tagId] = true
+		end
+	end
+	return filtered
+end
+
 local function GetEnumToTagIdMap()
 	if FriendTags.enumToTagIdMap then
 		return FriendTags.enumToTagIdMap
 	end
 	local map = {}
 	for _, def in ipairs(BLIZZARD_TAGS) do
-		map[GetEnumValue(def)] = def.id
+		if FriendTags:IsBlizzardTagSupported(def) then
+			map[GetEnumValue(def)] = def.id
+		end
 	end
 	FriendTags.enumToTagIdMap = map
 	return map
@@ -858,7 +900,10 @@ local function FindConflictingTagName(self, name, ignoredTagId)
 	end
 
 	for _, def in ipairs(BLIZZARD_TAGS) do
-		if def.id ~= ignoredTagId and (Matches(GetLocalizedTagName(def)) or Matches(def.fallback)) then
+		if FriendTags:IsBlizzardTagSupported(def)
+			and def.id ~= ignoredTagId
+			and (Matches(GetLocalizedTagName(def)) or Matches(def.fallback))
+		then
 			return def.id, SOURCE_BLIZZARD
 		end
 	end
@@ -1565,28 +1610,30 @@ function FriendTags:GetBlizzardTagDefinitions()
 
 	local definitions = {}
 	for _, def in ipairs(BLIZZARD_TAGS) do
-		local icon = GetIconInfo(def.defaultIcon)
-		definitions[#definitions + 1] = {
-			id = def.id,
-			source = SOURCE_BLIZZARD,
-			enumKey = def.enumKey,
-			enumFallback = def.enumFallback,
-			labelKey = def.labelKey,
-			fallback = def.fallback,
-			name = GetLocalizedTagName(def),
-			group = def.group,
-			color = CopyColor(def.color),
-			defaultIcon = def.defaultIcon,
-			iconType = icon.iconType,
-			iconValue = icon.iconValue,
-			icon = icon.icon,
-			atlas = icon.atlas,
-			fallbackAtlas = icon.fallbackAtlas,
-			texture = icon.texture,
-			texCoord = CopyTexCoord(icon.texCoord),
-			iconZoom = NormalizeIconZoom(icon.iconZoom),
-			order = tonumber(def.order) or 0,
-		}
+		if self:IsBlizzardTagSupported(def) then
+			local icon = GetIconInfo(def.defaultIcon)
+			definitions[#definitions + 1] = {
+				id = def.id,
+				source = SOURCE_BLIZZARD,
+				enumKey = def.enumKey,
+				enumFallback = def.enumFallback,
+				labelKey = def.labelKey,
+				fallback = def.fallback,
+				name = GetLocalizedTagName(def),
+				group = def.group,
+				color = CopyColor(def.color),
+				defaultIcon = def.defaultIcon,
+				iconType = icon.iconType,
+				iconValue = icon.iconValue,
+				icon = icon.icon,
+				atlas = icon.atlas,
+				fallbackAtlas = icon.fallbackAtlas,
+				texture = icon.texture,
+				texCoord = CopyTexCoord(icon.texCoord),
+				iconZoom = NormalizeIconZoom(icon.iconZoom),
+				order = tonumber(def.order) or 0,
+			}
+		end
 	end
 	cache.blizzardTagDefinitions = definitions
 	return definitions
@@ -2069,7 +2116,7 @@ local function GetStoredBlizzardTagIdSet(self, friend, explicitUID)
 end
 
 function FriendTags:GetStoredBlizzardTagIdSet(friend, explicitUID)
-	return CopySet(GetStoredBlizzardTagIdSet(self, friend, explicitUID))
+	return FilterSupportedBlizzardTagSet(GetStoredBlizzardTagIdSet(self, friend, explicitUID))
 end
 
 function FriendTags:TryHandoffLocalBlizzardTags(friend, nativeSet)
@@ -2092,7 +2139,7 @@ function FriendTags:TryHandoffLocalBlizzardTags(friend, nativeSet)
 
 	local merged = CopySet(nativeSet)
 	for tagId, enabled in pairs(storedSet) do
-		if enabled and BLIZZARD_TAG_BY_ID[tagId] then
+		if enabled and self:IsBlizzardTagSupported(tagId) then
 			merged[tagId] = true
 		end
 	end
@@ -2131,14 +2178,14 @@ function FriendTags:GetBlizzardTagIdSetForFriend(friend, explicitUID, runtimeCac
 		else
 			local storedSet = GetStoredBlizzardTagIdSet(self, friend, explicitUID)
 			for tagId, enabled in pairs(storedSet) do
-				if enabled and BLIZZARD_TAG_BY_ID[tagId] then
+				if enabled and self:IsBlizzardTagSupported(tagId) then
 					nativeSet[tagId] = true
 				end
 			end
 			result = nativeSet
 		end
 	else
-		result = CopySet(GetStoredBlizzardTagIdSet(self, friend, explicitUID))
+		result = FilterSupportedBlizzardTagSet(GetStoredBlizzardTagIdSet(self, friend, explicitUID))
 	end
 	cache.blizzardTagSets[cacheKey] = result
 	return result
@@ -2154,23 +2201,12 @@ function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 		return false, "missingUID"
 	end
 
-	local desired = CopySet(tagIds)
-	for tagId in pairs(desired) do
-		if not BLIZZARD_TAG_BY_ID[tagId] then
-			desired[tagId] = nil
-		end
-	end
+	local desired, enumTags = self:BuildSupportedBlizzardTagPayload(tagIds)
 
 	local db = self:NormalizeDB()
 	if self:AreBlizzardTagsEnabled() and friend.bnetAccountID then
 		if options.userInitiated ~= true then
 			return false, "notUserInitiated"
-		end
-		local enumTags = {}
-		for _, def in ipairs(BLIZZARD_TAGS) do
-			if desired[def.id] then
-				enumTags[#enumTags + 1] = GetEnumValue(def)
-			end
 		end
 		local ok = pcall(C_BattleNet.SetFriendTags, friend.bnetAccountID, enumTags)
 		if ok then
@@ -2225,7 +2261,7 @@ function FriendTags:HandoffLocalBlizzardTagsForFriend(friend, refreshCallback, e
 
 	local merged = self:GetNativeBlizzardTagIdSet(friend)
 	for tagId, enabled in pairs(info.tags or {}) do
-		if enabled and BLIZZARD_TAG_BY_ID[tagId] then
+		if enabled and self:IsBlizzardTagSupported(tagId) then
 			merged[tagId] = true
 		end
 	end

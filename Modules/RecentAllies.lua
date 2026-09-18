@@ -201,11 +201,65 @@ local function GetFilterOptionLabel(option)
 		away = CHAT_FLAG_AFK,
 		busy = CHAT_FLAG_DND,
 	}
-	return _G[option.global] or BFL.L[option.fallback] or legacyLabels[option.id] or option.id
+	return option.label or _G[option.global] or BFL.L[option.fallback] or legacyLabels[option.id] or option.id
 end
 
 local function CanUseNativeRecentAlliesSearch()
-	return BFL.IsRetail and C_RecentAllies and type(C_RecentAllies.SearchRecentAllies) == "function"
+	return BFL.IsMainline and C_RecentAllies and type(C_RecentAllies.SearchRecentAllies) == "function"
+end
+
+function RecentAllies.ResolveSearchSchema(enumRoot, recentAlliesAPI)
+	enumRoot = type(enumRoot) == "table" and enumRoot or {}
+	recentAlliesAPI = type(recentAlliesAPI) == "table" and recentAlliesAPI or {}
+	if type(enumRoot.RecentAlliesInteractionCategoryFilter) == "table" then
+		return {
+			kind = "interactionCategoryFilters",
+			field = "interactionCategoryFilters",
+			enum = enumRoot.RecentAlliesInteractionCategoryFilter,
+			isSupported = recentAlliesAPI.IsInteractionCategoryFilterSupportedForCurrentGameType,
+		}
+	end
+	if type(enumRoot.RecentAlliesFriendTag) == "table" then
+		return {
+			kind = "interests",
+			field = "interests",
+			enum = enumRoot.RecentAlliesFriendTag,
+		}
+	end
+	return nil
+end
+
+function RecentAllies.IsSearchFilterValueSupported(schema, enumValue)
+	if not schema or enumValue == nil then
+		return false
+	end
+	if type(schema.isSupported) ~= "function" then
+		return true
+	end
+	local ok, supported = pcall(schema.isSupported, enumValue)
+	return ok and not BFL:IsSecret(supported) and supported == true
+end
+
+function RecentAllies:GetSearchSchema()
+	return self.ResolveSearchSchema(Enum, C_RecentAllies)
+end
+
+function RecentAllies:IsSystemEnabled()
+	local evaluator = C_RecentAllies and (C_RecentAllies.IsSystemEnabled or C_RecentAllies.IsRecentAlliesEnabled)
+	if type(evaluator) ~= "function" then
+		return false
+	end
+	local ok, enabled = pcall(evaluator)
+	return ok and not BFL:IsSecret(enabled) and enabled == true
+end
+
+function RecentAllies:IsDataReady()
+	local evaluator = C_RecentAllies and C_RecentAllies.IsRecentAllyDataReady
+	if type(evaluator) ~= "function" then
+		return false
+	end
+	local ok, ready = pcall(evaluator)
+	return ok and not BFL:IsSecret(ready) and ready == true
 end
 
 -- ========================================
@@ -214,7 +268,7 @@ end
 
 -- Initialize (called from ADDON_LOADED)
 function RecentAllies:Initialize()
-	-- Recent Allies is TWW-only (11.0.7+)
+	-- Capability-gated Mainline feature (Midnight Standard and Forever).
 	if not BFL.HasRecentAllies then
 		-- BFL:DebugPrint("|cffffcc00BFL RecentAllies:|r Not available in Classic - module disabled")
 		return
@@ -260,7 +314,7 @@ end
 
 -- Initialize Recent Allies Frame (RecentAlliesListMixin:OnLoad)
 function RecentAllies:OnLoad(frame)
-	-- Recent Allies is TWW-only (11.0.7+)
+	-- Capability-gated Mainline feature (Midnight Standard and Forever).
 	if not BFL.HasRecentAllies then
 		-- Show "Not Available" message for Classic users
 		local notAvailableText = frame:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
@@ -397,7 +451,7 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 	end
 
 	-- Check if the Recent Allies system is enabled at all
-	if not BFL.HasRecentAllies or not C_RecentAllies or not C_RecentAllies.IsSystemEnabled() then
+	if not BFL.HasRecentAllies or not self:IsSystemEnabled() then
 		self:SetLoadingSpinnerShown(frame, false)
 		-- Show a message that the system is not available
 		if not frame.UnavailableText then
@@ -415,7 +469,7 @@ function RecentAllies:Refresh(frame, retainScrollPosition)
 	end
 
 	-- Check if data is ready
-	local dataReady = C_RecentAllies.IsRecentAllyDataReady()
+	local dataReady = self:IsDataReady()
 	self:SetLoadingSpinnerShown(frame, not dataReady)
 
 	if not dataReady then
@@ -453,15 +507,33 @@ function RecentAllies:GetFilterDropdownText()
 	return count > 0 and string.format("%s (%d)", label, count) or label
 end
 
-function RecentAllies:GetAvailableInterestOptions()
+function RecentAllies:GetAvailableInterestOptions(schema)
 	local available = {}
-	local recentTags = Enum and Enum.RecentAlliesFriendTag
-	if not (CanUseNativeRecentAlliesSearch() and recentTags) then
+	local explicitSchema = schema ~= nil
+	schema = schema or self:GetSearchSchema()
+	if not (schema and (explicitSchema or CanUseNativeRecentAlliesSearch())) then
 		return available
 	end
 	for _, option in ipairs(INTEREST_FILTER_OPTIONS) do
-		if recentTags[option.enum] ~= nil then
-			available[#available + 1] = option
+		local enumValue = schema.enum[option.enum]
+		if self.IsSearchFilterValueSupported(schema, enumValue) then
+			local entry = {
+				id = option.id,
+				enum = option.enum,
+				enumValue = enumValue,
+				global = option.global,
+				fallback = option.fallback,
+			}
+			if schema.kind == "interactionCategoryFilters"
+				and RecentAlliesUtil
+				and type(RecentAlliesUtil.GetLabelForInteractionCategoryFilter) == "function"
+			then
+				local ok, label = pcall(RecentAlliesUtil.GetLabelForInteractionCategoryFilter, enumValue)
+				if ok and not BFL:IsSecret(label) and type(label) == "string" then
+					entry.label = label
+				end
+			end
+			available[#available + 1] = entry
 		end
 	end
 	return available
@@ -536,26 +608,25 @@ function RecentAllies:InitializeFilterDropdown(dropdown)
 	return true
 end
 
-function RecentAllies:BuildSearchInfo()
+function RecentAllies:BuildSearchInfo(schema)
 	local searchInfo = {
 		searchText = self.searchText or "",
 		isOnline = false,
 		isAFK = false,
 		isDND = false,
 		isOffline = false,
-		interests = {},
 	}
 	for _, option in ipairs(STATUS_FILTER_OPTIONS) do
 		if self.selectedFilters[option.id] then
 			searchInfo[option.field] = true
 		end
 	end
-	local recentTags = Enum and Enum.RecentAlliesFriendTag
-	if recentTags then
-		for _, option in ipairs(INTEREST_FILTER_OPTIONS) do
-			local enumValue = recentTags[option.enum]
-			if enumValue ~= nil and self.selectedFilters[option.id] then
-				searchInfo.interests[#searchInfo.interests + 1] = enumValue
+	schema = schema or self:GetSearchSchema()
+	if schema then
+		searchInfo[schema.field] = {}
+		for _, option in ipairs(self:GetAvailableInterestOptions(schema)) do
+			if self.selectedFilters[option.id] then
+				searchInfo[schema.field][#searchInfo[schema.field] + 1] = option.enumValue
 			end
 		end
 	end
@@ -590,11 +661,14 @@ function RecentAllies:GetFilteredRecentAllies()
 
 	if CanUseNativeRecentAlliesSearch() and (self:HasActiveFilters() or self.searchText ~= "") then
 		local ok, result = pcall(C_RecentAllies.SearchRecentAllies, self:BuildSearchInfo())
-		if ok and type(result) == "table" then
+		if ok and not BFL:IsSecret(result) and type(result) == "table" then
 			return result, true
 		end
 	end
-	return C_RecentAllies.GetRecentAllies(), false
+	if BFL.Compat and BFL.Compat.GetRecentAllies then
+		return BFL.Compat.GetRecentAllies(), false
+	end
+	return {}, false
 end
 
 function RecentAllies:PartitionByPinAndLegacyState(recentAllies)
