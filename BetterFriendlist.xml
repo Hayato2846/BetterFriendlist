@@ -1088,6 +1088,26 @@
 				</FontString>
 			</Layer>
 			<Layer level="OVERLAY">
+				<!-- 12.1.5 secret-safe PvP / prestige indicator. The secure Blizzard
+				     updater controls which of these overlapping textures is visible. -->
+				<Texture parentKey="PvPIcon" hidden="true">
+					<Size x="14" y="14" />
+					<Anchors>
+						<Anchor point="CENTER" relativeKey="$parent.ClassIcon" />
+					</Anchors>
+				</Texture>
+				<Texture parentKey="PrestigePortrait" hidden="true">
+					<Size x="14" y="14" />
+					<Anchors>
+						<Anchor point="CENTER" relativeKey="$parent.ClassIcon" />
+					</Anchors>
+				</Texture>
+				<Texture parentKey="PrestigeBadge" hidden="true">
+					<Size x="14" y="14" />
+					<Anchors>
+						<Anchor point="CENTER" relativeKey="$parent.ClassIcon" />
+					</Anchors>
+				</Texture>
 				<!-- Role Icon - Tank/Healer/DPS (right side) -->
 				<Texture parentKey="RoleIcon" hidden="true">
 					<Size x="16" y="16" />
@@ -1924,7 +1944,7 @@
 								<Scripts>
 									<OnEnter>
 										BFL_Tooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT", 0, 40)
-										GameTooltip_AddNormalLine(BFL_Tooltip, RAF_NEXT_REWARD_HELP_TEXT or "Information about RAF rewards")
+										GameTooltip_AddNormalLine(BFL_Tooltip, (BFL.L and BFL.L.RAF_NEXT_REWARD_HELP) or "Information about RAF rewards")
 										BFL_Tooltip:Show()
 									</OnEnter>
 									<OnLeave>
@@ -2166,16 +2186,10 @@
 			<!-- Who Frame (replicate Blizzard's Who functionality) -->
 			<Frame parentKey="WhoFrame" hidden="true" setAllPoints="true">
 				<Frames>
-					<!-- Search EditBox with WhoFrameEditBoxMixin -->
+					<!-- Search EditBox with BFL-owned mixin -->
 					<!-- Note: Do NOT set frameStrata here - it would appear above EditMode overlay -->
 					<EditBox parentKey="EditBox" inherits="SearchBoxTemplate" autoFocus="false"
-						historyLines="32" bytes="256" mixin="WhoFrameEditBoxMixin">
-						<KeyValues>
-							<KeyValue key="instructionText" value="WHO_LIST_SEARCH_INSTRUCTIONS"
-								type="global" />
-							<KeyValue key="instructionsFontObject"
-								value="BetterFriendlistFontDisableSmall" type="global" />
-						</KeyValues>
+						historyLines="32" bytes="256" mixin="BetterFriendlistWhoFrameEditBoxMixin">
 						<Size y="20" />
 						<Anchors>
 							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ListInset" x="35" y="15" />
@@ -2272,7 +2286,7 @@
 					</Button>
 					<!-- Variable Column Dropdown (Zone/Guild/Race) -->
 					<DropdownButton parentKey="ColumnDropdown" inherits="WowStyle1DropdownTemplate"
-						mixin="WhoFrameColumnDropdownMixin">
+						mixin="BetterFriendlistWhoFrameColumnDropdownMixin">
 						<NormalFont style="BetterFriendlistFontHighlightSmall" />
 						<HighlightFont style="BetterFriendlistFontHighlightSmall" />
 						<DisabledFont style="BetterFriendlistFontDisableSmall" />
@@ -2468,17 +2482,6 @@
 						-- CRITICAL: Set Who data routing FIRST before any other operations
 						C_FriendList.SetWhoToUi(true)
 
-						-- CRITICAL: Unregister Blizzard's FriendsFrame from WHO_LIST_UPDATE
-						-- This prevents the FriendsFrame from auto-opening when WHO results arrive
-						if FriendsFrame then
-						FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
-
-						-- Hide Blizzard's Who Frame if it exists
-						if FriendsFrame.WhoFrame then
-						FriendsFrame.WhoFrame:Hide()
-						end
-						end
-
 						-- Register for font scale updates
 						EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated",
 						function()
@@ -2495,11 +2498,6 @@
 					<OnHide>
 						-- Unregister callbacks
 						EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", self)
-						-- CRITICAL: Re-register Blizzard's FriendsFrame to WHO_LIST_UPDATE
-						-- This restores normal Blizzard behavior when our frame is closed
-						if FriendsFrame then
-						FriendsFrame:RegisterEvent("WHO_LIST_UPDATE")
-						end
 
 						-- Reset Who data routing (allows Blizzard's frame to work normally)
 						C_FriendList.SetWhoToUi(false)

@@ -297,12 +297,14 @@ local function GetPixelAlignedBrokerSeparatorHeight(region)
 end
 
 function BU.ApplyBrokerSeparatorColor(texture)
-	if not texture or not texture.SetColorTexture then
+	if not texture or not BFL.TrySetColorTexture then
 		return nil
 	end
 
 	local color = BU.GetBrokerSeparatorColor()
-	texture:SetColorTexture(color.r, color.g, color.b, color.a or 1)
+	if not BFL.TrySetColorTexture(texture, color.r, color.g, color.b, color.a or 1) then
+		return nil
+	end
 	return color
 end
 
@@ -406,13 +408,11 @@ local function ApplyBackdropColor(object, color)
 		local ok = pcall(object.SetBackdropColor, object, color.r, color.g, color.b, color.a or 1)
 		applied = ok or applied
 	end
-	if object.bg and object.bg.SetColorTexture then
-		local ok = pcall(object.bg.SetColorTexture, object.bg, color.r, color.g, color.b, color.a or 1)
-		applied = ok or applied
+	if object.bg and BFL.TrySetColorTexture then
+		applied = BFL.TrySetColorTexture(object.bg, color.r, color.g, color.b, color.a or 1) or applied
 	end
-	if object.SetColorTexture then
-		local ok = pcall(object.SetColorTexture, object, color.r, color.g, color.b, color.a or 1)
-		applied = ok or applied
+	if BFL.TrySetColorTexture then
+		applied = BFL.TrySetColorTexture(object, color.r, color.g, color.b, color.a or 1) or applied
 	end
 	return applied
 end

@@ -464,7 +464,9 @@ function IgnoreList:Unignore()
 		C_FriendList.DelIgnoreByIndex(C_FriendList.GetSelectedIgnore())
 	elseif selectedSquelchType == SQUELCH_TYPE_BLOCK_INVITE then
 		local blockID = BNGetBlockedInfo(BNGetSelectedBlock())
-		BNSetBlocked(blockID, false)
+		if BFL.SetBNetBlocked then
+			BFL.SetBNetBlocked(blockID, false)
+		end
 	end
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 end

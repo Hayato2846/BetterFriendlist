@@ -1760,8 +1760,8 @@ function ElvUISkin:SkinSettings(E, S)
 	for i = 1, 10 do
 		local tab = _G["BetterFriendlistSettingsFrameTab" .. i]
 		if tab then
-			-- Fixed: Removed IsShown() check to ensure all tabs (including Beta/Global Sync)
-			-- are skinned even if hidden during initial load.
+			-- Keep hidden or conditionally available tabs skinned before they are shown,
+			-- including tabs hidden during initial load.
 			-- Tabs should exist if XML defines them.
 			S:HandleTab(tab)
 			tab:SetHeight(28) -- Fixed height
@@ -2090,7 +2090,7 @@ function ElvUISkin:SkinSettings(E, S)
 
 					-- Skin the background if possible, or strip it
 					if holder.bg then
-						holder.bg:SetColorTexture(0, 0, 0, 0) -- Hide default bg
+						BFL.TrySetColorTexture(holder.bg, 0, 0, 0, 0) -- Hide default bg when permitted
 						holder:CreateBackdrop("Transparent")
 					end
 				end
@@ -3078,10 +3078,11 @@ end
 
 local function SetTextureColor(texture, r, g, b, a)
 	if texture and texture.SetColorTexture then
-		texture:SetColorTexture(r, g, b, a)
+		return BFL.TrySetColorTexture(texture, r, g, b, a)
 	elseif texture and texture.SetVertexColor then
-		texture:SetVertexColor(r, g, b, a)
+		return pcall(texture.SetVertexColor, texture, r, g, b, a)
 	end
+	return false
 end
 
 local function EnsureTransparentBackdrop(frame, inset)

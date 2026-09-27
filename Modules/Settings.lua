@@ -898,7 +898,7 @@ local TAB_DEFINITIONS = {
 		id = 14,
 		name = L.CONTACT_MEMORY_TITLE or "Private Notes",
 		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\file-text.blp",
-		beta = true,
+		beta = false,
 	},
 	{
 		id = 12,
@@ -5358,7 +5358,6 @@ function Settings:RefreshContactMemoryTab()
 	local allFrames = {}
 	local contactMemory = BFL:GetModule("ContactMemory")
 	local contactMemoryDB = BetterFriendlistDB and BetterFriendlistDB.contactMemory
-	local betaEnabled = BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
 	local contactMemoryEnabled = false
 	if contactMemory and contactMemory.GetEnabledSetting then
 		contactMemoryEnabled = contactMemory:GetEnabledSetting() == true
@@ -5384,18 +5383,9 @@ function Settings:RefreshContactMemoryTab()
 		)
 	)
 
-	local contactMemoryTooltipDesc = L.CONTACT_MEMORY_SETTINGS_ENABLE_DESC
-		or "Adds local private notes for friends and ignored players."
-	if not betaEnabled then
-		contactMemoryTooltipDesc = contactMemoryTooltipDesc
-			.. "\n\n"
-			.. (L.CONTACT_MEMORY_DISABLED_BETA or "Enable Beta Features to use Private Notes.")
-	end
-
 	local contactMemoryToggle = Components:CreateCheckbox(tab, {
-		label = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
+		label = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes",
 		initialValue = contactMemoryEnabled,
-		disabled = not betaEnabled,
 		callback = function(checked)
 			if contactMemory and contactMemory.SetEnabled then
 				contactMemory:SetEnabled(checked == true)
@@ -5408,12 +5398,12 @@ function Settings:RefreshContactMemoryTab()
 			end
 			RefreshContactMemorySettings()
 		end,
-		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes (Beta)",
-		tooltipDesc = contactMemoryTooltipDesc,
+		tooltipTitle = L.CONTACT_MEMORY_SETTINGS_ENABLE or "Private Notes",
+		tooltipDesc = L.CONTACT_MEMORY_SETTINGS_ENABLE_DESC or "Adds local private notes for friends and ignored players.",
 	})
 	table.insert(allFrames, contactMemoryToggle)
 
-	local detailsDisabled = not betaEnabled or contactMemoryEnabled ~= true
+	local detailsDisabled = contactMemoryEnabled ~= true
 	local function GetContactMemorySetting(key, defaultValue)
 		if contactMemory and contactMemory.GetSetting then
 			return contactMemory:GetSetting(key, defaultValue)
@@ -7115,6 +7105,65 @@ function Settings:RefreshAdvancedTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- ===========================================
+	-- External AddOn Menu Bridge Section
+	-- ===========================================
+	if BFL.HasSecretValues then
+		local MenuBridge = BFL:GetModule("MenuBridge")
+		local companionLoaded = MenuBridge
+			and MenuBridge.IsCompanionAddOnLoaded
+			and MenuBridge:IsCompanionAddOnLoaded() == true
+
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge"))
+		table.insert(
+			allFrames,
+			Components:CreateLabel(
+				tab,
+				L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC
+					or "Adds compatible AddOn actions to supported BetterFriendlist context menus.",
+				true
+			)
+		)
+
+		local bridgeToggle = Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge",
+			initialValue = BetterFriendlistDB.externalMenuBridgeEnabled ~= false,
+			disabled = not companionLoaded,
+			callback = function(checked)
+				local DB = GetDB()
+				if not DB then
+					return
+				end
+				DB:Set("externalMenuBridgeEnabled", checked == true)
+				if MenuBridge and MenuBridge.RefreshEnabledState then
+					MenuBridge:RefreshEnabledState()
+				end
+			end,
+			tooltipTitle = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge",
+			tooltipDesc = companionLoaded
+				and (L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC
+					or "Adds compatible AddOn actions to supported BetterFriendlist context menus.")
+				or (L.SETTINGS_EXTERNAL_MENU_BRIDGE_REQUIRES_ADDON
+					or "This setting can only be used when the BetterFriendlist Menu Bridge addon is also enabled."),
+		})
+		table.insert(allFrames, bridgeToggle)
+
+		if not companionLoaded then
+			table.insert(
+				allFrames,
+				Components:CreateLabel(
+					tab,
+					L.SETTINGS_EXTERNAL_MENU_BRIDGE_REQUIRES_ADDON
+						or "This setting can only be used when the BetterFriendlist Menu Bridge addon is also enabled.",
+					true,
+					{ r = 1, g = 0.2, b = 0.2, a = 1 }
+				)
+			)
+		end
+
+		table.insert(allFrames, Components:CreateSpacer(tab))
+	end
+
+	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
 	local betaFeaturesHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r")
@@ -7161,11 +7210,6 @@ function Settings:RefreshAdvancedTab()
 			local oldStoredTheme = DB:Get("theme", "blizzard")
 			local oldEffectiveTheme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or oldStoredTheme
 			DB:Set("enableBetaFeatures", checked)
-			local MenuBridge = BFL:GetModule("MenuBridge")
-			if MenuBridge and MenuBridge.RefreshEnabledState then
-				MenuBridge:RefreshEnabledState()
-			end
-
 			-- If disabling Beta and currently on ANY Beta tab, switch to General
 			if not checked then
 				-- Theme is stable, so disabling Beta must not force Dark/Custom to Blizzard.
@@ -7250,29 +7294,6 @@ function Settings:RefreshAdvancedTab()
 			or "Use the new LibSettingsDesigner Settings Center instead of the classic settings window.",
 	})
 	table.insert(allFrames, settingsCenterToggle)
-
-	if BFL.HasSecretValues then
-		local bridgeToggle = Components:CreateCheckbox(tab, {
-			label = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge (Beta)",
-			initialValue = BetterFriendlistDB.externalMenuBridgeEnabled or false,
-			disabled = BetterFriendlistDB.enableBetaFeatures ~= true,
-			callback = function(checked)
-				local DB = GetDB()
-				if not DB then
-					return
-				end
-				DB:Set("externalMenuBridgeEnabled", checked == true)
-				local MenuBridge = BFL:GetModule("MenuBridge")
-				if MenuBridge and MenuBridge.RefreshEnabledState then
-					MenuBridge:RefreshEnabledState()
-				end
-			end,
-			tooltipTitle = L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge (Beta)",
-			tooltipDesc = L.SETTINGS_EXTERNAL_MENU_BRIDGE_DESC
-				or "Adds compatible AddOn actions to supported BetterFriendlist context menus.",
-		})
-		table.insert(allFrames, bridgeToggle)
-	end
 
 	-- Beta feature list (informational)
 	-- Only show if there are actual beta features

@@ -728,7 +728,8 @@ local function GetWoWFriendUID(name, realm)
 	if not name then
 		return nil
 	end
-	local fullName = realm and realm ~= "" and (name .. "-" .. realm) or name
+	local fullName = BFL.NormalizePlayerIdentityName and BFL.NormalizePlayerIdentityName(name, realm)
+		or (realm and realm ~= "" and (name .. "-" .. realm) or name)
 	if BFL.NormalizeWoWFriendName then
 		fullName = BFL:NormalizeWoWFriendName(fullName) or fullName
 	end

@@ -22,7 +22,8 @@ end
 
 local function GetSafeText(value, nilFallback)
 	-- Secret values must be rejected before any comparison, conversion, or
-	-- boolean test. C_Intl accepts secret arguments only from untainted code.
+	-- boolean test. In 12.1.5 C_Intl accepts them from tainted code, but its
+	-- secret results still cannot be evaluated safely by BFL.
 	if IsSecretValue(value) then
 		return nil
 	end

@@ -183,6 +183,56 @@ local function IsModernRaidLayout()
 	return BFL.IsRetail and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 end
 
+local RAID_PVP_INDICATOR_SIZE = 14
+
+local function GetRaidUnitFrameUtil()
+	if RaidFrame._testUnitFrameUtil ~= nil then
+		return RaidFrame._testUnitFrameUtil or nil
+	end
+	return UnitFrameUtil
+end
+
+local function HideRaidPvPIndicator(button)
+	for _, key in ipairs({ "PvPIcon", "PrestigePortrait", "PrestigeBadge" }) do
+		local texture = button and button[key]
+		if texture and texture.Hide then
+			texture:Hide()
+		end
+	end
+end
+
+function RaidFrame:UpdatePvPIndicator(button, unit)
+	if not button or not (button.PvPIcon or button.PrestigePortrait or button.PrestigeBadge) then
+		return false
+	end
+
+	local api = GetRaidUnitFrameUtil()
+	if not unit or not api or type(api.UpdateUnitPvPIndicator) ~= "function" then
+		HideRaidPvPIndicator(button)
+		return false
+	end
+
+	local ok = pcall(api.UpdateUnitPvPIndicator, {
+		pvpIcon = button.PvPIcon,
+		prestigePortrait = button.PrestigePortrait,
+		prestigeBadge = button.PrestigeBadge,
+	}, unit, true)
+	if not ok then
+		HideRaidPvPIndicator(button)
+		return false
+	end
+
+	-- The secure delegate uses native atlas dimensions for the faction icon.
+	-- Restore the compact raid-row dimensions without inspecting secret state.
+	for _, key in ipairs({ "PvPIcon", "PrestigePortrait", "PrestigeBadge" }) do
+		local texture = button[key]
+		if texture and texture.SetSize then
+			texture:SetSize(RAID_PVP_INDICATOR_SIZE, RAID_PVP_INDICATOR_SIZE)
+		end
+	end
+	return true
+end
+
 local function FormatRoleCount(value, minimumDigits)
 	value = tonumber(value) or 0
 	if minimumDigits and minimumDigits > 1 then
@@ -1414,10 +1464,17 @@ function RaidFrame:RegisterEvents()
 	end, 50)
 
 	-- Retail 12.1's extracted Blizzard_RaidFrame refreshes the complete roster
-	-- for leadership/LFG restrictions and per-unit connection or level changes.
+	-- for leadership/LFG restrictions and per-unit connection, PvP, or level changes.
 	-- These events also exist on supported Classic clients, so the shared
 	-- coalesced refresh remains capability-safe without flavor branching.
-	for _, event in ipairs({ "PARTY_LEADER_CHANGED", "PARTY_LFG_RESTRICTED", "UNIT_CONNECTION", "UNIT_LEVEL" }) do
+	for _, event in ipairs({
+		"PARTY_LEADER_CHANGED",
+		"PARTY_LFG_RESTRICTED",
+		"PLAYER_FLAGS_CHANGED",
+		"UNIT_CONNECTION",
+		"UNIT_FACTION",
+		"UNIT_LEVEL",
+	}) do
 		BFL:RegisterEventCallback(event, function(...)
 			RaidFrame:OnRaidRosterUpdate(...)
 		end, 50)
@@ -1969,6 +2026,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		if button.ReadyCheckIcon then
 			button.ReadyCheckIcon:Hide()
 		end
+		self:UpdatePvPIndicator(button, nil)
 		if button.ClassColorTint then
 			button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 			button.ClassColorTint:SetShown(false)
@@ -2045,6 +2103,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 	elseif button.ClassIcon then
 		button.ClassIcon:Hide()
 	end
+	self:UpdatePvPIndicator(button, memberData._isMock and nil or memberData.unit)
 
 	-- Update level
 	if button.Level and memberData.level and memberData.level > 0 then

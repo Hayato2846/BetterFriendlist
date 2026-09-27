@@ -94,6 +94,11 @@ local WHO_CLASSIC_ELVUI_DROPDOWN_VISUAL_WIDTH = 106
 local WHO_SCROLLBAR_RESERVE = 18
 local LEGACY_SEARCH_BOTTOM_OFFSET = 15
 
+local function GetWhoSearchInstructions()
+	local locale = BFL.L or {}
+	return locale.WHO_LIST_SEARCH_INSTRUCTIONS or SEARCH or ""
+end
+
 local WHO_QUERY_FIELDS = {
 	n = "name",
 	g = "guild",
@@ -178,6 +183,178 @@ local function GetWhoResult(index)
 	return C_FriendList.GetWhoInfo(index)
 end
 
+local function GetFriendListAPI(module)
+	return module._testFriendListAPI or C_FriendList
+end
+
+function WhoFrame:HasStructuredWhoFilters()
+	if self._testStructuredWhoFilters ~= nil then
+		return self._testStructuredWhoFilters == true
+	end
+	-- Build 1.60.1.70009 accepts Blizzard's structured filter payload but
+	-- rejects an addon-created third argument. Keep BFL's own Who UI and use
+	-- its established text-query path on Forever.
+	if BFL.IsForever then
+		return false
+	end
+	local api = GetFriendListAPI(self)
+	return api ~= nil
+		and type(api.SendWho) == "function"
+		and type(api.GetWhoRaceFilters) == "function"
+end
+
+-- Forever deliberately keeps the legacy two-argument call. Other clients can
+-- use the structured third argument when their API exposes that capability.
+function WhoFrame:DispatchWhoRequest(text, origin, filters)
+	local requestText = text or ""
+	local requestOrigin = origin
+	if requestOrigin == nil and Enum and Enum.SocialWhoOrigin then
+		requestOrigin = Enum.SocialWhoOrigin.Social
+	end
+
+	local testAPI = self._testFriendListAPI
+	if testAPI then
+		if filters and self:HasStructuredWhoFilters() then
+			testAPI.SendWho(requestText, requestOrigin, filters)
+		else
+			testAPI.SendWho(requestText, requestOrigin)
+		end
+		return true
+	end
+
+	if filters and self:HasStructuredWhoFilters() then
+		C_FriendList.SendWho(requestText, requestOrigin, filters)
+	else
+		C_FriendList.SendWho(requestText, requestOrigin)
+	end
+	return true
+end
+
+function WhoFrame:GetWhoClassFilters()
+	if self._testWhoClassFilters then
+		return self._testWhoClassFilters
+	end
+	if type(GetNumClasses) ~= "function" or type(GetClassInfo) ~= "function" then
+		return nil
+	end
+	local ok, count = pcall(GetNumClasses)
+	if not ok or type(count) ~= "number" or (BFL.IsSecret and BFL:IsSecret(count)) then
+		return nil
+	end
+	local result = {}
+	for index = 1, count do
+		local infoOK, name, _classFile, classID = pcall(GetClassInfo, index)
+		if infoOK and type(name) == "string" and type(classID) == "number"
+			and not (BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(classID)))
+		then
+			result[#result + 1] = { name = name, ID = classID }
+		end
+	end
+	return result
+end
+
+function WhoFrame:GetWhoRaceFilters()
+	local api = GetFriendListAPI(self)
+	if not (api and type(api.GetWhoRaceFilters) == "function") then
+		return nil
+	end
+	local ok, filters = pcall(api.GetWhoRaceFilters)
+	if not ok or type(filters) ~= "table" or (BFL.IsSecret and BFL:IsSecret(filters)) then
+		return nil
+	end
+	local result = {}
+	for _, filter in ipairs(filters) do
+		if type(filter) == "table"
+			and type(filter.name) == "string"
+			and type(filter.ID) == "number"
+			and not (BFL.IsSecret and (BFL:IsSecret(filter.name) or BFL:IsSecret(filter.ID)))
+		then
+			result[#result + 1] = { name = filter.name, ID = filter.ID }
+		end
+	end
+	return result
+end
+
+local function GetSelectedWhoFilterNames(selection)
+	local selected = {}
+	if type(selection) == "string" then
+		if selection ~= "" then selected[selection] = true end
+	elseif type(selection) == "table" then
+		for key, value in pairs(selection) do
+			local name = type(key) == "number" and value or key
+			local enabled = type(key) == "number" or value == true
+			if enabled and type(name) == "string" and name ~= "" then
+				selected[name] = true
+			end
+		end
+	end
+	return selected
+end
+
+local function CountSelectedWhoFilters(selection)
+	local count, single = 0, nil
+	for name in pairs(GetSelectedWhoFilterNames(selection)) do
+		count = count + 1
+		single = name
+	end
+	return count, single
+end
+
+local function BuildExcludedWhoFilterIDs(entries, selection)
+	local selectedNames = GetSelectedWhoFilterNames(selection)
+	local selectedCount = 0
+	for _ in pairs(selectedNames) do selectedCount = selectedCount + 1 end
+	if selectedCount == 0 then
+		return {}, true
+	end
+	if type(entries) ~= "table" then
+		return {}, false
+	end
+	local resolvedCount = 0
+	for _, entry in ipairs(entries) do
+		if selectedNames[entry.name] then
+			resolvedCount = resolvedCount + 1
+		end
+	end
+	if resolvedCount ~= selectedCount then
+		return {}, false
+	end
+	local excluded = {}
+	for _, entry in ipairs(entries) do
+		if not selectedNames[entry.name] then
+			excluded[#excluded + 1] = entry.ID
+		end
+	end
+	table.sort(excluded)
+	return excluded, true
+end
+
+-- SendWhoFilters uses exclusion lists for class/race and an inclusion list for
+-- maps. BFL currently keeps its free-text zone field, but accepts map IDs here
+-- so future/native map pickers can use the same payload without another API
+-- migration.
+function WhoFrame:BuildStructuredWhoFilters(className, raceName, uiMapIDs)
+	if not self:HasStructuredWhoFilters() then
+		return nil, false, false
+	end
+	local classIDs, classCovered = BuildExcludedWhoFilterIDs(self:GetWhoClassFilters(), className)
+	local raceIDs, raceCovered = BuildExcludedWhoFilterIDs(self:GetWhoRaceFilters(), raceName)
+	local mapIDs = {}
+	for _, mapID in ipairs(type(uiMapIDs) == "table" and uiMapIDs or {}) do
+		if type(mapID) == "number" and not (BFL.IsSecret and BFL:IsSecret(mapID)) then
+			mapIDs[#mapIDs + 1] = mapID
+		end
+	end
+	if #classIDs == 0 and #raceIDs == 0 and #mapIDs == 0 then
+		return nil, classCovered, raceCovered
+	end
+	return {
+		classIDs = classIDs,
+		raceIDs = raceIDs,
+		uiMapIDs = mapIDs,
+	}, classCovered, raceCovered
+end
+
 -- Class icon texture coordinates (from WoW global CLASS_ICON_TCOORDS)
 local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 
@@ -258,6 +435,7 @@ local DOUBLE_CLICK_THRESHOLD = 0.4
 local WHO_COOLDOWN = 5 -- seconds between WHO queries
 local WHO_TIMEOUT = 8 -- seconds to wait for WHO_LIST_UPDATE before showing timeout
 local WHO_LIST_UPDATE_EVENT = "WHO_LIST_UPDATE"
+local FOREVER_GROUP_FINDER_ADDON = "Blizzard_GroupFinder_VanillaStyle"
 
 -- ========================================
 -- Module Lifecycle
@@ -274,41 +452,95 @@ function WhoFrame:IsAvailable()
 		and type(C_FriendList.SendWho) == "function"
 end
 
--- Forever's LFGWhoListFrame opens LFGParentFrame from its WHO_LIST_UPDATE
--- handler when the Social UI is disabled. Temporarily suspend only that
--- listener while BFL owns the request; manual/native Who routing stays intact.
-function WhoFrame:SuspendNativeWhoListUpdates(nativeWhoFrame)
-	self:RestoreNativeWhoListUpdates()
-
-	local frame = nativeWhoFrame or _G.LFGWhoListFrame
-	if not frame or type(frame.UnregisterEvent) ~= "function" then
+-- Blizzard's legacy FriendsFrame and Forever's LFG Who surface open their
+-- complete parent panels when they receive WHO_LIST_UPDATE while the new
+-- Social UI is disabled. BFL owns its own result surface, so isolate only
+-- those native listeners for BFL-owned requests. Event registration is C-side
+-- state; no Blizzard scripts, fields, mixins, or protected functions are
+-- replaced.
+function WhoFrame:IsNativeWhoAutoOpenActive()
+	local socialUI = self._testSocialUIAPI or C_SocialUI
+	if type(socialUI) ~= "table" or type(socialUI.IsSystemEnabled) ~= "function" then
 		return false
 	end
 
-	if type(frame.IsEventRegistered) == "function" then
-		local ok, isRegistered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
-		if not ok or isRegistered ~= true then
-			return false
+	local ok, isEnabled = pcall(socialUI.IsSystemEnabled)
+	return ok and isEnabled == false
+end
+
+function WhoFrame:SuspendNativeWhoListUpdates(nativeWhoFrame)
+	if not self:IsNativeWhoAutoOpenActive() then
+		return false
+	end
+
+	local frames = {}
+	if nativeWhoFrame then
+		frames[1] = nativeWhoFrame
+	else
+		if _G.FriendsFrame then
+			frames[#frames + 1] = _G.FriendsFrame
+		end
+		if _G.LFGWhoListFrame and _G.LFGWhoListFrame ~= _G.FriendsFrame then
+			frames[#frames + 1] = _G.LFGWhoListFrame
+		end
+	end
+	self.suspendedNativeWhoListFrames = self.suspendedNativeWhoListFrames or {}
+	self.suspendedNativeWhoListFrameSet = self.suspendedNativeWhoListFrameSet or {}
+	local suspendedAny = false
+
+	for _, frame in ipairs(frames) do
+		if frame
+			and not self.suspendedNativeWhoListFrameSet[frame]
+			and type(frame.IsEventRegistered) == "function"
+			and type(frame.UnregisterEvent) == "function"
+		then
+			local ok, isRegistered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
+			if ok and isRegistered == true then
+				ok = pcall(frame.UnregisterEvent, frame, WHO_LIST_UPDATE_EVENT)
+				if ok then
+					self.suspendedNativeWhoListFrames[#self.suspendedNativeWhoListFrames + 1] = frame
+					self.suspendedNativeWhoListFrameSet[frame] = true
+					suspendedAny = true
+				end
+			end
 		end
 	end
 
-	local ok = pcall(frame.UnregisterEvent, frame, WHO_LIST_UPDATE_EVENT)
-	if not ok then
-		return false
-	end
-
-	self.suspendedNativeWhoListFrame = frame
-	return true
+	return suspendedAny
 end
 
 function WhoFrame:RestoreNativeWhoListUpdates()
-	local frame = self.suspendedNativeWhoListFrame
-	self.suspendedNativeWhoListFrame = nil
-	if not frame or type(frame.RegisterEvent) ~= "function" then
+	local frames = self.suspendedNativeWhoListFrames
+	self.suspendedNativeWhoListFrames = nil
+	self.suspendedNativeWhoListFrameSet = nil
+	if not frames then
 		return false
 	end
 
-	return pcall(frame.RegisterEvent, frame, WHO_LIST_UPDATE_EVENT)
+	local restoredAny = false
+	for _, frame in ipairs(frames) do
+		if frame and type(frame.RegisterEvent) == "function" then
+			local isRegistered = false
+			if type(frame.IsEventRegistered) == "function" then
+				local ok, registered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
+				isRegistered = ok and registered == true
+			end
+
+			if isRegistered or pcall(frame.RegisterEvent, frame, WHO_LIST_UPDATE_EVENT) then
+				restoredAny = true
+			end
+		end
+	end
+
+	return restoredAny
+end
+
+function WhoFrame:OnNativeWhoListAddonLoaded(addonName, nativeWhoFrame)
+	if addonName ~= FOREVER_GROUP_FINDER_ADDON or not self.whoPending then
+		return false
+	end
+
+	return self:SuspendNativeWhoListUpdates(nativeWhoFrame)
 end
 
 function WhoFrame:Initialize()
@@ -318,6 +550,12 @@ function WhoFrame:Initialize()
 	-- Register event callback for WHO list updates
 	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
 		self:OnWhoListUpdate(...)
+	end, 10)
+	BFL:RegisterEventCallback("ADDON_LOADED", function(addonName)
+		self:OnNativeWhoListAddonLoaded(addonName)
+	end, 10)
+	BFL:RegisterEventCallback("ADDONS_UNLOADING", function()
+		self:RestoreNativeWhoListUpdates()
 	end, 10)
 
 	-- Hook OnShow to re-render if data changed while hidden
@@ -410,7 +648,8 @@ function WhoFrame:RestoreLegacySearchBoxVisual()
 		)
 	end
 	if editBox.Instructions then
-		editBox.Instructions:SetText(editBox.instructionText or WHO_LIST_SEARCH_INSTRUCTIONS or "")
+		editBox.instructionText = GetWhoSearchInstructions()
+		editBox.Instructions:SetText(editBox.instructionText)
 		editBox.Instructions:SetMaxLines(2)
 		editBox.Instructions:SetFontObject("BetterFriendlistFontDisableSmall")
 	end
@@ -578,6 +817,9 @@ function WhoFrame:EnsureSearchBuilderForCurrentStyle()
 		levelMax = previous.levelMax and previous.levelMax:GetText() or "",
 		selectedClass = previous.selectedClass or "",
 		selectedRace = previous.selectedRace or "",
+		selectedClasses = previous.selectedClasses,
+		selectedRaces = previous.selectedRaces,
+		selectedMapIDs = previous.selectedMapIDs,
 		extraQuery = previous.extraQuery or "",
 	} or nil
 	local wasShown = self.builderFlyout and self.builderFlyout:IsShown() or false
@@ -612,6 +854,9 @@ function WhoFrame:EnsureSearchBuilderForCurrentStyle()
 		if self.builder.levelMax then self.builder.levelMax:SetText(previousValues.levelMax) end
 		self.builder.selectedClass = previousValues.selectedClass
 		self.builder.selectedRace = previousValues.selectedRace
+		self.builder.selectedClasses = previousValues.selectedClasses or {}
+		self.builder.selectedRaces = previousValues.selectedRaces or {}
+		self.builder.selectedMapIDs = previousValues.selectedMapIDs or {}
 		self.builder.extraQuery = previousValues.extraQuery
 		if self.builder.RebuildClassDropdown then self.builder.RebuildClassDropdown() end
 		if self.builder.RebuildRaceDropdown then self.builder.RebuildRaceDropdown() end
@@ -927,13 +1172,21 @@ end
 
 -- Handle WHO_LIST_UPDATE event
 function WhoFrame:OnWhoListUpdate(...)
-	-- Re-register after the current event dispatch so the native Forever frame
-	-- cannot receive the BFL-owned result that triggered this callback.
-	local suspendedFrame = self.suspendedNativeWhoListFrame
-	if suspendedFrame then
+	-- Restore after this event dispatch has completely unwound. Re-registering
+	-- immediately would let the native frame receive the same BFL-owned result.
+	local suspendedFrames = self.suspendedNativeWhoListFrames
+	if suspendedFrames then
 		C_Timer.After(0, function()
-			if self.suspendedNativeWhoListFrame == suspendedFrame then
+			if self.suspendedNativeWhoListFrames == suspendedFrames then
 				self:RestoreNativeWhoListUpdates()
+			end
+		end)
+	end
+	local requestGuard = self.nativeWhoRequestGuard
+	if requestGuard then
+		C_Timer.After(0, function()
+			if self.nativeWhoRequestGuard == requestGuard then
+				self.nativeWhoRequestGuard = nil
 			end
 		end)
 	end
@@ -1556,7 +1809,7 @@ function WhoFrame:InitButton(button, elementData)
 		button.Name:SetPoint("RIGHT", button, "LEFT", widths.name, 0)
 
 		-- Variable column: aligned with ColumnDropdown text (offset for dropdown padding)
-		local dropdownTextPad = 8 -- Match WhoFrameColumnDropdownMixin Text LEFT offset
+		local dropdownTextPad = 8 -- Match the BFL Who column mixin's Text LEFT offset
 		local variableStart = widths.name + headerGap + dropdownTextPad
 		button.Variable:SetJustifyH("LEFT")
 		button.Variable:ClearAllPoints()
@@ -1646,8 +1899,9 @@ function WhoFrame:IsOnCooldown()
 	return self.lastWhoSendTime and (GetTime() - self.lastWhoSendTime < WHO_COOLDOWN)
 end
 
--- Send Who request
-function WhoFrame:SendWhoRequest(text, origin)
+-- Send a Who request through BFL's own UI. Forever deliberately uses the
+-- legacy two-argument text query because its structured payload is restricted.
+function WhoFrame:SendWhoRequest(text, origin, filters)
 	if not self:IsAvailable() then
 		return
 	end
@@ -1660,7 +1914,7 @@ function WhoFrame:SendWhoRequest(text, origin)
 		return
 	end
 
-	if not text or text == "" then
+	if (not text or text == "") and not filters then
 		-- Use default Who command if no text provided
 		local level = UnitLevel("player")
 		local minLevel = level - 3
@@ -1687,6 +1941,7 @@ function WhoFrame:SendWhoRequest(text, origin)
 		self.whoTimeoutTimer = nil
 		if self.whoPending then
 			self.whoPending = false
+			self.nativeWhoRequestGuard = nil
 			self:RestoreNativeWhoListUpdates()
 			self:ShowThrottleHint()
 		end
@@ -1698,24 +1953,16 @@ function WhoFrame:SendWhoRequest(text, origin)
 	-- Clear selection from previous search results
 	self:SetSelectedButton(nil)
 
-	-- CRITICAL: Ensure FriendsFrame is unregistered from WHO_LIST_UPDATE
-	if FriendsFrame then
-		FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
-
-		-- Hide Blizzard's Who Frame BEFORE sending request
-		if FriendsFrame.WhoFrame then
-			FriendsFrame.WhoFrame:Hide()
-		end
-	end
-
-	-- Forever's LFG Who surface has its own WHO_LIST_UPDATE listener which
-	-- opens LFGParentFrame. Suspend it only for this BFL-owned request.
+	-- Prevent native listeners from opening FriendsFrame or LFGParentFrame for
+	-- a request whose result is owned and rendered by BFL.
+	self:RestoreNativeWhoListUpdates()
+	self.nativeWhoRequestGuard = {}
 	self:SuspendNativeWhoListUpdates()
 
 	-- CRITICAL: Set Who routing IMMEDIATELY before each SendWho call
 	C_FriendList.SetWhoToUi(true)
 
-	C_FriendList.SendWho(text, origin)
+	return self:DispatchWhoRequest(text, origin, filters)
 end
 
 -- Show "Searching..." in the totals area while waiting for results
@@ -2073,6 +2320,13 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		BetterFriendsFrame.WhoFrame.currentSort = sortType
 	end
 
+	-- Forever's SortWho accepts an explicit direction. Apply it before reading
+	-- the result array, then retain BFL's stable secondary/tertiary local sort.
+	local friendListAPI = GetFriendListAPI(self)
+	if self:HasStructuredWhoFilters() and friendListAPI and type(friendListAPI.SortWho) == "function" then
+		pcall(friendListAPI.SortWho, sortType, BetterFriendsFrame.WhoFrame.sortAscending == true)
+	end
+
 	-- Client-side sort: Get all WHO data and sort it locally
 	local numWhos = GetWhoResultCounts()
 	if numWhos == 0 then
@@ -2380,7 +2634,9 @@ function WhoFrame:HandleAltClick(button)
 
 	if column == "name" then
 		if info.fullName and info.fullName ~= "" then
-			local name = info.fullName:match("^([^%-]+)") or info.fullName
+			local name = BFL.GetPlayerNameWithoutRealm and BFL.GetPlayerNameWithoutRealm(info.fullName)
+				or info.fullName:match("^([^%-]+)")
+				or info.fullName
 			self.builder.nameInput:SetText(name)
 		end
 	elseif column == "variable" then
@@ -2388,6 +2644,7 @@ function WhoFrame:HandleAltClick(button)
 			self.builder.guildInput:SetText(info.fullGuildName)
 		elseif whoSortValue == 3 and info.raceStr and info.raceStr ~= "" then
 			self.builder.selectedRace = info.raceStr
+			self.builder.selectedRaces = { [info.raceStr] = true }
 			self.builder.RebuildRaceDropdown()
 			self.builder.RebuildClassDropdown()
 		else
@@ -2404,6 +2661,7 @@ function WhoFrame:HandleAltClick(button)
 	elseif column == "class" then
 		if info.classStr and info.classStr ~= "" then
 			self.builder.selectedClass = info.classStr
+			self.builder.selectedClasses = { [info.classStr] = true }
 			self.builder.RebuildClassDropdown()
 			self.builder.RebuildRaceDropdown()
 		end
@@ -2429,8 +2687,14 @@ function WhoFrame:HandleCtrlClick(button)
 
 	if column == "name" then
 		if info.fullName and info.fullName ~= "" then
-			-- Strip realm suffix for name search
-			local name = info.fullName:match("^([^%-]+)") or info.fullName
+			-- Strip only a realm suffix. Forever surnames are part of the unique
+			-- identity and must stay in the exact search value.
+			local name = BFL.GetPlayerNameWithoutRealm and BFL.GetPlayerNameWithoutRealm(info.fullName)
+				or info.fullName:match("^([^%-]+)")
+				or info.fullName
+			if BFL.ReplaceSurnameSeparatorWithLinkSeparator then
+				name = BFL.ReplaceSurnameSeparatorWithLinkSeparator(name) or name
+			end
 			searchText = 'n-"' .. name .. '"'
 		end
 	elseif column == "variable" then
@@ -2651,12 +2915,16 @@ end
 -- WHO FRAME UI MIXINS
 -- ========================================
 
--- WHO EditBox Mixin (Blizzard 11.2.5 compatible)
-local WhoFrameEditBoxMixin = {}
+-- Use BFL-specific global names for every XML mixin. Forever loads Blizzard's
+-- own WhoFrameEditBoxMixin later; sharing that name taints its protected LFG
+-- Who frame during Blizzard_GroupFinder_VanillaStyle initialization.
+local BetterFriendlistWhoFrameEditBoxMixin = {}
 
-function WhoFrameEditBoxMixin:OnLoad()
+function BetterFriendlistWhoFrameEditBoxMixin:OnLoad()
 	-- SearchBoxTemplate OnLoad already ran (inherit="append")
-	-- KeyValues (instructionText, instructionsFontObject) are already set by SearchBoxTemplate
+	-- Override its generic SEARCH placeholder with BFL-owned localization. Do
+	-- not publish this through Blizzard's WHO_LIST_SEARCH_INSTRUCTIONS global.
+	self.instructionText = GetWhoSearchInstructions()
 
 	-- Hide old-style textures (we use modern SearchBoxTemplate)
 	if self.Left then
@@ -2687,15 +2955,14 @@ function WhoFrameEditBoxMixin:OnLoad()
 		end
 	end
 
-	-- Instructions are already configured by SearchBoxTemplate via KeyValues
-	-- Just ensure Instructions has proper line wrapping
 	if self.Instructions then
+		self.Instructions:SetText(self.instructionText)
 		self.Instructions:SetMaxLines(2)
 		self.Instructions:SetFontObject("BetterFriendlistFontDisableSmall")
 	end
 end
 
-function WhoFrameEditBoxMixin:OnShow()
+function BetterFriendlistWhoFrameEditBoxMixin:OnShow()
 	-- Register for font scale updates
 	if EventRegistry then
 		EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
@@ -2710,14 +2977,14 @@ function WhoFrameEditBoxMixin:OnShow()
 	EditBox_ClearFocus(self)
 end
 
-function WhoFrameEditBoxMixin:OnHide()
+function BetterFriendlistWhoFrameEditBoxMixin:OnHide()
 	-- Unregister from font scale updates
 	if EventRegistry then
 		EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", self)
 	end
 end
 
-function WhoFrameEditBoxMixin:AdjustHeightToFitInstructions()
+function BetterFriendlistWhoFrameEditBoxMixin:AdjustHeightToFitInstructions()
 	if not self.Instructions then
 		return
 	end
@@ -2728,14 +2995,15 @@ function WhoFrameEditBoxMixin:AdjustHeightToFitInstructions()
 	self:SetHeight(totalInstructionHeight + padding)
 end
 
-function WhoFrameEditBoxMixin:OnEnterPressed()
+function BetterFriendlistWhoFrameEditBoxMixin:OnEnterPressed()
 	local text = self:GetText()
-	self:ClearFocus()
 
-	-- Use centralized function to prevent Blizzard frame from opening
+	-- Send while the Enter key's hardware event is still active. Forever marks
+	-- SendWho as restricted and rejects the request after focus is cleared.
 	if _G.BetterWhoFrame_SendWhoRequest then
 		_G.BetterWhoFrame_SendWhoRequest(text)
 	end
+	self:ClearFocus()
 
 	-- Update the Who list after search (wait for server response)
 	C_Timer.After(0.3, function()
@@ -2747,22 +3015,22 @@ function WhoFrameEditBoxMixin:OnEnterPressed()
 	end)
 end
 
-function WhoFrameEditBoxMixin:OnEnter()
+function BetterFriendlistWhoFrameEditBoxMixin:OnEnter()
 	if self.Instructions:IsShown() and self.Instructions:IsTruncated() then
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-		BFL_Tooltip:AddLine(WHO_LIST_SEARCH_INSTRUCTIONS or "Enter player name or search criteria", 1, 1, 1, true)
+		BFL_Tooltip:AddLine(self.instructionText or GetWhoSearchInstructions(), 1, 1, 1, true)
 		BFL_Tooltip:Show()
 	end
 end
 
-function WhoFrameEditBoxMixin:OnLeave()
+function BetterFriendlistWhoFrameEditBoxMixin:OnLeave()
 	BFL_Tooltip:Hide()
 end
 
 -- WHO Column Dropdown Mixin (Variable Column: Zone/Guild/Race)
-local WhoFrameColumnDropdownMixin = {}
+local BetterFriendlistWhoFrameColumnDropdownMixin = {}
 
-function WhoFrameColumnDropdownMixin:OnLoad()
+function BetterFriendlistWhoFrameColumnDropdownMixin:OnLoad()
 	-- Set up dropdown with user-scalable font
 	self.fontObject = "BetterFriendlistFontNormalSmall"
 
@@ -2837,8 +3105,8 @@ function WhoFrameColumnDropdownMixin:OnLoad()
 end
 
 -- Export mixins globally for XML access
-_G.WhoFrameEditBoxMixin = WhoFrameEditBoxMixin
-_G.WhoFrameColumnDropdownMixin = WhoFrameColumnDropdownMixin
+_G.BetterFriendlistWhoFrameEditBoxMixin = BetterFriendlistWhoFrameEditBoxMixin
+_G.BetterFriendlistWhoFrameColumnDropdownMixin = BetterFriendlistWhoFrameColumnDropdownMixin
 
 -- ========================================
 -- WHO SEARCH BUILDER
@@ -3745,8 +4013,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 			WhoFrame:UpdateBuilderPreview()
 		end)
 		input:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
 			WhoFrame:ExecuteBuilderSearch()
+			self:ClearFocus()
 		end)
 		input:SetScript("OnEscapePressed", function(self)
 			self:ClearFocus()
@@ -3763,14 +4031,16 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		return input
 	end
 
-	-- Row 1: Name (max 12 chars = WoW character name limit)
+	-- Row 1: Forever may expose a first name plus surname as the unique name.
 	self.builder.nameInput = CreateInputRow(
 		flyout,
 		(L.WHO_BUILDER_NAME or "Name") .. ":",
 		L.WHO_BUILDER_NAME_PLACEHOLDER or "Search for character name",
 		yOffset
 	)
-	self.builder.nameInput:SetMaxLetters(12)
+	self.builder.nameInput:SetMaxLetters(
+		BFL.AreRegionalUniqueNamesEnabled and BFL.AreRegionalUniqueNamesEnabled() and 25 or 12
+	)
 	yOffset = yOffset - rowHeight
 
 	-- Row 2: Guild
@@ -3801,6 +4071,9 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 
 	self.builder.selectedClass = "" -- "" = All
 	self.builder.selectedRace = "" -- "" = All (pre-declare for cross-reference)
+	self.builder.selectedClasses = {}
+	self.builder.selectedRaces = {}
+	self.builder.selectedMapIDs = {}
 
 	local useModernBuilderDropdowns = BFL.CanCreateModernDropdown and BFL.CanCreateModernDropdown()
 
@@ -3823,11 +4096,16 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		local classLabels = { L.WHO_BUILDER_ALL_CLASSES or "All Classes" }
 		local classValues = { "" }
 
-		local compatibleClasses = GetCompatibleClassesForRace(self.builder.selectedRace)
-
 		-- Collect classes first (excluding "All Classes")
 		local tempClasses = {}
-		if CLASS_SORT_ORDER then
+		local structuredClassFilters = self:HasStructuredWhoFilters() and self:GetWhoClassFilters() or nil
+		local useStructuredClasses = type(structuredClassFilters) == "table" and #structuredClassFilters > 0
+		if useStructuredClasses then
+			for _, classFilter in ipairs(structuredClassFilters) do
+				tempClasses[#tempClasses + 1] = classFilter.name
+			end
+		elseif CLASS_SORT_ORDER then
+			local compatibleClasses = GetCompatibleClassesForRace(self.builder.selectedRace)
 			for _, classToken in ipairs(CLASS_SORT_ORDER) do
 				local localName = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classToken]
 				if localName then
@@ -3848,16 +4126,37 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 			table.insert(classValues, className)
 		end
 
-		BFL.InitializeDropdown(classDropdown, {
-			labels = classLabels,
-			values = classValues,
-		}, function(value)
-			return self.builder.selectedClass == value
-		end, function(value)
-			self.builder.selectedClass = value
-			RebuildRaceDropdown()
-			self:UpdateBuilderPreview()
-		end, 300)
+		if useStructuredClasses then
+			table.remove(classLabels, 1)
+			table.remove(classValues, 1)
+			BFL.InitializeMultiSelectDropdown(classDropdown, {
+				labels = classLabels,
+				values = classValues,
+			}, function(value)
+				return self.builder.selectedClasses[value] == true
+			end, function(value, checked)
+				self.builder.selectedClasses[value] = checked and true or nil
+				local count, single = CountSelectedWhoFilters(self.builder.selectedClasses)
+				self.builder.selectedClass = count == 1 and single or ""
+				self:UpdateBuilderPreview()
+			end, function()
+				local count, single = CountSelectedWhoFilters(self.builder.selectedClasses)
+				if count == 0 then return L.WHO_BUILDER_ALL_CLASSES or "All Classes" end
+				if count == 1 then return single end
+				return (CLASS or L.WHO_BUILDER_CLASS or "Class") .. " (" .. count .. ")"
+			end, 300)
+		else
+			BFL.InitializeDropdown(classDropdown, {
+				labels = classLabels,
+				values = classValues,
+			}, function(value)
+				return self.builder.selectedClass == value
+			end, function(value)
+				self.builder.selectedClass = value
+				RebuildRaceDropdown()
+				self:UpdateBuilderPreview()
+			end, 300)
+		end
 	end
 
 	self.builder.RebuildClassDropdown = RebuildClassDropdown
@@ -3887,44 +4186,36 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		local raceLabels = { L.WHO_BUILDER_ALL_RACES or "All Races" }
 		local raceValues = { "" }
 
-		local compatibleRaces = GetCompatibleRacesForClass(self.builder.selectedClass)
-		local faction = UnitFactionGroup("player")
-
 		-- Collect races first (excluding "All Races")
 		local tempRaces = {}
 
-		-- Helper: Add race if compatible with selected class and available in current flavor
-		local function AddRaceIfCompatible(raceName)
-			if not IsRaceAvailableInFlavor(raceName) then
-				return
+		local structuredRaceFilters = self:HasStructuredWhoFilters() and self:GetWhoRaceFilters() or nil
+		local useStructuredRaces = type(structuredRaceFilters) == "table" and #structuredRaceFilters > 0
+		if useStructuredRaces then
+			for _, raceFilter in ipairs(structuredRaceFilters) do
+				tempRaces[#tempRaces + 1] = raceFilter.name
 			end
-			if not compatibleRaces or tContains(compatibleRaces, raceName) then
-				table.insert(tempRaces, raceName)
+		else
+			local compatibleRaces = GetCompatibleRacesForClass(self.builder.selectedClass)
+			local faction = UnitFactionGroup("player")
+			local function AddLegacyRace(raceName)
+				if not IsRaceAvailableInFlavor(raceName) then
+					return
+				end
+				if not compatibleRaces or tContains(compatibleRaces, raceName) then
+					tempRaces[#tempRaces + 1] = raceName
+				end
 			end
-		end
 
-		-- Faction-specific races
-		local factionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE or WHO_RACES_HORDE
-		for _, raceName in ipairs(factionRaces) do
-			AddRaceIfCompatible(raceName)
-		end
-
-		-- Allied races (Retail only)
-		if not BFL.IsClassic then
-			local retailFactionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE_RETAIL or WHO_RACES_HORDE_RETAIL
-			for _, raceName in ipairs(retailFactionRaces) do
-				AddRaceIfCompatible(raceName)
+			local factionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE or WHO_RACES_HORDE
+			for _, raceName in ipairs(factionRaces) do AddLegacyRace(raceName) end
+			if not BFL.IsClassic then
+				local retailFactionRaces = (faction == "Alliance") and WHO_RACES_ALLIANCE_RETAIL or WHO_RACES_HORDE_RETAIL
+				for _, raceName in ipairs(retailFactionRaces) do AddLegacyRace(raceName) end
 			end
-		end
-
-		-- Neutral races
-		for _, raceName in ipairs(WHO_RACES_NEUTRAL) do
-			AddRaceIfCompatible(raceName)
-		end
-
-		if not BFL.IsClassic then
-			for _, raceName in ipairs(WHO_RACES_NEUTRAL_RETAIL) do
-				AddRaceIfCompatible(raceName)
+			for _, raceName in ipairs(WHO_RACES_NEUTRAL) do AddLegacyRace(raceName) end
+			if not BFL.IsClassic then
+				for _, raceName in ipairs(WHO_RACES_NEUTRAL_RETAIL) do AddLegacyRace(raceName) end
 			end
 		end
 
@@ -3937,16 +4228,37 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 			table.insert(raceValues, raceName)
 		end
 
-		BFL.InitializeDropdown(raceDropdown, {
-			labels = raceLabels,
-			values = raceValues,
-		}, function(value)
-			return self.builder.selectedRace == value
-		end, function(value)
-			self.builder.selectedRace = value
-			RebuildClassDropdown()
-			self:UpdateBuilderPreview()
-		end, 300)
+		if useStructuredRaces then
+			table.remove(raceLabels, 1)
+			table.remove(raceValues, 1)
+			BFL.InitializeMultiSelectDropdown(raceDropdown, {
+				labels = raceLabels,
+				values = raceValues,
+			}, function(value)
+				return self.builder.selectedRaces[value] == true
+			end, function(value, checked)
+				self.builder.selectedRaces[value] = checked and true or nil
+				local count, single = CountSelectedWhoFilters(self.builder.selectedRaces)
+				self.builder.selectedRace = count == 1 and single or ""
+				self:UpdateBuilderPreview()
+			end, function()
+				local count, single = CountSelectedWhoFilters(self.builder.selectedRaces)
+				if count == 0 then return L.WHO_BUILDER_ALL_RACES or "All Races" end
+				if count == 1 then return single end
+				return (RACE or L.WHO_BUILDER_RACE or "Race") .. " (" .. count .. ")"
+			end, 300)
+		else
+			BFL.InitializeDropdown(raceDropdown, {
+				labels = raceLabels,
+				values = raceValues,
+			}, function(value)
+				return self.builder.selectedRace == value
+			end, function(value)
+				self.builder.selectedRace = value
+				RebuildClassDropdown()
+				self:UpdateBuilderPreview()
+			end, 300)
+		end
 	end
 
 	self.builder.RebuildRaceDropdown = RebuildRaceDropdown
@@ -3989,8 +4301,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		WhoFrame:UpdateBuilderPreview()
 	end)
 	levelMin:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
 		WhoFrame:ExecuteBuilderSearch()
+		self:ClearFocus()
 	end)
 	levelMin:SetScript("OnEscapePressed", function(self)
 		self:ClearFocus()
@@ -4032,8 +4344,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 		WhoFrame:UpdateBuilderPreview()
 	end)
 	levelMax:SetScript("OnEnterPressed", function(self)
-		self:ClearFocus()
 		WhoFrame:ExecuteBuilderSearch()
+		self:ClearFocus()
 	end)
 	levelMax:SetScript("OnEscapePressed", function(self)
 		self:ClearFocus()
@@ -4350,7 +4662,9 @@ function WhoFrame:ToggleSearchBuilder(show)
 	if show then
 		local whoFrame = self.builderWhoFrame or (BetterFriendsFrame and BetterFriendsFrame.WhoFrame)
 		local query = whoFrame and whoFrame.EditBox and whoFrame.EditBox:GetText() or ""
-		self:ApplyQueryToBuilder(query)
+		if query ~= self.lastBuilderDisplayQuery then
+			self:ApplyQueryToBuilder(query)
+		end
 		-- In docked mode, also show the container
 		if self.builderDocked and self.builderDockedContainer then
 			self.builderDockedContainer:Show()
@@ -4483,6 +4797,9 @@ function WhoFrame:ApplyQueryToBuilder(query)
 	if self.builder.levelMax then self.builder.levelMax:SetText(parsed.levelMax) end
 	self.builder.selectedClass = parsed.class
 	self.builder.selectedRace = parsed.race
+	self.builder.selectedClasses = parsed.class ~= "" and { [parsed.class] = true } or {}
+	self.builder.selectedRaces = parsed.race ~= "" and { [parsed.race] = true } or {}
+	self.builder.selectedMapIDs = {}
 	self.builder.extraQuery = parsed.extraQuery
 
 	if self.builder.RebuildClassDropdown then
@@ -4497,10 +4814,11 @@ function WhoFrame:ApplyQueryToBuilder(query)
 end
 
 -- Compose the WHO query string from builder fields
-function WhoFrame:ComposeBuilderQuery()
+function WhoFrame:ComposeBuilderQuery(options)
 	if not self.builder then
 		return ""
 	end
+	options = options or {}
 
 	local parts = {}
 
@@ -4520,12 +4838,12 @@ function WhoFrame:ComposeBuilderQuery()
 	end
 
 	local class = self.builder.selectedClass or ""
-	if class ~= "" then
+	if class ~= "" and not options.omitClass then
 		table.insert(parts, 'c-"' .. class .. '"')
 	end
 
 	local race = self.builder.selectedRace or ""
-	if race ~= "" then
+	if race ~= "" and not options.omitRace then
 		table.insert(parts, 'r-"' .. race .. '"')
 	end
 
@@ -4545,6 +4863,35 @@ function WhoFrame:ComposeBuilderQuery()
 	end
 
 	return table.concat(parts, " ")
+end
+
+function WhoFrame:BuildBuilderRequest()
+	if not self.builder then
+		return "", nil
+	end
+	local filters, classCovered, raceCovered = self:BuildStructuredWhoFilters(
+		next(self.builder.selectedClasses or {}) and self.builder.selectedClasses or self.builder.selectedClass,
+		next(self.builder.selectedRaces or {}) and self.builder.selectedRaces or self.builder.selectedRace,
+		self.builder.selectedMapIDs
+	)
+	if not filters then
+		return self:ComposeBuilderQuery(), nil
+	end
+	return self:ComposeBuilderQuery({
+		omitClass = classCovered,
+		omitRace = raceCovered,
+	}), filters
+end
+
+function WhoFrame:ResolveBuilderDispatchRequest(editBox, query, filters)
+	local useForeverPath = self._testForeverBuilderDispatch
+	if useForeverPath == nil then
+		useForeverPath = BFL.IsForever == true
+	end
+	if useForeverPath and editBox and type(editBox.GetText) == "function" then
+		return editBox:GetText(), nil
+	end
+	return query, filters
 end
 
 -- Update the live preview text (or live-update EditBox in docked mode)
@@ -4569,12 +4916,26 @@ function WhoFrame:UpdateBuilderPreview()
 	if not self.builder.previewText then
 		return
 	end
+	local summaries = {}
+	local classCount = CountSelectedWhoFilters(self.builder.selectedClasses)
+	local raceCount = CountSelectedWhoFilters(self.builder.selectedRaces)
+	if classCount > 1 then
+		summaries[#summaries + 1] = (CLASS or L.WHO_BUILDER_CLASS or "Class") .. " (" .. classCount .. ")"
+	end
+	if raceCount > 1 then
+		summaries[#summaries + 1] = (RACE or L.WHO_BUILDER_RACE or "Race") .. " (" .. raceCount .. ")"
+	end
+	local previewQuery = query
+	if #summaries > 0 then
+		previewQuery = previewQuery ~= "" and (previewQuery .. "  |  " .. table.concat(summaries, ", "))
+			or table.concat(summaries, ", ")
+	end
 
-	if query == "" then
+	if previewQuery == "" then
 		self.builder.previewText:SetText(L.WHO_BUILDER_PREVIEW_EMPTY or "Fill in fields to build a search")
 		self.builder.previewText:SetTextColor(0.5, 0.5, 0.5)
 	else
-		self.builder.previewText:SetText(query)
+		self.builder.previewText:SetText(previewQuery)
 		self.builder.previewText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
 	end
 end
@@ -4587,25 +4948,35 @@ function WhoFrame:ExecuteBuilderSearch()
 		return
 	end
 
-	local query = self:ComposeBuilderQuery()
-	if query == "" then
+	local displayQuery = self:ComposeBuilderQuery()
+	local query, filters = self:BuildBuilderRequest()
+	if displayQuery == "" and not filters then
 		return
 	end
 
 	-- Set in EditBox for visibility
 	local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
 	if editBox then
-		editBox:SetText(query)
+		-- Keep the readable query in the edit box even when class/race tags are
+		-- transmitted as structured IDs.
+		editBox:SetText(displayQuery)
+		-- Forever's restricted SendWho accepts the same widget-sourced value used
+		-- by BFL's working Refresh button. Re-read it instead of forwarding the
+		-- addon's locally composed string directly.
+	end
+	query, filters = self:ResolveBuilderDispatchRequest(editBox, query, filters)
+	self.lastBuilderDisplayQuery = displayQuery
+
+	-- Dispatch before clearing focus or hiding the builder. Restricted Who
+	-- requests must remain inside the original button/Enter hardware event.
+	local sent = self:SendWhoRequest(query, nil, filters)
+	if editBox then
 		editBox:ClearFocus()
 	end
-
-	-- In docked mode, keep builder open; in flyout mode, close it
 	if not self.builderDocked then
 		self:ToggleSearchBuilder(false)
 	end
-
-	-- Send the WHO request
-	self:SendWhoRequest(query)
+	return sent
 end
 
 -- Reset all builder fields
@@ -4632,6 +5003,10 @@ function WhoFrame:ResetBuilder()
 
 	self.builder.selectedClass = ""
 	self.builder.selectedRace = ""
+	self.builder.selectedClasses = {}
+	self.builder.selectedRaces = {}
+	self.builder.selectedMapIDs = {}
+	self.lastBuilderDisplayQuery = nil
 	self.builder.extraQuery = ""
 
 	-- Rebuild dropdowns to show full lists (no filtering)

@@ -4,6 +4,7 @@ local MenuBridge = BFL:RegisterModule("MenuBridge", {})
 local PROVIDER_VERSION = 1
 local MENU_UNIT_PREFIX = "MENU_UNIT_"
 local EARLY_CAPTURE_GLOBAL = "BetterFriendlist_MenuBridgeCaptures"
+local COMPANION_ADDON_NAME = "!BetterFriendlist_MenuBridge"
 
 local DESCRIPTION_METHODS = {
 	CreateButton = true,
@@ -287,10 +288,30 @@ function MenuBridge:IsEnabled()
 	if not BFL.HasSecretValues then
 		return false
 	end
-	if GetDBValue("enableBetaFeatures", false) ~= true then
+	if not self:IsCompanionAddOnLoaded() then
 		return false
 	end
-	return GetDBValue("externalMenuBridgeEnabled", false) == true
+	return GetDBValue("externalMenuBridgeEnabled", true) == true
+end
+
+function MenuBridge:IsCompanionAddOnLoaded()
+	if self._testCompanionAddOnLoaded ~= nil then
+		return self._testCompanionAddOnLoaded == true
+	end
+
+	local isAddOnLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+	if type(isAddOnLoaded) ~= "function" then
+		return false
+	end
+
+	local ok, loadedOrLoading, loaded = pcall(isAddOnLoaded, COMPANION_ADDON_NAME)
+	if not ok then
+		return false
+	end
+	if loaded ~= nil then
+		return loaded == true
+	end
+	return loadedOrLoading == true
 end
 
 function MenuBridge:RefreshEnabledState()

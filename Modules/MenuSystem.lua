@@ -88,6 +88,8 @@ function MenuSystem:OpenFriendMenu(button, friendType, friendID, extraData)
 			friendsList = extraData.index, -- Use numeric index if available (restores behavior from BetterFriendlist.lua)
 			bnetIDAccount = friendID,
 			battleTag = extraData.battleTag,
+			accountInfo = extraData.accountInfo,
+			friendLevel = extraData.friendLevel or (extraData.accountInfo and extraData.accountInfo.friendLevel),
 			uid = friendID, -- For Nickname
 		}
 	else
@@ -163,16 +165,15 @@ function MenuSystem:OpenWhoPlayerMenu(button, whoInfo)
 		cleanShortName = cleanShortName:gsub("%-$", "")
 	end
 
-	-- Extract server from fullName (e.g., "Name-Server" -> "Server")
-	-- DO NOT use fullGuildName as server - that's the guild name!
+
+	-- Forever uses the same visual separator for surnames that other clients
+	-- use for realms. The compatibility helper only returns a second value when
+	-- it is an actual realm, preserving regional-unique full names intact.
 	local serverName = nil
-	if cleanName and cleanName:find("-") then
-		-- Split "Charactername-Servername"
-		local _, _, name, server = cleanName:find("^(.-)%-(.+)$")
-		if server then
-			cleanName = name -- Use just the character name
-			serverName = server
-		end
+	if cleanName and BFL.SplitPlayerName then
+		cleanName, serverName = BFL.SplitPlayerName(cleanName)
+	elseif cleanName and cleanName:find("-") then
+		cleanName, serverName = cleanName:match("^(.-)%-(.+)$")
 	end
 
 	local contextData = {

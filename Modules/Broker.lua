@@ -2177,7 +2177,12 @@ local function CreateLibQTipTooltip(anchorFrame)
 				local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 				if friendInfo then
 					local fullName = friendInfo.name or ""
-					local name, realm = strsplit("-", fullName, 2)
+					local name, realm
+					if BFL.SplitPlayerName then
+						name, realm = BFL.SplitPlayerName(fullName)
+					else
+						name, realm = strsplit("-", fullName, 2)
+					end
 					local normalizedName = BFL:NormalizeWoWFriendName(fullName)
 					local friendUID = normalizedName and ("wow_" .. normalizedName) or ("wow_" .. fullName)
 
@@ -2192,7 +2197,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 						classID = friendInfo.classID,
 						client = "WoW",
 						area = friendInfo.area or "",
-						realmName = realm or GetRealmName(),
+						realmName = realm or ((not BFL.AreRegionalUniqueNamesEnabled
+							or not BFL.AreRegionalUniqueNamesEnabled()) and GetRealmName() or nil),
 						factionName = UnitFactionGroup("player"),
 						guildName = GetGuildInfo(fullName) or "",
 						isAFK = friendInfo.afk,

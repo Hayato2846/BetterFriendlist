@@ -83,6 +83,16 @@ local function L(key)
 	return key
 end
 
+local function GetGuildMOTDLabel()
+	local label = _G.GUILD_MOTD_LABEL
+		or (BFL.L and BFL.L.GUILD_MOTD_TOOLTIP_HEADER)
+		or "Message of the Day"
+	if not tostring(label):find("[:：]%s*$") then
+		label = tostring(label) .. ":"
+	end
+	return label
+end
+
 local function ShouldAvoidSecretValueGuildActions()
 	return BFL.HasSecretValues
 end
@@ -171,18 +181,13 @@ local function GetProfessionIcon(professionID, size)
 	return string.format("|T%s:%d:%d:0:0|t", tostring(texture), size, size)
 end
 
-local function FormatProfessionEntry(professionID, professionName, professionRank)
+local function FormatProfessionEntry(professionID, professionName)
 	if not professionID and (not professionName or professionName == "") then
 		return ""
 	end
 
 	local icon = GetProfessionIcon(professionID)
-	local text = icon ~= "" and icon or (professionName or "")
-	if professionRank and professionRank > 1 then
-		text = string.format("%s %d", text, professionRank)
-	end
-
-	return text
+	return icon ~= "" and icon or (professionName or "")
 end
 
 local function BuildGuildProfessionLookup()
@@ -210,16 +215,8 @@ local function BuildGuildProfessionLookup()
 		local okMemberInfo, memberInfo = pcall(C_Club.GetMemberInfo, clubId, memberId)
 		if okMemberInfo and memberInfo and memberInfo.name then
 			local professions = {}
-			local firstProfession = FormatProfessionEntry(
-				memberInfo.profession1ID,
-				memberInfo.profession1Name,
-				memberInfo.profession1Rank
-			)
-			local secondProfession = FormatProfessionEntry(
-				memberInfo.profession2ID,
-				memberInfo.profession2Name,
-				memberInfo.profession2Rank
-			)
+			local firstProfession = FormatProfessionEntry(memberInfo.profession1ID, memberInfo.profession1Name)
+			local secondProfession = FormatProfessionEntry(memberInfo.profession2ID, memberInfo.profession2Name)
 
 			if firstProfession ~= "" then
 				professions[#professions + 1] = firstProfession
@@ -800,36 +797,6 @@ function GuildBroker:OpenMemberContextMenu(data)
 	return false
 end
 
-function GuildBroker:PromoteMember(data)
-	local GuildActions = BFL:GetModule("GuildActions")
-	if GuildActions and GuildActions.PromoteMember then
-		GuildActions:PromoteMember(data)
-		return
-	end
-
-	BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-end
-
-function GuildBroker:DemoteMember(data)
-	local GuildActions = BFL:GetModule("GuildActions")
-	if GuildActions and GuildActions.DemoteMember then
-		GuildActions:DemoteMember(data)
-		return
-	end
-
-	BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-end
-
-function GuildBroker:RemoveMember(data)
-	local GuildActions = BFL:GetModule("GuildActions")
-	if GuildActions and GuildActions.RemoveMember then
-		GuildActions:RemoveMember(data)
-		return
-	end
-
-	BFL:DebugPrint(L("GUILD_BROKER_ACTION_RESTRICTED"))
-end
-
 -- ========================================
 -- ElvUI Tooltip Skin Helpers (delegate to BrokerUtils)
 -- ========================================
@@ -1242,10 +1209,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			end
 		end
 
-		local motdLabel = L("GUILD_HEADER_MOTD")
-		if motdLabel == "GUILD_HEADER_MOTD" then
-			motdLabel = "MOTD:"
-		end
+		local motdLabel = GetGuildMOTDLabel()
 		motdCell:SetText(C("ltyellow", motdLabel) .. " " .. C("white", motd))
 		return true
 	end
@@ -1719,10 +1683,7 @@ local function CreateBasicTooltip(gameTooltip)
 
 	local motd = SafeGetGuildMOTD()
 	if motd ~= "" then
-		local motdLabel = L("GUILD_HEADER_MOTD")
-		if motdLabel == "GUILD_HEADER_MOTD" then
-			motdLabel = "MOTD:"
-		end
+		local motdLabel = GetGuildMOTDLabel()
 		gameTooltip:AddLine(C("ltyellow", motdLabel) .. " " .. C("white", motd), 1, 1, 1, true)
 	end
 	gameTooltip:AddLine(" ")

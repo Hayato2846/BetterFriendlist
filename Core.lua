@@ -33,6 +33,7 @@ function BFL.ResolveClientFlavor(interfaceVersion, projectID, mainlineProjectID,
 	return {
 		isMainline = isMainline,
 		isClassic = isClassic,
+		isForever = isMainline and interfaceNumber >= 16000 and interfaceNumber < 17000,
 		isClassicEra = isClassic and interfaceNumber < 20000,
 		isTBCClassic = isClassic and interfaceNumber >= 20000 and interfaceNumber < 30000,
 		isWrathClassic = isClassic and interfaceNumber >= 30000 and interfaceNumber < 40000,
@@ -51,6 +52,7 @@ local clientFlavor = BFL.ResolveClientFlavor(
 )
 BFL.IsMainline = clientFlavor.isMainline
 BFL.IsClassic = clientFlavor.isClassic
+BFL.IsForever = clientFlavor.isForever
 BFL.IsClassicEra = clientFlavor.isClassicEra
 BFL.IsTBCClassic = clientFlavor.isTBCClassic
 BFL.IsWrathClassic = clientFlavor.isWrathClassic
@@ -60,6 +62,14 @@ BFL.IsTWW = clientFlavor.isTWW
 BFL.IsMidnight = clientFlavor.isMidnight
 -- Kept as a compatibility alias for modules and third-party integrations.
 BFL.IsRetail = BFL.IsMainline
+
+-- Keep compatibility fallbacks in BFL's namespace. Never create or replace
+-- Blizzard-owned FRIENDS_* globals: native Social UI addons can load later and
+-- must continue to observe only Blizzard's values.
+BFL.FRIENDS_WOW_BACKGROUND_COLOR = _G.FRIENDS_WOW_BACKGROUND_COLOR
+	or CreateColor(0.101961, 0.149020, 0.196078, 1)
+BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR = _G.FRIENDS_OFFLINE_BACKGROUND_COLOR
+	or CreateColor(0.35, 0.35, 0.35, 1)
 
 local function IsSecretValue(value)
 	if type(issecretvalue) ~= "function" then
@@ -185,6 +195,7 @@ function BFL:GetCompatibilityDiagnostics()
 		and guildRosterData.HasPreferredPlaySettingsAPI
 		and guildRosterData:HasPreferredPlaySettingsAPI()
 		or false
+	local whoFrame = self.GetModule and self:GetModule("WhoFrame")
 	return {
 		interfaceVersion = self.TOCVersion,
 		projectID = WOW_PROJECT_ID,
@@ -200,6 +211,16 @@ function BFL:GetCompatibilityDiagnostics()
 			recentAllies = self.HasRecentAllies == true,
 			editMode = self.HasEditMode == true,
 			guildPreferredPlaySettings = preferredPlaySettingsAvailable == true,
+			battleNetBlockAPI = self.CanSetBNetBlocked and self.CanSetBNetBlocked() or false,
+			ageVerificationRestrictions = C_SocialRestrictions ~= nil
+				and type(C_SocialRestrictions.IsAgeVerificationRestricted) == "function",
+			regionalUniqueNames = self.AreRegionalUniqueNamesEnabled
+				and self.AreRegionalUniqueNamesEnabled()
+				or false,
+			structuredWhoFilters = whoFrame
+				and whoFrame.HasStructuredWhoFilters
+				and whoFrame:HasStructuredWhoFilters()
+				or false,
 		},
 	}
 end
@@ -453,8 +474,6 @@ local BFL_SOCIAL_BINDING = "BETTERFRIENDLIST_TOGGLE"
 local SOCIAL_BINDING_MIGRATION_VERSION = "2.5.6-social-keybind-v1"
 local CLASSIC_GUILD_UI_CVAR = "useClassicGuildUI"
 
-_G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = "Toggle BetterFriendlist"
-
 -- Mock Friend Invites System (for testing)
 BFL.MockFriendInvites = {
 	enabled = false,
@@ -679,9 +698,24 @@ function BFL:IsGuildTabEnabled()
 	return enabled
 end
 
+function BFL.ShouldDeferBindingGlobalWrite(isForever, globalsReady)
+	return isForever == true and globalsReady ~= true
+end
+
 function BFL:UpdateBindingGlobals()
+	-- Forever loads its protected Group Finder from PLAYER_ENTERING_WORLD. If
+	-- Blizzard's keybinding index reads an addon-written BINDING_NAME global in
+	-- that same execution chain, the subsequent LFG initialization is tainted.
+	-- Publish the display label only after that event has fully unwound.
+	if self.ShouldDeferBindingGlobalWrite(self.IsForever, self.foreverBindingGlobalsReady) then
+		self.pendingBindingGlobalsUpdate = true
+		return false
+	end
+
 	local L = self.L or _G.BFL_L
 	_G.BINDING_NAME_BETTERFRIENDLIST_TOGGLE = (L and L.KEYBIND_TOGGLE_BETTERFRIENDLIST) or "Toggle BetterFriendlist"
+	self.pendingBindingGlobalsUpdate = nil
+	return true
 end
 
 local function CollectBindingKeys(action)
@@ -962,18 +996,147 @@ local function RunNextFrame(callback)
 	end
 end
 
+function BFL.ShouldUseUISpecialFrames(isForever)
+	return isForever ~= true
+end
+
+local localEscapeHandlerFrames = setmetatable({}, { __mode = "k" })
+local pendingLocalEscapeHandlerFrames = setmetatable({}, { __mode = "k" })
+
+function BFL:IsLocalEscapeHandlerRestricted()
+	return type(InCombatLockdown) == "function" and InCombatLockdown() == true
+end
+
+local function SetLocalEscapeKeyboardPropagation(owner, propagate)
+	if not owner or type(owner.SetPropagateKeyboardInput) ~= "function" then
+		return false
+	end
+	if BFL:IsLocalEscapeHandlerRestricted() then
+		if propagate then
+			owner.BFL_LocalEscapePropagationPending = true
+		end
+		return false
+	end
+
+	owner:SetPropagateKeyboardInput(propagate)
+	if propagate then
+		owner.BFL_LocalEscapePropagationPending = nil
+	end
+	return true
+end
+
+local function RestoreLocalEscapeHandlerFrame(owner)
+	if not owner then
+		return false
+	end
+	if BFL:IsLocalEscapeHandlerRestricted() then
+		owner.BFL_LocalEscapePropagationPending = true
+		return false
+	end
+
+	if owner.BFL_LocalEscapeHidePending then
+		owner.BFL_LocalEscapeHidePending = nil
+		if type(owner.IsShown) ~= "function" or owner:IsShown() then
+			owner:Hide()
+		end
+	end
+
+	return SetLocalEscapeKeyboardPropagation(owner, true)
+end
+
+function BFL:RestoreLocalEscapeHandlersAfterCombat(targetFrame)
+	if self:IsLocalEscapeHandlerRestricted() then
+		return false
+	end
+
+	if targetFrame then
+		return RestoreLocalEscapeHandlerFrame(targetFrame)
+	end
+
+	for frame in pairs(pendingLocalEscapeHandlerFrames) do
+		pendingLocalEscapeHandlerFrames[frame] = nil
+		self:InstallLocalEscapeHandler(frame)
+	end
+	for frame in pairs(localEscapeHandlerFrames) do
+		RestoreLocalEscapeHandlerFrame(frame)
+	end
+	return true
+end
+
+-- Forever initializes its protected Group Finder later in the same
+-- PLAYER_ENTERING_WORLD call that closes UISpecialFrames. Reading an addon-owned
+-- frame from that global registry taints the remaining bootstrap and blocks
+-- C_LFGList.Search. Keep Escape handling local to BFL-owned frames instead.
+function BFL:InstallLocalEscapeHandler(frame)
+	if not frame then
+		return false
+	end
+	if frame.BFL_LocalEscapeHandlerInstalled then
+		return true
+	end
+	if type(frame.EnableKeyboard) ~= "function"
+		or type(frame.SetPropagateKeyboardInput) ~= "function"
+		or type(frame.HookScript) ~= "function"
+		or type(frame.Hide) ~= "function"
+	then
+		return false
+	end
+	if self:IsLocalEscapeHandlerRestricted() then
+		pendingLocalEscapeHandlerFrames[frame] = true
+		return false
+	end
+
+	frame.BFL_LocalEscapeHandlerInstalled = true
+	pendingLocalEscapeHandlerFrames[frame] = nil
+	localEscapeHandlerFrames[frame] = true
+	frame:EnableKeyboard(true)
+	SetLocalEscapeKeyboardPropagation(frame, true)
+	frame:HookScript("OnShow", function(owner)
+		SetLocalEscapeKeyboardPropagation(owner, true)
+	end)
+	frame:HookScript("OnKeyDown", function(owner, key)
+		if key ~= "ESCAPE" then
+			return
+		end
+
+		-- Consume only Escape; every other key continues to the normal binding
+		-- and edit-box handlers. Restricted frame operations are never attempted
+		-- during combat; the pending close is completed after lockdown instead.
+		if BFL:IsLocalEscapeHandlerRestricted() then
+			owner.BFL_LocalEscapeHidePending = true
+			owner.BFL_LocalEscapePropagationPending = true
+			return
+		end
+
+		SetLocalEscapeKeyboardPropagation(owner, false)
+		owner:Hide()
+		owner.BFL_LocalEscapePropagationPending = true
+		RunNextFrame(function()
+			RestoreLocalEscapeHandlerFrame(owner)
+		end)
+	end)
+	return true
+end
+
 function BFL:AddUniqueUISpecialFrame(frameName)
-	if not (frameName and UISpecialFrames) then
+	if not frameName then
 		return
+	end
+	if not self.ShouldUseUISpecialFrames(self.IsForever) then
+		return self:InstallLocalEscapeHandler(_G[frameName])
+	end
+	if not UISpecialFrames then
+		return false
 	end
 
 	for _, value in ipairs(UISpecialFrames) do
 		if value == frameName then
-			return
+			return true
 		end
 	end
 
 	tinsert(UISpecialFrames, frameName)
+	return true
 end
 
 function BFL:InstallBetterFriendsFrameEscapeHandler()
@@ -981,8 +1144,12 @@ function BFL:InstallBetterFriendsFrameEscapeHandler()
 		return
 	end
 
-	self.betterFriendsFrameEscapeHandlerInstalled = true
-	self:AddUniqueUISpecialFrame("BetterFriendsFrame")
+	if self:AddUniqueUISpecialFrame("BetterFriendsFrame") then
+		self.betterFriendsFrameEscapeHandlerInstalled = true
+		self.pendingBetterFriendsFrameEscapeHandlerInstall = nil
+	else
+		self.pendingBetterFriendsFrameEscapeHandlerInstall = true
+	end
 end
 
 function BFL.ResolveFriendsFrameRedirectTab(
@@ -1392,8 +1559,8 @@ function BFL:InstallFriendsFrameRedirects()
 	installRedirect("ShowFriends", function()
 		return directShow(1)
 	end)
-	-- BFL owns the Who entry point while it replaces the Friends frame, including
-	-- Forever where Blizzard otherwise routes ShowWhoPanel to LFGWhoListFrame.
+	-- BFL owns the Who entry point while it replaces the Friends frame,
+	-- including Forever where Blizzard otherwise routes it into Group Finder.
 	if self:ShouldInterceptNativeWhoPanel() then
 		installRedirect("ShowWhoPanel", function()
 			return BFL:HandleFriendsFrameRedirect("show", 2, nil, true)
@@ -1454,6 +1621,12 @@ function BFL:InstallFriendsFrameRedirects()
 			end
 
 			local requestedTab = NormalizeFriendsFrameTab(PanelTemplates_GetSelectedTab(FriendsFrame) or 1)
+			local whoModule = BFL:GetModule("WhoFrame")
+			local redirectAction = requestedTab == 2
+				and whoModule
+				and whoModule.nativeWhoRequestGuard
+				and "show"
+				or "toggle"
 			if PanelTemplates_SetTab then
 				PanelTemplates_SetTab(FriendsFrame, 1)
 			end
@@ -1469,7 +1642,10 @@ function BFL:InstallFriendsFrameRedirects()
 				end
 
 				BFL:HideBlizzardFriendsFrameForRedirect()
-				BFL:ConsumeFriendsFrameRedirect("toggle", requestedTab)
+				-- A native Who result may open FriendsFrame programmatically. Treat
+				-- that as an idempotent show, never as a second user toggle that
+				-- closes BFL's already-visible Who tab.
+				BFL:ConsumeFriendsFrameRedirect(redirectAction, requestedTab)
 			end)
 		end)
 	end
@@ -1907,7 +2083,20 @@ end
 -- Fix: On 12.0.0+, use securecallfunction() to call Blizzard APIs in a new secure
 -- execution context that does not inherit the caller's taint.
 
+function BFL:ShowWhisperRestrictionError()
+	local reason = self.GetAgeVerificationRestrictionTooltip
+		and self.GetAgeVerificationRestrictionTooltip()
+	if reason and UIErrorsFrame and UIErrorsFrame.AddExternalErrorMessage then
+		UIErrorsFrame:AddExternalErrorMessage(reason)
+	end
+	return reason
+end
+
 function BFL:SecureSendBNetTell(name, bnetIDAccount, displayName)
+	if self.CanSendWhisper and not self.CanSendWhisper() then
+		self:ShowWhisperRestrictionError()
+		return false
+	end
 	local safeName = name
 	if BFL:IsSecret(safeName) then
 		safeName = nil
@@ -1933,35 +2122,41 @@ function BFL:SecureSendBNetTell(name, bnetIDAccount, displayName)
 		else
 			BFL:DebugPrint("SecureSendBNetTell: Missing safe BNet account ID")
 		end
-		return
+		return safeBNetID ~= nil
 	end
-	if not safeName then return end
+	if not safeName then return false end
 	local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
-	if not func then return end
+	if not func then return false end
 	if BFL.HasSecretValues and securecallfunction then
 		securecallfunction(func, safeName)
 	else
 		func(safeName)
 	end
+	return true
 end
 
 function BFL:SecureSendTell(name)
-	if BFL:IsSecret(name) then
-		return
+	if self.CanSendWhisper and not self.CanSendWhisper() then
+		self:ShowWhisperRestrictionError()
+		return false
 	end
-	if not name then return end
+	if BFL:IsSecret(name) then
+		return false
+	end
+	if not name then return false end
 	-- Taint-Free Whisper: Use the BFL-owned composer instead of Blizzard chat.
 	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper then
 		BFL:OpenTaintFreeWhisper(name, name, nil, false)
-		return
+		return true
 	end
 	local func = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
-	if not func then return end
+	if not func then return false end
 	if BFL.HasSecretValues and securecallfunction then
 		securecallfunction(func, name)
 	else
 		func(name)
 	end
+	return true
 end
 
 function BFL:SecureOpenChat(msg)
@@ -2114,12 +2309,14 @@ function BFL:FireEventCallbacks(event, ...)
 	end
 end
 
--- Normalize WoW friend name to always include realm
--- If name doesn't contain "-", append current player's realm
--- This ensures consistent identification across connected realms
+-- Normalize a WoW friend identity. Traditional clients append the realm;
+-- regional-unique-name clients preserve the full first-name/surname identity.
 -- @param name: Friend name from API (e.g., "Name" or "Name-Realm")
--- @return: Normalized name with realm (e.g., "Name-Realm")
+-- @return: Normalized identity (e.g., "Name-Realm" or Forever's full name)
 function BFL:NormalizeWoWFriendName(name, playerRealm)
+	if self.NormalizePlayerIdentityName then
+		return self.NormalizePlayerIdentityName(name, nil, playerRealm)
+	end
 	if not name or name == "" then
 		return nil
 	end
@@ -2148,6 +2345,9 @@ end
 -- @return: Display name ("Renzai" if same realm, "Renzai-Blackhand" if different)
 function BFL:GetWoWFriendDisplayName(fullName)
 	if not fullName or fullName == "" then
+		return fullName
+	end
+	if self.AreRegionalUniqueNamesEnabled and self.AreRegionalUniqueNamesEnabled() then
 		return fullName
 	end
 
@@ -2460,6 +2660,7 @@ end
 -- Register initial events
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("UPDATE_BINDINGS")
 pcall(eventFrame.RegisterEvent, eventFrame, "BINDINGS_LOADED")
@@ -2593,7 +2794,20 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 				end)
 			end)
 		end
+	elseif event == "PLAYER_ENTERING_WORLD" then
+		if BFL.IsForever and not BFL.foreverBindingGlobalsReady then
+			-- Timers run after all PLAYER_ENTERING_WORLD handlers, including
+			-- Forever's protected Group Finder bootstrap.
+			C_Timer.After(0, function()
+				BFL.foreverBindingGlobalsReady = true
+				BFL:UpdateBindingGlobals()
+			end)
+		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
+		if BFL.pendingBetterFriendsFrameEscapeHandlerInstall then
+			BFL:InstallBetterFriendsFrameEscapeHandler()
+		end
+		BFL:RestoreLocalEscapeHandlersAfterCombat()
 		if BFL.pendingBlizzardFriendsFrameHide then
 			BFL:HideBlizzardFriendsFrameForRedirect()
 		end

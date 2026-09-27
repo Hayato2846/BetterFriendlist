@@ -5746,12 +5746,18 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 	for i = 1, numWoWFriends do
 		local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
 		if friendInfo then
-			-- Normalize name to always include realm for consistent identification
+			-- Normalize to a stable Name-Realm or regional full-name identity.
 			local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name, playerRealm)
 
 			if normalizedName then
-				-- Extract realm name from normalized name (Name-Realm)
-				local _, realmName = strsplit("-", normalizedName)
+				-- The second component is a realm only outside regional-unique-name
+				-- clients, where it may instead be a surname.
+				local _, realmName
+				if BFL.SplitPlayerName then
+					_, realmName = BFL.SplitPlayerName(normalizedName)
+				else
+					_, realmName = strsplit("-", normalizedName)
+				end
 
 				-- Classic Fallback: Ensure area is populated
 				-- C_FriendList might return nil area in some Classic versions
@@ -5765,7 +5771,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 
 				friend.type = "wow"
 				friend.index = i
-				friend.name = normalizedName -- Always includes realm: "Name-Realm"
+				friend.name = normalizedName
 				friend.guid = friendInfo.guid
 
 				-- PHASE 9.6: Cache UID
@@ -9618,10 +9624,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			end
 		else
 			bgR, bgG, bgB, bgA =
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.r,
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.g,
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.b,
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.a
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.r,
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.g,
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.b,
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.a
 		end
 
 		-- Explicit check for ANY change including Alpha
@@ -9818,10 +9824,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		local bgR, bgG, bgB, bgA
 		if friend.connected then
 			bgR, bgG, bgB, bgA =
-				FRIENDS_WOW_BACKGROUND_COLOR.r,
-				FRIENDS_WOW_BACKGROUND_COLOR.g,
-				FRIENDS_WOW_BACKGROUND_COLOR.b,
-				FRIENDS_WOW_BACKGROUND_COLOR.a
+				BFL.FRIENDS_WOW_BACKGROUND_COLOR.r,
+				BFL.FRIENDS_WOW_BACKGROUND_COLOR.g,
+				BFL.FRIENDS_WOW_BACKGROUND_COLOR.b,
+				BFL.FRIENDS_WOW_BACKGROUND_COLOR.a
 
 			-- Phase 4.1: Faction Background
 			if self.settingsCache.showFactionBg then
@@ -9835,10 +9841,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			end
 		else
 			bgR, bgG, bgB, bgA =
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.r,
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.g,
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.b,
-				FRIENDS_OFFLINE_BACKGROUND_COLOR.a
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.r,
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.g,
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.b,
+				BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR.a
 		end
 
 		if button.lastBgR ~= bgR or button.lastBgG ~= bgG or button.lastBgB ~= bgB or button.lastBgA ~= bgA then
@@ -10347,7 +10353,7 @@ function FriendsList:UpdateInviteButton(button, data)
 				return
 			end
 
-			local inviteID, accountName
+			local inviteID, accountName, friendLevel
 
 			-- Get invite info from mock or real API
 			if BFL.MockFriendInvites.enabled then
@@ -10355,12 +10361,14 @@ function FriendsList:UpdateInviteButton(button, data)
 				if mockInvite then
 					inviteID = mockInvite.inviteID
 					accountName = mockInvite.accountName
+					friendLevel = mockInvite.friendLevel
 				end
 			else
 				local inviteInfo = BFL.GetBNetFriendInviteInfo and BFL.GetBNetFriendInviteInfo(parent.inviteIndex)
 				if inviteInfo then
 					inviteID = inviteInfo.inviteID
 					accountName = inviteInfo.accountName
+					friendLevel = inviteInfo.friendLevel
 				end
 			end
 
@@ -10412,12 +10420,17 @@ function FriendsList:UpdateInviteButton(button, data)
 						end
 					end,
 				}
-				items[#items + 1] = {
-					text = BLOCK_INVITES or "Block Invites",
-					func = function()
-						BNSetBlocked(inviteID, true)
-					end,
-				}
+				if not BFL.CanBlockBNetFriendInvite or BFL.CanBlockBNetFriendInvite(friendLevel) then
+					items[#items + 1] = {
+						text = BLOCK_INVITES or "Block Invites",
+						destructive = true,
+						func = function()
+							if BFL.SetBNetBlocked then
+								BFL.SetBNetBlocked(inviteID, true)
+							end
+						end,
+					}
+				end
 			end
 
 			BFL.OpenSimpleContextMenu(self, "BFL_BNetInviteDeclineDropdown", items)

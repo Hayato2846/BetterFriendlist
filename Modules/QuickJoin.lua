@@ -219,6 +219,48 @@ local function GetFriendInfoByGUID(guid)
 	return nil
 end
 
+local function GetSafePlayerInfoByGUID(guid)
+	if (BFL.IsSecret and BFL:IsSecret(guid)) or guid == nil or type(GetPlayerInfoByGUID) ~= "function" then
+		return nil, nil, nil
+	end
+
+	local ok, name, realmName, level = pcall(function()
+		return select(6, GetPlayerInfoByGUID(guid))
+	end)
+	if not ok then
+		return nil, nil, nil
+	end
+
+	if BFL.IsSecret and BFL:IsSecret(name) then
+		name = nil
+	elseif type(name) ~= "string" or name == "" then
+		name = nil
+	end
+	if BFL.IsSecret and BFL:IsSecret(realmName) then
+		realmName = nil
+	elseif type(realmName) ~= "string" then
+		realmName = nil
+	end
+	if BFL.IsSecret and BFL:IsSecret(level) then
+		level = nil
+	elseif type(level) ~= "number" or level <= 0 then
+		level = nil
+	end
+
+	return name, realmName, level
+end
+
+local function FormatQuickJoinLevel(level)
+	if type(level) ~= "number" or level <= 0 then
+		return nil
+	end
+	local ok, text = pcall(string.format, (L and L.LEVEL_FORMAT) or "Lvl %d", level)
+	return ok and text or tostring(level)
+end
+
+QuickJoin.GetSafePlayerInfoByGUID = GetSafePlayerInfoByGUID
+QuickJoin.FormatPlayerLevel = FormatQuickJoinLevel
+
 --[[
 	Blizzard's SocialQueueUtil_GetRelationshipInfo (1:1 copy from SocialQueue.lua)
 	Returns: name, colorCode, relationshipType, playerLink
@@ -286,7 +328,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 
 	-- 3. CRITICAL FIX: GetPlayerInfoByGUID fallback (like Blizzard's SocialQueueUtil_GetRelationshipInfo)
 	-- This fixes "Unknown" name display for players without direct relationship
-	local name, normalizedRealmName = select(6, GetPlayerInfoByGUID(guid))
+	local name, normalizedRealmName = GetSafePlayerInfoByGUID(guid)
 
 	-- [STREAMER MODE CHECK FOR WOW FRIENDS]
 	if BFL.StreamerMode and BFL.StreamerMode:IsActive() and BFL.IsWoWFriend(guid) then
@@ -1363,12 +1405,22 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local groupTitle = nil
 	local activityName = nil
 	local leaderName = nil
+	local leaderLevel = nil
 	local comment = nil
 	local needTank, needHealer, needDamage = false, false, false
 
 	-- 12.0.0+: Track whether secret values are present (combat lockdown).
 	-- Secret values can be stored/concatenated/displayed but NOT compared/iterated.
 	local hasSecrets = self.groupInfo and self.groupInfo._hasSecretValues
+	local leaderInfoGUID = self.groupInfo and self.groupInfo.leaderGUID
+	if BFL.IsSecret and BFL:IsSecret(leaderInfoGUID) then
+		leaderInfoGUID = nil
+	end
+	if not leaderInfoGUID and self.displayedMembers and self.displayedMembers[1] then
+		leaderInfoGUID = self.displayedMembers[1].guid
+	end
+	local guidLeaderName, guidLeaderRealm
+	guidLeaderName, guidLeaderRealm, leaderLevel = GetSafePlayerInfoByGUID(leaderInfoGUID)
 
 	-- Get group title from first queue (this is searchResultInfo.name - "Wo ist Hayato")
 	if self.displayedQueues and #self.displayedQueues > 0 and self.displayedQueues[1] then
@@ -1405,10 +1457,10 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	if
 		self.groupInfo
 		and not self.groupInfo._isMock
-		and self.groupInfo.leaderGUID
+		and leaderInfoGUID
 		and C_BattleNet
 		and C_BattleNet.GetAccountInfoByGUID
-		and C_BattleNet.GetAccountInfoByGUID(self.groupInfo.leaderGUID)
+		and C_BattleNet.GetAccountInfoByGUID(leaderInfoGUID)
 	then
 		isBNetFriend = true
 	end
@@ -1456,22 +1508,15 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		if self.groupInfo and self.groupInfo.leaderName then
 			leaderName = self.groupInfo.leaderName
 		elseif self.displayedMembers and #self.displayedMembers > 0 and self.displayedMembers[1] then
-			local memberGuid = self.displayedMembers[1].guid
-			if memberGuid then
-				-- Check if this is a mock GUID first
-				if self.groupInfo and self.groupInfo._mockLeaderName then
-					leaderName = self.groupInfo._mockLeaderName
+			-- Check if this is a mock GUID first
+			if self.groupInfo and self.groupInfo._mockLeaderName then
+				leaderName = self.groupInfo._mockLeaderName
+			elseif guidLeaderName then
+				-- Format: "Name-Server" or just "Name" if same server
+				if guidLeaderRealm and guidLeaderRealm ~= "" and guidLeaderRealm ~= GetNormalizedRealmName() then
+					leaderName = guidLeaderName .. "-" .. guidLeaderRealm
 				else
-					-- Get CHARACTER name and realm from GUID (like Blizzard does)
-					local characterName, realmName = select(6, GetPlayerInfoByGUID(memberGuid))
-					if characterName then
-						-- Format: "Name-Server" or just "Name" if same server
-						if realmName and realmName ~= "" and realmName ~= GetNormalizedRealmName() then
-							leaderName = characterName .. "-" .. realmName
-						else
-							leaderName = characterName
-						end
-					end
+					leaderName = guidLeaderName
 				end
 			end
 		end
@@ -1556,6 +1601,10 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		then
 			leaderNameWithFaction = leaderName .. " (" .. factionName .. ")"
 		end
+	end
+	local leaderLevelText = not hasSecrets and FormatQuickJoinLevel(leaderLevel) or nil
+	if leaderLevelText then
+		leaderNameWithFaction = string.format("%s — %s", leaderNameWithFaction, leaderLevelText)
 	end
 
 	-- Use color code format like MemberCount: gold "Leader:" + white name

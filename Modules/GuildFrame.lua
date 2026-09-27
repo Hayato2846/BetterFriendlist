@@ -25,6 +25,18 @@ local STATUS_TEX_DND = _G.FRIENDS_TEXTURE_DND or "Interface\\FriendsFrame\\Statu
 local STATUS_TEX_MOBILE = "Interface\\ChatFrame\\UI-ChatIcon-ArmoryChat"
 local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local ROSTER_REFRESH_THROTTLE = 10 -- seconds (WoW server enforces this)
+local GUILD_HEADER_CONTENT_HEIGHT = 82
+local GUILD_HEADER_CONTENT_TOP = -28
+local GUILD_NEWS_MAX_ENTRIES = 50
+local GUILD_NEWS_ROW_HEIGHT = 15
+local GUILD_NEWS_FILTER_IDS = { 1, 2, 3, 4, 5, 6, 9 }
+local NEWS_GUILD_ACHIEVEMENT_TYPE = _G.NEWS_GUILD_ACHIEVEMENT or 0
+local NEWS_PLAYER_ACHIEVEMENT_TYPE = _G.NEWS_PLAYER_ACHIEVEMENT or 1
+local NEWS_DUNGEON_ENCOUNTER_TYPE = _G.NEWS_DUNGEON_ENCOUNTER or 2
+local NEWS_ITEM_LOOTED_TYPE = _G.NEWS_ITEM_LOOTED or 3
+local NEWS_ITEM_CRAFTED_TYPE = _G.NEWS_ITEM_CRAFTED or 4
+local NEWS_ITEM_PURCHASED_TYPE = _G.NEWS_ITEM_PURCHASED or 5
+local NEWS_LEGENDARY_LOOTED_TYPE = _G.NEWS_LEGENDARY_LOOTED or 8
 
 -- Sort modes
 local SORT_NAME = "name"
@@ -167,6 +179,56 @@ end
 local function ShouldUseGuildNicknames()
 	local DB = GetDB()
 	return DB and DB:Get("guildTabUseNicknames", true) ~= false
+end
+
+local function GetMemberProfession(member, professionID)
+	professionID = tonumber(professionID)
+	if not member or not professionID then
+		return nil
+	end
+	for slot = 1, 2 do
+		if tonumber(member["profession" .. slot .. "ID"]) == professionID then
+			return member["profession" .. slot .. "Name"]
+		end
+	end
+	return nil
+end
+
+local function GetGuildMOTDLabel()
+	return _G.GUILD_MOTD_LABEL
+		or (L and L.GUILD_MOTD_TOOLTIP_HEADER)
+		or "Message of the Day"
+end
+
+local function GetGuildProfessionLabel()
+	return _G.PROFESSIONS_COLUMN_LABEL
+		or _G.PROFESSIONS
+		or (L and L.FRIEND_TAGS_BLIZZARD_PROFESSIONS)
+		or "Professions"
+end
+
+local function FormatGuildLabeledText(label, text)
+	label = tostring(label or "")
+	text = tostring(text or "")
+	if text == "" then
+		return label
+	end
+	local separator = label:find("[:：]%s*$") and " " or ": "
+	return label .. separator .. text
+end
+
+local function SetGuildTextColor(fontString)
+	if not (fontString and fontString.SetTextColor) then
+		return
+	end
+	local guildColor = _G.ChatTypeInfo and _G.ChatTypeInfo.GUILD
+	local r = guildColor and tonumber(guildColor.r)
+	local g = guildColor and tonumber(guildColor.g)
+	local b = guildColor and tonumber(guildColor.b)
+	if not (r and g and b) and _G.GREEN_FONT_COLOR and _G.GREEN_FONT_COLOR.GetRGB then
+		r, g, b = _G.GREEN_FONT_COLOR:GetRGB()
+	end
+	fontString:SetTextColor(r or 0.25, g or 1, b or 0.25, 1)
 end
 
 local function IsSimpleModeEnabled()
@@ -321,6 +383,13 @@ function GuildFrame:Initialize()
 	end
 	self.sortReversed = {}
 	self.selectedMember = nil
+	self.professionFilterID = nil
+	self.professionFilterName = nil
+	self.guildNewsEntries = {}
+	self.guildNewsRequested = false
+	self.headerDetailMode = "motd"
+	self.guildMOTDText = ""
+	self.guildInfoText = nil
 	self.totalMembers = 0
 	self.onlineMembers = 0
 	self.suppressedForSecretValues = false
@@ -350,6 +419,14 @@ function GuildFrame:RegisterGuildEvents()
 		else
 			needsRenderOnShow = true
 		end
+	end, 50)
+
+	BFL:RegisterEventCallback("GUILD_NEWS_UPDATE", function()
+		local provider = GetGuildRosterData()
+		if provider and provider.InvalidateGuildNews then
+			provider:InvalidateGuildNews()
+		end
+		self:RefreshGuildNews()
 	end, 50)
 
 	BFL:RegisterEventCallback("PLAYER_GUILD_UPDATE", function(...)
@@ -433,6 +510,13 @@ function GuildFrame:OnPlayerGuildUpdate(unitTarget)
 	end
 
 	rosterDirty = true
+	self.professionFilterID = nil
+	self.professionFilterName = nil
+	self.guildNewsEntries = {}
+	self.guildNewsRequested = false
+	self.headerDetailMode = "motd"
+	self.guildMOTDText = ""
+	self.guildInfoText = nil
 	MarkDisplayListDirty(self)
 
 	-- Update empty state visibility
@@ -498,7 +582,8 @@ function GuildFrame:CollectRoster()
 		return
 	end
 
-	local members, counts = provider:CollectRoster()
+	local includeClubInfo = provider.HasClubMemberInfoAPI and provider:HasClubMemberInfoAPI() or false
+	local members, counts = provider:CollectRoster({ includeClubInfo = includeClubInfo })
 	self.guildMembers = members
 	self.totalMembers = counts and counts.total or #members
 	self.onlineMembers = counts and counts.online or 0
@@ -554,6 +639,13 @@ function GuildFrame:PassesFilter(member)
 		if member.online then return false end
 	end
 
+	if self.professionFilterID then
+		local professionName = GetMemberProfession(member, self.professionFilterID)
+		if not professionName then
+			return false
+		end
+	end
+
 	-- Search text
 	if self.searchText ~= "" then
 		local s = self.searchText
@@ -562,6 +654,8 @@ function GuildFrame:PassesFilter(member)
 		if (member.rank or ""):lower():find(s, 1, true) then return true end
 		if (member.zone or ""):lower():find(s, 1, true) then return true end
 		if (member.className or ""):lower():find(s, 1, true) then return true end
+		if (member.profession1Name or ""):lower():find(s, 1, true) then return true end
+		if (member.profession2Name or ""):lower():find(s, 1, true) then return true end
 		if (member.note or ""):lower():find(s, 1, true) then return true end
 		if CanViewOfficerNote() then
 			if (member.officerNote or ""):lower():find(s, 1, true) then return true end
@@ -752,6 +846,7 @@ function GuildFrame:Refresh()
 
 	-- Update header info
 	self:UpdateHeaderInfo()
+	self:UpdateGuildFeatureBar()
 	self:UpdateEmptyState()
 	self:UpdateFilterHighlight()
 
@@ -1007,12 +1102,18 @@ function GuildFrame:GetSortLabel(mode)
 end
 
 function GuildFrame:GetFilterLabel(mode)
+	local statusLabel
 	for _, option in ipairs(GetFilterOptions()) do
 		if option.value == mode then
-			return option.text
+			statusLabel = option.text
+			break
 		end
 	end
-	return FRIENDS_LIST_ONLINE or "Online"
+	statusLabel = statusLabel or FRIENDS_LIST_ONLINE or "Online"
+	if self.professionFilterName then
+		return statusLabel .. " · " .. self.professionFilterName
+	end
+	return statusLabel
 end
 
 local function IsModernDropdown(dropdown)
@@ -1158,24 +1259,752 @@ function GuildFrame:CreateFilterDropdown(frame)
 	end
 
 	frame.FilterDropdown = dropdown
-	local actions = GetGuildActions()
-	InitializeGuildDropdown(
-		dropdown,
-		actions and actions.GetFilterMenuItems and actions:GetFilterMenuItems(),
-		GetFilterOptions(),
-		function(value)
-			return self.filterMode == value
-		end,
-		function(value)
-			self:SetFilter(value)
-			self:RefreshFilterDropdown()
-		end,
-		function(value)
-			return self:GetFilterLabel(value)
-		end,
-		104
-	)
+	if not IsModernDropdown(dropdown) and BFL.SetDropdownWidth then
+		BFL.SetDropdownWidth(dropdown, 104)
+	end
+	if BFL.InitializeDropdown then
+		BFL.InitializeDropdown(dropdown, {
+			getSelectionText = function()
+				return self:GetFilterLabel(self.filterMode)
+			end,
+			populateRootDescription = function(rootDescription)
+				self:PopulateFilterMenu(rootDescription)
+			end,
+		}, function()
+			return false
+		end, function() end)
+	end
 	self:RefreshFilterDropdown()
+end
+
+local function CreateGuildFeatureIconButton(parent, iconPath, tooltipText, onClick)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(20, 20)
+	local selectedLine = button:CreateTexture(nil, "BORDER")
+	selectedLine:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT", 2, 0)
+	selectedLine:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 0)
+	selectedLine:SetHeight(2)
+	selectedLine:SetColorTexture(GetAccentColor(1, 0.82, 0, 0.95))
+	selectedLine:Hide()
+	button.selectedLine = selectedLine
+	local icon = button:CreateTexture(nil, "ARTWORK")
+	icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+	icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 3)
+	icon:SetTexture(iconPath)
+	icon:SetAlpha(0.76)
+	button.icon = icon
+	button:SetScript("OnClick", onClick)
+	button:SetScript("OnEnter", function(btn)
+		btn.icon:SetAlpha(1)
+		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+		local text = type(tooltipText) == "function" and tooltipText() or tooltipText
+		GameTooltip:SetText(text or "")
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function(btn)
+		btn.icon:SetAlpha(btn.selected and 1 or 0.76)
+		if GameTooltip:IsOwned(btn) then
+			GameTooltip:Hide()
+		end
+	end)
+	return button
+end
+
+local function SetGuildFeatureButtonSelected(button, selected)
+	if not button then
+		return
+	end
+	button.selected = selected == true
+	button.icon:SetAlpha(button.selected and 1 or 0.76)
+	button.selectedLine:SetShown(button.selected)
+end
+
+local function CreateGuildNewsScrollButton(parent, iconPath, onClick)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(14, 14)
+	local icon = button:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	icon:SetTexture(iconPath)
+	icon:SetAlpha(0.75)
+	button.icon = icon
+	button:SetScript("OnClick", onClick)
+	button:SetScript("OnEnter", function(btn)
+		btn.icon:SetAlpha(btn:IsEnabled() and 1 or 0.3)
+	end)
+	button:SetScript("OnLeave", function(btn)
+		btn.icon:SetAlpha(btn:IsEnabled() and 0.75 or 0.3)
+	end)
+	return button
+end
+
+function GuildFrame:CreateGuildFeatureBar(frame)
+	if not frame or frame.FeatureBar then
+		return frame and frame.FeatureBar
+	end
+
+	local bar = CreateFrame("Frame", nil, frame.ListInset)
+	bar:SetPoint("TOPLEFT", frame.ListInset, "TOPLEFT", 4, -4)
+	bar:SetPoint("TOPRIGHT", frame.ListInset, "TOPRIGHT", -4, -4)
+	bar:SetHeight(GUILD_HEADER_CONTENT_HEIGHT)
+	local background = bar:CreateTexture(nil, "BACKGROUND")
+	background:SetAllPoints()
+	background:SetColorTexture(0.04, 0.04, 0.04, 0.72)
+	bar.background = background
+	local divider = bar:CreateTexture(nil, "BORDER")
+	divider:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+	divider:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+	divider:SetHeight(1)
+	divider:SetColorTexture(GetAccentColor(1, 0.82, 0, 0.3))
+	bar.divider = divider
+
+	bar.motdButton = CreateGuildFeatureIconButton(
+		bar,
+		"Interface\\AddOns\\BetterFriendlist\\Icons\\message-square.blp",
+		function()
+			return GetGuildMOTDLabel()
+		end,
+		function()
+			self:SetGuildHeaderMode("motd")
+		end
+	)
+	bar.newsButton = CreateGuildFeatureIconButton(
+		bar,
+		"Interface\\AddOns\\BetterFriendlist\\Icons\\rss.blp",
+		function()
+			return (BFL.L and BFL.L.GUILD_NEWS_TOOLTIP) or "Refresh and show recent guild news"
+		end,
+		function()
+			self:SetGuildHeaderMode("news")
+		end
+	)
+
+	bar.newsFilterButton = CreateGuildFeatureIconButton(
+		bar,
+		"Interface\\AddOns\\BetterFriendlist\\Icons\\filter.blp",
+		_G.GUILD_NEWS_FILTERS or _G.FILTERS or "Filters",
+		function(button)
+			self:ShowGuildNewsFilterMenu(button)
+		end
+	)
+
+	bar.infoButton = CreateGuildFeatureIconButton(
+		bar,
+		"Interface\\AddOns\\BetterFriendlist\\Icons\\info.blp",
+		function()
+			return (BFL.L and BFL.L.GUILD_INFO_TOOLTIP) or "Show guild information"
+		end,
+		function()
+			self:SetGuildHeaderMode("info")
+		end
+	)
+
+	bar.detailText = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	ApplyDefaultSlugToFontString(bar.detailText)
+	bar.detailText:SetPoint("TOPLEFT", bar, "TOPLEFT", 7, -29)
+	bar.detailText:SetPoint("RIGHT", bar, "RIGHT", -7, 0)
+	bar.detailText:SetJustifyH("LEFT")
+	bar.detailText:SetJustifyV("TOP")
+	bar.detailText:SetWordWrap(true)
+	bar.detailText:SetNonSpaceWrap(true)
+	bar.detailText:SetMaxLines(3)
+	bar.detailText:SetTextColor(0.75, 0.75, 0.75)
+	bar.detailText:Hide()
+
+	bar.newsViewport = CreateFrame("ScrollFrame", nil, bar)
+	bar.newsViewport:SetPoint("TOPLEFT", bar, "TOPLEFT", 7, -28)
+	bar.newsViewport:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -21, 4)
+	bar.newsViewport:EnableMouseWheel(true)
+	bar.newsViewport:Hide()
+	bar.newsContent = CreateFrame("Frame", nil, bar.newsViewport)
+	bar.newsContent:SetSize(1, 1)
+	bar.newsViewport:SetScrollChild(bar.newsContent)
+	bar.newsRows = {}
+	bar.newsViewport:SetScript("OnSizeChanged", function(scrollFrame, width)
+		bar.newsContent:SetWidth(math.max(1, width))
+	end)
+	bar.newsViewport:SetScript("OnMouseWheel", function(scrollFrame, delta)
+		self:ScrollGuildNews(-delta * GUILD_NEWS_ROW_HEIGHT)
+	end)
+	bar.newsViewport:SetScript("OnVerticalScroll", function()
+		self:UpdateGuildNewsScrollControls()
+	end)
+	bar.newsViewport:SetScript("OnScrollRangeChanged", function()
+		self:UpdateGuildNewsScrollControls()
+	end)
+
+	bar.newsScrollUp = CreateGuildNewsScrollButton(
+		bar,
+		"Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-up.blp",
+		function() self:ScrollGuildNews(-GUILD_NEWS_ROW_HEIGHT) end
+	)
+	bar.newsScrollUp:SetPoint("TOPRIGHT", bar, "TOPRIGHT", -4, -29)
+	bar.newsScrollDown = CreateGuildNewsScrollButton(
+		bar,
+		"Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down.blp",
+		function() self:ScrollGuildNews(GUILD_NEWS_ROW_HEIGHT) end
+	)
+	bar.newsScrollDown:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -4, 4)
+	bar.newsScrollUp:Hide()
+	bar.newsScrollDown:Hide()
+
+	frame.FeatureBar = bar
+	return bar
+end
+
+function GuildFrame:UpdateGuildListAnchors()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	if not frame or not frame.ListInset then
+		return
+	end
+	local bar = frame.FeatureBar
+	local useBar = bar and bar:IsShown()
+
+	if BFL.HasModernScrollBox and frame.ScrollBox then
+		local scrollBarReserve, scrollBarGap, scrollBarWidth = self:GetRetailScrollBarGeometry()
+		frame.ScrollBox:ClearAllPoints()
+		if useBar then
+			frame.ScrollBox:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -2)
+		else
+			frame.ScrollBox:SetPoint("TOPLEFT", frame.ListInset, "TOPLEFT", 4, -4)
+		end
+		frame.ScrollBox:SetPoint("BOTTOMRIGHT", frame.ListInset, "BOTTOMRIGHT", -scrollBarReserve, 2)
+		if frame.ScrollBar then
+			frame.ScrollBar:ClearAllPoints()
+			frame.ScrollBar:SetWidth(scrollBarWidth)
+			frame.ScrollBar:SetPoint("TOPLEFT", frame.ScrollBox, "TOPRIGHT", scrollBarGap, 0)
+			frame.ScrollBar:SetPoint("BOTTOMLEFT", frame.ScrollBox, "BOTTOMRIGHT", scrollBarGap, 0)
+		end
+	elseif frame.FauxScroll then
+		frame.FauxScroll:ClearAllPoints()
+		if useBar then
+			frame.FauxScroll:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 6, -2)
+		else
+			frame.FauxScroll:SetPoint("TOPLEFT", frame.ListInset, "TOPLEFT", 10, -2)
+		end
+		frame.FauxScroll:SetPoint("BOTTOMRIGHT", frame.ListInset, "BOTTOMRIGHT", -22, 18)
+	end
+end
+
+function GuildFrame:SetProfessionFilter(professionID, professionName)
+	professionID = tonumber(professionID)
+	if professionID and professionID <= 0 then
+		professionID = nil
+	end
+	if self.professionFilterID == professionID then
+		return
+	end
+	self.professionFilterID = professionID
+	self.professionFilterName = professionID and professionName or nil
+	MarkDisplayListDirty(self)
+	self:RefreshFilterDropdown()
+	self:RefreshHeaderControls(true)
+	self:Refresh()
+end
+
+function GuildFrame:GetProfessionFilterMenuItems()
+	local provider = GetGuildRosterData()
+	if not (provider and provider.HasClubMemberInfoAPI and provider:HasClubMemberInfoAPI()) then
+		return nil
+	end
+	local catalog = provider and provider.GetProfessionCatalog and provider:GetProfessionCatalog(self.guildMembers) or {}
+	local items = {
+		{
+			type = "radio",
+			text = (L and L.GUILD_PROFESSION_ALL) or "All Professions",
+			checked = function() return self.professionFilterID == nil end,
+			func = function() self:SetProfessionFilter(nil) end,
+		},
+	}
+	for _, profession in ipairs(catalog) do
+		local professionID = profession.id
+		local professionName = profession.name
+		items[#items + 1] = {
+			type = "radio",
+			text = professionName,
+			checked = function() return self.professionFilterID == professionID end,
+			func = function() self:SetProfessionFilter(professionID, professionName) end,
+		}
+	end
+	return items
+end
+
+local function IsGuildNewsAchievement(newsType)
+	return newsType == NEWS_GUILD_ACHIEVEMENT_TYPE or newsType == NEWS_PLAYER_ACHIEVEMENT_TYPE
+end
+
+local function IsGuildNewsLoot(newsType)
+	return newsType == NEWS_ITEM_LOOTED_TYPE
+		or newsType == NEWS_ITEM_CRAFTED_TYPE
+		or newsType == NEWS_ITEM_PURCHASED_TYPE
+		or newsType == NEWS_LEGENDARY_LOOTED_TYPE
+end
+
+local function FormatGuildNewsEntry(entry)
+	if type(entry) ~= "table" then
+		return ""
+	end
+	local newsType = tonumber(entry.newsType) or 0
+	local whoText = tostring(entry.whoText or ""):gsub("[%c]+", " ")
+	local whatText = tostring(entry.whatText or ""):gsub("[%c]+", " ")
+	local text1 = whoText
+	local text2 = whatText
+	local achievementColor = _G.ACHIEVEMENT_COLOR_CODE or "|cffffff00"
+	if newsType == NEWS_GUILD_ACHIEVEMENT_TYPE and whatText ~= "" then
+		text1 = achievementColor .. "[" .. whatText .. "]|r"
+		text2 = ""
+	elseif newsType == NEWS_PLAYER_ACHIEVEMENT_TYPE and whatText ~= "" then
+		text2 = achievementColor .. "[" .. whatText .. "]|r"
+	end
+
+	local formatString = _G["GUILD_NEWS_FORMAT" .. newsType]
+	if type(formatString) == "string" and formatString ~= "" then
+		local ok, formatted = pcall(string.format, formatString, text1, text2)
+		if ok and type(formatted) == "string" and formatted ~= "" then
+			return formatted
+		end
+	end
+	if whoText ~= "" and whatText ~= "" then
+		return whoText .. " - " .. whatText
+	end
+	return whoText ~= "" and whoText or whatText
+end
+
+function GuildFrame:ShowGuildNewsFilterMenu(owner)
+	local provider = GetGuildRosterData()
+	if not (BFL.OpenSimpleContextMenu and provider and provider.HasGuildNewsFilterAPI
+		and provider:HasGuildNewsFilterAPI())
+	then
+		return
+	end
+
+	local items = {
+		{ type = "title", text = _G.GUILD_NEWS_FILTERS or _G.FILTERS or "Filters" },
+	}
+	for _, filterID in ipairs(GUILD_NEWS_FILTER_IDS) do
+		if not provider.IsGuildNewsFilterAvailable or provider:IsGuildNewsFilterAvailable(filterID) then
+			local capturedID = filterID
+			items[#items + 1] = {
+				type = "checkbox",
+				text = _G["GUILD_NEWS_FILTER" .. capturedID] or tostring(capturedID),
+				keepShownOnClick = true,
+				checked = function()
+					local filters = provider:GetGuildNewsFilters()
+					return filters[capturedID] == true
+				end,
+				func = function()
+					local filters = provider:GetGuildNewsFilters()
+					if provider:SetGuildNewsFilter(capturedID, filters[capturedID] ~= true) then
+						self.headerDetailMode = "news"
+						self:RefreshGuildNews()
+					end
+					return MenuResponse and MenuResponse.Refresh
+				end,
+			}
+		end
+	end
+	BFL.OpenSimpleContextMenu(owner or UIParent, "BFL_GuildNewsFilters", items)
+end
+
+function GuildFrame:UpdateGuildNewsScrollControls()
+	local bar = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+		and BetterFriendsFrame.GuildFrame.FeatureBar
+	if not (bar and bar.newsViewport and bar.newsScrollUp and bar.newsScrollDown) then
+		return
+	end
+	local range = math.max(0, bar.newsViewport:GetVerticalScrollRange() or 0)
+	local offset = math.max(0, math.min(bar.newsViewport:GetVerticalScroll() or 0, range))
+	local showControls = bar.newsViewport:IsShown() and range > 0.5
+	bar.newsScrollUp:SetShown(showControls)
+	bar.newsScrollDown:SetShown(showControls)
+	if not showControls then
+		return
+	end
+	local canScrollUp = offset > 0.5
+	local canScrollDown = offset < range - 0.5
+	bar.newsScrollUp:SetEnabled(canScrollUp)
+	bar.newsScrollDown:SetEnabled(canScrollDown)
+	bar.newsScrollUp.icon:SetAlpha(canScrollUp and 0.75 or 0.3)
+	bar.newsScrollDown.icon:SetAlpha(canScrollDown and 0.75 or 0.3)
+end
+
+function GuildFrame:ScrollGuildNews(delta)
+	local bar = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+		and BetterFriendsFrame.GuildFrame.FeatureBar
+	if not (bar and bar.newsViewport and bar.newsViewport:IsShown()) then
+		return
+	end
+	local range = math.max(0, bar.newsViewport:GetVerticalScrollRange() or 0)
+	local offset = math.max(0, math.min((bar.newsViewport:GetVerticalScroll() or 0) + delta, range))
+	bar.newsViewport:SetVerticalScroll(offset)
+	self:UpdateGuildNewsScrollControls()
+end
+
+function GuildFrame:ShowGuildNewsEntryTooltip(row)
+	local entry = row and row.entry
+	if type(entry) ~= "table" then
+		return
+	end
+	local newsType = tonumber(entry.newsType) or 0
+	GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+	if IsGuildNewsLoot(newsType) and type(entry.whatText) == "string" and entry.whatText:find("|H", 1, true) then
+		local ok = pcall(GameTooltip.SetHyperlink, GameTooltip, entry.whatText)
+		if ok then
+			GameTooltip:Show()
+			return
+		end
+	elseif IsGuildNewsAchievement(newsType) and type(GetAchievementInfo) == "function" then
+		local results = { pcall(GetAchievementInfo, tonumber(entry.newsDataID) or 0) }
+		local name = results[3]
+		local description = results[9]
+		if results[1] and type(name) == "string" and name ~= "" then
+			GameTooltip:SetText((_G.ACHIEVEMENT_COLOR_CODE or "|cffffff00") .. name .. "|r")
+			if type(description) == "string" and description ~= "" then
+				GameTooltip:AddLine(description, 1, 1, 1, true)
+			end
+			GameTooltip:Show()
+			return
+		end
+	elseif newsType == NEWS_DUNGEON_ENCOUNTER_TYPE then
+		local title = tostring(entry.whatText or "")
+		local zone
+		if type(GetRealZoneText) == "function" and type(entry.data) == "table" and entry.data[1] then
+			local ok, result = pcall(GetRealZoneText, entry.data[1])
+			if ok and type(result) == "string" then
+				zone = result
+			end
+		end
+		if title ~= "" then
+			GameTooltip:SetText(title)
+			if zone and zone ~= "" then
+				GameTooltip:AddLine(zone, 1, 1, 1)
+			end
+			GameTooltip:Show()
+			return
+		end
+	end
+
+	if row.text and row.text:IsTruncated() then
+		GameTooltip:SetText(row.displayText or "")
+		GameTooltip:Show()
+	end
+end
+
+local function LinkGuildNewsItem(entry)
+	if type(entry) ~= "table" then
+		return false
+	end
+	if ChatFrameUtil and type(ChatFrameUtil.LinkItem) == "function" then
+		return pcall(ChatFrameUtil.LinkItem, tonumber(entry.newsDataID) or 0, entry.whatText)
+	end
+	if type(ChatEdit_InsertLink) == "function" and type(entry.whatText) == "string" then
+		return pcall(ChatEdit_InsertLink, entry.whatText)
+	end
+	return false
+end
+
+function GuildFrame:OpenGuildNewsEntryMenu(owner, entry)
+	if not (BFL.OpenSimpleContextMenu and type(entry) == "table") then
+		return
+	end
+	local newsType = tonumber(entry.newsType) or 0
+	local items = {
+		{ type = "title", text = tostring(entry.whatText or entry.whoText or "") },
+	}
+	if IsGuildNewsAchievement(newsType) and type(ShowAchievementFrameForAchievement) == "function" then
+		items[#items + 1] = {
+			text = _G.GUILD_NEWS_VIEW_ACHIEVEMENT or _G.ACHIEVEMENTS or "Achievement",
+			func = function()
+				pcall(ShowAchievementFrameForAchievement, tonumber(entry.newsDataID) or 0)
+			end,
+		}
+	elseif IsGuildNewsLoot(newsType) then
+		items[#items + 1] = {
+			text = _G.GUILD_NEWS_LINK_ITEM or _G.ITEM_LINK or _G.LINK or "Link Item",
+			func = function() LinkGuildNewsItem(entry) end,
+		}
+	end
+	if #items > 1 then
+		BFL.OpenSimpleContextMenu(owner or UIParent, "BFL_GuildNewsEntry", items)
+	end
+end
+
+function GuildFrame:ActivateGuildNewsEntry(row, mouseButton)
+	local entry = row and row.entry
+	if type(entry) ~= "table" then
+		return
+	end
+	local newsType = tonumber(entry.newsType) or 0
+	if mouseButton == "RightButton" then
+		self:OpenGuildNewsEntryMenu(row, entry)
+		return
+	end
+	if IsGuildNewsAchievement(newsType) and type(ShowAchievementFrameForAchievement) == "function" then
+		pcall(ShowAchievementFrameForAchievement, tonumber(entry.newsDataID) or 0)
+	elseif IsGuildNewsLoot(newsType) and type(entry.whatText) == "string" then
+		if type(HandleModifiedItemClick) == "function" then
+			local ok, handled = pcall(HandleModifiedItemClick, entry.whatText)
+			if ok and handled then
+				return
+			end
+		end
+		if type(SetItemRef) == "function" then
+			local link = entry.whatText:match("|H([^|]+)|h")
+			local text = entry.whatText:match("|h(.-)|h") or entry.whatText
+			if link then
+				pcall(SetItemRef, link, text, "LeftButton", DEFAULT_CHAT_FRAME)
+			end
+		end
+	end
+end
+
+function GuildFrame:GetGuildNewsRow(bar, index)
+	local row = bar.newsRows[index]
+	if row then
+		return row
+	end
+	row = CreateFrame("Button", nil, bar.newsContent)
+	row:SetHeight(GUILD_NEWS_ROW_HEIGHT)
+	row:SetPoint("TOPLEFT", bar.newsContent, "TOPLEFT", 0, -((index - 1) * GUILD_NEWS_ROW_HEIGHT))
+	row:SetPoint("TOPRIGHT", bar.newsContent, "TOPRIGHT", 0, -((index - 1) * GUILD_NEWS_ROW_HEIGHT))
+	row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	row:EnableMouseWheel(true)
+	local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+	highlight:SetAllPoints()
+	highlight:SetColorTexture(GetAccentColor(1, 0.82, 0, 0.1))
+	row.highlight = highlight
+	row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	ApplyDefaultSlugToFontString(row.text)
+	row.text:SetPoint("LEFT", row, "LEFT", 0, 0)
+	row.text:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+	row.text:SetJustifyH("LEFT")
+	row.text:SetWordWrap(false)
+	row.text:SetMaxLines(1)
+	row:SetScript("OnClick", function(button, mouseButton)
+		self:ActivateGuildNewsEntry(button, mouseButton)
+	end)
+	row:SetScript("OnEnter", function(button)
+		self:ShowGuildNewsEntryTooltip(button)
+	end)
+	row:SetScript("OnLeave", function(button)
+		if GameTooltip:IsOwned(button) then
+			GameTooltip:Hide()
+		end
+	end)
+	row:SetScript("OnMouseWheel", function(_, delta)
+		self:ScrollGuildNews(-delta * GUILD_NEWS_ROW_HEIGHT)
+	end)
+	bar.newsRows[index] = row
+	return row
+end
+
+function GuildFrame:RenderGuildNews(bar)
+	if not (bar and bar.newsViewport and bar.newsContent) then
+		return 0
+	end
+	for _, row in ipairs(bar.newsRows) do
+		row:Hide()
+	end
+
+	local visibleCount = 0
+	for _, entry in ipairs(self.guildNewsEntries or {}) do
+		local text = FormatGuildNewsEntry(entry)
+		if text ~= "" then
+			visibleCount = visibleCount + 1
+			local row = self:GetGuildNewsRow(bar, visibleCount)
+			row.entry = entry
+			row.displayText = text
+			row.text:SetText("|cffd7b75b•|r " .. text)
+			row:Show()
+		end
+	end
+	bar.newsContent:SetHeight(math.max(1, visibleCount * GUILD_NEWS_ROW_HEIGHT))
+	if self.guildNewsResetScroll then
+		bar.newsViewport:SetVerticalScroll(0)
+		self.guildNewsResetScroll = false
+	end
+	self:UpdateGuildNewsScrollControls()
+	return visibleCount
+end
+
+function GuildFrame:RefreshGuildNews()
+	local provider = GetGuildRosterData()
+	if not (provider and provider.HasGuildNewsAPI and provider:HasGuildNewsAPI()) then
+		self.guildNewsEntries = {}
+		return
+	end
+	self.guildNewsEntries = provider and provider.CollectGuildNews
+		and provider:CollectGuildNews(GUILD_NEWS_MAX_ENTRIES) or {}
+	self.guildNewsResetScroll = true
+	if IsGuildFrameVisible() then
+		self:UpdateGuildFeatureBar()
+	end
+end
+
+function GuildFrame:RequestGuildNews(force)
+	if self.guildNewsRequested and not force then
+		return true
+	end
+	local provider = GetGuildRosterData()
+	if not (provider and provider.HasGuildNewsAPI and provider:HasGuildNewsAPI()) then
+		return false
+	end
+	self.guildNewsRequested = true
+	local requested = provider.RequestGuildNews and provider:RequestGuildNews() or false
+	self:RefreshGuildNews()
+	return requested
+end
+
+function GuildFrame:SetGuildHeaderMode(mode)
+	if mode ~= "motd" and mode ~= "info" and mode ~= "news" then
+		mode = "motd"
+	end
+
+	local provider = GetGuildRosterData()
+	if mode == "info" then
+		if not (provider and provider.HasGuildInfoTextAPI and provider:HasGuildInfoTextAPI()) then
+			mode = "motd"
+		else
+			self.guildInfoText = provider.GetGuildInfoText and provider:GetGuildInfoText() or ""
+		end
+	elseif mode == "news" then
+		if not (provider and provider.HasGuildNewsAPI and provider:HasGuildNewsAPI()) then
+			mode = "motd"
+		end
+	end
+
+	self.headerDetailMode = mode
+	if mode == "news" then
+		-- Match Blizzard's Guild News panel: entering the view always requests
+		-- current server data and applies the active filters/sticky ordering.
+		self:RequestGuildNews(true)
+	end
+	self:UpdateGuildFeatureBar()
+	self:UpdateHeaderEditButtons()
+end
+
+-- Kept as a compatibility entry point for callers from older UI revisions.
+function GuildFrame:ToggleGuildInfo()
+	self:SetGuildHeaderMode("info")
+end
+
+function GuildFrame:LayoutGuildHeaderButtons(frame, bar, showInfo, showNews, reserveNewsFilter)
+	local buttons = {}
+	buttons[#buttons + 1] = bar.motdButton
+	if showInfo then
+		buttons[#buttons + 1] = bar.infoButton
+	end
+	if showNews then
+		buttons[#buttons + 1] = bar.newsButton
+	end
+	if reserveNewsFilter then
+		buttons[#buttons + 1] = bar.newsFilterButton
+	end
+
+	for _, button in ipairs({ bar.motdButton, bar.infoButton, bar.newsFilterButton, bar.newsButton }) do
+		button:ClearAllPoints()
+	end
+
+	local previous
+	for index = #buttons, 1, -1 do
+		local button = buttons[index]
+		if previous then
+			button:SetPoint("RIGHT", previous, "LEFT", -2, 0)
+		else
+			button:SetPoint("TOPRIGHT", bar, "TOPRIGHT", -3, -3)
+		end
+		previous = button
+	end
+end
+
+function GuildFrame:LayoutGuildHeaderContent(frame, bar)
+	local detailRight = frame.MOTDEditButton and frame.MOTDEditButton:IsShown() and -25 or -7
+	bar.detailText:ClearAllPoints()
+	bar.detailText:SetPoint("TOPLEFT", bar, "TOPLEFT", 7, GUILD_HEADER_CONTENT_TOP)
+	bar.detailText:SetPoint("RIGHT", bar, "RIGHT", detailRight, 0)
+	bar.detailText:SetMaxLines(BFL.IsClassic and 3 or 5)
+
+	bar.newsViewport:ClearAllPoints()
+	bar.newsViewport:SetPoint("TOPLEFT", bar, "TOPLEFT", 7, GUILD_HEADER_CONTENT_TOP + 1)
+	bar.newsViewport:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -21, 4)
+	bar.newsScrollUp:ClearAllPoints()
+	bar.newsScrollUp:SetPoint("TOPRIGHT", bar, "TOPRIGHT", -4, GUILD_HEADER_CONTENT_TOP)
+end
+
+function GuildFrame:UpdateGuildFeatureBar()
+	local frame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+	if not frame or not frame.ListInset then
+		return
+	end
+	local bar = self:CreateGuildFeatureBar(frame)
+	local provider = GetGuildRosterData()
+	local inGuild = provider and provider.IsInGuild and provider:IsInGuild() or false
+	local showInfo = provider and provider.HasGuildInfoTextAPI and provider:HasGuildInfoTextAPI()
+	local showNews = provider and provider.HasGuildNewsAPI and provider:HasGuildNewsAPI()
+	local showBar = inGuild
+	bar:SetShown(showBar)
+	if not showBar then
+		self:UpdateGuildListAnchors()
+		return
+	end
+	if not self.headerDetailMode
+		or (self.headerDetailMode == "info" and not showInfo)
+		or (self.headerDetailMode == "news" and not showNews)
+	then
+		self.headerDetailMode = "motd"
+	end
+
+	bar.motdButton:Show()
+	bar.infoButton:SetShown(showInfo)
+	bar.newsButton:SetShown(showNews)
+	local hasNewsFilters = showNews
+		and provider.HasGuildNewsFilterAPI and provider:HasGuildNewsFilterAPI()
+	local showNewsFilters = hasNewsFilters and self.headerDetailMode == "news"
+	bar.newsFilterButton:SetShown(showNewsFilters)
+	-- Keep the filter slot reserved in every header view so the MOTD, info, and
+	-- news buttons do not move when the filter itself appears in Guild News.
+	self:LayoutGuildHeaderButtons(frame, bar, showInfo, showNews, hasNewsFilters)
+	self:LayoutGuildHeaderContent(frame, bar)
+	SetGuildFeatureButtonSelected(bar.motdButton, self.headerDetailMode == "motd")
+	SetGuildFeatureButtonSelected(bar.infoButton, self.headerDetailMode == "info")
+	SetGuildFeatureButtonSelected(bar.newsButton, self.headerDetailMode == "news")
+	local detailText = ""
+	local showNewsViewport = false
+	if self.headerDetailMode == "motd" then
+		local motd = tostring(self.guildMOTDText or "")
+		detailText = FormatGuildLabeledText(GetGuildMOTDLabel(), motd)
+	elseif self.headerDetailMode == "info" and showInfo then
+		detailText = tostring(self.guildInfoText or ""):gsub("|n", " "):gsub("\\n", " "):gsub("\n", " ")
+		if detailText == "" then
+			detailText = (L and L.GUILD_INFO_EMPTY) or "No guild information is available."
+		end
+	elseif self.headerDetailMode == "news" and showNews then
+		showNewsViewport = true
+		bar.newsViewport:Show()
+		local visibleNews = self:RenderGuildNews(bar)
+		if visibleNews == 0 then
+			showNewsViewport = false
+			bar.newsViewport:Hide()
+			detailText = (L and L.GUILD_NEWS_EMPTY) or "No recent guild news is available."
+		end
+	end
+
+	bar.newsViewport:SetShown(showNewsViewport)
+	if not showNewsViewport then
+		bar.newsScrollUp:Hide()
+		bar.newsScrollDown:Hide()
+	end
+	bar.detailText:SetText(detailText)
+	bar.detailText:SetShown(detailText ~= "")
+	if self.headerDetailMode == "motd" or self.headerDetailMode == "info" then
+		SetGuildTextColor(bar.detailText)
+	else
+		bar.detailText:SetTextColor(0.75, 0.75, 0.75, 1)
+	end
+	bar:SetHeight(GUILD_HEADER_CONTENT_HEIGHT)
+	if showNewsViewport then
+		self:UpdateGuildNewsScrollControls()
+	end
+	self:UpdateGuildListAnchors()
 end
 
 function GuildFrame:OnLoad(frame)
@@ -1192,7 +2021,7 @@ function GuildFrame:OnLoad(frame)
 	-- XML anchors use positive y offsets (UP from ListInset), designed for WhoFrame.
 	-- We override ALL positions for the guild-specific top-down layout.
 	-- Dynamic elements (SearchBox, Filters, ListInset) are repositioned in
-	-- UpdateLayout() whenever MOTD height changes.
+	-- UpdateLayout(). MOTD, news and guild information share one content area.
 	if not BFL.IsClassic then
 		local inset = frame:GetParent() and frame:GetParent().Inset
 		if inset then
@@ -1202,19 +2031,11 @@ function GuildFrame:OnLoad(frame)
 			frame.MemberCount:ClearAllPoints()
 			frame.MemberCount:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -6, -4)
 
-			-- Row 2: MOTD below guild name, compact two-line max.
-			frame.MOTDText:ClearAllPoints()
-			frame.MOTDText:SetPoint("TOPLEFT", frame.GuildName, "BOTTOMLEFT", 0, -2)
-			frame.MOTDText:SetPoint("RIGHT", inset, "RIGHT", -6, 0)
-			frame.MOTDText:SetWordWrap(true)
-			frame.MOTDText:SetMaxLines(2)
-			frame.MOTDText:SetNonSpaceWrap(true)
-
 			-- Bottom buttons: mirror the Friends tab Add Friend / Send Message layout.
 			frame.ActionsButton:ClearAllPoints()
 			frame.ActionsButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 4)
 
-			-- Initial layout with empty MOTD
+			-- Initial layout for the unified guild header content.
 			self:UpdateLayout()
 		end
 	end
@@ -1235,9 +2056,18 @@ function GuildFrame:OnLoad(frame)
 	end
 
 	self:CreateEmptyState(frame)
+	self:CreateGuildFeatureBar(frame)
+	if frame.MOTDText then
+		frame.MOTDText:SetText("")
+		frame.MOTDText:Hide()
+	end
+	if frame.HeaderDivider then
+		frame.HeaderDivider:Hide()
+	end
 
 	if not BFL.HasModernScrollBox then
 		self:InitializeClassicScrollFrame(frame)
+		self:UpdateGuildFeatureBar()
 		return
 	end
 
@@ -1274,6 +2104,7 @@ function GuildFrame:OnLoad(frame)
 
 	-- Empty state
 	self:CreateEmptyState(frame)
+	self:UpdateGuildFeatureBar()
 end
 
 -- ========================================
@@ -1311,6 +2142,44 @@ function GuildFrame:SetupMemberButton(button)
 	button.statusIcon = button:CreateTexture(nil, "OVERLAY")
 	button.statusIcon:SetSize(STATUS_ICON_SIZE, STATUS_ICON_SIZE)
 	button.statusIcon:Hide()
+
+	button.rowAction = CreateFrame("Button", nil, button)
+	button.rowAction:SetSize(18, 18)
+	button.rowAction:SetPoint("RIGHT", button, "RIGHT", -5, 0)
+	button.rowAction.icon = button.rowAction:CreateTexture(nil, "ARTWORK")
+	button.rowAction.icon:SetPoint("TOPLEFT", button.rowAction, "TOPLEFT", 2, -2)
+	button.rowAction.icon:SetPoint("BOTTOMRIGHT", button.rowAction, "BOTTOMRIGHT", -2, 2)
+	button.rowAction.icon:SetAlpha(0.82)
+	button.rowAction:RegisterForClicks("LeftButtonUp")
+	button.rowAction:SetScript("OnClick", function(actionButton)
+		local memberData = actionButton:GetParent() and actionButton:GetParent().memberData
+		if not memberData then
+			return
+		end
+		local actions = GetGuildActions()
+		if self.professionFilterID and actions and actions.QueryMemberRecipes then
+			actions:QueryMemberRecipes(memberData, self.professionFilterID)
+		end
+	end)
+	button.rowAction:SetScript("OnEnter", function(actionButton)
+		actionButton.icon:SetAlpha(1)
+		if not self.professionFilterID then
+			return
+		end
+		GameTooltip:SetOwner(actionButton, "ANCHOR_RIGHT")
+		local professionName = GetMemberProfession(actionButton:GetParent().memberData, self.professionFilterID)
+		GameTooltip:SetText(string.format(
+			(L and L.GUILD_PROFESSION_VIEW_RECIPES) or "View %s Recipes",
+			professionName or self.professionFilterName or PROFESSIONS_COLUMN_LABEL or "Profession"
+		))
+		GameTooltip:Show()
+	end)
+	button.rowAction:SetScript("OnLeave", function(actionButton)
+		actionButton.icon:SetAlpha(0.82)
+		if GameTooltip:IsOwned(actionButton) then
+			GameTooltip:Hide()
+		end
+	end)
 
 	-- Secondary info line (rank, level, class, zone/last online)
 	button.rankText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1443,8 +2312,16 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 		end
 	end
 
+	local provider = GetGuildRosterData()
+	local canViewRecipes = not member._isMock
+		and self.professionFilterID
+		and provider and provider.HasGuildRecipeAPI and provider:HasGuildRecipeAPI()
+		and GetMemberProfession(member, self.professionFilterID)
+
 	-- Status icon (Blizzard AFK/DND/Mobile, hidden for plain online)
 	if button.statusIcon then
+		button.statusIcon:ClearAllPoints()
+		button.statusIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", canViewRecipes and -27 or -7, -7)
 		if member.online and member.isDND then
 			button.statusIcon:SetTexture(STATUS_TEX_DND)
 			button.statusIcon:SetVertexColor(1, 1, 1, 1)
@@ -1459,6 +2336,15 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 			button.statusIcon:Show()
 		else
 			button.statusIcon:Hide()
+		end
+	end
+
+	if button.rowAction then
+		if canViewRecipes then
+			button.rowAction.icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\tool.blp")
+			button.rowAction:Show()
+		else
+			button.rowAction:Hide()
 		end
 	end
 
@@ -1479,6 +2365,12 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 		levelText = string.format("%s %d", levelLabel, member.level)
 	end
 	local infoParts = {}
+	if self.professionFilterID then
+		local professionName = GetMemberProfession(member, self.professionFilterID)
+		if professionName and professionName ~= "" then
+			table.insert(infoParts, professionName)
+		end
+	end
 	if member.rank and member.rank ~= "" then
 		table.insert(infoParts, member.rank)
 	end
@@ -1598,7 +2490,7 @@ end
 
 function GuildFrame:UpdateMOTD()
 	local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
-	if not guildFrame or not guildFrame.MOTDText then return end
+	if not guildFrame then return end
 	if not IsGuildFrameVisible() then
 		needsRenderOnShow = true
 		return
@@ -1619,31 +2511,19 @@ function GuildFrame:UpdateMOTD()
 		end
 	end
 
-	if motd ~= "" then
-		local label = (L and L.GUILD_HEADER_MOTD) or "MOTD:"
-		guildFrame.MOTDText:SetText(label .. " " .. motd)
-		guildFrame.MOTDText:Show()
-		if guildFrame.HeaderDivider then
-			guildFrame.HeaderDivider:Show()
-		end
-	else
+	self.guildMOTDText = motd
+	if guildFrame.MOTDText then
 		guildFrame.MOTDText:SetText("")
 		guildFrame.MOTDText:Hide()
-		if guildFrame.HeaderDivider then
-			guildFrame.HeaderDivider:Hide()
-		end
 	end
-
-	-- Defer layout update so FontString width is resolved before measuring height
-	if self._layoutTimer then self._layoutTimer:Cancel() end
-	self._layoutTimer = C_Timer.NewTimer(0, function()
-		self._layoutTimer = nil
-		if IsGuildFrameVisible() then
-			self:UpdateLayout()
-		else
-			needsRenderOnShow = true
-		end
-	end)
+	if guildFrame.HeaderDivider then
+		guildFrame.HeaderDivider:Hide()
+	end
+	if BFL.IsClassic then
+		self:UpdateGuildFeatureBar()
+	else
+		self:UpdateLayout()
+	end
 end
 
 function GuildFrame:IsRetailHeaderActive()
@@ -1668,6 +2548,7 @@ function GuildFrame:RefreshHeaderControls(force)
 		active and "active" or "inactive",
 		simpleMode and "simple" or "full",
 		tostring(self.filterMode or ""),
+		tostring(self.professionFilterID or ""),
 		tostring(self.sortMode or ""),
 		self.sortReversed and self.sortReversed[self.sortMode] and "reversed" or "normal",
 		tostring(BFL.SettingsVersion or 0),
@@ -1686,7 +2567,7 @@ function GuildFrame:RefreshHeaderControls(force)
 			if header.QuickFilterDropdown.GenerateMenu then
 				header.QuickFilterDropdown:GenerateMenu()
 			else
-				SetDropdownText(header.QuickFilterDropdown, actions:GetFilterLabel(self.filterMode))
+				SetDropdownText(header.QuickFilterDropdown, self:GetFilterLabel(self.filterMode))
 			end
 		end
 		if header.PrimarySortDropdown then
@@ -1695,6 +2576,13 @@ function GuildFrame:RefreshHeaderControls(force)
 			else
 				SetDropdownText(header.PrimarySortDropdown, actions:GetSortLabel(self.sortMode))
 			end
+		end
+		local guildFrame = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+		local inset = BetterFriendsFrame and BetterFriendsFrame.Inset
+		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+		local modernLayout = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+		if not modernLayout then
+			self:LayoutLegacyGuildHeader(guildFrame, inset, header)
 		end
 	else
 		if header.SecondarySortDropdown then
@@ -1736,6 +2624,16 @@ function GuildFrame:PopulateFilterMenu(rootDescription)
 	if actions and actions.PopulateFilterMenu then
 		actions:PopulateFilterMenu(rootDescription)
 	end
+
+	local professionItems = self:GetProfessionFilterMenuItems()
+	if professionItems and BFL.PopulateSimpleMenu then
+		BFL.PopulateSimpleMenu(rootDescription, {
+			{
+				text = GetGuildProfessionLabel(),
+				children = professionItems,
+			},
+		})
+	end
 end
 
 function GuildFrame:PopulateSortMenu(rootDescription)
@@ -1746,9 +2644,7 @@ function GuildFrame:PopulateSortMenu(rootDescription)
 end
 
 function GuildFrame:GetHeaderFilterText()
-	local actions = GetGuildActions()
-	return actions and actions.GetFilterLabel and actions:GetFilterLabel(self.filterMode)
-		or self.filterMode
+	return self:GetFilterLabel(self.filterMode)
 end
 
 function GuildFrame:GetHeaderFilterIcon()
@@ -1805,7 +2701,8 @@ function GuildFrame:EnsureHeaderEditButtons(guildFrame)
 			actions:EditMOTD()
 		end
 	end)
-	guildFrame.MOTDEditButton:SetPoint("TOPRIGHT", guildFrame.MOTDText or guildFrame, "TOPRIGHT", -2, 0)
+	local featureBar = guildFrame.FeatureBar or guildFrame
+	guildFrame.MOTDEditButton:SetPoint("TOPRIGHT", featureBar, "TOPRIGHT", -4, GUILD_HEADER_CONTENT_TOP - 1)
 
 	guildFrame._bflHeaderEditButtonsReady = true
 end
@@ -1823,18 +2720,67 @@ function GuildFrame:UpdateHeaderEditButtons()
 
 	if guildFrame.MOTDEditButton then
 		local actions = GetGuildActions()
-		if actions and actions.CanEditMOTD and actions:CanEditMOTD()
-			and guildFrame.MOTDText and guildFrame.MOTDText:IsShown() then
+		local showMOTDEdit = self.headerDetailMode == "motd"
+			and actions and actions.CanEditMOTD and actions:CanEditMOTD()
+		local featureBar = guildFrame.FeatureBar or guildFrame
+		guildFrame.MOTDEditButton:ClearAllPoints()
+		guildFrame.MOTDEditButton:SetPoint("TOPRIGHT", featureBar, "TOPRIGHT", -4, GUILD_HEADER_CONTENT_TOP - 1)
+		if showMOTDEdit then
 			guildFrame.MOTDEditButton:Show()
 		else
 			guildFrame.MOTDEditButton:Hide()
+		end
+		local detailText = guildFrame.FeatureBar and guildFrame.FeatureBar.detailText
+		if detailText then
+			detailText:SetPoint("RIGHT", guildFrame.FeatureBar, "RIGHT", showMOTDEdit and -25 or -7, 0)
 		end
 	end
 end
 
 -- ========================================
--- Dynamic Layout (repositions elements below MOTD based on MOTD height)
+-- Dynamic Layout (positions the unified guild header and roster)
 -- ========================================
+
+function GuildFrame:LayoutLegacyGuildHeader(guildFrame, inset, header)
+	if not (guildFrame and inset and header and header.SearchBox and header.QuickFilterDropdown and header.PrimarySortDropdown) then
+		return false
+	end
+
+	local searchBox = header.SearchBox
+	local sortDropdown = header.PrimarySortDropdown
+	local flatThemeActive = BFL.UsesFlatTheme and BFL:UsesFlatTheme()
+	local guildNameOffsetX = flatThemeActive and 2 or -3.5
+
+	if header.SecondarySortDropdown then
+		header.SecondarySortDropdown:Hide()
+	end
+	local memberCountAnchor = searchBox
+	if not IsSimpleModeEnabled() then
+		local insetRight = inset.GetRight and inset:GetRight()
+		for _, control in ipairs({ sortDropdown, header.QuickFilterDropdown }) do
+			local controlRight = control and control.GetRight and control:GetRight()
+			if control and control.IsShown and control:IsShown()
+				and insetRight and controlRight and controlRight <= insetRight + 1 then
+				memberCountAnchor = control
+				break
+			end
+		end
+	end
+
+	-- The shared header geometry belongs to FriendsList. Re-anchoring SearchBox
+	-- against its dropdowns here can create a cycle because the dropdowns are
+	-- already anchored back to SearchBox. Guild only owns the content below that
+	-- established row.
+	guildFrame.GuildName:ClearAllPoints()
+	guildFrame.GuildName:SetPoint("TOPLEFT", searchBox, "BOTTOMLEFT", guildNameOffsetX, -8)
+	guildFrame.MemberCount:ClearAllPoints()
+	guildFrame.MemberCount:SetPoint("TOPRIGHT", memberCountAnchor, "BOTTOMRIGHT", 0, -8)
+
+	guildFrame.ListInset:ClearAllPoints()
+	guildFrame.ListInset:SetPoint("TOPLEFT", guildFrame.GuildName, "BOTTOMLEFT", -6, -8)
+	guildFrame.ListInset:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", 0, 0)
+	return true
+end
 
 function GuildFrame:UpdateLayout()
 	if not self:IsEnabled() then
@@ -1846,25 +2792,30 @@ function GuildFrame:UpdateLayout()
 	if not guildFrame or not inset then return end
 	if BFL.IsClassic then return end
 	self:ApplyV1Visibility(guildFrame)
-
-	-- Measure MOTD height (0 when empty)
-	local motdText = guildFrame.MOTDText and guildFrame.MOTDText:GetText()
-	local motdHeight = 0
-	if motdText and motdText ~= "" then
-		motdHeight = guildFrame.MOTDText:GetStringHeight() or 0
+	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	local modernLayout = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+	if not modernLayout and self:IsRetailHeaderActive()
+		and self:LayoutLegacyGuildHeader(guildFrame, inset, header) then
+		self:UpdateGuildFeatureBar()
+		self:UpdateResponsiveLayout()
+		return
 	end
 
 	-- Calculate row positions from Inset top (negative y = downward).
 	-- Retail Guild uses the shared header Search/Filter/Sorter row, so this frame
-	-- only owns the guild header and list.
+	-- only owns the guild name, unified guild content and list.
 	local guildNameHeight = guildFrame.GuildName and guildFrame.GuildName:GetStringHeight() or 14
-	local motdBottom = -4 - guildNameHeight - 2 - motdHeight
-
-	local listInsetTop = motdBottom - 10
+	local listInsetTop = -4 - guildNameHeight - 8
+	guildFrame.GuildName:ClearAllPoints()
+	guildFrame.GuildName:SetPoint("TOPLEFT", inset, "TOPLEFT", 6, -4)
+	guildFrame.MemberCount:ClearAllPoints()
+	guildFrame.MemberCount:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -6, -4)
 
 	guildFrame.ListInset:ClearAllPoints()
 	guildFrame.ListInset:SetPoint("TOPLEFT", inset, "TOPLEFT", 0, listInsetTop)
 	guildFrame.ListInset:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", 0, 0)
+	self:UpdateGuildFeatureBar()
 
 	-- Column headers are hidden; sorting is handled through the shared header dropdown.
 	-- ScrollBox/ScrollBar follow ListInset via Lua OnLoad anchors.
@@ -2019,6 +2970,18 @@ function GuildFrame:OnMemberEnter(button)
 		end
 	end
 
+	local professionLines = {}
+	for slot = 1, 2 do
+		local professionName = member["profession" .. slot .. "Name"]
+		if professionName and professionName ~= "" then
+			professionLines[#professionLines + 1] = professionName
+		end
+	end
+	if #professionLines > 0 then
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine(table.concat(professionLines, "  •  "), 0.75, 0.75, 0.75, true)
+	end
+
 	-- Hints
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine(L and L.GUILD_TOOLTIP_HINT or "Right-click for options", 0.5, 0.5, 0.5)
@@ -2134,7 +3097,7 @@ function GuildFrame:ApplyColumnWidths(button)
 			button.iconBorder:Hide()
 		end
 	end
-	local rightReserve = STATUS_ICON_SIZE + 14
+	local rightReserve = STATUS_ICON_SIZE + (self.professionFilterID and 38 or 14)
 	if button.nameText then
 		button.nameText:ClearAllPoints()
 		button.nameText:SetPoint("TOPLEFT", button, "TOPLEFT", nameOffset, -4)
@@ -2142,12 +3105,12 @@ function GuildFrame:ApplyColumnWidths(button)
 	end
 	if button.statusIcon then
 		button.statusIcon:ClearAllPoints()
-		button.statusIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -7, -7)
+		button.statusIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", self.professionFilterID and -27 or -7, -7)
 	end
 	if button.rankText then
 		button.rankText:ClearAllPoints()
 		button.rankText:SetPoint("TOPLEFT", button, "TOPLEFT", nameOffset, -21)
-		button.rankText:SetWidth(math.max(width - nameOffset - 10, 40))
+		button.rankText:SetWidth(math.max(width - nameOffset - rightReserve, 40))
 	end
 	if button.levelText then
 		button.levelText:Hide()
@@ -2433,11 +3396,6 @@ function GuildFrame:RefreshMemberInfoPanelAccent()
 	end
 end
 
--- Rank changes are handled only through adjacent promote/demote actions.
-function GuildFrame:_RefreshRankDropdown(member)
-	return
-end
-
 function GuildFrame:_RefreshRankDropdown_Legacy(member)
 	local panel = self._infoPanel
 	if not panel or not panel.rankText then
@@ -2663,6 +3621,8 @@ function BFL_GuildFrame_OnShow(frame)
 		end
 		-- Pill-style filter buttons
 		GF:SetupFilterPills()
+		-- Every visit to the Guild tab starts with the guild message.
+		GF.headerDetailMode = "motd"
 		GF:UpdateHeaderEditButtons()
 
 		-- Request roster update

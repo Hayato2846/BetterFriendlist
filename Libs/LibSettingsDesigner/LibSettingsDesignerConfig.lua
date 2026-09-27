@@ -63,9 +63,15 @@ local function normalizeID(text)
 end
 
 local function normalizeSearchText(text)
-	text = tostring(text or ""):lower()
+	text = tostring(text or "")
 	text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-	text = text:gsub("[^%w]+", " ")
+	if type(CaseAccentInsensitiveParse) == "function" then
+		text = CaseAccentInsensitiveParse(text)
+	else
+		text = text:lower()
+	end
+	text = text:gsub("[%c%p]+", " ")
+	text = text:gsub("%s+", " ")
 	text = text:gsub("^%s+", ""):gsub("%s+$", "")
 	return text
 end
@@ -300,6 +306,9 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"hidden",
 	"hiddenWhen",
 	"hideSummary",
+	"icon",
+	"iconAtlas",
+	"iconTexCoord",
 	"inputWidth",
 	"isMainToggle",
 	"isSelected",
@@ -351,11 +360,13 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"showEntryID",
 	"showRemoveButton",
 	"selectionSource",
+	"selectAllLabel",
 	"soundResolver",
 	"step",
 	"subvar",
 	"suffix",
 	"summary",
+	"textColor",
 	"tooltip",
 	"uiRole",
 	"valueFormatter",
@@ -633,6 +644,10 @@ function AppMixin:RegisterLegacySection(section, data)
 		isVisible = data.isVisible,
 		visibleWhen = data.visibleWhen,
 		hiddenWhen = data.hiddenWhen,
+		sortGroups = data.sortGroups,
+		sortPageGroups = data.sortPageGroups,
+		groupSort = data.groupSort,
+		groupSortMode = data.groupSortMode,
 		order = data.order or 500,
 		legacy = true,
 	})

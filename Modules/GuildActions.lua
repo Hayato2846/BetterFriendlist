@@ -186,16 +186,6 @@ local function RefreshGuildSurfaces(requestRoster)
 	end
 end
 
-local function RefreshGuildSurfacesSoon(requestRoster)
-	if C_Timer and C_Timer.After then
-		C_Timer.After(0.25, function()
-			RefreshGuildSurfaces(requestRoster)
-		end)
-	else
-		RefreshGuildSurfaces(requestRoster)
-	end
-end
-
 local function FormatIcon(icon, size)
 	size = size or 16
 	if BFL.FormatIcon then
@@ -248,6 +238,47 @@ function GuildActions:IsActionReady()
 	return true
 end
 
+function GuildActions:GetGuildClubMemberInfo(member)
+	if not member then
+		return nil, nil
+	end
+	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubMembers and C_Club.GetMemberInfo) then
+		return nil, nil
+	end
+
+	local okClubId, clubId = SafeCall(C_Club.GetGuildClubId)
+	if not okClubId or not clubId then
+		return nil, nil
+	end
+
+	if member.memberId then
+		local okInfo, info = SafeCall(C_Club.GetMemberInfo, clubId, member.memberId)
+		if okInfo and info then
+			return clubId, info
+		end
+	end
+
+	local okMembers, members = SafeCall(C_Club.GetClubMembers, clubId)
+	if not okMembers or type(members) ~= "table" then
+		return clubId, nil
+	end
+
+	local targetGUID = IsUsableString(member.guid) and member.guid or nil
+	local normalizedTarget = NormalizeName(self:GetFullName(member)) or NormalizeName(member.name)
+	for _, memberId in ipairs(members) do
+		local okInfo, info = SafeCall(C_Club.GetMemberInfo, clubId, memberId)
+		if okInfo and info then
+			local guidMatches = targetGUID and IsUsableString(info.guid) and info.guid == targetGUID
+			local nameMatches = normalizedTarget and IsUsableString(info.name) and NormalizeName(info.name) == normalizedTarget
+			if guidMatches or nameMatches then
+				return clubId, info
+			end
+		end
+	end
+
+	return clubId, nil
+end
+
 function GuildActions:GetMemberGUID(member)
 	if not member then
 		return nil, self:GetMemberRankOrder(member)
@@ -257,35 +288,10 @@ function GuildActions:GetMemberGUID(member)
 		return member.guid, self:GetMemberRankOrder(member)
 	end
 
-	local targetName = self:GetFullName(member)
-	if not IsUsableString(targetName) then
-		return nil, self:GetMemberRankOrder(member)
-	end
-
-	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubMembers and C_Club.GetMemberInfo) then
-		return nil, self:GetMemberRankOrder(member)
-	end
-
-	local okClubId, clubId = SafeCall(C_Club.GetGuildClubId)
-	if not okClubId or not clubId then
-		return nil, self:GetMemberRankOrder(member)
-	end
-
-	local okMembers, members = SafeCall(C_Club.GetClubMembers, clubId)
-	if not okMembers or type(members) ~= "table" then
-		return nil, self:GetMemberRankOrder(member)
-	end
-
-	local normalizedTarget = NormalizeName(targetName)
-	for _, memberId in ipairs(members) do
-		local okInfo, info = SafeCall(C_Club.GetMemberInfo, clubId, memberId)
-		if okInfo and info and IsUsableString(info.name) and NormalizeName(info.name) == normalizedTarget then
-			local rankOrder = tonumber(info.guildRankOrder) or self:GetMemberRankOrder(member)
-			if IsUsableString(info.guid) then
-				return info.guid, rankOrder
-			end
-			return nil, rankOrder
-		end
+	local _, info = self:GetGuildClubMemberInfo(member)
+	if info then
+		return IsUsableString(info.guid) and info.guid or nil,
+			tonumber(info.guildRankOrder) or self:GetMemberRankOrder(member)
 	end
 
 	return nil, self:GetMemberRankOrder(member)
@@ -305,98 +311,6 @@ function GuildActions:GetMemberRankOrder(member)
 		return member.rankIndex + 1
 	end
 	return nil
-end
-
-function GuildActions:GetSelfRankOrder()
-	if GetGuildInfo then
-		local ok, _, _, rankIndex = SafeCall(GetGuildInfo, "player")
-		if ok and type(rankIndex) == "number" then
-			return rankIndex + 1
-		end
-	end
-
-	if C_Club and C_Club.GetGuildClubId and C_Club.GetMemberInfoForSelf then
-		local okClubId, clubId = SafeCall(C_Club.GetGuildClubId)
-		if okClubId and clubId then
-			local okInfo, info = SafeCall(C_Club.GetMemberInfoForSelf, clubId)
-			if okInfo and info and type(info.guildRankOrder) == "number" then
-				return info.guildRankOrder
-			end
-		end
-	end
-
-	return nil
-end
-
-function GuildActions:GetRankName(rankOrder)
-	return string.format("%s %d", RANK or "Rank", rankOrder or 0)
-end
-
-function GuildActions:IsRankAssignmentAllowed(member, rankOrder)
-	local guid = self:GetMemberGUID(member)
-	if C_GuildInfo and C_GuildInfo.IsGuildRankAssignmentAllowed and IsUsableString(guid) then
-		local ok, allowed = SafeCall(C_GuildInfo.IsGuildRankAssignmentAllowed, guid, rankOrder)
-		if ok then
-			return allowed == true
-		end
-	end
-
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	local selfRankOrder = self:GetSelfRankOrder()
-	if not currentRankOrder or not selfRankOrder or not rankOrder then
-		return false
-	end
-	if rankOrder == currentRankOrder then
-		return true
-	end
-	if self:IsSelf(member) then
-		return false
-	end
-	if rankOrder < currentRankOrder then
-		return (CanGuildPromote and CanGuildPromote() == true) and rankOrder > selfRankOrder
-	end
-	return (CanGuildDemote and CanGuildDemote() == true) and currentRankOrder > selfRankOrder
-end
-
-function GuildActions:CanPromote(member)
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	local selfRankOrder = self:GetSelfRankOrder()
-	return CanGuildPromote
-		and CanGuildPromote() == true
-		and C_GuildInfo
-		and C_GuildInfo.Promote
-		and currentRankOrder
-		and selfRankOrder
-		and currentRankOrder > selfRankOrder + 1
-		and not self:IsSelf(member)
-		and self:IsRankAssignmentAllowed(member, currentRankOrder - 1)
-end
-
-function GuildActions:CanDemote(member)
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	local selfRankOrder = self:GetSelfRankOrder()
-	return CanGuildDemote
-		and CanGuildDemote() == true
-		and C_GuildInfo
-		and C_GuildInfo.Demote
-		and currentRankOrder
-		and selfRankOrder
-		and currentRankOrder > selfRankOrder
-		and not self:IsSelf(member)
-		and self:IsRankAssignmentAllowed(member, currentRankOrder + 1)
-end
-
-function GuildActions:CanRemoveMember(member)
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	local selfRankOrder = self:GetSelfRankOrder()
-	return CanGuildRemove
-		and CanGuildRemove() == true
-		and IsUsableString(self:GetFullName(member))
-		and ((C_GuildInfo and C_GuildInfo.Uninvite) or GuildUninvite)
-		and currentRankOrder
-		and selfRankOrder
-		and currentRankOrder > selfRankOrder
-		and not self:IsSelf(member)
 end
 
 function GuildActions:CanSetLeader(member)
@@ -426,6 +340,32 @@ function GuildActions:CanViewOfficerNote()
 	return false
 end
 
+function GuildActions:IsCharacterFriend(member)
+	local guid = member and member.guid
+	if C_FriendList and C_FriendList.IsFriend and IsUsableString(guid) then
+		local ok, result = SafeCall(C_FriendList.IsFriend, guid)
+		if ok then
+			return result == true
+		end
+	end
+
+	local fullName = self:GetFullName(member)
+	if C_FriendList and C_FriendList.GetFriendInfo and IsUsableString(fullName) then
+		local ok, info = SafeCall(C_FriendList.GetFriendInfo, fullName)
+		return ok and info ~= nil
+	end
+	return false
+end
+
+function GuildActions:IsIgnored(member)
+	local fullName = self:GetFullName(member)
+	if C_FriendList and C_FriendList.IsOnIgnoredList and IsUsableString(fullName) then
+		local ok, result = SafeCall(C_FriendList.IsOnIgnoredList, fullName)
+		return ok and result == true
+	end
+	return false
+end
+
 function GuildActions:CanEditMOTD()
 	return IsClassicGuildFlavor()
 		and CanEditMOTD
@@ -440,12 +380,12 @@ function GuildActions:GetMemberCapabilities(member)
 		return {
 			whisper = false,
 			inviteParty = false,
-			who = false,
+			addFriend = false,
+			toggleIgnore = false,
+			viewHouses = false,
+			viewRecipes = false,
 			nickname = false,
 			copyName = true,
-			promote = false,
-			demote = false,
-			remove = false,
 			setLeader = false,
 		}
 	end
@@ -455,12 +395,28 @@ function GuildActions:GetMemberCapabilities(member)
 	return {
 		whisper = hasName and online,
 		inviteParty = self:CanInviteParty(member),
-		who = hasName,
+		addFriend = hasName
+			and not self:IsSelf(member)
+			and C_FriendList
+			and type(C_FriendList.AddFriend) == "function"
+			and not self:IsCharacterFriend(member),
+		toggleIgnore = hasName
+			and not self:IsSelf(member)
+			and C_FriendList
+			and type(C_FriendList.AddOrDelIgnore) == "function",
+		viewHouses = hasName
+			and not IsClassicGuildFlavor()
+			and UNIT_VIEW_HOUSES ~= nil
+			and C_AddOns
+			and type(C_AddOns.LoadAddOn) == "function",
+		viewRecipes = hasName
+			and IsUsableString(member and member.guid)
+			and C_GuildInfo
+			and type(C_GuildInfo.QueryGuildMemberRecipes) == "function"
+			and ((tonumber(member and member.profession1ID) or 0) > 0
+				or (tonumber(member and member.profession2ID) or 0) > 0),
 		nickname = hasName,
 		copyName = hasName,
-		promote = self:CanPromote(member),
-		demote = self:CanDemote(member),
-		remove = self:CanRemoveMember(member),
 		setLeader = self:CanSetLeader(member),
 	}
 end
@@ -505,16 +461,72 @@ function GuildActions:InviteParty(member)
 	end
 end
 
-function GuildActions:Who(member)
+function GuildActions:AddCharacterFriend(member)
 	local fullName = self:GetFullName(member)
-	if not fullName then
+	if not (IsUsableString(fullName) and C_FriendList and C_FriendList.AddFriend) then
 		return
 	end
-	if C_FriendList and C_FriendList.SendWho then
-		pcall(C_FriendList.SendWho, fullName)
-	elseif SendWho then
-		pcall(SendWho, fullName)
+	if self:IsSelf(member) or self:IsCharacterFriend(member) or not self:IsActionReady() then
+		return
 	end
+	SafeCall(C_FriendList.AddFriend, fullName)
+end
+
+function GuildActions:ToggleIgnore(member)
+	local fullName = self:GetFullName(member)
+	if not (IsUsableString(fullName) and C_FriendList and C_FriendList.AddOrDelIgnore) then
+		return
+	end
+	if self:IsSelf(member) or not self:IsActionReady() then
+		return
+	end
+	SafeCall(C_FriendList.AddOrDelIgnore, fullName)
+end
+
+function GuildActions:ViewHouses(member)
+	if not self:IsActionReady() then
+		return
+	end
+
+	local fullName = self:GetFullName(member)
+	local guid = self:GetMemberGUID(member)
+	if not HouseListFrame and C_AddOns and C_AddOns.LoadAddOn then
+		SafeCall(C_AddOns.LoadAddOn, "Blizzard_HouseList")
+	end
+	if HouseListFrame and HouseListFrame.InitWithContextData and IsUsableString(fullName) then
+		if ShowUIPanel then
+			ShowUIPanel(HouseListFrame)
+		else
+			HouseListFrame:Show()
+		end
+		HouseListFrame:InitWithContextData(fullName, guid, nil, true)
+	else
+		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
+	end
+end
+
+function GuildActions:QueryMemberRecipes(member, professionID)
+	professionID = tonumber(professionID)
+	if not professionID or professionID <= 0 then
+		return false
+	end
+	if not (C_GuildInfo and type(C_GuildInfo.QueryGuildMemberRecipes) == "function") then
+		return false
+	end
+	if not self:IsActionReady() then
+		return false
+	end
+
+	local guid = self:GetMemberGUID(member)
+	if not IsUsableString(guid) then
+		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
+		return false
+	end
+	local ok = SafeCall(C_GuildInfo.QueryGuildMemberRecipes, guid, professionID)
+	if not ok then
+		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
+	end
+	return ok == true
 end
 
 function GuildActions:CopyName(member)
@@ -611,113 +623,6 @@ function GuildActions:SetNicknameDialog(member)
 		preferredIndex = 3,
 	}
 	StaticPopup_Show("BFL_GUILD_SET_NICKNAME")
-end
-
-function GuildActions:SetRank(member, rankOrder)
-	rankOrder = tonumber(rankOrder)
-	if not member or not rankOrder then
-		return
-	end
-	if not self:IsActionReady() then
-		return
-	end
-	if not self:IsRankAssignmentAllowed(member, rankOrder) then
-		ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-		return
-	end
-
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	if currentRankOrder == rankOrder then
-		return
-	end
-
-	local fullName = self:GetFullName(member)
-	local isPromote = rankOrder == currentRankOrder - 1
-	local isDemote = rankOrder == currentRankOrder + 1
-	if not (IsUsableString(fullName) and (isPromote or isDemote)) then
-		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
-		return
-	end
-
-	local targetRankName = self:GetRankName(rankOrder)
-	local dialogKey = "BFL_GUILD_SET_RANK"
-
-	StaticPopupDialogs[dialogKey] = {
-		text = string.format(T("GUILD_SET_RANK_CONFIRM", "Set %s to %s?"), self:GetDisplayName(member), targetRankName),
-		button1 = ACCEPT,
-		button2 = CANCEL,
-		OnAccept = function()
-			if isPromote and C_GuildInfo and C_GuildInfo.Promote then
-				C_GuildInfo.Promote(fullName)
-				RefreshGuildSurfacesSoon(true)
-			elseif isDemote and C_GuildInfo and C_GuildInfo.Demote then
-				C_GuildInfo.Demote(fullName)
-				RefreshGuildSurfacesSoon(true)
-			else
-				ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
-			end
-		end,
-		timeout = 30,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	StaticPopup_Show(dialogKey)
-end
-
-function GuildActions:PromoteMember(member)
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	if currentRankOrder and self:CanPromote(member) then
-		self:SetRank(member, currentRankOrder - 1)
-	else
-		ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-	end
-end
-
-function GuildActions:DemoteMember(member)
-	local currentRankOrder = self:GetMemberRankOrder(member)
-	if currentRankOrder and self:CanDemote(member) then
-		self:SetRank(member, currentRankOrder + 1)
-	else
-		ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-	end
-end
-
-function GuildActions:RemoveMember(member)
-	if not self:CanRemoveMember(member) then
-		ShowActionMessage("GUILD_ACTION_NO_PERMISSION", "You do not have permission to do this.")
-		return
-	end
-	if not self:IsActionReady() then
-		return
-	end
-
-	local fullName = self:GetFullName(member)
-	if not IsUsableString(fullName) then
-		ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
-		return
-	end
-
-	StaticPopupDialogs["BFL_GUILD_REMOVE_MEMBER"] = {
-		text = string.format(T("GUILD_REMOVE_CONFIRM", "Remove %s from the guild?"), self:GetDisplayName(member)),
-		button1 = ACCEPT,
-		button2 = CANCEL,
-		OnAccept = function()
-			if IsUsableString(fullName) and C_GuildInfo and C_GuildInfo.Uninvite then
-				C_GuildInfo.Uninvite(fullName)
-			elseif IsUsableString(fullName) and GuildUninvite then
-				GuildUninvite(fullName)
-			else
-				ShowActionMessage("GUILD_ACTION_RESTRICTED", "This action is not available right now.")
-			end
-			RefreshGuildSurfacesSoon(true)
-		end,
-		timeout = 30,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	StaticPopup_Show("BFL_GUILD_REMOVE_MEMBER")
 end
 
 function GuildActions:SetLeader(member)
@@ -1003,11 +908,20 @@ function GuildActions:GetMemberMenuItems(member)
 		})
 		hasCommunication = true
 	end
-	if caps.who then
+	if caps.addFriend then
 		table.insert(items, {
-			text = T("GUILD_BROKER_MENU_WHO", WHO or "Who"),
+			text = ADD_FRIEND or "Add Friend",
 			func = function()
-				self:Who(member)
+				self:AddCharacterFriend(member)
+			end,
+		})
+		hasCommunication = true
+	end
+	if caps.toggleIgnore then
+		table.insert(items, {
+			text = self:IsIgnored(member) and (IGNORE_REMOVE or "Remove Ignore") or (IGNORE or "Ignore"),
+			func = function()
+				self:ToggleIgnore(member)
 			end,
 		})
 		hasCommunication = true
@@ -1017,7 +931,32 @@ function GuildActions:GetMemberMenuItems(member)
 		table.insert(items, { type = "divider" })
 	end
 
-	if caps.nickname or caps.copyName then
+	if caps.viewHouses or caps.viewRecipes or caps.nickname or caps.copyName then
+		if caps.viewHouses then
+			table.insert(items, {
+				text = UNIT_VIEW_HOUSES or "View Houses",
+				func = function()
+					self:ViewHouses(member)
+				end,
+			})
+		end
+		if caps.viewRecipes then
+			for slot = 1, 2 do
+				local professionID = tonumber(member["profession" .. slot .. "ID"])
+				local professionName = member["profession" .. slot .. "Name"]
+				if professionID and professionID > 0 then
+					table.insert(items, {
+						text = string.format(
+							T("GUILD_PROFESSION_VIEW_RECIPES", "View %s Recipes"),
+							IsUsableString(professionName) and professionName or PROFESSIONS_COLUMN_LABEL or "Profession"
+						),
+						func = function()
+							self:QueryMemberRecipes(member, professionID)
+						end,
+					})
+				end
+			end
+		end
 		local DB = BFL:GetModule("DB")
 		local currentNick = DB and DB:GetGuildNickname(self:GetFullName(member)) or ""
 		if caps.nickname then
@@ -1048,33 +987,6 @@ function GuildActions:GetMemberMenuItems(member)
 		end
 	end
 
-	if caps.promote then
-		AddManagementDivider()
-		table.insert(items, {
-			text = T("GUILD_ACTION_PROMOTE", "Promote"),
-			func = function()
-				self:PromoteMember(member)
-			end,
-		})
-	end
-	if caps.demote then
-		AddManagementDivider()
-		table.insert(items, {
-			text = T("GUILD_ACTION_DEMOTE", "Demote"),
-			func = function()
-				self:DemoteMember(member)
-			end,
-		})
-	end
-	if caps.remove then
-		AddManagementDivider()
-		table.insert(items, {
-			text = T("GUILD_ACTION_REMOVE", "Remove from Guild"),
-			func = function()
-				self:RemoveMember(member)
-			end,
-		})
-	end
 	if caps.setLeader then
 		AddManagementDivider()
 		table.insert(items, {

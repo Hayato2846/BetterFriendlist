@@ -2166,6 +2166,8 @@ local function AddToggle(pageID, data)
 		type = "toggle",
 		label = data.label,
 		description = data.desc,
+		descriptionColor = data.descriptionColor,
+		alwaysShowDescription = data.alwaysShowDescription,
 		default = data.default,
 		order = data.order,
 		parentCheck = data.parentCheck,
@@ -4331,6 +4333,8 @@ local function RegisterPrivacyPages()
 	RegisterPage({ id = "privacy.whisper", category = "privacy", title = T("SETTINGS_CENTER_PAGE_PRIVACY_WHISPER", "Whisper"), iconKey = "bfl-privacy-whisper", mainToggleID = "taintFreeWhisper", order = 110, newTagID = "privacy.whisper" })
 	AddGroup("privacy.whisper", "whisper", T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), 100)
 	AddToggle("privacy.whisper", { key = "taintFreeWhisper", group = "whisper", label = T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), desc = T("SETTINGS_TAINT_FREE_WHISPER_DESC", "Use a BFL-owned whisper box without changing Blizzard chat."), default = false, order = 100, newTagID = "taintFreeWhisper", after = function(value) if not value and BFL.CloseTaintFreeWhisper then BFL:CloseTaintFreeWhisper(true) end end })
+
+	RegisterPage({ id = "privacy.notes", category = "privacy", title = T("CONTACT_MEMORY_TITLE", "Private Notes"), iconKey = "bfl-privacy-whisper", mainToggleID = "contactMemory.enabled", order = 120 })
 end
 
 local function RegisterAdvancedPages()
@@ -4343,13 +4347,39 @@ local function RegisterAdvancedPages()
 	AddGroup("advanced.tools", "cleanup", T("WIZARD_HEADER", "Note Cleanup"), 300)
 	AddButton("advanced.tools", { id = "cleanup.notes", group = "cleanup", label = T("WIZARD_BTN", "Note Cleanup Wizard"), desc = T("WIZARD_DESC", "Clean up FriendGroups-style suffixes from friend notes."), buttonText = T("WIZARD_BTN", "Note Cleanup Wizard"), order = 300, onClick = function() ShowNoteCleanupFrame("Show", "BetterFriendlistNoteCleanupWizard") end })
 	AddButton("advanced.tools", { id = "cleanup.backups", group = "cleanup", label = T("WIZARD_BACKUP_VIEWER", "Backup Viewer"), desc = T("WIZARD_BACKUP_VIEWER_DESC", "Review and restore note cleanup backups."), buttonText = T("WIZARD_BACKUP_VIEWER", "Backup Viewer"), order = 310, onClick = function() ShowNoteCleanupFrame("ShowBackupViewer", "BetterFriendlistNoteBackupViewer") end })
+	if BFL.HasSecretValues == true then
+		local MenuBridge = BFL:GetModule("MenuBridge")
+		local function IsMenuBridgeCompanionLoaded()
+			return MenuBridge and MenuBridge.IsCompanionAddOnLoaded and MenuBridge:IsCompanionAddOnLoaded() == true
+		end
+		local companionLoaded = IsMenuBridgeCompanionLoaded()
+		AddGroup("advanced.tools", "integrations", T("SETTINGS_EXTERNAL_MENU_BRIDGE", "External AddOn Menu Bridge"), 400)
+		AddToggle("advanced.tools", {
+			key = "externalMenuBridgeEnabled",
+			group = "integrations",
+			label = T("SETTINGS_EXTERNAL_MENU_BRIDGE", "External AddOn Menu Bridge"),
+			desc = companionLoaded
+				and T("SETTINGS_EXTERNAL_MENU_BRIDGE_DESC", "Adds compatible AddOn actions to supported BetterFriendlist context menus.")
+				or T("SETTINGS_EXTERNAL_MENU_BRIDGE_REQUIRES_ADDON", "This setting can only be used when the BetterFriendlist Menu Bridge addon is also enabled."),
+			descriptionColor = not companionLoaded and { 1, 0.22, 0.22, 1 } or nil,
+			alwaysShowDescription = not companionLoaded,
+			default = true,
+			order = 400,
+			isEnabled = IsMenuBridgeCompanionLoaded,
+			newTagID = "externalMenuBridgeEnabled",
+			after = function()
+				if MenuBridge and MenuBridge.RefreshEnabledState then
+					MenuBridge:RefreshEnabledState()
+				end
+			end,
+		})
+	end
 
 	RegisterPage({ id = "advanced.beta", category = "advanced", title = T("SETTINGS_CENTER_PAGE_ADVANCED_BETA", "Beta Features"), iconKey = "bfl-advanced-beta", mainToggleID = "enableBetaFeatures", order = 110, newTagID = "advanced.beta" })
 	AddGroup("advanced.beta", "beta", T("SETTINGS_BETA_FEATURES_TITLE", "Beta Features"), 100)
 	AddToggle("advanced.beta", { key = "enableBetaFeatures", group = "beta", label = T("SETTINGS_BETA_FEATURES_ENABLE", "Enable Beta Features"), desc = T("SETTINGS_BETA_FEATURES_TOOLTIP", "Shows experimental BetterFriendlist features."), default = false, order = 100, refreshOnChange = true, skinRefresh = true, newTagID = "advanced.beta" })
 	AddToggle("advanced.beta", { key = "enableSettingsCenterBeta", group = "beta", label = T("SETTINGS_ENABLE_SETTINGS_CENTER", "New Settings Center (Beta)"), desc = T("SETTINGS_ENABLE_SETTINGS_CENTER_DESC", "Use the new LibSettingsDesigner Settings Center instead of the classic settings window."), default = false, order = 105, setValue = SetSettingsCenterBetaEnabled, skinRefresh = true, newTagID = "enableSettingsCenterBeta" })
-	AddToggle("advanced.beta", { key = "externalMenuBridgeEnabled", group = "beta", label = T("SETTINGS_EXTERNAL_MENU_BRIDGE", "External Menu Bridge"), desc = T("SETTINGS_EXTERNAL_MENU_BRIDGE_DESC", "Add supported addon actions to supported BFL context menus."), default = false, order = 110, visibleWhen = function() return IsBetaEnabled() and BFL.HasSecretValues == true end, newTagID = "externalMenuBridgeEnabled" })
-	AddToggle("advanced.beta", { key = "debugPrintEnabled", group = "beta", label = T("SETTINGS_DEBUG_PRINT", "Debug Prints"), desc = T("SETTINGS_DEBUG_PRINT_DESC", "Enable verbose BetterFriendlist debug output."), default = false, order = 120, after = function(value) BFL.debugPrintEnabled = value == true end })
+	AddToggle("advanced.beta", { key = "debugPrintEnabled", group = "beta", label = T("SETTINGS_DEBUG_PRINT", "Debug Prints"), desc = T("SETTINGS_DEBUG_PRINT_DESC", "Enable verbose BetterFriendlist debug output."), default = false, order = 110, after = function(value) BFL.debugPrintEnabled = value == true end })
 	AddGroup("advanced.beta", "available", T("SETTINGS_BETA_FEATURES_LIST", "Currently available Beta Features:"), 200)
 	AddBetaFeatureLink({
 		id = "quickfilterEditor",
@@ -4362,7 +4392,7 @@ local function RegisterAdvancedPages()
 	})
 	-- Theme Customization used to be listed here while Dark/Custom were beta.
 	-- It is now a standard Appearance page and must not be advertised as beta.
-	-- Keep QuickFilter, Guild, and Menu Bridge in this beta list.
+	-- Keep QuickFilter and Guild in this beta list.
 	-- The Appearance > Theme page is always reachable from Appearance.
 	-- Dark and Custom tuning visibility is handled by selected theme.
 	-- ElvUI remains conditional through the main theme dropdown.
@@ -4381,18 +4411,6 @@ local function RegisterAdvancedPages()
 		keywords = { "beta", "guild", "roster", "tab" },
 		newTagID = "social.guild",
 	})
-	AddBetaFeatureLink({
-		id = "externalMenuBridge",
-		label = T("SETTINGS_EXTERNAL_MENU_BRIDGE", "External AddOn Menu Bridge (Beta)"),
-		desc = T("SETTINGS_EXTERNAL_MENU_BRIDGE_DESC", "Adds compatible AddOn actions to supported BetterFriendlist context menus."),
-		pageID = "advanced.beta",
-		focusControlID = "externalMenuBridgeEnabled",
-		order = 230,
-		visibleWhen = function() return BFL.HasSecretValues == true end,
-		keywords = { "beta", "context", "menu", "addon", "bridge" },
-		newTagID = "externalMenuBridgeEnabled",
-	})
-
 end
 
 local function BuildSupportActionEntries()
@@ -4528,8 +4546,17 @@ function SettingsDesigner:Register()
 		iconTextures = SETTINGS_ICON_TEXTURES,
 		categoryIconTextures = SETTINGS_CATEGORY_ICON_TEXTURES,
 		colors = GetSettingsCenterThemeColors,
+		dropdownStyle = "themed",
+		inputStyle = "themed",
 		showDensityButton = true,
 		density = "compact",
+		sidePanel = false,
+		defaultControlColumns = 2,
+		settingRowStyle = function(_, state)
+			-- The companion-addon warning on Advanced > Tools intentionally uses
+			-- the descriptive row layout so its red dependency text stays visible.
+			return state and state.selectedPageID == "advanced.tools" and "standard" or "matrix"
+		end,
 		topbar = {
 			titleActions = {
 				{
@@ -4555,6 +4582,14 @@ function SettingsDesigner:Register()
 		},
 		subnav = {
 			enabled = true,
+		},
+		sidebar = {
+			featureNavigation = true,
+			search = true,
+			rowHeight = 40,
+			pageRowHeight = 34,
+			sectionHeight = 24,
+			iconSize = 20,
 		},
 		db = GetProfile,
 		locale = DesignerLocale,

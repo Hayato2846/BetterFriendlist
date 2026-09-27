@@ -58,9 +58,6 @@ end
 function GuildDetails:UpdateOfficerNote()
 end
 
-function GuildDetails:UpdatePromoteDemote()
-end
-
 function GuildDetails:UpdateActionButtons()
 end
 
@@ -70,18 +67,6 @@ function GuildDetails:RunMemberAction(methodName)
 	if actions and member and actions[methodName] then
 		actions[methodName](actions, member)
 	end
-end
-
-function GuildDetails:PromoteMember()
-	self:RunMemberAction("PromoteMember")
-end
-
-function GuildDetails:DemoteMember()
-	self:RunMemberAction("DemoteMember")
-end
-
-function GuildDetails:RemoveMember()
-	self:RunMemberAction("RemoveMember")
 end
 
 function GuildDetails:InviteMember()

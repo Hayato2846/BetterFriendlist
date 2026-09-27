@@ -38,6 +38,18 @@ local function GetEngine()
 	return BFL:GetModule("SkinEngine")
 end
 
+local PALETTE_ONLY_REAPPLY_REASONS = {
+	["custom-theme-reset-color"] = true,
+	["reset-dark-theme"] = true,
+	["reset-custom-theme"] = true,
+	["settings-designer"] = true,
+}
+
+local function IsPaletteOnlyReapply(reason)
+	return PALETTE_ONLY_REAPPLY_REASONS[reason] == true
+		or (type(reason) == "string" and reason:match("%-theme%-setting$") ~= nil)
+end
+
 local function GetArtworkAlpha(defaultAlpha)
 	local ThemePalette = BFL:GetModule("ThemePalette")
 	if ThemePalette and ThemePalette.GetArtworkAlpha then
@@ -833,9 +845,15 @@ function DarkTheme:Apply(reason)
 		return
 	end
 
-	engine:Activate(BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "dark")
+	local needsFullPass = engine:Activate(BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "dark")
 	self.applied = true
 	self:InstallHooks()
+	-- Theme tuning only changes semantic palette tokens. Existing controls are
+	-- repainted by SkinEngine's dependency graph, so avoid rediscovering and
+	-- reskinning the complete known frame tree for every slider/color update.
+	if not needsFullPass and IsPaletteOnlyReapply(reason) then
+		return
+	end
 	self:ClearMainFrameSkinKeys()
 	self:SkinKnownFrames(reason)
 end

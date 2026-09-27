@@ -19,6 +19,13 @@ local MAX_TARGET_ROWS = 12
 local SUGGESTION_ROW_HEIGHT = 40
 local TARGET_ROW_HEIGHT = 40
 local ROSTER_SETTLE_DELAYS = { 1.0, 2.5 }
+local CANDIDATE_SOURCE_PRIORITY = {
+	bnetFriend = 1,
+	wowFriend = 2,
+	titleFriend = 2,
+	guild = 3,
+	group = 4,
+}
 
 local function L(key, fallback)
 	local locale = BFL and (BFL.L or _G.BFL_L)
@@ -151,6 +158,60 @@ local function FinalizeCandidateSearch(candidate, parts)
 	candidate.sortKey = tostring(candidate.displayName or candidate.value or ""):lower()
 	ClearSearchParts(parts)
 	return candidate
+end
+
+local function GetFriendCandidateSource(friend, kind)
+	if BFL.IsTitleFriend and BFL.IsTitleFriend(friend) then
+		return "titleFriend"
+	end
+	if kind == "bnet" then
+		return "bnetFriend"
+	end
+	return "wowFriend"
+end
+
+local function CandidateSortsBefore(a, b)
+	local aPriority = CANDIDATE_SOURCE_PRIORITY[a.source] or math.huge
+	local bPriority = CANDIDATE_SOURCE_PRIORITY[b.source] or math.huge
+	if aPriority ~= bPriority then
+		return aPriority < bPriority
+	end
+
+	local aSortKey = a.sortKey or ""
+	local bSortKey = b.sortKey or ""
+	if aSortKey ~= bSortKey then
+		return aSortKey < bSortKey
+	end
+	return tostring(a.key or ""):lower() < tostring(b.key or ""):lower()
+end
+
+local function CopyClassColor(color)
+	if type(color) ~= "table" then
+		return nil
+	end
+	local ok, r, g, b = pcall(function()
+		return tonumber(color.r), tonumber(color.g), tonumber(color.b)
+	end)
+	if not ok or not r or not g or not b then
+		return nil
+	end
+	return { r = r, g = g, b = b }
+end
+
+local function GetFriendCandidateColor(friend, source)
+	if source ~= "wowFriend" and source ~= "titleFriend" then
+		return source == "bnetFriend" and CopyClassColor(FRIENDS_BNET_NAME_COLOR) or nil
+	end
+	local classUtils = BFL and BFL.ClassUtils
+	if not (classUtils and classUtils.GetClassColorForFriend) then
+		return nil
+	end
+	local ok, color = pcall(classUtils.GetClassColorForFriend, classUtils, friend)
+	return ok and CopyClassColor(color) or nil
+end
+
+local function GetGuildCandidateClassColor(member)
+	return CopyClassColor(member and RAID_CLASS_COLORS and RAID_CLASS_COLORS[member.classFile])
 end
 
 local function GetCurrentGroupLabel()
@@ -641,11 +702,11 @@ function AutoRaidAssist:AddTargetFromCandidate(candidate)
 		DebugValue(candidate.displayName),
 		DebugValue(candidate.source)
 	)
-	if candidate.friend then
-		return self:AddTargetFromFriend(candidate.friend)
-	end
 	if candidate.key then
 		return self:AddTarget(candidate.key, candidate.source or "manual", candidate.displayName)
+	end
+	if candidate.friend then
+		return self:AddTargetFromFriend(candidate.friend)
 	end
 	return false, "invalid"
 end
@@ -873,6 +934,7 @@ function AutoRaidAssist:BuildCandidateCache()
 			local lookupKey = ContactIdentity:NormalizeLookupKey(key)
 			if key and lookupKey and not seen[lookupKey] then
 				local kind, value = ContactIdentity:SplitContactKey(key)
+				local source = GetFriendCandidateSource(friend, kind)
 				local displayName = self:GetFriendDisplayName(friend) or value
 				local nicknameUID = friend.uid
 				if not nicknameUID and kind == "bnet" then
@@ -898,6 +960,8 @@ function AutoRaidAssist:BuildCandidateCache()
 					kind = kind,
 					value = value,
 					friend = friend,
+					source = source,
+					classColor = GetFriendCandidateColor(friend, source),
 					displayName = displayName,
 					nickname = nickname,
 					subtitle = self:GetCandidateSubtitle(friend, kind, value),
@@ -941,6 +1005,7 @@ function AutoRaidAssist:BuildCandidateCache()
 					kind = "player",
 					value = normalizedName,
 					source = "guild",
+					classColor = GetGuildCandidateClassColor(member),
 					displayName = displayName,
 					nickname = nickname,
 					subtitle = (GUILD or "Guild") .. " - " .. normalizedName,
@@ -951,9 +1016,7 @@ function AutoRaidAssist:BuildCandidateCache()
 
 	self:AddCurrentGroupCandidates(candidates, seen, "", ContactIdentity, DB, parts)
 
-	table.sort(candidates, function(a, b)
-		return (a.sortKey or "") < (b.sortKey or "")
-	end)
+	table.sort(candidates, CandidateSortsBefore)
 
 	self.candidateCache = {
 		signature = signature,
@@ -1010,6 +1073,32 @@ function AutoRaidAssist:GetCandidateSubtitle(friend, kind, value)
 	return L("AUTO_RAID_ASSIST_WOW", "WoW Friend") .. " - " .. tostring(value or "")
 end
 
+function AutoRaidAssist:GetTargetNameColor(target, friend, kind)
+	if type(target) ~= "table" then
+		return nil
+	end
+	if friend then
+		local source = GetFriendCandidateSource(friend, kind)
+		return GetFriendCandidateColor(friend, source)
+	end
+	if kind == "bnet" or target.source == "bnetFriend" then
+		return CopyClassColor(FRIENDS_BNET_NAME_COLOR)
+	end
+
+	local ContactIdentity = GetContactIdentity()
+	local lookupKey = ContactIdentity and ContactIdentity:NormalizeLookupKey(target.key or target.id)
+	if not lookupKey then
+		return nil
+	end
+	local cache = self:BuildCandidateCache()
+	for _, candidate in ipairs(cache.candidates or {}) do
+		if ContactIdentity:NormalizeLookupKey(candidate.key) == lookupKey then
+			return CopyClassColor(candidate.classColor)
+		end
+	end
+	return nil
+end
+
 function AutoRaidAssist:GetTargetDisplay(target)
 	local ContactIdentity = GetContactIdentity()
 	local kind, value
@@ -1030,7 +1119,7 @@ function AutoRaidAssist:GetTargetDisplay(target)
 	else
 		source = L("AUTO_RAID_ASSIST_WOW", "WoW Friend")
 	end
-	return displayName, source .. " - " .. tostring(value or "")
+	return displayName, source .. " - " .. tostring(value or ""), self:GetTargetNameColor(target, friend, kind)
 end
 
 local function GetRaidIndexFromUnit(unit)
@@ -2425,6 +2514,12 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 			row.candidate = candidate
 			if candidate then
 				row.primary:SetText(candidate.displayName or candidate.value or "")
+				local classColor = candidate.classColor
+				if classColor then
+					row.primary:SetTextColor(classColor.r, classColor.g, classColor.b)
+				else
+					row.primary:SetTextColor(1, 1, 1)
+				end
 				row.secondary:SetText(candidate.subtitle or "")
 				row:Show()
 			else
@@ -2448,8 +2543,13 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 			local target = targets[index]
 			row.target = target
 			if target then
-				local primary, secondary = AutoRaidAssist:GetTargetDisplay(target)
+				local primary, secondary, nameColor = AutoRaidAssist:GetTargetDisplay(target)
 				row.primary:SetText(primary or "")
+				if nameColor then
+					row.primary:SetTextColor(nameColor.r, nameColor.g, nameColor.b)
+				else
+					row.primary:SetTextColor(1, 1, 1)
+				end
 				row.secondary:SetText(secondary or "")
 				row:Show()
 			else

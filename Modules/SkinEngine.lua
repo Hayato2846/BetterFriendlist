@@ -85,6 +85,24 @@ local function CopyColorTable(source)
 	return result
 end
 
+local function ColorArraysEqual(left, right)
+	if left == right then
+		return true
+	end
+	return left
+		and right
+		and left[1] == right[1]
+		and left[2] == right[2]
+		and left[3] == right[3]
+		and left[4] == right[4]
+end
+
+local function CopyColorValues(target, source)
+	target = type(target) == "table" and target or {}
+	target[1], target[2], target[3], target[4] = source[1], source[2], source[3], source[4]
+	return target
+end
+
 local function CopyBackdropInfo(source)
 	if type(source) ~= "table" then
 		return source
@@ -193,20 +211,44 @@ local NINE_SLICE_KEYS = {
 	"Center",
 }
 
+local function NewWeakKeySet()
+	return setmetatable({}, { __mode = "k" })
+end
+
 SkinEngine.colors = COLORS
 SkinEngine.defaultColors = DEFAULT_COLORS
-SkinEngine.registry = {}
+SkinEngine.registry = NewWeakKeySet()
+SkinEngine.tokenConsumers = {}
+SkinEngine.rendererOwners = setmetatable({}, { __mode = "k" })
 
 function SkinEngine:RefreshThemeColors()
 	local ThemePalette = BFL:GetModule("ThemePalette")
+	local resolved = {}
 	if ThemePalette and ThemePalette.ApplyToColors then
-		ThemePalette:ApplyToColors(COLORS, DEFAULT_COLORS)
+		ThemePalette:ApplyToColors(resolved, DEFAULT_COLORS)
 	else
 		for key, value in pairs(DEFAULT_COLORS) do
-			COLORS[key] = { value[1], value[2], value[3], value[4] }
+			resolved[key] = { value[1], value[2], value[3], value[4] }
 		end
 	end
-	self.themeColorVersion = (self.themeColorVersion or 0) + 1
+
+	local changedTokens = {}
+	for key, value in pairs(resolved) do
+		if not ColorArraysEqual(COLORS[key], value) then
+			changedTokens[#changedTokens + 1] = key
+		end
+		-- Keep semantic token tables stable. Render states can retain the token
+		-- reference and only their concrete paint values need to be refreshed.
+		COLORS[key] = CopyColorValues(COLORS[key], value)
+	end
+
+	if #changedTokens > 0 then
+		self.themeColorVersion = (self.themeColorVersion or 0) + 1
+		if self:IsActive() and self.RefreshTokens then
+			self:RefreshTokens(changedTokens)
+		end
+	end
+	return changedTokens
 end
 
 local function IsForbidden(frame)
@@ -345,15 +387,7 @@ local function UnpackColor(color)
 end
 
 local function SameColor(left, right)
-	if left == right then
-		return true
-	end
-	return left
-		and right
-		and left[1] == right[1]
-		and left[2] == right[2]
-		and left[3] == right[3]
-		and left[4] == right[4]
+	return ColorArraysEqual(left, right)
 end
 
 local function SetBackdropStoredColors(backdrop, bgColor, borderColor)
@@ -621,8 +655,11 @@ local function SetBackdropColors(backdrop, bgColor, borderColor)
 
 	backdrop:SetBackdropColor(UnpackColor(bgColor))
 	backdrop:SetBackdropBorderColor(UnpackColor(borderColor))
-	backdrop.BFL_DarkAppliedBgColor = bgColor
-	backdrop.BFL_DarkAppliedBorderColor = borderColor
+	-- Applied colors are value snapshots, while base colors remain semantic
+	-- token references. This lets tokens mutate in place without making the
+	-- paint cache mistake a changed token for an already-applied value.
+	backdrop.BFL_DarkAppliedBgColor = CopyColorValues(backdrop.BFL_DarkAppliedBgColor, bgColor)
+	backdrop.BFL_DarkAppliedBorderColor = CopyColorValues(backdrop.BFL_DarkAppliedBorderColor, borderColor)
 	SetBackdropStoredColors(backdrop, bgColor, borderColor)
 end
 
@@ -691,9 +728,12 @@ function SkinEngine:IsActive()
 end
 
 function SkinEngine:Activate(theme)
-	self:RefreshThemeColors()
+	local activeTheme = theme == "custom" and "custom" or "dark"
+	local needsFullPass = self.active ~= true or self.activeTheme ~= activeTheme
+	local changedTokens = self:RefreshThemeColors()
 	self.active = true
-	self.activeTheme = theme == "custom" and "custom" or "dark"
+	self.activeTheme = activeTheme
+	return needsFullPass, changedTokens
 end
 
 function SkinEngine:Deactivate()
@@ -743,6 +783,243 @@ function SkinEngine:GetState(frame)
 	end
 	self.registry[frame] = true
 	return state
+end
+
+local function NormalizeTokenSet(tokens)
+	local result = {}
+	if type(tokens) == "string" then
+		result[tokens] = true
+	elseif type(tokens) == "table" then
+		for key, value in pairs(tokens) do
+			local token = type(key) == "number" and value or key
+			local enabled = type(key) == "number" or value == true
+			if enabled and type(token) == "string" then
+				result[token] = true
+			end
+		end
+	end
+	return result
+end
+
+local function ClearRendererMembership(engine, frame, state)
+	for token in pairs(state.rendererTokens or {}) do
+		local consumers = engine.tokenConsumers[token]
+		if consumers then
+			consumers[frame] = nil
+		end
+	end
+	for owner in pairs(state.rendererOwnerMembership or {}) do
+		local targets = engine.rendererOwners[owner]
+		if targets then
+			targets[frame] = nil
+		end
+	end
+	state.rendererTokens = nil
+	state.rendererOwnerMembership = nil
+end
+
+local function RebuildRendererMembership(engine, frame, state)
+	ClearRendererMembership(engine, frame, state)
+	local tokenMembership = {}
+	local ownerMembership = {}
+	for _, key in ipairs(state.rendererOrder or {}) do
+		local renderer = state.renderers and state.renderers[key]
+		if renderer then
+			for token in pairs(renderer.tokens or {}) do
+				tokenMembership[token] = true
+			end
+			if renderer.owner ~= nil then
+				ownerMembership[renderer.owner] = true
+			end
+		end
+	end
+	state.rendererTokens = tokenMembership
+	state.rendererOwnerMembership = ownerMembership
+
+	for token in pairs(tokenMembership) do
+		local consumers = engine.tokenConsumers[token]
+		if not consumers then
+			consumers = NewWeakKeySet()
+			engine.tokenConsumers[token] = consumers
+		end
+		consumers[frame] = true
+	end
+	for owner in pairs(ownerMembership) do
+		local targets = engine.rendererOwners[owner]
+		if not targets then
+			targets = NewWeakKeySet()
+			engine.rendererOwners[owner] = targets
+		end
+		targets[frame] = true
+	end
+end
+
+function SkinEngine:RegisterRenderer(frame, key, tokens, refresh, owner, spec)
+	if not frame or type(key) ~= "string" or type(refresh) ~= "function" then
+		return nil
+	end
+	local state = self:GetState(frame)
+	if not state then
+		return nil
+	end
+	state.renderers = state.renderers or {}
+	state.rendererOrder = state.rendererOrder or {}
+	local renderer = state.renderers[key]
+	local resolvedOwner = owner or self
+	if
+		renderer
+		and renderer.sourceTokens == tokens
+		and renderer.owner == resolvedOwner
+		and renderer.refresh == refresh
+		and renderer.spec == spec
+	then
+		return renderer
+	end
+	if not renderer then
+		renderer = {}
+		state.renderers[key] = renderer
+		state.rendererOrder[#state.rendererOrder + 1] = key
+	end
+	renderer.owner = resolvedOwner
+	renderer.sourceTokens = tokens
+	renderer.tokens = NormalizeTokenSet(tokens)
+	renderer.refresh = refresh
+	renderer.spec = spec
+	RebuildRendererMembership(self, frame, state)
+	return renderer
+end
+
+function SkinEngine:UnregisterRenderer(frame, key)
+	local state = frame and frame.BFL_DarkSkin
+	if not (state and state.renderers) then
+		return false
+	end
+	if key ~= nil then
+		if not state.renderers[key] then
+			return false
+		end
+		state.renderers[key] = nil
+		for index = #state.rendererOrder, 1, -1 do
+			if state.rendererOrder[index] == key then
+				table.remove(state.rendererOrder, index)
+				break
+			end
+		end
+	else
+		wipe(state.renderers)
+		wipe(state.rendererOrder)
+	end
+	RebuildRendererMembership(self, frame, state)
+	return true
+end
+
+function SkinEngine:UnregisterRenderers(frame)
+	return self:UnregisterRenderer(frame)
+end
+
+local function RendererMatchesTokens(renderer, changedTokens)
+	if not changedTokens then
+		return true
+	end
+	for token in pairs(renderer.tokens or {}) do
+		if changedTokens[token] then
+			return true
+		end
+	end
+	return false
+end
+
+local function ReportRendererError(message)
+	if type(geterrorhandler) ~= "function" then
+		return
+	end
+	local handler = geterrorhandler()
+	if type(handler) == "function" then
+		pcall(handler, message)
+	end
+end
+
+function SkinEngine:RefreshRenderers(frame, changedTokens)
+	if not self:IsActive() then
+		return 0
+	end
+	local state = frame and frame.BFL_DarkSkin
+	if not (state and state.renderers) or state.rendererRefreshActive then
+		return 0
+	end
+	changedTokens = changedTokens and NormalizeTokenSet(changedTokens) or nil
+	state.rendererRefreshActive = true
+	local calls = 0
+	local firstError
+	for _, key in ipairs(state.rendererOrder or {}) do
+		local renderer = state.renderers[key]
+		if renderer and RendererMatchesTokens(renderer, changedTokens) then
+			local ok, message = pcall(renderer.refresh, self, frame, renderer.spec, changedTokens)
+			if ok then
+				calls = calls + 1
+			else
+				firstError = firstError or message
+				ReportRendererError(message)
+			end
+		end
+	end
+	state.rendererRefreshActive = nil
+	return calls, firstError
+end
+
+function SkinEngine:RefreshTokens(tokens)
+	if not self:IsActive() then
+		return 0
+	end
+	local changedTokens = NormalizeTokenSet(tokens)
+	local targets = NewWeakKeySet()
+	for token in pairs(changedTokens) do
+		for frame in pairs(self.tokenConsumers[token] or {}) do
+			targets[frame] = true
+		end
+	end
+	local count = 0
+	for frame in pairs(targets) do
+		self:RefreshRenderers(frame, changedTokens)
+		count = count + 1
+	end
+	return count
+end
+
+function SkinEngine:RefreshToken(token)
+	return self:RefreshTokens(token)
+end
+
+function SkinEngine:ReleaseRendererOwner(owner, restoreFrames)
+	local targets = self.rendererOwners[owner]
+	if not targets then
+		return 0
+	end
+	local frames = {}
+	for frame in pairs(targets) do
+		frames[#frames + 1] = frame
+	end
+	local released = 0
+	for _, frame in ipairs(frames) do
+		local state = frame.BFL_DarkSkin
+		if state and state.renderers then
+			for index = #(state.rendererOrder or {}), 1, -1 do
+				local key = state.rendererOrder[index]
+				local renderer = state.renderers[key]
+				if renderer and renderer.owner == owner then
+					state.renderers[key] = nil
+					table.remove(state.rendererOrder, index)
+					released = released + 1
+				end
+			end
+			RebuildRendererMembership(self, frame, state)
+			if restoreFrames and not next(state.renderers) then
+				self:RestoreFrame(frame)
+			end
+		end
+	end
+	self.rendererOwners[owner] = nil
+	return released
 end
 
 local function ApplyStoredPoint(frame, point)
@@ -1181,6 +1458,72 @@ local function ResolveBackdropColors(variant)
 	return bg, border
 end
 
+local BACKDROP_THEME_TOKENS = {
+	main = { "panel", "border", "topLine", "bottomShadow" },
+	popup = { "popup", "border", "topLine", "bottomShadow" },
+	inset = { "inset", "borderSoft", "topLine" },
+	slider = { "sliderTrack", "borderMuted", "topLine" },
+	scrollbar = { "scrollTrack", "borderMuted" },
+	tab = { "tab", "borderMuted", "controlTopLine", "bottomShadow" },
+	control = { "control", "controlBorder", "controlTopLine", "bottomShadow" },
+	button = { "control", "controlBorder", "controlTopLine", "bottomShadow" },
+	dropdown = { "control", "controlBorder", "controlTopLine", "bottomShadow" },
+	editbox = { "control", "controlBorder", "controlTopLine", "bottomShadow" },
+	nav = { "control", "controlBorder", "controlTopLine", "bottomShadow" },
+	nativeButton = { "borderNone", "borderSoft" },
+	icon = { "borderNone" },
+	thumb = { "scrollThumb", "borderNone", "topLine" },
+	row = { "row", "borderNone", "divider" },
+}
+local DEFAULT_BACKDROP_THEME_TOKENS = { "panelSoft", "borderMuted" }
+local BUTTON_THEME_TOKENS = {
+	"borderNone",
+	"borderSoft",
+	"borderMuted",
+	"controlDisabled",
+	"controlBorderDisabled",
+	"controlDown",
+	"controlHover",
+	"controlBorderHover",
+	"controlBorder",
+	"panelSoft",
+	"tab",
+	"tabHover",
+	"rowHover",
+	"accent",
+	"accentState",
+	"gold",
+	"text",
+	"disabledText",
+	"icon",
+	"iconHover",
+	"iconDown",
+}
+local CHECK_THEME_TOKENS = { "control", "controlDown", "controlBorder", "gold", "disabledText" }
+local DROPDOWN_MENU_THEME_TOKENS = {
+	"panel",
+	"panelSoft",
+	"borderSoft",
+	"borderNone",
+	"gold",
+	"accent",
+	"accentSoft",
+	"accentState",
+	"rowHover",
+	"controlHover",
+	"controlBorderHover",
+}
+local SCROLL_THUMB_THEME_TOKENS = { "scrollThumb", "scrollThumbHover", "scrollThumbDown", "borderNone" }
+local ROW_THEME_TOKENS = { "row", "rowHover", "rowDown", "borderNone", "accent", "controlBorderHover" }
+local SLIDER_THEME_TOKENS = { "sliderTrack", "borderMuted", "sliderThumb", "borderNone", "gold" }
+local GOLD_THEME_TOKENS = { "gold" }
+local ACCENT_THEME_TOKENS = { "accent" }
+local DROPDOWN_INDICATOR_THEME_TOKENS = { "controlDown", "borderSoft", "gold" }
+
+local function GetBackdropThemeTokens(variant)
+	return BACKDROP_THEME_TOKENS[variant] or DEFAULT_BACKDROP_THEME_TOKENS
+end
+
 local function ColorValuesMatch(r, g, b, a, color)
 	return color
 		and r == color[1]
@@ -1208,6 +1551,14 @@ local function BackdropColorsMatch(backdrop, bg, border)
 	return SameColor(backdrop.BFL_DarkAppliedBgColor, bg) and SameColor(backdrop.BFL_DarkAppliedBorderColor, border)
 end
 
+function SkinEngine:RefreshBackdropRenderer(frame)
+	local backdrop = frame and frame.BFL_DarkBackdrop
+	if not backdrop then
+		return
+	end
+	self:CreateBackdrop(frame, backdrop.BFL_DarkRenderVariant or "panel", backdrop.BFL_DarkRenderInsets or ZERO_INSETS)
+end
+
 function SkinEngine:CreateBackdrop(frame, variant, insets)
 	if not frame or IsForbidden(frame) or not CreateFrame then
 		return nil
@@ -1230,6 +1581,17 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 		frame.BFL_DarkBackdrop = backdrop
 		state.backdrops[backdrop] = true
 	end
+	local renderInsets = backdrop.BFL_DarkRenderInsets
+	if not renderInsets then
+		renderInsets = {}
+		backdrop.BFL_DarkRenderInsets = renderInsets
+	end
+	renderInsets.left = insets.left or 0
+	renderInsets.right = insets.right or 0
+	renderInsets.top = insets.top or 0
+	renderInsets.bottom = insets.bottom or 0
+	backdrop.BFL_DarkRenderVariant = variant
+	self:RegisterRenderer(frame, "backdrop", GetBackdropThemeTokens(variant), self.RefreshBackdropRenderer)
 
 	local left = insets.left or 0
 	local right = insets.right or 0
@@ -1258,7 +1620,7 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 				SetBackdropColors(backdrop, appliedBg, appliedBorder)
 			elseif backdrop.bg then
 				backdrop.bg:SetColorTexture(UnpackColor(appliedBg))
-				backdrop.BFL_DarkAppliedBgColor = appliedBg
+				backdrop.BFL_DarkAppliedBgColor = CopyColorValues(backdrop.BFL_DarkAppliedBgColor, appliedBg)
 				SetBackdropStoredColors(backdrop, appliedBg, appliedBorder)
 			end
 		end
@@ -1283,7 +1645,7 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 	elseif backdrop.bg then
 		if not SameColor(backdrop.BFL_DarkAppliedBgColor, bg) then
 			backdrop.bg:SetColorTexture(UnpackColor(bg))
-			backdrop.BFL_DarkAppliedBgColor = bg
+			backdrop.BFL_DarkAppliedBgColor = CopyColorValues(backdrop.BFL_DarkAppliedBgColor, bg)
 		end
 		SetBackdropStoredColors(backdrop, bg, border)
 	end
@@ -1525,6 +1887,7 @@ function SkinEngine:SkinFrame(frame, variant, opts)
 
 	variant = variant or "panel"
 	self:CreateBackdrop(frame, variant, opts and opts.insets)
+	self:RegisterRenderer(frame, "frame-decoration", GOLD_THEME_TOKENS, self.RefreshFrameRenderer)
 
 	local stripTextures = opts and opts.stripTextures == true
 	local textureAlpha = (opts and opts.textureAlpha) or 0
@@ -1544,9 +1907,7 @@ function SkinEngine:SkinFrame(frame, variant, opts)
 		self:DampenKnownArtwork(frame, decorAlpha)
 	end
 
-	if frame.TitleContainer and frame.TitleContainer.TitleText then
-		self:SetFontColor(frame, frame.TitleContainer.TitleText, UnpackColor(COLORS.gold))
-	end
+	self:RefreshFrameRenderer(frame)
 
 	local closeButton = frame.CloseButton
 	local frameName = GetName(frame)
@@ -1555,6 +1916,12 @@ function SkinEngine:SkinFrame(frame, variant, opts)
 	end
 	if closeButton then
 		self:SkinCloseButton(closeButton)
+	end
+end
+
+function SkinEngine:RefreshFrameRenderer(frame)
+	if frame and frame.TitleContainer and frame.TitleContainer.TitleText then
+		self:SetFontColor(frame, frame.TitleContainer.TitleText, UnpackColor(COLORS.gold))
 	end
 end
 
@@ -1579,6 +1946,8 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		end
 		return
 	end
+	button.BFL_DarkInteractionState = interactionState
+	self:RegisterRenderer(button, "button-state", BUTTON_THEME_TOKENS, self.RefreshButtonRenderer)
 
 	local selectedTab = button.BFL_DarkTabButton and self:IsTabSelected(button)
 	if button.BFL_DarkTabButton then
@@ -1706,6 +2075,10 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		overlayAlpha = enabled and 1 or 0.82
 	end
 	SetButtonOverlayAlpha(button, overlayAlpha)
+end
+
+function SkinEngine:RefreshButtonRenderer(button)
+	self:ApplyButtonState(button, button and button.BFL_DarkInteractionState)
 end
 
 function SkinEngine:InstallButtonHooks(button)
@@ -2136,9 +2509,19 @@ function SkinEngine:SkinNavigationButton(button)
 		self:RegisterOverlay(button, indicator)
 	end
 	if indicator then
-		indicator:SetColorTexture(UnpackColor(COLORS.accent))
-		indicator:SetShown(selected)
+		self:RegisterRenderer(button, "navigation-indicator", ACCENT_THEME_TOKENS, self.RefreshNavigationRenderer)
+		self:RefreshNavigationRenderer(button)
 	end
+end
+
+function SkinEngine:RefreshNavigationRenderer(button)
+	local indicator = button and button.BFL_DarkNavIndicator
+	if not indicator then
+		return
+	end
+	local selected = button.selectedTex and button.selectedTex.IsShown and button.selectedTex:IsShown()
+	indicator:SetColorTexture(UnpackColor(COLORS.accent))
+	indicator:SetShown(selected == true)
 end
 
 function SkinEngine:IsTabSelected(tab)
@@ -2425,14 +2808,23 @@ function SkinEngine:SkinArrowButton(button, direction)
 		self:SetTextureAlpha(button, icon, 1)
 		self:PositionArrowButtonIcon(button, direction)
 	end
+	self:RegisterRenderer(button, "arrow-icon", GOLD_THEME_TOKENS, self.RefreshArrowRenderer)
 	self:InstallArrowButtonHooks(button)
 	self:ApplyButtonState(button)
+end
+
+function SkinEngine:RefreshArrowRenderer(button)
+	local icon = button and button.BFL_DarkArrowIcon
+	if icon then
+		self:SetTextureVertexColor(button, icon, UnpackColor(COLORS.gold))
+	end
 end
 
 function SkinEngine:SkinCompactCheckButton(checkButton)
 	if not self:IsActive() or not checkButton or IsForbidden(checkButton) then
 		return
 	end
+	self:RegisterRenderer(checkButton, "check", CHECK_THEME_TOKENS, self.RefreshCheckRenderer)
 
 	if checkButton.BFL_DarkBackdrop then
 		checkButton.BFL_DarkBackdrop:Hide()
@@ -2512,6 +2904,7 @@ function SkinEngine:SkinCheckButton(checkButton)
 		self:RestoreFrame(checkButton)
 		return
 	end
+	self:RegisterRenderer(checkButton, "check", CHECK_THEME_TOKENS, self.RefreshCheckRenderer)
 
 	self:CreateBackdrop(
 		checkButton,
@@ -2555,6 +2948,14 @@ function SkinEngine:SkinCheckButton(checkButton)
 	local text = checkButton.Text or _G[GetName(checkButton) .. "Text"]
 	if text then
 		self:SetFontColor(checkButton, text, 0.88, 0.88, 0.88, 1)
+	end
+end
+
+function SkinEngine:RefreshCheckRenderer(checkButton)
+	if checkButton and checkButton.BFL_DarkCompactCheckButton then
+		self:SkinCompactCheckButton(checkButton)
+	else
+		self:SkinCheckButton(checkButton)
 	end
 end
 
@@ -2603,6 +3004,12 @@ function SkinEngine:SkinDropdownIndicator(dropdown)
 	if not dropdown or IsForbidden(dropdown) or not CreateFrame then
 		return
 	end
+	self:RegisterRenderer(
+		dropdown,
+		"dropdown-indicator",
+		DROPDOWN_INDICATOR_THEME_TOKENS,
+		self.RefreshDropdownIndicatorRenderer
+	)
 
 	local indicator = dropdown.BFL_DarkDropdownIndicator
 	if not indicator then
@@ -2642,6 +3049,10 @@ function SkinEngine:SkinDropdownIndicator(dropdown)
 		indicator.Icon:SetAlpha(1)
 		indicator.Icon:Show()
 	end
+end
+
+function SkinEngine:RefreshDropdownIndicatorRenderer(dropdown)
+	self:SkinDropdownIndicator(dropdown)
 end
 
 function SkinEngine:GetDropdownMenu(dropdown)
@@ -2689,6 +3100,7 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 	if not data or not menu then
 		return
 	end
+	self:RegisterRenderer(dropdown, "dropdown-menu", DROPDOWN_MENU_THEME_TOKENS, self.RefreshDropdownMenuRenderer)
 
 	local labels = data.labels or {}
 	local values = data.values or {}
@@ -2819,6 +3231,10 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 	for rowIndex = maxVisible + 1, #menu.Rows do
 		menu.Rows[rowIndex]:Hide()
 	end
+end
+
+function SkinEngine:RefreshDropdownMenuRenderer(dropdown)
+	self:RenderCustomDropdown(dropdown)
 end
 
 function SkinEngine:ToggleCustomDropdown(dropdown)
@@ -3022,6 +3438,12 @@ function SkinEngine:ApplyScrollThumbState(scrollBar, thumb, interactionState)
 	if not self:IsActive() or not scrollBar or IsForbidden(scrollBar) then
 		return
 	end
+	-- When the thumb owns a Backdrop renderer, bind its state renderer to the
+	-- same target so base paint always runs before hover/drag paint. Texture
+	-- thumbs use the scrollbar-owned marker and therefore stay on the owner.
+	local rendererTarget = thumb and thumb.BFL_DarkBackdrop and thumb or scrollBar
+	rendererTarget.BFL_DarkScrollThumbRenderOwner = scrollBar
+	self:RegisterRenderer(rendererTarget, "scroll-thumb-state", SCROLL_THUMB_THEME_TOKENS, self.RefreshScrollThumbRenderer)
 
 	if scrollBar.BFL_DarkScrollThumbDragging then
 		interactionState = "down"
@@ -3041,6 +3463,12 @@ function SkinEngine:ApplyScrollThumbState(scrollBar, thumb, interactionState)
 	elseif thumb and thumb.BFL_DarkBackdrop then
 		SetBackdropColors(thumb.BFL_DarkBackdrop, color, COLORS.borderNone)
 	end
+end
+
+function SkinEngine:RefreshScrollThumbRenderer(target)
+	local scrollBar = target and target.BFL_DarkScrollThumbRenderOwner or target
+	local thumb = target ~= scrollBar and target or (scrollBar and scrollBar.BFL_DarkScrollThumbFrame)
+	self:ApplyScrollThumbState(scrollBar, thumb)
 end
 
 function SkinEngine:InstallScrollThumbHooks(scrollBar, thumb)
@@ -3354,6 +3782,7 @@ function SkinEngine:SkinSlider(slider)
 	if not self:IsActive() or not slider or IsForbidden(slider) then
 		return
 	end
+	self:RegisterRenderer(slider, "slider", SLIDER_THEME_TOKENS, self.RefreshSliderRenderer)
 
 	if slider.Slider and slider.Slider ~= slider then
 		self:SkinSlider(slider.Slider)
@@ -3389,6 +3818,10 @@ function SkinEngine:SkinSlider(slider)
 
 	local thumb = slider.Thumb or (slider.GetThumbTexture and slider:GetThumbTexture())
 	self:SkinSliderThumb(slider, thumb)
+end
+
+function SkinEngine:RefreshSliderRenderer(slider)
+	self:SkinSlider(slider)
 end
 
 function SkinEngine:SkinColorSwatch(button)
@@ -3552,6 +3985,7 @@ function SkinEngine:SkinRow(row)
 			row.BFL_DarkRowOver = BFL:IsRegionMouseOver(row) or nil
 		end
 	end
+	self:RegisterRenderer(row, "row-state", ROW_THEME_TOKENS, self.RefreshRowRenderer)
 	if row.background and row.BFL_DarkRowBackground ~= row.background then
 		row.BFL_DarkRowBackground = row.background
 		self:SetTextureAlpha(row, row.background, 0)
@@ -3584,6 +4018,10 @@ function SkinEngine:SkinRow(row)
 
 	RefreshRowTravelPassButton(self, row, row.travelPassButton, TRAVEL_PASS_ROW_BUTTON_KEY, TRAVEL_PASS_ROW_SHOWN_KEY, TRAVEL_PASS_ROW_ENABLED_KEY)
 	RefreshRowTravelPassButton(self, row, row.PartyButton, PARTY_ROW_BUTTON_KEY, PARTY_ROW_SHOWN_KEY, PARTY_ROW_ENABLED_KEY)
+end
+
+function SkinEngine:RefreshRowRenderer(row)
+	self:RefreshRow(row)
 end
 
 function SkinEngine:RefreshRow(row)
@@ -3773,8 +4211,20 @@ function SkinEngine:SkinControl(control)
 	if control.text then
 		self:SetFontColor(control, control.text, UnpackColor(COLORS.gold))
 	end
+	if control.ValueLabel or control.text then
+		self:RegisterRenderer(control, "control-labels", GOLD_THEME_TOKENS, self.RefreshControlLabelRenderer)
+	end
 
 	self:SkinTree(control, 2)
+end
+
+function SkinEngine:RefreshControlLabelRenderer(control)
+	if control and control.ValueLabel then
+		self:SetFontColor(control, control.ValueLabel, UnpackColor(COLORS.gold))
+	end
+	if control and control.text then
+		self:SetFontColor(control, control.text, UnpackColor(COLORS.gold))
+	end
 end
 
 function SkinEngine:SkinTree(root, maxDepth, currentDepth)
@@ -4038,6 +4488,7 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkKeepFontColor = nil
 	frame.BFL_DarkButtonSkinned = nil
 	frame.BFL_DarkButtonStateKey = nil
+	frame.BFL_DarkInteractionState = nil
 	frame.BFL_DarkButtonVariant = nil
 	frame.BFL_DarkButtonInsetLeft = nil
 	frame.BFL_DarkButtonInsetRight = nil
@@ -4088,6 +4539,7 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkScrollBarSetupKey = nil
 	frame.BFL_DarkScrollThumbFrame = nil
 	frame.BFL_DarkScrollThumbSkinned = nil
+	frame.BFL_DarkScrollThumbRenderOwner = nil
 	frame.BFL_DarkCompactCheckButton = nil
 	frame.BFL_DarkNoCheckChrome = nil
 	frame.BFL_DarkCheckButtonInsets = nil
@@ -4095,17 +4547,23 @@ function SkinEngine:RestoreFrame(frame)
 	frame.BFL_DarkCheckButtonPushedAlpha = nil
 	frame.BFL_DarkCheckButtonDisabledAlpha = nil
 	frame.BFL_DarkCheckButtonHighlightAlpha = nil
+	self:UnregisterRenderers(frame)
+	self.registry[frame] = nil
 end
 
 function SkinEngine:RestoreAll()
 	local restoredButtons = {}
-	for frame, _ in pairs(self.registry) do
+	local frames = {}
+	for frame in pairs(self.registry) do
+		frames[#frames + 1] = frame
+	end
+	for _, frame in ipairs(frames) do
 		self:RestoreFrame(frame)
 		if IsObjectType(frame, "Button") then
 			restoredButtons[#restoredButtons + 1] = frame
 		end
 	end
-	wipe(self.registry)
+	self.registry = NewWeakKeySet()
 
 	-- A texture can be captured by both its button and a recursively skinned
 	-- owner. Registry iteration order is undefined, so the per-frame refresh can

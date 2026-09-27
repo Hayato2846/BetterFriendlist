@@ -201,8 +201,11 @@ function Groups:RunSmartMigration()
 			-- Normalize to ensure we have the full Name-Realm format
 			local normalized = BFL:NormalizeWoWFriendName(info.name)
 			if normalized then
-				-- Extract short name (before hyphen)
-				local shortName = normalized:match("^([^%-]+)")
+				-- Only remove a realm suffix. Forever surnames remain part of the
+				-- unique identity and therefore of the migration lookup key.
+				local shortName = BFL.GetPlayerNameWithoutRealm
+					and BFL.GetPlayerNameWithoutRealm(normalized)
+					or normalized:match("^([^%-]+)")
 				if shortName then
 					nameLookup[shortName] = nameLookup[shortName] or {}
 					table.insert(nameLookup[shortName], normalized)

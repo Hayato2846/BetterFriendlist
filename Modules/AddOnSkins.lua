@@ -305,7 +305,7 @@ SkinBetterFriendlist = function(event, addon)
 				if holder.downButton then S:HandleButton(holder.downButton) end
 				if holder.upButton then S:HandleButton(holder.upButton) end
 				if holder.bg then
-					holder.bg:SetColorTexture(0, 0, 0, 0)
+					BFL.TrySetColorTexture(holder.bg, 0, 0, 0, 0)
 					S:CreateBackdrop(holder, "Transparent")
 				end
 			end

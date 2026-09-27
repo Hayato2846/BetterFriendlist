@@ -340,16 +340,24 @@ function EllesmereUISkin:SkinModernFriendCard(button, factionTint)
 		button.FactionTint:Hide()
 	end
 	if button.background and button.background.SetColorTexture then
+		local applied
 		if factionTint then
-			button.background:SetColorTexture(factionTint[1], factionTint[2], factionTint[3], EUI_FRIENDS_FACTION_ALPHA)
+			applied = BFL.TrySetColorTexture(
+				button.background,
+				factionTint[1],
+				factionTint[2],
+				factionTint[3],
+				EUI_FRIENDS_FACTION_ALPHA
+			)
 		else
-			button.background:SetColorTexture(unpack(EUI_FRIENDS_ROW))
+			applied = BFL.TrySetColorTexture(button.background, unpack(EUI_FRIENDS_ROW))
 		end
-		button.background:Show()
+		if applied then
+			button.background:Show()
+		end
 	end
 	local highlight = button.highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
-	if highlight and highlight.SetColorTexture then
-		highlight:SetColorTexture(unpack(EUI_FRIENDS_HOVER))
+	if highlight and highlight.SetColorTexture and BFL.TrySetColorTexture(highlight, unpack(EUI_FRIENDS_HOVER)) then
 		highlight:SetDesaturated(false)
 		highlight:SetVertexColor(1, 1, 1, 1)
 		highlight:SetAlpha(1)

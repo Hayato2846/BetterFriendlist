@@ -496,6 +496,50 @@ local function BuildShortNameLookup()
 	return lookup
 end
 
+local function GetUsableDamageMeterSourceName(source)
+	if type(source) ~= "table" then
+		return nil
+	end
+
+	-- Both identity fields can be conditional-secret on 12.1.5. Reject the
+	-- complete source before comparing its name or using it as a table key.
+	local sourceName = source.name
+	local sourceGUID = source.sourceGUID
+	if
+		(BFL.IsSecret and BFL:IsSecret(sourceName))
+		or (BFL.IsSecret and BFL:IsSecret(sourceGUID))
+	then
+		return nil
+	end
+	if type(sourceName) ~= "string" or sourceName == "" then
+		return nil
+	end
+	return sourceName
+end
+
+local function AccumulateBlizzardCombatSources(combatSources, shortNameLookup, targetSnapshot)
+	if type(combatSources) ~= "table" then
+		return false
+	end
+
+	local found = false
+	for _, source in ipairs(combatSources) do
+		local sourceName = GetUsableDamageMeterSourceName(source)
+		if sourceName then
+			local amount = source.totalAmount
+			if not (BFL.IsSecret and BFL:IsSecret(amount)) and type(amount) == "number" then
+				local rosterName = shortNameLookup[sourceName] or sourceName
+				targetSnapshot[rosterName] = (targetSnapshot[rosterName] or 0) + amount
+				found = true
+			end
+		end
+	end
+	return found
+end
+
+RaidTools.GetUsableDamageMeterSourceName = GetUsableDamageMeterSourceName
+RaidTools.AccumulateBlizzardCombatSources = AccumulateBlizzardCombatSources
+
 local function GetBlizzardMeterSnapshot()
 	if not C_DamageMeter or not C_DamageMeter.IsDamageMeterAvailable then
 		return false
@@ -515,20 +559,12 @@ local function GetBlizzardMeterSnapshot()
 	local shortNameLookup = BuildShortNameLookup()
 	local found = false
 
-	if damageSession and damageSession.combatSources then
-		for _, source in ipairs(damageSession.combatSources) do
-			local rosterName = shortNameLookup[source.name] or source.name
-			found = true
-			meterSnapshot[rosterName] = (meterSnapshot[rosterName] or 0) + (source.totalAmount or 0)
-		end
+	if damageSession then
+		found = AccumulateBlizzardCombatSources(damageSession.combatSources, shortNameLookup, meterSnapshot) or found
 	end
 
-	if healingSession and healingSession.combatSources then
-		for _, source in ipairs(healingSession.combatSources) do
-			local rosterName = shortNameLookup[source.name] or source.name
-			found = true
-			meterSnapshot[rosterName] = (meterSnapshot[rosterName] or 0) + (source.totalAmount or 0)
-		end
+	if healingSession then
+		found = AccumulateBlizzardCombatSources(healingSession.combatSources, shortNameLookup, meterSnapshot) or found
 	end
 
 	return found

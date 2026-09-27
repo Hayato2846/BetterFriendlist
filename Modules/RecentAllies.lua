@@ -830,7 +830,9 @@ function RecentAllies:InitializeEntry(button, elementData)
 
 	-- Update background color based on online status
 	button.NormalTexture:Show()
-	local backgroundColor = stateData.isOnline and FRIENDS_WOW_BACKGROUND_COLOR or FRIENDS_OFFLINE_BACKGROUND_COLOR
+	local backgroundColor = stateData.isOnline
+		and BFL.FRIENDS_WOW_BACKGROUND_COLOR
+		or BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR
 	button.NormalTexture:SetColorTexture(backgroundColor:GetRGBA())
 
 	-- Set name in class color (Line 1, Part 1)
@@ -841,7 +843,11 @@ function RecentAllies:InitializeEntry(button, elementData)
 	else
 		nameColor = FRIENDS_GRAY_COLOR
 	end
-	button.CharacterData.Name:SetText(nameColor:WrapTextInColorCode(characterData.name))
+	local displayName = BFL.AreRegionalUniqueNamesEnabled
+		and BFL.AreRegionalUniqueNamesEnabled()
+		and characterData.fullName
+		or characterData.name
+	button.CharacterData.Name:SetText(nameColor:WrapTextInColorCode(displayName))
 	button.CharacterData.Name:SetWidth(math.min(button.CharacterData.Name:GetUnboundedStringWidth(), 150))
 
 	-- Set level (Line 1, Part 2)
@@ -954,10 +960,11 @@ function RecentAllies:OpenMenu(button)
 	end
 
 	local recentAllyData = elementData
+	local useFullName = BFL.AreRegionalUniqueNamesEnabled and BFL.AreRegionalUniqueNamesEnabled()
 	local contextData = {
 		recentAllyData = recentAllyData,
-		name = recentAllyData.characterData.name,
-		server = recentAllyData.characterData.realmName,
+		name = useFullName and recentAllyData.characterData.fullName or recentAllyData.characterData.name,
+		server = useFullName and nil or recentAllyData.characterData.realmName,
 		guid = recentAllyData.characterData.guid,
 		isOffline = not recentAllyData.stateData.isOnline,
 	}

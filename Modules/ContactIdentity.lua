@@ -60,6 +60,9 @@ function ContactIdentity:GetContactKeyFromBattleTag(battleTag)
 end
 
 function ContactIdentity:NormalizePlayerName(name, realm)
+	if BFL.NormalizePlayerIdentityName then
+		return BFL.NormalizePlayerIdentityName(name, realm)
+	end
 	name = self:CleanString(name)
 	realm = self:CleanString(realm)
 	if not name then

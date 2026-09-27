@@ -93,7 +93,7 @@
 								</Anchors>
 							</Frame>
 
-							<!-- Friend Tags Tab Content (BETA) -->
+							<!-- Friend Tags Tab Content -->
 							<Frame parentKey="FriendTagsTab" hidden="true">
 								<Anchors>
 									<Anchor point="TOPLEFT" />
@@ -101,7 +101,7 @@
 								</Anchors>
 							</Frame>
 
-							<!-- Private Notes Tab Content (BETA) -->
+							<!-- Private Notes Tab Content -->
 							<Frame parentKey="ContactMemoryTab" hidden="true">
 								<Anchors>
 									<Anchor point="TOPLEFT" />
@@ -125,7 +125,7 @@
 								</Anchors>
 							</Frame>
 							
-							<!-- Global Sync Tab Content (BETA) -->
+							<!-- Global Sync Tab Content -->
 							<Frame parentKey="GlobalSyncTab" hidden="true">
 								<Anchors>
 									<Anchor point="TOPLEFT" />

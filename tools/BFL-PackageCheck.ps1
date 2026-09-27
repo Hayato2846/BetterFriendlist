@@ -20,6 +20,40 @@ $compatAllowedPathPatterns = @(
 
 $compatViolations = @()
 $luaFiles = & git ls-files '*.lua'
+
+Write-Host ''
+Write-Host '[BFL] Blizzard global ownership guard'
+
+$blizzardOwnedDataGlobals = @(
+    'RAF_NEXT_REWARD_HELP_TEXT',
+    'WHO_LIST_SEARCH_INSTRUCTIONS',
+    'WHO_LIST_LEVEL_TOOLTIP',
+    'FRIENDS_WOW_BACKGROUND_COLOR',
+    'FRIENDS_OFFLINE_BACKGROUND_COLOR'
+)
+$blizzardGlobalWriteViolations = @()
+foreach ($file in $luaFiles) {
+    $normalizedFile = ($file -replace '\\', '/')
+    foreach ($globalName in $blizzardOwnedDataGlobals) {
+        $escapedName = [regex]::Escape($globalName)
+        $writePatterns = @(
+            "\b_G\.$escapedName\s*=",
+            "\b_G\[`"$escapedName`"\]\s*=",
+            "^\s*$escapedName\s*="
+        )
+        $matches = Select-String -LiteralPath $file -Pattern $writePatterns -CaseSensitive
+        foreach ($match in $matches) {
+            $blizzardGlobalWriteViolations += "${normalizedFile}:$($match.LineNumber): $($match.Line.Trim())"
+        }
+    }
+}
+
+if ($blizzardGlobalWriteViolations.Count -gt 0) {
+    throw "BFL must not create or overwrite Blizzard-owned data globals. Use BFL namespaced values or direct widget assignment instead. Violations:`n$($blizzardGlobalWriteViolations -join "`n")"
+}
+
+Write-Host '[OK] Blizzard-owned data globals are read-only.'
+
 foreach ($file in $luaFiles) {
     $normalizedFile = ($file -replace '\\', '/')
     $isAllowed = $false

@@ -1498,6 +1498,23 @@ local function RegisterBuiltInTests()
 			local settingsApp = SettingsDesigner:Register()
 			local controls = settingsApp and settingsApp.controlsByID
 			V:Assert(type(controls) == "table", "Settings Center controls should be registered")
+			V:AssertEqual(settingsApp.opts.dropdownStyle, "themed", "Settings Center dropdowns should use the modern themed style")
+			V:AssertEqual(settingsApp.opts.inputStyle, "themed", "Settings Center inputs should use the modern themed style")
+			V:AssertEqual(settingsApp.opts.sidePanel, false, "Settings Center should use full-width feature pages")
+			V:AssertEqual(settingsApp.opts.defaultControlColumns, 2, "Settings Center should default to a two-column control grid")
+			V:Assert(settingsApp.opts.sidebar.featureNavigation == true, "Settings Center should expose direct feature navigation")
+			V:Assert(settingsApp.opts.sidebar.search == true, "Settings Center feature navigation should retain search")
+			V:AssertType(settingsApp.opts.settingRowStyle, "function", "Settings Center should choose its row style per page")
+			V:AssertEqual(
+				settingsApp.opts.settingRowStyle(settingsApp, { selectedPageID = "friends.display" }),
+				"matrix",
+				"Regular Settings Center pages should use matrix rows"
+			)
+			V:AssertEqual(
+				settingsApp.opts.settingRowStyle(settingsApp, { selectedPageID = "advanced.tools" }),
+				"standard",
+				"Advanced Tools should preserve descriptive rows for dependency warnings"
+			)
 
 			local namePreset = controls and controls.nameFormatPreset
 			V:AssertNotNil(namePreset, "Name format preset control should exist")
@@ -1520,6 +1537,30 @@ local function RegisterBuiltInTests()
 
 			V:AssertNil(controls.showNoteIcon, "Settings Center must not expose the unimplemented note icon setting")
 			V:AssertNil(controls.guildBrokerTooltipMode, "Settings Center must not expose the unused guild tooltip mode")
+			V:AssertNil(controls.guildTabEnableProfessions, "Guild profession filters should not require a Settings toggle")
+			V:AssertNil(controls.guildTabShowNews, "Guild News should not require a Settings toggle")
+			V:AssertNil(controls.guildTabOpenDetailsOnDoubleClick, "Guild Settings should not expose the redundant native detail action")
+
+			local privateNotesPage = settingsApp.GetPage and settingsApp:GetPage("privacy.notes")
+			V:AssertNotNil(privateNotesPage, "Private Notes should have a standard Privacy page")
+			V:AssertNil(privateNotesPage.visibleWhen, "Private Notes page should not depend on Beta Features")
+			V:AssertNotNil(controls["contactMemory.enabled"], "Private Notes should expose its dedicated feature toggle")
+			V:AssertNil(
+				controls["contactMemory.enabled"].visibleWhen,
+				"Private Notes toggle should not depend on Beta Features"
+			)
+
+			if BFL.HasSecretValues == true then
+				local bridgeControl = controls.externalMenuBridgeEnabled
+				V:AssertNotNil(bridgeControl, "External Menu Bridge should expose a stable Tools control")
+				V:AssertEqual(bridgeControl.pageID, "advanced.tools", "External Menu Bridge should live on the stable Tools page")
+				V:AssertEqual(bridgeControl.default, true, "External Menu Bridge should default to enabled")
+				V:AssertType(bridgeControl.isEnabled, "function", "External Menu Bridge should track companion addon availability")
+				if not bridgeControl.isEnabled() then
+					V:AssertEqual(bridgeControl.alwaysShowDescription, true, "Disabled bridge warnings should remain visible in Compact density")
+					V:AssertType(bridgeControl.descriptionColor, "table", "Disabled bridge warnings should use an explicit warning color")
+				end
+			end
 
 			local friendTagsPage = settingsApp.GetPage and settingsApp:GetPage("groups.friendtags")
 			V:AssertNotNil(friendTagsPage, "Friend Tags should have a standard Settings Center page")
@@ -2282,10 +2323,46 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(tempDB.primarySort, "status", "primarySort default should be 'status'")
 				V:AssertEqual(tempDB.theme, "blizzard", "theme default should be 'blizzard'")
 				V:AssertEqual(tempDB.forceModernFriendsUI, false, "Modern capability override should default to off")
+				V:AssertEqual(tempDB.externalMenuBridgeEnabled, true, "External Menu Bridge should default to enabled")
 				V:Assert(tempDB.groupOrder == nil, "groupOrder default should be nil")
 				V:Assert(type(tempDB.groupStates) == "table", "groupStates should be a table")
 				V:Assert(type(tempDB.groupColors) == "table", "groupColors should be a table")
 			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "Database_ExternalMenuBridgeV291Migration", {
+		description = "v2.9.1 enables External Menu Bridge once and preserves later user opt-outs",
+		action = function(V)
+			local DB = BFL:GetModule("DB")
+			local legacyProfile = {
+				externalMenuBridgeEnabled = false,
+			}
+
+			V:Assert(
+				DB:ApplyExternalMenuBridgeDefaultMigration(legacyProfile),
+				"An existing profile should receive the v2.9.1 migration"
+			)
+			V:AssertEqual(
+				legacyProfile.externalMenuBridgeEnabled,
+				true,
+				"The migration should enable External Menu Bridge even after an earlier explicit opt-out"
+			)
+			V:Assert(
+				type(legacyProfile.externalMenuBridgeDefaultMigrationVersion) == "number",
+				"The migration should persist its one-time version marker"
+			)
+
+			legacyProfile.externalMenuBridgeEnabled = false
+			V:Assert(
+				not DB:ApplyExternalMenuBridgeDefaultMigration(legacyProfile),
+				"A migrated profile should not be migrated a second time"
+			)
+			V:AssertEqual(
+				legacyProfile.externalMenuBridgeEnabled,
+				false,
+				"A user opt-out after migration should remain disabled"
+			)
 		end,
 	})
 
@@ -2313,7 +2390,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("data", "ContactMemory_DisabledState", {
-		description = "Contact Memory should require both its toggle and Beta Features",
+		description = "Contact Memory should follow its own toggle independently from Beta Features",
 		action = function(V)
 			WithTemporaryDatabase({
 				enableBetaFeatures = false,
@@ -2323,10 +2400,7 @@ local function RegisterBuiltInTests()
 			}, function()
 				local ContactMemory = BFL:GetModule("ContactMemory")
 				V:AssertNotNil(ContactMemory, "ContactMemory module should exist")
-				V:Assert(ContactMemory:IsEnabled() == false, "Beta disabled should disable Contact Memory")
-
-				BetterFriendlistDB.enableBetaFeatures = true
-				V:Assert(ContactMemory:IsEnabled() == true, "Both toggles enabled should enable Contact Memory")
+				V:Assert(ContactMemory:IsEnabled() == true, "Private Notes should remain enabled while Beta Features are disabled")
 
 				ContactMemory:SetEnabled(false)
 				V:Assert(ContactMemory:IsEnabled() == false, "Contact Memory toggle should disable the feature")
@@ -2348,7 +2422,7 @@ local function RegisterBuiltInTests()
 
 				local fakeApp = {
 					pagesByID = {
-						["advanced.beta"] = {},
+						["privacy.notes"] = {},
 					},
 					groups = {},
 					controls = {},
@@ -2384,6 +2458,8 @@ local function RegisterBuiltInTests()
 				V:AssertNotNil(enableControl, "Enable control should be registered")
 				V:AssertNotNil(tooltipControl, "Tooltip control should be registered")
 				V:AssertNotNil(streamerControl, "Streamer Mode control should be registered")
+				V:AssertEqual(enableControl.pageID, "privacy.notes", "Private Notes should use its stable Privacy page")
+				V:AssertNil(enableControl.visibleWhen, "Private Notes should not depend on Beta Features")
 				V:AssertEqual(
 					enableControl.groupTitle,
 					(BFL.L and BFL.L.CONTACT_MEMORY_TITLE) or "Private Notes",
@@ -2420,6 +2496,39 @@ local function RegisterBuiltInTests()
 					false,
 					"Streamer control should update nested settings"
 				)
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "MenuBridge_StableEnablement", {
+		description = "External Menu Bridge should be independent from Beta Features and require its companion addon",
+		action = function(V)
+			WithTemporaryDatabase({
+				enableBetaFeatures = false,
+				externalMenuBridgeEnabled = true,
+			}, function(tempDB)
+				local MenuBridge = BFL:GetModule("MenuBridge")
+				V:AssertNotNil(MenuBridge, "MenuBridge module should exist")
+
+				local oldHasSecretValues = BFL.HasSecretValues
+				local oldTestCompanion = MenuBridge._testCompanionAddOnLoaded
+				local ok, err = pcall(function()
+					BFL.HasSecretValues = true
+					MenuBridge._testCompanionAddOnLoaded = true
+					V:Assert(MenuBridge:IsEnabled() == true, "Beta Features should not gate an enabled Menu Bridge")
+
+					MenuBridge._testCompanionAddOnLoaded = false
+					V:Assert(MenuBridge:IsEnabled() == false, "The companion addon should be required at runtime")
+
+					MenuBridge._testCompanionAddOnLoaded = true
+					tempDB.externalMenuBridgeEnabled = false
+					V:Assert(MenuBridge:IsEnabled() == false, "The dedicated Menu Bridge toggle should still disable the feature")
+				end)
+				BFL.HasSecretValues = oldHasSecretValues
+				MenuBridge._testCompanionAddOnLoaded = oldTestCompanion
+				if not ok then
+					error(err, 0)
+				end
 			end)
 		end,
 	})
@@ -4498,6 +4607,11 @@ local function RegisterBuiltInTests()
 			V:AssertNotNil(GuildActions, "GuildActions module should exist")
 			V:AssertType(GuildActions.ShowMemberMenu, "function", "GuildActions should expose member menus")
 			V:AssertType(GuildActions.ShowGuildActionsMenu, "function", "GuildActions should expose guild action menus")
+			V:AssertNil(GuildActions.OpenMemberInfo, "GuildActions should not expose the redundant native member detail action")
+			V:AssertNil(GuildActions.PromoteMember, "GuildActions should not expose protected promote actions")
+			V:AssertNil(GuildActions.DemoteMember, "GuildActions should not expose protected demote actions")
+			V:AssertNil(GuildActions.SetRank, "GuildActions should not expose protected rank assignment")
+			V:AssertNil(GuildActions.RemoveMember, "GuildActions should not expose protected guild removal actions")
 
 			local oldOpenSimpleContextMenu = BFL.OpenSimpleContextMenu
 			local oldGetMemberCapabilities = GuildActions.GetMemberCapabilities
@@ -4517,12 +4631,12 @@ local function RegisterBuiltInTests()
 					return {
 						whisper = true,
 						inviteParty = true,
-						who = true,
+						addFriend = true,
+						toggleIgnore = false,
+						viewHouses = true,
+						viewRecipes = true,
 						nickname = true,
 						copyName = true,
-						promote = false,
-						demote = false,
-						remove = false,
 						setLeader = false,
 					}
 				end
@@ -4540,6 +4654,9 @@ local function RegisterBuiltInTests()
 					name = "Unit",
 					fullName = "Unit-Realm",
 					online = true,
+					guid = "Player-1-00000001",
+					profession1ID = 164,
+					profession1Name = "Blacksmithing",
 				}, "BFL_TestGuildMemberDropdown")
 				local actionsResult = GuildActions:ShowGuildActionsMenu(owner)
 
@@ -4550,6 +4667,20 @@ local function RegisterBuiltInTests()
 				V:AssertEqual(captured[2].name, "BFL_GuildActionsDropdown", "Guild actions menu should use stable dropdown name")
 				V:AssertType(captured[1].items, "table", "Member menu should provide simple menu items")
 				V:AssertType(captured[2].items, "table", "Guild actions menu should provide simple menu items")
+				local labels = {}
+				for _, item in ipairs(captured[1].items) do
+					if item.text then
+						labels[item.text] = true
+					end
+				end
+				V:Assert(labels[ADD_FRIEND or "Add Friend"] == true, "Guild member menus should offer Add Friend")
+				V:AssertNil(labels["View Member Info"], "Guild member menus should not duplicate tooltip details in a native window")
+				V:Assert(labels[UNIT_VIEW_HOUSES or "View Houses"] == true, "Guild member menus should expose Retail housing")
+				V:Assert(
+					labels[string.format((BFL.L and BFL.L.GUILD_PROFESSION_VIEW_RECIPES) or "View %s Recipes", "Blacksmithing")] == true,
+					"Guild member menus should expose explicit profession recipe queries"
+				)
+				V:AssertNil(labels[WHO or "Who"], "Guild member menus should not offer the redundant Who action")
 			end)
 
 			BFL.OpenSimpleContextMenu = oldOpenSimpleContextMenu
@@ -4631,18 +4762,18 @@ local function RegisterBuiltInTests()
 				V:AssertNotNil(captured[1].options.getSelectionText("rank"), "Sort selection text should resolve without error")
 				V:AssertNotNil(captured[2].options.getSelectionText("all"), "Filter selection text should resolve without error")
 				V:Assert(captured[1].getter("rank") == true, "Sort getter should use current GuildFrame sort mode")
-				V:Assert(captured[2].getter("online") == true, "Filter getter should use current GuildFrame filter mode")
+				V:Assert(captured[2].getter("online") == false, "Nested filter menu should own its radio selection state")
 				V:Assert(table.concat(captured[1].options.values, ","):find("nickname", 1, true) ~= nil, "Sort dropdown should include nickname sort")
 				V:Assert(table.concat(captured[1].options.values, ","):find("status", 1, true) ~= nil, "Sort dropdown should include status sort")
 				V:Assert(table.concat(captured[1].options.values, ","):find("lastonline", 1, true) ~= nil, "Sort dropdown should include last-online sort")
-				V:Assert(table.concat(captured[2].options.values, ","):find("offline", 1, true) ~= nil, "Filter dropdown should include offline filter")
+				V:AssertType(captured[2].options.populateRootDescription, "function", "Filter dropdown should support nested menu content")
 
 				captured[1].setter("name")
 				V:AssertEqual(sortArgs.mode, "name", "Sort setter should pass selected mode")
 				V:AssertEqual(sortArgs.skipToggle, true, "Sort dropdown should not toggle direction when reselecting")
 
 				captured[2].setter("all")
-				V:AssertEqual(filterMode, "all", "Filter setter should pass selected mode")
+				V:AssertNil(filterMode, "Nested filter entries should own their individual setters")
 			end)
 
 			BFL.CreateDropdown = oldCreateDropdown
@@ -5020,6 +5151,7 @@ local function RegisterBuiltInTests()
 								fullName = "Dimmy-Realm",
 								realm = "Realm",
 								rank = "Raider",
+								classFile = "MAGE",
 							},
 							{
 								name = "Seb",
@@ -5042,6 +5174,8 @@ local function RegisterBuiltInTests()
 					V:AssertEqual(#candidates, 1, "Guild character query should return one candidate")
 					V:AssertEqual(candidates[1].key, "player:Dimmy-Realm", "Guild candidate should use a player key")
 					V:AssertEqual(candidates[1].source, "guild", "Guild candidate should be marked as guild source")
+					V:AssertNotNil(candidates[1].classColor, "Guild candidates should keep their class color")
+					V:AssertEqual(candidates[1].classColor.b, RAID_CLASS_COLORS.MAGE.b, "Guild candidates should use Blizzard's class color")
 					V:Assert(fakeGuildRosterData.requested == true, "Guild roster refresh should be requested")
 
 					local addOK = AutoRaidAssist:AddTargetFromCandidate(candidates[1])
@@ -5054,6 +5188,336 @@ local function RegisterBuiltInTests()
 				end
 				BFL.Modules.GuildRosterData = originalGuildRosterData
 				AutoRaidAssist.lastGuildRosterRequest = originalGuildRosterRequest
+				if not ok then
+					error(err, 2)
+				end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildRoster_ProfessionCatalogAndFilter", {
+		description = "Guild profession filters should aggregate professions and combine with online status",
+		action = function(V)
+			WithTemporaryDatabase({
+				guildTabEnableProfessions = false,
+			}, function()
+				local GuildRosterData = BFL:GetModule("GuildRosterData")
+				local GuildFrame = BFL:GetModule("GuildFrame")
+				V:AssertNotNil(GuildRosterData, "GuildRosterData module should exist")
+				V:AssertNotNil(GuildFrame, "GuildFrame module should exist")
+				V:AssertType(GuildRosterData.GetProfessionCatalog, "function", "Profession catalog API should exist")
+
+				local members = {
+					{ name = "Ada", online = true, profession1ID = 164, profession1Name = "Blacksmithing", profession1Rank = 100 },
+					{ name = "Grace", online = true, profession1ID = 164, profession1Name = "Blacksmithing", profession1Rank = 80, profession2ID = 197, profession2Name = "Tailoring", profession2Rank = 75 },
+					{ name = "Lin", online = false, profession1ID = 197, profession1Name = "Tailoring", profession1Rank = 100 },
+				}
+				local catalog = GuildRosterData:GetProfessionCatalog(members)
+				V:AssertEqual(#catalog, 2, "Profession catalog should contain unique professions")
+				V:AssertEqual(catalog[1].name, "Blacksmithing", "Profession catalog should sort by display name")
+				V:AssertEqual(catalog[1].count, 2, "Profession catalog should count matching members")
+
+				local oldFilter = GuildFrame.filterMode
+				local oldSearch = GuildFrame.searchText
+				local oldProfession = GuildFrame.professionFilterID
+				local ok, err = pcall(function()
+					GuildFrame.filterMode = "online"
+					GuildFrame.searchText = ""
+					GuildFrame.professionFilterID = 197
+					V:Assert(GuildFrame:PassesFilter(members[2]), "Matching profession member should pass")
+					V:Assert(not GuildFrame:PassesFilter(members[1]), "Non-matching profession member should be filtered")
+					V:Assert(not GuildFrame:PassesFilter(members[3]), "Offline profession matches should not bypass the Online filter")
+					GuildFrame.filterMode = "offline"
+					V:Assert(GuildFrame:PassesFilter(members[3]), "Profession filter should combine with the Offline filter")
+				end)
+				GuildFrame.filterMode = oldFilter
+				GuildFrame.searchText = oldSearch
+				GuildFrame.professionFilterID = oldProfession
+				if not ok then error(err, 0) end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildRoster_MOTDReadDuringActionRestrictions", {
+		description = "The read-only Guild MOTD should remain available while unrelated actions are restricted",
+		action = function(V)
+			local oldGuildInfo = C_GuildInfo
+			local oldIsInGuild = IsInGuild
+			local oldHasSecretValues = BFL.HasSecretValues
+			local oldIsActionRestricted = BFL.IsActionRestricted
+			local ok, err = pcall(function()
+				BFL.ClearGuildMOTDCache()
+				C_GuildInfo = {
+					GetMOTD = function()
+						return "Raid tonight"
+					end,
+				}
+				IsInGuild = function()
+					return true
+				end
+				BFL.HasSecretValues = false
+				BFL.IsActionRestricted = function()
+					return true
+				end
+				V:AssertEqual(BFL.GetGuildMOTD(), "Raid tonight", "Action restrictions must not hide the Guild MOTD")
+			end)
+			C_GuildInfo = oldGuildInfo
+			IsInGuild = oldIsInGuild
+			BFL.HasSecretValues = oldHasSecretValues
+			BFL.IsActionRestricted = oldIsActionRestricted
+			BFL.ClearGuildMOTDCache()
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildRoster_NewsRequestsAreEventDriven", {
+		description = "Guild News should ignore the retired setting and request once on demand until explicitly refreshed",
+		action = function(V)
+			WithTemporaryDatabase({ guildTabShowNews = false }, function()
+				local GuildRosterData = BFL:GetModule("GuildRosterData")
+				local GuildFrame = BFL:GetModule("GuildFrame")
+				local oldHasNews = GuildRosterData.HasGuildNewsAPI
+				local oldRequest = GuildRosterData.RequestGuildNews
+				local oldCollect = GuildRosterData.CollectGuildNews
+				local oldRequested = GuildFrame.guildNewsRequested
+				local requests = 0
+				local ok, err = pcall(function()
+					GuildRosterData.HasGuildNewsAPI = function() return true end
+					GuildRosterData.RequestGuildNews = function()
+						requests = requests + 1
+						return true
+					end
+					GuildRosterData.CollectGuildNews = function()
+						return { { whoText = "Ada", whatText = "Achievement" } }
+					end
+					GuildFrame.guildNewsRequested = false
+					GuildFrame:RequestGuildNews(false)
+					GuildFrame:RequestGuildNews(false)
+					V:AssertEqual(requests, 1, "Automatic Guild News request should run only once")
+					GuildFrame:RequestGuildNews(true)
+					V:AssertEqual(requests, 2, "Explicit refresh should request Guild News again")
+				end)
+				GuildRosterData.HasGuildNewsAPI = oldHasNews
+				GuildRosterData.RequestGuildNews = oldRequest
+				GuildRosterData.CollectGuildNews = oldCollect
+				GuildFrame.guildNewsRequested = oldRequested
+				if not ok then error(err, 0) end
+			end)
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildRoster_NewsPreserveLinksAndUseBlizzardFilters", {
+		description = "Guild News should preserve link metadata and use Blizzard's shared filter state",
+		action = function(V)
+			local GuildRosterData = BFL:GetModule("GuildRosterData")
+			local oldGuildInfo = C_GuildInfo
+			local oldGetNumGuildNews = GetNumGuildNews
+			local oldQueryGuildNews = QueryGuildNews
+			local oldGetFilters = GetGuildNewsFilters
+			local oldSetFilter = SetGuildNewsFilter
+			local oldNewsSort = GuildNewsSort
+			local oldCache = GuildRosterData.guildNewsCache
+			local filterCall
+			local sortCalls = 0
+			local ok, err = pcall(function()
+				C_GuildInfo = {
+					GetGuildNewsInfo = function(index)
+						if index == 1 then
+							return { isHeader = true }
+						end
+						return {
+							isHeader = false,
+							isSticky = true,
+							newsType = _G.NEWS_ITEM_LOOTED or 3,
+							newsDataID = 19019,
+							whoText = "Ada",
+							whatText = "|cffff8000|Hitem:19019::::::::|h[Thunderfury]|h|r",
+							data = { 11, 22, 33 },
+						}
+					end,
+					IsEncounterGuildNewsEnabled = function() return true end,
+				}
+				GetNumGuildNews = function() return 13 end
+				QueryGuildNews = function() end
+				GetGuildNewsFilters = function()
+					return true, false, true, true, false, true, false, false, true
+				end
+				SetGuildNewsFilter = function(filterID, enabled)
+					filterCall = { filterID, enabled }
+				end
+				GuildNewsSort = function(mode)
+					V:AssertEqual(mode, 0, "Guild News should use Blizzard's normal filtered sort")
+					sortCalls = sortCalls + 1
+				end
+				GuildRosterData.guildNewsCache = nil
+
+				local entries = GuildRosterData:CollectGuildNews(50)
+				V:AssertEqual(#entries, 12, "BFL should retain more than the two immediately visible news rows")
+				V:AssertEqual(entries[1].newsDataID, 19019, "Item actions should retain the news data ID")
+				V:AssertEqual(entries[1].data[3], 33, "News tooltips should retain auxiliary data")
+				V:Assert(entries[1].whatText:find("|Hitem:19019", 1, true) ~= nil, "Item hyperlinks should remain intact")
+
+				local filters = GuildRosterData:GetGuildNewsFilters()
+				V:Assert(filters[1] == true, "Enabled Blizzard Guild News filters should be reported")
+				V:Assert(filters[2] == false, "Disabled Blizzard Guild News filters should be reported")
+				V:Assert(filters[9] == true, "Non-contiguous Blizzard filter IDs should retain their state")
+				V:Assert(GuildRosterData:SetGuildNewsFilter(9, false), "Available Guild News filters should be writable")
+				V:AssertEqual(filterCall[1], 9, "The selected Blizzard filter ID should be passed through")
+				V:AssertEqual(filterCall[2], 0, "Disabling a filter should use Blizzard's numeric false state")
+				V:AssertEqual(sortCalls, 1, "Changing a filter should immediately re-sort Guild News")
+			end)
+			C_GuildInfo = oldGuildInfo
+			GetNumGuildNews = oldGetNumGuildNews
+			QueryGuildNews = oldQueryGuildNews
+			GetGuildNewsFilters = oldGetFilters
+			SetGuildNewsFilter = oldSetFilter
+			GuildNewsSort = oldNewsSort
+			GuildRosterData.guildNewsCache = oldCache
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	TS:RegisterTest("data", "GuildActions_ProfessionRecipeQueryIsUserInitiated", {
+		description = "Guild profession recipe queries should run only through the explicit member action",
+		action = function(V)
+			local GuildActions = BFL:GetModule("GuildActions")
+			local oldGuildInfo = C_GuildInfo
+			local oldReady = GuildActions.IsActionReady
+			local oldGetGUID = GuildActions.GetMemberGUID
+			local calls = 0
+			local ok, err = pcall(function()
+				C_GuildInfo = {
+					QueryGuildMemberRecipes = function(guid, professionID)
+						calls = calls + 1
+						V:AssertEqual(guid, "Player-1-00000001", "Recipe query should use the roster GUID")
+						V:AssertEqual(professionID, 164, "Recipe query should use the selected profession")
+					end,
+				}
+				GuildActions.IsActionReady = function() return true end
+				GuildActions.GetMemberGUID = function() return "Player-1-00000001" end
+				V:Assert(GuildActions:QueryMemberRecipes({ name = "Ada" }, 164), "Explicit recipe query should succeed")
+				V:AssertEqual(calls, 1, "Recipe API should be called exactly once")
+			end)
+			C_GuildInfo = oldGuildInfo
+			GuildActions.IsActionReady = oldReady
+			GuildActions.GetMemberGUID = oldGetGUID
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	TS:RegisterTest("data", "AutoRaidAssist_CandidateSourcePriority", {
+		description = "Auto Raid Assist should prioritize candidate sources and retain their colors in saved targets",
+		action = function(V)
+			WithTemporaryDatabase({}, function()
+				local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
+				local FriendsList = BFL:GetModule("FriendsList")
+				V:AssertNotNil(AutoRaidAssist, "AutoRaidAssist module should exist")
+				V:AssertNotNil(FriendsList, "FriendsList module should exist")
+
+				local originalFriends = FriendsList.friendsList
+				local originalGetDisplayName = FriendsList.GetDisplayName
+				local originalGuildRosterData = BFL.Modules and BFL.Modules.GuildRosterData
+				local originalGuildRosterRequest = AutoRaidAssist.lastGuildRosterRequest
+				local originalGetCurrentGroupCandidateUnits = AutoRaidAssist.GetCurrentGroupCandidateUnits
+				local originalIsTitleFriend = BFL.IsTitleFriend
+				local titleFriendLevel = {}
+				local fakeGuildRosterData = {
+					HasBaseRosterAPI = function()
+						return true
+					end,
+					IsInGuild = function()
+						return true
+					end,
+					RequestRosterUpdate = function()
+						return true
+					end,
+					CollectRoster = function()
+						return {
+							{
+								name = "Aardvark Guild",
+								fullName = "AardvarkGuild-Realm",
+								realm = "Realm",
+								rank = "Member",
+								classFile = "PALADIN",
+							},
+						}
+					end,
+				}
+
+				local ok, err = pcall(function()
+					FriendsList.friendsList = {
+						{
+							type = "wow",
+							uid = "wow_Alpha-Realm",
+							name = "Alpha-Realm",
+							displayName = "Alpha WoW",
+							classFile = "MAGE",
+						},
+						{
+							type = "bnet",
+							uid = "bnet_42",
+							bnetAccountID = 42,
+							friendLevel = titleFriendLevel,
+							displayName = "Beta Title",
+							classFile = "DRUID",
+						},
+						{
+							type = "bnet",
+							uid = "bnet_Zulu#1234",
+							battleTag = "Zulu#1234",
+							displayName = "Zulu Battle.net",
+							classFile = "WARRIOR",
+						},
+					}
+					FriendsList.GetDisplayName = function(_, friend)
+						return friend.displayName
+					end
+					BFL.IsTitleFriend = function(friend)
+						return friend and friend.friendLevel == titleFriendLevel
+					end
+					BFL.Modules.GuildRosterData = fakeGuildRosterData
+					AutoRaidAssist.GetCurrentGroupCandidateUnits = function()
+						return {}
+					end
+					AutoRaidAssist.lastGuildRosterRequest = nil
+					AutoRaidAssist:InvalidateCandidateCache()
+
+					local candidates = AutoRaidAssist:BuildCandidateList("", 10)
+					V:AssertEqual(#candidates, 4, "Every configured candidate source should be returned")
+					V:AssertEqual(candidates[1].source, "bnetFriend", "Battle.net friends should rank first")
+					V:AssertEqual(candidates[1].displayName, "Zulu Battle.net", "Source priority should outrank alphabetic order")
+					V:AssertEqual(candidates[1].classColor and candidates[1].classColor.b, 1, "Battle.net account results should use Blizzard's Battle.net blue")
+					V:AssertEqual(candidates[2].source, "wowFriend", "WoW friends should rank after Battle.net friends")
+					V:AssertEqual(candidates[2].displayName, "Alpha WoW", "WoW and Title friends should sort alphabetically together")
+					V:AssertNotNil(candidates[2].classColor, "WoW friends should expose their class color")
+					V:AssertEqual(candidates[3].source, "titleFriend", "Title friends should share the WoW friend priority")
+					V:AssertEqual(candidates[3].displayName, "Beta Title", "Title friend ordering should be deterministic")
+					V:AssertNotNil(candidates[3].classColor, "Title friends should expose their class color")
+					V:AssertEqual(candidates[4].source, "guild", "Guild candidates should rank after friends")
+					V:AssertNotNil(candidates[4].classColor, "Guild members should expose their class color")
+
+					for _, candidate in ipairs(candidates) do
+						local _, _, targetColor = AutoRaidAssist:GetTargetDisplay({
+							key = candidate.key,
+							source = candidate.source,
+							displayName = candidate.displayName,
+						})
+						V:AssertNotNil(targetColor, candidate.source .. " targets should retain their search-result color")
+						V:AssertEqual(targetColor.r, candidate.classColor.r, candidate.source .. " target red should match search")
+						V:AssertEqual(targetColor.g, candidate.classColor.g, candidate.source .. " target green should match search")
+						V:AssertEqual(targetColor.b, candidate.classColor.b, candidate.source .. " target blue should match search")
+					end
+				end)
+
+				FriendsList.friendsList = originalFriends
+				FriendsList.GetDisplayName = originalGetDisplayName
+				BFL.Modules.GuildRosterData = originalGuildRosterData
+				AutoRaidAssist.lastGuildRosterRequest = originalGuildRosterRequest
+				AutoRaidAssist.GetCurrentGroupCandidateUnits = originalGetCurrentGroupCandidateUnits
+				BFL.IsTitleFriend = originalIsTitleFriend
+				AutoRaidAssist:InvalidateCandidateCache()
 				if not ok then
 					error(err, 2)
 				end
@@ -13772,20 +14236,20 @@ function TestSuite:Initialize()
 	self:RegisterEventCompatibilityTests()
 	self:RegisterForeverCompatibilityTests()
 	self:Register1215CompatibilityTests()
-	self:RegisterLateUITests(); self:RegisterRaidInteractionTest(); self:RegisterPreviewFriendTagsTest()
+	self:RegisterLateUITests(); self:RegisterRaidInteractionTest(); self:RegisterPreviewFriendTagsTest(); self:RegisterGuildNewsRefreshTest(); self:RegisterGuildHeaderLayoutTest()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
 end
 
 function TestSuite:RegisterForeverCompatibilityTests()
 	self:RegisterTest("data", "Forever_ClientFamilyMatrix", {
 		description = "Forever remains Mainline despite its 1.60 interface number while Classic families keep their existing routing",
-		action = function(V)
+			action = function(V)
 			local forever = BFL.ResolveClientFlavor(16001, 1, 1, 2)
-			V:Assert(forever.isMainline and not forever.isClassic, "Forever project identity resolves to Mainline")
+			V:Assert(forever.isMainline and forever.isForever and not forever.isClassic, "Forever project identity resolves to Mainline")
 			local fallbackForever = BFL.ResolveClientFlavor(16001, nil, nil, nil)
-			V:Assert(fallbackForever.isMainline and not fallbackForever.isClassic, "Forever fallback never resolves as Classic")
+			V:Assert(fallbackForever.isMainline and fallbackForever.isForever and not fallbackForever.isClassic, "Forever fallback never resolves as Classic")
 			local midnight = BFL.ResolveClientFlavor(120105, 1, 1, 2)
-			V:Assert(midnight.isMainline and midnight.isMidnight, "Midnight Standard resolves as Mainline")
+			V:Assert(midnight.isMainline and midnight.isMidnight and not midnight.isForever, "Midnight Standard resolves as Mainline")
 			local era = BFL.ResolveClientFlavor(11509, 2, 1, 2)
 			V:Assert(era.isClassic and era.isClassicEra and not era.isMainline, "Classic Era remains Classic")
 			local anniversary = BFL.ResolveClientFlavor(20506, 2, 1, 2)
@@ -13840,7 +14304,7 @@ function TestSuite:RegisterForeverCompatibilityTests()
 			V:Assert(not BFL.ResolveGameRuleState(7, function() error("unavailable") end, nil, false), "Rule API errors use the safe fallback")
 			local secret = {}
 			V:Assert(not BFL.ResolveGameRuleState(7, function() return secret end, function(value) return value == secret end, false), "Secret rule results use the safe fallback")
-			V:Assert(BFL.ResolveNativeWhoInterception(false, true), "BFL intercepts Who while its owned surface is available")
+			V:Assert(BFL.ResolveNativeWhoInterception(false, true), "BFL intercepts Who while an addon-owned surface is permitted")
 			V:Assert(not BFL.ResolveNativeWhoInterception(true, true), "Explicit native-frame access bypasses BFL interception")
 			V:Assert(not BFL.ResolveNativeWhoInterception(false, false), "Disabled Who systems are not intercepted")
 			V:AssertEqual(
@@ -13856,46 +14320,190 @@ function TestSuite:RegisterForeverCompatibilityTests()
 		end,
 	})
 
-	self:RegisterTest("data", "Forever_BFLWhoSuppressesNativeLFGWindow", {
-		description = "BFL Who requests temporarily suspend Forever's native LFG Who event without changing manual routing",
+	self:RegisterTest("data", "Forever_BindingLabelWaitsForProtectedBootstrap", {
+		description = "Forever does not publish addon binding globals while Blizzard bootstraps the protected Group Finder",
 		condition = function()
-			local module = BFL:GetModule("WhoFrame")
-			return module and module.SuspendNativeWhoListUpdates and module.RestoreNativeWhoListUpdates
+			return BFL.ShouldDeferBindingGlobalWrite ~= nil
 		end,
 		action = function(V)
-			if BFL.IsMainline then
-				V:Assert(BFL.whoSlashRedirectInstalled, "Mainline's /who slash handler is redirected to BFL")
+			V:Assert(
+				BFL.ShouldDeferBindingGlobalWrite(true, false),
+				"Forever defers the binding label before PLAYER_ENTERING_WORLD has unwound"
+			)
+			V:Assert(
+				not BFL.ShouldDeferBindingGlobalWrite(true, true),
+				"Forever publishes the binding label after the protected bootstrap"
+			)
+			V:Assert(
+				not BFL.ShouldDeferBindingGlobalWrite(false, false),
+				"Other clients retain their existing immediate binding labels"
+			)
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_BindingCategoryAvoidsAddonNamespace", {
+		description = "The BFL keybinding category must not resolve to an addon-owned global during protected UI initialization",
+		condition = function()
+			return type(GetNumBindings) == "function" and type(GetBinding) == "function"
+		end,
+		action = function(V)
+			local bindingCategory
+			for bindingIndex = 1, GetNumBindings() do
+				local action, category = GetBinding(bindingIndex)
+				if action == "BETTERFRIENDLIST_TOGGLE" then
+					bindingCategory = category
+					break
+				end
 			end
 
-			local module = BFL:GetModule("WhoFrame")
-			local subject = setmetatable({}, { __index = module })
-			local nativeFrame = {
-				registered = true,
-				unregisterCount = 0,
-				registerCount = 0,
-				IsEventRegistered = function(self, event)
-					return self.registered and event == "WHO_LIST_UPDATE"
-				end,
-				UnregisterEvent = function(self, event)
-					if event == "WHO_LIST_UPDATE" then
-						self.registered = false
-						self.unregisterCount = self.unregisterCount + 1
-					end
-				end,
-				RegisterEvent = function(self, event)
-					if event == "WHO_LIST_UPDATE" then
-						self.registered = true
-						self.registerCount = self.registerCount + 1
-					end
-				end,
-			}
+			V:AssertNotNil(bindingCategory, "BFL's native keybinding should be registered")
+			V:AssertEqual(bindingCategory, "ADDONS", "BFL should use Blizzard's taint-safe AddOns category")
+			V:Assert(bindingCategory ~= "BetterFriendlist", "The binding category must not collide with _G.BetterFriendlist")
+		end,
+	})
 
-			V:Assert(subject:SuspendNativeWhoListUpdates(nativeFrame), "Forever's native Who listener is suspended")
-			V:Assert(not nativeFrame.registered, "The native frame cannot consume BFL's Who result")
-			V:AssertEqual(nativeFrame.unregisterCount, 1, "The native listener is removed exactly once")
-			V:Assert(subject:RestoreNativeWhoListUpdates(), "The native Who listener is restored")
-			V:Assert(nativeFrame.registered, "Manual native Who routing remains available")
-			V:AssertEqual(nativeFrame.registerCount, 1, "The native listener is restored exactly once")
+	self:RegisterTest("data", "WhoResultListenerIsolation", {
+		description = "BFL Who requests temporarily isolate Retail and Forever native auto-open listeners and restore them afterward",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module
+				and module.IsNativeWhoAutoOpenActive
+				and module.SuspendNativeWhoListUpdates
+				and module.RestoreNativeWhoListUpdates
+				and module.OnNativeWhoListAddonLoaded
+		end,
+		action = function(V)
+			local module = BFL:GetModule("WhoFrame")
+			local originalSocialUI = module._testSocialUIAPI
+			local originalPending = module.whoPending
+			local originalSuspendedFrames = module.suspendedNativeWhoListFrames
+			local originalSuspendedFrameSet = module.suspendedNativeWhoListFrameSet
+
+			local function NewNativeListener(label)
+				local state = { registered = true, unregisterCalls = 0, registerCalls = 0 }
+				local frame = {}
+
+				function frame:IsEventRegistered(event)
+					V:AssertEqual(event, "WHO_LIST_UPDATE", label .. " should inspect only WHO_LIST_UPDATE")
+					return state.registered
+				end
+
+				function frame:UnregisterEvent(event)
+					V:AssertEqual(event, "WHO_LIST_UPDATE", label .. " should suspend only WHO_LIST_UPDATE")
+					state.unregisterCalls = state.unregisterCalls + 1
+					state.registered = false
+				end
+
+				function frame:RegisterEvent(event)
+					V:AssertEqual(event, "WHO_LIST_UPDATE", label .. " should restore only WHO_LIST_UPDATE")
+					state.registerCalls = state.registerCalls + 1
+					state.registered = true
+				end
+
+				return frame, state
+			end
+
+			local retailFrame, retail = NewNativeListener("Retail FriendsFrame")
+			local foreverFrame, forever = NewNativeListener("Forever LFGWhoListFrame")
+
+			local ok, err = pcall(function()
+				module.suspendedNativeWhoListFrames = nil
+				module.suspendedNativeWhoListFrameSet = nil
+				module._testSocialUIAPI = { IsSystemEnabled = function() return false end }
+				V:Assert(module:IsNativeWhoAutoOpenActive(), "Disabled Social UI should expose native Who auto-open behavior")
+				V:Assert(module:SuspendNativeWhoListUpdates(retailFrame), "BFL should suspend Retail's registered listener")
+				V:Assert(module:SuspendNativeWhoListUpdates(foreverFrame), "BFL should also suspend Forever's registered listener")
+				V:Assert(not module:SuspendNativeWhoListUpdates(retailFrame), "An already suspended listener should not be changed twice")
+				V:AssertEqual(retail.unregisterCalls, 1, "Retail's listener should be suspended exactly once")
+				V:AssertEqual(forever.unregisterCalls, 1, "Forever's listener should be suspended exactly once")
+				V:Assert(not retail.registered and not forever.registered, "Native listeners should remain disabled during the BFL result")
+
+				V:Assert(module:RestoreNativeWhoListUpdates(), "BFL should restore all native listeners")
+				V:AssertEqual(retail.registerCalls, 1, "Retail's listener should be restored exactly once")
+				V:AssertEqual(forever.registerCalls, 1, "Forever's listener should be restored exactly once")
+				V:Assert(retail.registered and forever.registered, "Native Who should be operational after the BFL request")
+
+				module._testSocialUIAPI = { IsSystemEnabled = function() return true end }
+				V:Assert(not module:SuspendNativeWhoListUpdates(retailFrame), "Enabled Social UI clients should not alter native listeners")
+				V:AssertEqual(retail.unregisterCalls, 1, "Other clients should retain their native registration")
+
+				module._testSocialUIAPI = { IsSystemEnabled = function() return false end }
+				module.whoPending = true
+				V:Assert(module:SuspendNativeWhoListUpdates(retailFrame), "Retail should remain isolated while a request is pending")
+				V:Assert(
+					not module:OnNativeWhoListAddonLoaded("Unrelated_AddOn", foreverFrame),
+					"Unrelated addon loads should not touch the native listener"
+				)
+				V:Assert(
+					module:OnNativeWhoListAddonLoaded("Blizzard_GroupFinder_VanillaStyle", foreverFrame),
+					"A late Group Finder load should isolate its listener while a BFL request is pending"
+				)
+				V:Assert(not retail.registered, "Late Group Finder loading must not restore Retail prematurely")
+				V:AssertEqual(retail.unregisterCalls, 2, "Retail should be suspended once per request")
+				V:AssertEqual(forever.unregisterCalls, 2, "The late-load path should suspend Forever once")
+				V:Assert(module:RestoreNativeWhoListUpdates(), "Both pending listeners should restore together")
+				V:AssertEqual(retail.registerCalls, 2, "Every Retail suspension should have one matching restore")
+				V:AssertEqual(forever.registerCalls, 2, "Every Forever suspension should have one matching restore")
+			end)
+
+			if module.suspendedNativeWhoListFrames then
+				module:RestoreNativeWhoListUpdates()
+			end
+			module._testSocialUIAPI = originalSocialUI
+			module.whoPending = originalPending
+			module.suspendedNativeWhoListFrames = originalSuspendedFrames
+			module.suspendedNativeWhoListFrameSet = originalSuspendedFrameSet
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_WhoUsesLegacyAddonOwnedSearch", {
+		description = "Forever keeps BFL's Who surface and omits the restricted structured filter payload",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module and module.DispatchWhoRequest and module.HasStructuredWhoFilters
+				and module.ResolveBuilderDispatchRequest
+		end,
+		action = function(V)
+			local module = BFL:GetModule("WhoFrame")
+			local originalStructured = module._testStructuredWhoFilters
+			local originalAPI = module._testFriendListAPI
+			local originalBuilderDispatch = module._testForeverBuilderDispatch
+			local calls = {}
+			local ok, err = pcall(function()
+				module._testStructuredWhoFilters = false
+				module._testFriendListAPI = {
+					GetWhoRaceFilters = function() return {} end,
+					SendWho = function(...)
+						calls[#calls + 1] = { count = select("#", ...), ... }
+					end,
+				}
+
+				V:Assert(not module:HasStructuredWhoFilters(), "Forever does not advertise the restricted structured filters")
+				V:Assert(
+					module:DispatchWhoRequest("Ada", 1, { classIDs = { 1 }, raceIDs = {}, uiMapIDs = {} }),
+					"BFL dispatches the Who request from its own surface"
+				)
+				V:AssertEqual(#calls, 1, "The request is sent exactly once")
+				V:AssertEqual(calls[1].count, 2, "Forever receives the proven two-argument SendWho signature")
+				V:AssertEqual(calls[1][1], "Ada", "The text query remains intact")
+
+				module._testForeverBuilderDispatch = true
+				local requestText, requestFilters = module:ResolveBuilderDispatchRequest({
+					GetText = function() return 'n-"Ada"' end,
+				}, "locally-composed-value", { classIDs = { 1 } })
+				V:AssertEqual(requestText, 'n-"Ada"', "The Builder re-reads the BFL Who edit-box value")
+				V:AssertEqual(requestFilters, nil, "The Builder omits restricted structured filters on Forever")
+				V:AssertType(_G.BetterFriendlistWhoFrameEditBoxMixin, "table", "BFL exports a namespaced Who edit-box mixin")
+				V:Assert(
+					_G.WhoFrameEditBoxMixin ~= _G.BetterFriendlistWhoFrameEditBoxMixin,
+					"BFL never shadows Blizzard's WhoFrameEditBoxMixin"
+				)
+			end)
+			module._testStructuredWhoFilters = originalStructured
+			module._testFriendListAPI = originalAPI
+			module._testForeverBuilderDispatch = originalBuilderDispatch
+			if not ok then error(err, 0) end
 		end,
 	})
 
@@ -14173,7 +14781,7 @@ function TestSuite:Register1215CompatibilityTests()
 				V:AssertEqual(
 					calls.nativeCallCount,
 					callsBeforeSecretInputs,
-					"Secret values must be rejected before reaching C_Intl"
+					"Secret values must be rejected before C_Intl because its results cannot be evaluated safely"
 				)
 
 				local function Fail()
@@ -14376,6 +14984,495 @@ function TestSuite:Register1215CompatibilityTests()
 			V:AssertNil(RaidFrame.GetPartyMasterLooterID(function()
 				error("simulated API error")
 			end), "Loot-method API errors should fail closed")
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_EscapeFramesAvoidGlobalRegistry", {
+		description = "Forever closes BFL-owned windows locally without restricted keyboard calls during combat",
+		condition = function()
+			return BFL.ShouldUseUISpecialFrames
+				and BFL.InstallLocalEscapeHandler
+				and BFL.RestoreLocalEscapeHandlersAfterCombat
+		end,
+		action = function(V)
+			V:Assert(not BFL.ShouldUseUISpecialFrames(true), "Forever never registers BFL frames in UISpecialFrames")
+			V:Assert(BFL.ShouldUseUISpecialFrames(false), "Other clients retain the native Escape registry")
+
+			local originalRestrictionCheck = BFL.IsLocalEscapeHandlerRestricted
+			local inCombat = false
+			local propagationCalls = 0
+			local hideCalls = 0
+			local scripts = {}
+			local frame = {
+				shown = true,
+				EnableKeyboard = function(self, enabled) self.keyboardEnabled = enabled end,
+				SetPropagateKeyboardInput = function(self, propagate)
+					propagationCalls = propagationCalls + 1
+					self.propagate = propagate
+				end,
+				HookScript = function(_, scriptName, callback) scripts[scriptName] = callback end,
+				Hide = function(self)
+					hideCalls = hideCalls + 1
+					self.shown = false
+				end,
+				IsShown = function(self) return self.shown end,
+			}
+			local ok, err = pcall(function()
+				BFL.IsLocalEscapeHandlerRestricted = function() return inCombat end
+				V:Assert(BFL:InstallLocalEscapeHandler(frame), "Forever's local Escape handler installs")
+				V:Assert(frame.keyboardEnabled and frame.propagate, "Normal keyboard input keeps propagating")
+				V:AssertEqual(propagationCalls, 1, "Installation configures keyboard propagation once")
+
+				scripts.OnKeyDown(frame, "A")
+				V:Assert(frame.shown and frame.propagate, "Non-Escape keys are not consumed")
+				V:AssertEqual(propagationCalls, 1, "Normal typing does not repeat the restricted setter")
+
+				inCombat = true
+				scripts.OnShow(frame)
+				scripts.OnKeyDown(frame, "A")
+				scripts.OnKeyDown(frame, "ESCAPE")
+				V:Assert(frame.shown, "Combat Escape defers the protected frame close")
+				V:AssertEqual(propagationCalls, 1, "Combat never calls SetPropagateKeyboardInput")
+				V:AssertEqual(hideCalls, 0, "Combat never calls the protected Hide method")
+
+				inCombat = false
+				V:Assert(BFL:RestoreLocalEscapeHandlersAfterCombat(frame), "Pending Escape state restores after combat")
+				V:Assert(not frame.shown, "Deferred Escape closes the frame after combat")
+				V:Assert(frame.propagate, "Keyboard propagation is restored for the next show")
+				V:AssertEqual(hideCalls, 1, "Deferred frame close executes exactly once")
+			end)
+			BFL.IsLocalEscapeHandlerRestricted = originalRestrictionCheck
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_BattleNetBlockAndSocialRestrictionContracts", {
+		description = "Forever prefers C_BattleNet blocking, hides Title-invite blocking, and fails closed for age-restricted chat",
+		action = function(V)
+			local originalCBattleNet = C_BattleNet
+			local originalLegacySetter = BNSetBlocked
+			local originalRestrictions = C_SocialRestrictions
+			local originalIsSecret = BFL.IsSecret
+			local secretResult = {}
+			local calls = {}
+			local ok, err = pcall(function()
+				C_BattleNet = {
+					SetBlocked = function(id, blocked)
+						calls[#calls + 1] = { source = "modern", id = id, blocked = blocked }
+					end,
+				}
+				BNSetBlocked = function(id, blocked)
+					calls[#calls + 1] = { source = "legacy", id = id, blocked = blocked }
+				end
+				V:Assert(BFL.SetBNetBlocked("42", true), "Numeric account IDs are accepted safely")
+				V:AssertEqual(calls[1].source, "modern", "C_BattleNet.SetBlocked is preferred")
+				V:AssertEqual(calls[1].id, 42, "String account IDs are normalized")
+
+				C_BattleNet = {}
+				V:Assert(BFL.SetBNetBlocked(43, false), "Older clients keep the legacy block fallback")
+				V:AssertEqual(calls[2].source, "legacy", "Legacy setter is used only as fallback")
+
+				local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
+				if titleLevel ~= nil then
+					V:Assert(not BFL.CanBlockBNetFriendInvite(titleLevel), "Title friend requests cannot expose Block Invites")
+				end
+				V:Assert(BFL.CanBlockBNetFriendInvite(nil), "Legacy requests without friend levels remain blockable")
+
+				C_SocialRestrictions = {
+					IsAgeVerificationRestricted = function() return true end,
+					IsAgeVerificationRestrictedMinor = function() return false end,
+				}
+				V:Assert(BFL.IsAgeVerificationRestricted(), "Age-verification restriction is detected")
+				V:Assert(not BFL.CanSendWhisper(), "Restricted accounts cannot open a BFL whisper path")
+				C_SocialRestrictions.IsAgeVerificationRestricted = function() return secretResult end
+				BFL.IsSecret = function(_, value) return value == secretResult end
+				V:Assert(BFL.IsAgeVerificationRestricted(), "Secret restriction state fails closed without inspection")
+				V:Assert(not BFL.CanSendWhisper(), "Unknown restricted state cannot enable whisper")
+			end)
+			C_BattleNet = originalCBattleNet
+			BNSetBlocked = originalLegacySetter
+			C_SocialRestrictions = originalRestrictions
+			BFL.IsSecret = originalIsSecret
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_RegionalUniqueNameContract", {
+		description = "Forever surnames stay intact while traditional clients still normalize Name-Realm identities",
+		action = function(V)
+			local originalRegionalNames = RegionalUniqueNamesEnabled
+			local originalNameUtil = NameUtil
+			local originalCNameUtil = C_NameUtil
+			local ok, err = pcall(function()
+				RegionalUniqueNamesEnabled = function() return true end
+				NameUtil = {
+					GetFullNameWithoutRealm = function(firstName, surname)
+						return firstName .. "-" .. surname
+					end,
+				}
+				C_NameUtil = {
+					ReplaceSurnameSeparatorWithLinkSeparator = function(fullName)
+						return fullName:gsub("-", "~")
+					end,
+				}
+				V:AssertEqual(
+					BFL.NormalizePlayerIdentityName("Ada", "Lovelace"),
+					"Ada-Lovelace",
+					"First name and surname form one stable identity"
+				)
+				local fullName, realm = BFL.SplitPlayerName("Ada-Lovelace")
+				V:AssertEqual(fullName, "Ada-Lovelace", "Surname is not mistaken for a realm")
+				V:AssertNil(realm, "Regional unique names never expose a synthetic realm")
+				V:AssertEqual(
+					BFL.ReplaceSurnameSeparatorWithLinkSeparator("Ada-Lovelace"),
+					"Ada~Lovelace",
+					"Exact WHO links use the Forever separator conversion API"
+				)
+
+				RegionalUniqueNamesEnabled = function() return false end
+				V:AssertEqual(
+					BFL.NormalizePlayerIdentityName("Ada", "Silvermoon"),
+					"Ada-Silvermoon",
+					"Traditional Name-Realm normalization remains unchanged"
+				)
+			end)
+			RegionalUniqueNamesEnabled = originalRegionalNames
+			NameUtil = originalNameUtil
+			C_NameUtil = originalCNameUtil
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "Who_StructuredWhoFilterContract", {
+		description = "Structured-capable clients use SendWhoFilters exclusion semantics with a textual fallback",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module and module.BuildStructuredWhoFilters and module.BuildBuilderRequest
+		end,
+		action = function(V)
+			local module = BFL:GetModule("WhoFrame")
+			local originalAPI = module._testFriendListAPI
+			local originalStructured = module._testStructuredWhoFilters
+			local originalClasses = module._testWhoClassFilters
+			local originalBuilder = module.builder
+			local ok, err = pcall(function()
+				module._testStructuredWhoFilters = true
+				module._testFriendListAPI = {
+					SendWho = function() end,
+					GetWhoRaceFilters = function()
+						return {
+							{ name = "Human", ID = 10 },
+							{ name = "Orc", ID = 20 },
+						}
+					end,
+				}
+				module._testWhoClassFilters = {
+					{ name = "Mage", ID = 1 },
+					{ name = "Warrior", ID = 2 },
+					{ name = "Druid", ID = 3 },
+				}
+				local filters, classCovered, raceCovered = module:BuildStructuredWhoFilters("Warrior", "Orc", { 77 })
+				V:Assert(classCovered and raceCovered, "Localized class and race selections resolve to IDs")
+				V:AssertEqual(#filters.classIDs, 2, "Only the selected class remains included")
+				V:AssertEqual(filters.classIDs[1], 1, "First non-selected class is excluded")
+				V:AssertEqual(filters.classIDs[2], 3, "Second non-selected class is excluded")
+				V:AssertEqual(#filters.raceIDs, 1, "Only the selected race remains included")
+				V:AssertEqual(filters.raceIDs[1], 10, "Non-selected race is excluded")
+				V:AssertEqual(filters.uiMapIDs[1], 77, "Map IDs use inclusion semantics")
+				local multiFilters = module:BuildStructuredWhoFilters({ Warrior = true, Druid = true }, { Orc = true })
+				V:AssertEqual(#multiFilters.classIDs, 1, "Multi-select keeps every selected class included")
+				V:AssertEqual(multiFilters.classIDs[1], 1, "Only unselected classes are excluded")
+
+				local function Input(value)
+					return { GetText = function() return value or "" end }
+				end
+				module.builder = {
+					nameInput = Input("Ada"),
+					guildInput = Input(""),
+					zoneInput = Input("Stormwind"),
+					levelMin = Input("10"),
+					levelMax = Input("20"),
+					selectedClass = "",
+					selectedRace = "Orc",
+					selectedClasses = { Warrior = true, Druid = true },
+					selectedRaces = { Orc = true },
+					selectedMapIDs = { 77 },
+					extraQuery = "",
+				}
+				local query, requestFilters = module:BuildBuilderRequest()
+				V:Assert(query:find('n-"Ada"', 1, true) ~= nil, "Text fields remain in the query")
+				V:Assert(query:find('z-"Stormwind"', 1, true) ~= nil, "Free-text zones retain the legacy-compatible path")
+				V:Assert(query:find('c-"', 1, true) == nil, "Resolved classes are not duplicated as text")
+				V:Assert(query:find('r-"', 1, true) == nil, "Resolved races are not duplicated as text")
+				V:AssertNotNil(requestFilters, "The request carries the structured payload")
+			end)
+			module._testFriendListAPI = originalAPI
+			module._testStructuredWhoFilters = originalStructured
+			module._testWhoClassFilters = originalClasses
+			module.builder = originalBuilder
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "Who_DispatchSignatureContract", {
+		description = "BFL preserves the supported SendWho signature for legacy and structured requests",
+		condition = function()
+			local module = BFL:GetModule("WhoFrame")
+			return module and module.DispatchWhoRequest
+		end,
+		action = function(V)
+			local module = BFL:GetModule("WhoFrame")
+			local originalAPI = module._testFriendListAPI
+			local originalStructured = module._testStructuredWhoFilters
+			local calls = {}
+			local ok, err = pcall(function()
+				module._testStructuredWhoFilters = true
+				module._testFriendListAPI = {
+					GetWhoRaceFilters = function() return {} end,
+					SendWho = function(...)
+						calls[#calls + 1] = { count = select("#", ...), ... }
+					end,
+				}
+				module:DispatchWhoRequest("Ada", 1)
+				module:DispatchWhoRequest("Ada", 1, { classIDs = {}, raceIDs = {}, uiMapIDs = {} })
+				V:AssertEqual(calls[1].count, 2, "Legacy clients keep the exact two-argument call")
+				V:AssertEqual(calls[2].count, 3, "Structured-capable unrestricted clients receive the third argument")
+
+				module._testFriendListAPI.SendWho = function() error("direct-sendwho-sentinel") end
+				local dispatched, dispatchError = pcall(function()
+					module:DispatchWhoRequest("Ada", 1)
+				end)
+				V:Assert(not dispatched, "Dispatch errors are not hidden behind an inner pcall")
+				V:Assert(
+					type(dispatchError) == "string" and dispatchError:find("direct-sendwho-sentinel", 1, true) ~= nil,
+					"The direct SendWho failure reaches the caller"
+				)
+			end)
+			module._testFriendListAPI = originalAPI
+			module._testStructuredWhoFilters = originalStructured
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("data", "TextureMutation_ForbiddenAspectContract", {
+		description = "12.1.0 texture writes skip forbidden foreign objects and retain older-client behavior",
+		action = function(V)
+			local compat = BFL.Compat
+			V:AssertNotNil(compat, "Client compatibility helper should exist")
+			V:AssertType(BFL.TrySetColorTexture, "function", "Safe texture mutation helper should exist")
+			local originalAspect = compat._testSetTextureForbiddenAspect
+			local originalIsSecret = BFL.IsSecret
+			local secretResult = {}
+			local ok, err = pcall(function()
+				compat._testSetTextureForbiddenAspect = 2048
+				BFL.IsSecret = function(_, value)
+					return value == secretResult
+				end
+
+				local allowed = {
+					HasAnyForbiddenAspects = function(self, aspect)
+						V:AssertEqual(aspect, 2048, "SetTexture aspect should be queried")
+						return false
+					end,
+					SetColorTexture = function(self, r, g, b, a)
+						self.color = { r, g, b, a }
+					end,
+				}
+				V:Assert(BFL.TrySetColorTexture(allowed, 0.1, 0.2, 0.3, 0.4), "Allowed foreign texture should be updated")
+				V:AssertEqual(allowed.color[4], 0.4, "Allowed texture should receive alpha")
+
+				local blockedCalls = 0
+				local blocked = {
+					HasAnyForbiddenAspects = function() return true end,
+					SetColorTexture = function() blockedCalls = blockedCalls + 1 end,
+				}
+				V:Assert(not BFL.TrySetColorTexture(blocked, 1, 1, 1, 1), "Forbidden texture should be skipped")
+				V:AssertEqual(blockedCalls, 0, "Forbidden texture setter must not run")
+
+				local secretQuery = {
+					HasAnyForbiddenAspects = function() return secretResult end,
+					SetColorTexture = function() blockedCalls = blockedCalls + 1 end,
+				}
+				V:Assert(not BFL.TrySetColorTexture(secretQuery, 1, 1, 1, 1), "Secret restriction state should fail closed")
+
+				local queryError = {
+					HasAnyForbiddenAspects = function() error("simulated restriction query error") end,
+					SetColorTexture = function() blockedCalls = blockedCalls + 1 end,
+				}
+				V:Assert(not BFL.TrySetColorTexture(queryError, 1, 1, 1, 1), "Restriction query errors should fail closed")
+
+				compat._testSetTextureForbiddenAspect = false
+				local legacy = {
+					SetColorTexture = function(self) self.updated = true end,
+				}
+				V:Assert(BFL.TrySetColorTexture(legacy, 1, 1, 1, 1), "Older clients should keep the protected setter path")
+				V:Assert(legacy.updated, "Older-client texture should be updated")
+
+				legacy.SetColorTexture = function() error("simulated setter error") end
+				V:Assert(not BFL.TrySetColorTexture(legacy, 1, 1, 1, 1), "Setter errors should be contained")
+			end)
+			compat._testSetTextureForbiddenAspect = originalAspect
+			BFL.IsSecret = originalIsSecret
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "DamageMeter_ConditionalSecretSources", {
+		description = "12.1.5 meter snapshots keep visible rows and skip secret names or GUIDs without table access",
+		action = function(V)
+			local RaidTools = BFL:GetModule("RaidTools")
+			V:AssertNotNil(RaidTools, "RaidTools module should exist")
+			local originalIsSecret = BFL.IsSecret
+			local secretName = {}
+			local secretGUID = {}
+			local ok, err = pcall(function()
+				BFL.IsSecret = function(_, value)
+					return value == secretName or value == secretGUID
+				end
+
+				local normalSnapshot = {}
+				V:Assert(
+					RaidTools.AccumulateBlizzardCombatSources(
+						{ { name = "Alice", sourceGUID = "Player-1", totalAmount = 125 } },
+						{ Alice = "Alice-Realm" },
+						normalSnapshot
+					),
+					"Visible sources should produce a Blizzard snapshot"
+				)
+				V:AssertEqual(normalSnapshot["Alice-Realm"], 125, "Visible source should retain roster matching")
+
+				local mixedSnapshot = {}
+				V:Assert(
+					RaidTools.AccumulateBlizzardCombatSources({
+						{ name = secretName, sourceGUID = "Player-SecretName", totalAmount = 500 },
+						{ name = "SecretGuid", sourceGUID = secretGUID, totalAmount = 400 },
+						{ name = "Bob", sourceGUID = "Player-2", totalAmount = 75 },
+					}, {}, mixedSnapshot),
+					"Mixed sessions should preserve visible sources"
+				)
+				V:AssertEqual(mixedSnapshot.Bob, 75, "Mixed session should keep the visible row")
+				V:AssertNil(mixedSnapshot.SecretGuid, "Secret-GUID row should be skipped")
+
+				local allSecretSnapshot = {}
+				V:Assert(
+					not RaidTools.AccumulateBlizzardCombatSources({
+						{ name = secretName, sourceGUID = "Player-SecretName", totalAmount = 500 },
+						{ name = "SecretGuid", sourceGUID = secretGUID, totalAmount = 400 },
+					}, {}, allSecretSnapshot),
+					"All-secret sessions should report no usable Blizzard rows so fallback remains available"
+				)
+				V:AssertNil(next(allSecretSnapshot), "All-secret session must not create snapshot keys")
+			end)
+			BFL.IsSecret = originalIsSecret
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "QuickJoin_PlayerLevelFallback", {
+		description = "12.1.5 Quick Join accepts the optional GUID level while older and secret results stay hidden",
+		action = function(V)
+			local QuickJoin = BFL:GetModule("QuickJoin")
+			if not QuickJoin then
+				V:Skip("QuickJoin not loaded")
+				return
+			end
+			local originalAPI = GetPlayerInfoByGUID
+			local originalIsSecret = BFL.IsSecret
+			local secretLevel = {}
+			local ok, err = pcall(function()
+				BFL.IsSecret = function(_, value)
+					return value == secretLevel
+				end
+				GetPlayerInfoByGUID = function()
+					return "Mage", "MAGE", "Human", "Human", 2, "Leader", "Realm", 80
+				end
+				local name, realm, level = QuickJoin.GetSafePlayerInfoByGUID("Player-1")
+				V:AssertEqual(name, "Leader", "GUID fallback should retain the character name")
+				V:AssertEqual(realm, "Realm", "GUID fallback should retain the realm")
+				V:AssertEqual(level, 80, "12.1.5 eighth return should expose the level")
+				V:Assert(QuickJoin.FormatPlayerLevel(level):find("80", 1, true) ~= nil, "Localized level text should include the value")
+
+				GetPlayerInfoByGUID = function()
+					return "Mage", "MAGE", "Human", "Human", 2, "LegacyLeader", "Realm"
+				end
+				local _, _, legacyLevel = QuickJoin.GetSafePlayerInfoByGUID("Player-2")
+				V:AssertNil(legacyLevel, "Older seven-return clients should omit the optional level")
+
+				GetPlayerInfoByGUID = function()
+					return "Mage", "MAGE", "Human", "Human", 2, "SecretLeader", "Realm", secretLevel
+				end
+				local _, _, hiddenLevel = QuickJoin.GetSafePlayerInfoByGUID("Player-3")
+				V:AssertNil(hiddenLevel, "Secret levels should not reach tooltip formatting")
+
+				GetPlayerInfoByGUID = function()
+					error("simulated player-info error")
+				end
+				local errorName, errorRealm, errorLevel = QuickJoin.GetSafePlayerInfoByGUID("Player-4")
+				V:AssertNil(errorName, "Player-info errors should fail closed")
+				V:AssertNil(errorRealm, "Player-info errors should omit the realm")
+				V:AssertNil(errorLevel, "Player-info errors should omit the level")
+			end)
+			GetPlayerInfoByGUID = originalAPI
+			BFL.IsSecret = originalIsSecret
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
+	self:RegisterTest("data", "RaidFrame_SecretSafePvPIndicatorDelegate", {
+		description = "12.1.5 raid rows use the secure PvP updater and hide cleanly when the capability is absent or errors",
+		action = function(V)
+			local RaidFrame = BFL:GetModule("RaidFrame")
+			V:AssertNotNil(RaidFrame, "RaidFrame module should exist")
+			local originalAPI = RaidFrame._testUnitFrameUtil
+			local function MakeTexture()
+				return {
+					shown = false,
+					Hide = function(self) self.shown = false end,
+					Show = function(self) self.shown = true end,
+					SetSize = function(self, width, height) self.width, self.height = width, height end,
+				}
+			end
+			local button = {
+				PvPIcon = MakeTexture(),
+				PrestigePortrait = MakeTexture(),
+				PrestigeBadge = MakeTexture(),
+			}
+			local ok, err = pcall(function()
+				local receivedUnit, receivedMercenary
+				RaidFrame._testUnitFrameUtil = {
+					UpdateUnitPvPIndicator = function(elements, unit, checkMercenary)
+						receivedUnit = unit
+						receivedMercenary = checkMercenary
+						elements.pvpIcon:Show()
+					end,
+				}
+				V:Assert(RaidFrame:UpdatePvPIndicator(button, "raid1"), "Available secure updater should handle the row")
+				V:AssertEqual(receivedUnit, "raid1", "Secure updater should receive the unit token")
+				V:Assert(receivedMercenary, "Raid indicator should honor mercenary faction display")
+				V:Assert(button.PvPIcon.shown, "Secure updater controls icon visibility")
+				V:AssertEqual(button.PvPIcon.width, 14, "Native atlas size should be normalized for the compact row")
+
+				RaidFrame._testUnitFrameUtil = false
+				V:Assert(not RaidFrame:UpdatePvPIndicator(button, "raid1"), "Missing updater should use the compatibility path")
+				V:Assert(not button.PvPIcon.shown, "Missing capability should hide stale indicators")
+
+				RaidFrame._testUnitFrameUtil = {
+					UpdateUnitPvPIndicator = function() error("simulated delegate error") end,
+				}
+				button.PvPIcon:Show()
+				V:Assert(not RaidFrame:UpdatePvPIndicator(button, "raid1"), "Delegate errors should be contained")
+				V:Assert(not button.PvPIcon.shown, "Delegate errors should clear stale indicators")
+			end)
+			RaidFrame._testUnitFrameUtil = originalAPI
+			if not ok then
+				error(err, 0)
+			end
 		end,
 	})
 end
@@ -15966,6 +17063,65 @@ function TestSuite:RegisterLateUITests()
 		end,
 	})
 
+	self:RegisterTest("data", "SkinEngine_TokenRendererGraphTargetsDependencies", {
+		description = "Theme token refreshes should repaint only dependent targets in stable renderer order",
+		action = function(V)
+			local SkinEngine = BFL:GetModule("SkinEngine")
+			V:AssertNotNil(SkinEngine, "SkinEngine module should exist")
+			V:AssertEqual(
+				getmetatable(SkinEngine.registry).__mode,
+				"k",
+				"Skin registry should not retain discarded UI frames"
+			)
+
+			local firstTarget = {}
+			local secondTarget = {}
+			local firstOwner = {}
+			local secondOwner = {}
+			local calls = {}
+			local originalActive = SkinEngine.active
+			local originalTheme = SkinEngine.activeTheme
+			local ok, err = pcall(function()
+				SkinEngine.active = true
+				SkinEngine.activeTheme = "dark"
+				SkinEngine:RegisterRenderer(firstTarget, "surface", { "panel", "accent" }, function()
+					calls[#calls + 1] = "surface"
+				end, firstOwner)
+				SkinEngine:RegisterRenderer(firstTarget, "state", { "accent" }, function()
+					calls[#calls + 1] = "state"
+				end, firstOwner)
+				SkinEngine:RegisterRenderer(secondTarget, "surface", { "border" }, function()
+					calls[#calls + 1] = "second"
+				end, secondOwner)
+
+				V:AssertEqual(SkinEngine:RefreshToken("accent"), 1, "Only the accent consumer should refresh")
+				V:AssertEqual(calls[1], "surface", "Base renderer should retain registration order")
+				V:AssertEqual(calls[2], "state", "State renderer should run after its base surface")
+				V:AssertNil(calls[3], "Unrelated border consumer should not refresh")
+
+				V:AssertEqual(SkinEngine:RefreshToken("border"), 1, "Border refresh should target its own consumer")
+				V:AssertEqual(calls[3], "second", "Border consumer should refresh independently")
+				V:AssertEqual(
+					SkinEngine:ReleaseRendererOwner(firstOwner, false),
+					2,
+					"Owner release should remove each owned renderer"
+				)
+				V:AssertEqual(SkinEngine:RefreshToken("accent"), 0, "Released owners should stop receiving token refreshes")
+			end)
+			SkinEngine:ReleaseRendererOwner(firstOwner, false)
+			SkinEngine:ReleaseRendererOwner(secondOwner, false)
+			SkinEngine.registry[firstTarget] = nil
+			SkinEngine.registry[secondTarget] = nil
+			firstTarget.BFL_DarkSkin = nil
+			secondTarget.BFL_DarkSkin = nil
+			SkinEngine.active = originalActive
+			SkinEngine.activeTheme = originalTheme
+			if not ok then
+				error(err, 0)
+			end
+		end,
+	})
+
 	self:RegisterTest("data", "SkinEngine_DisabledFlatInviteKeepsDisabledAlpha", {
 		description = "Cached Dark-theme invite refreshes should preserve the disabled icon alpha",
 		action = function(V)
@@ -16256,6 +17412,241 @@ function TestSuite:RegisterRaidInteractionTest()
 			if not ok then
 				error(err, 0)
 			end
+		end,
+	})
+end
+
+function TestSuite:RegisterGuildNewsRefreshTest()
+	self:RegisterTest("data", "GuildRoster_NewsViewAlwaysRefreshes", {
+		description = "Opening Guild News should always request current data even when an old profile stored the retired option as false",
+		action = function(V)
+		WithTemporaryDatabase({ guildTabShowNews = false }, function()
+				local GuildRosterData = BFL:GetModule("GuildRosterData")
+				local GuildFrame = BFL:GetModule("GuildFrame")
+				local oldHasNews = GuildRosterData.HasGuildNewsAPI
+				local oldRequest = GuildFrame.RequestGuildNews
+				local oldUpdateBar = GuildFrame.UpdateGuildFeatureBar
+				local oldUpdateEdit = GuildFrame.UpdateHeaderEditButtons
+				local oldMode = GuildFrame.headerDetailMode
+				local requests = 0
+				local ok, err = pcall(function()
+					GuildRosterData.HasGuildNewsAPI = function() return true end
+					GuildFrame.RequestGuildNews = function(_, force)
+						V:Assert(force == true, "Guild News view refresh should bypass the session cache")
+						requests = requests + 1
+						return true
+					end
+					GuildFrame.UpdateGuildFeatureBar = function() end
+					GuildFrame.UpdateHeaderEditButtons = function() end
+
+					GuildFrame:SetGuildHeaderMode("news")
+					GuildFrame:SetGuildHeaderMode("news")
+
+					V:AssertEqual(requests, 2, "Every Guild News view activation should request fresh data")
+					V:AssertEqual(GuildFrame.headerDetailMode, "news", "Guild News should remain the active header view")
+				end)
+				GuildRosterData.HasGuildNewsAPI = oldHasNews
+				GuildFrame.RequestGuildNews = oldRequest
+				GuildFrame.UpdateGuildFeatureBar = oldUpdateBar
+				GuildFrame.UpdateHeaderEditButtons = oldUpdateEdit
+				GuildFrame.headerDetailMode = oldMode
+				if not ok then error(err, 0) end
+			end)
+		end,
+	})
+end
+
+function TestSuite:RegisterGuildHeaderLayoutTest()
+	self:RegisterTest("ui", "GuildFrame_HeaderContentUsesOwnedFrame", {
+		description = "Guild header layout should use its explicitly owned frame during initial load",
+		action = function(V)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			local function NewRegion()
+				return {
+					points = {},
+					ClearAllPoints = function(self) self.points = {} end,
+					SetPoint = function(self, ...) self.points[#self.points + 1] = { ... } end,
+					SetMaxLines = function(self, maxLines) self.maxLines = maxLines end,
+				}
+			end
+			local frame = {
+				MOTDEditButton = {
+					IsShown = function() return true end,
+				},
+			}
+			local bar = {
+				detailText = NewRegion(),
+				newsViewport = NewRegion(),
+				newsScrollUp = NewRegion(),
+			}
+			local oldGlobalFrame = _G.frame
+			_G.frame = nil
+			local ok, err = pcall(GuildFrame.LayoutGuildHeaderContent, GuildFrame, frame, bar)
+			_G.frame = oldGlobalFrame
+			if not ok then
+				error(err, 0)
+			end
+
+			V:AssertEqual(bar.detailText.points[2][4], -25, "Visible MOTD edit controls should reserve header space")
+			V:AssertEqual(bar.detailText.points[1][5], -28, "Guild content should start below its view buttons")
+			V:AssertEqual(bar.detailText.maxLines, BFL.IsClassic and 3 or 5, "Header text should keep its flavor-specific line limit")
+		end,
+	})
+
+	self:RegisterTest("ui", "GuildFrame_LegacyHeaderSeparatesSearchAndContent", {
+		description = "Legacy Guild content should occupy its own rows without mutating shared header geometry",
+		action = function(V)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			local function NewRegion(existingPoint, shown, right)
+				return {
+					points = existingPoint and { existingPoint } or {},
+					shown = shown ~= false,
+					right = right,
+					ClearAllPoints = function(self) self.points = {} end,
+					SetPoint = function(self, ...) self.points[#self.points + 1] = { ... } end,
+					SetHeight = function(self, height) self.height = height end,
+					SetSize = function(self, width, height) self.width, self.height = width, height end,
+					Hide = function(self) self.hidden, self.shown = true, false end,
+					IsShown = function(self) return self.shown end,
+					GetRight = function(self) return self.right end,
+				}
+			end
+			local inset = NewRegion(nil, true, 440)
+			local searchPoint = { "TOPLEFT", inset, "TOPLEFT", 9.5, 60 }
+			local filterPoint = { "LEFT", "search", "RIGHT", 5, 0 }
+			local sortPoint = { "LEFT", "filter", "RIGHT", 5, 0 }
+			local header = {
+				SearchBox = NewRegion(searchPoint, true, 439),
+				QuickFilterDropdown = NewRegion(filterPoint, true, 500),
+				PrimarySortDropdown = NewRegion(sortPoint, true, 560),
+				SecondarySortDropdown = NewRegion(nil, true, 620),
+			}
+			local guild = {
+				GuildName = NewRegion(),
+				MemberCount = NewRegion(),
+				ListInset = NewRegion(),
+			}
+
+			V:Assert(GuildFrame:LayoutLegacyGuildHeader(guild, inset, header), "Legacy Guild layout should be available")
+			V:AssertEqual(header.SearchBox.points[1], searchPoint, "Guild must preserve the shared search anchor")
+			V:AssertEqual(header.QuickFilterDropdown.points[1], filterPoint, "Guild must preserve the shared filter anchor")
+			V:AssertEqual(header.PrimarySortDropdown.points[1], sortPoint, "Guild must preserve the shared sort anchor")
+			V:AssertEqual(guild.GuildName.points[1][2], header.SearchBox, "Guild title should start below search")
+			V:AssertEqual(guild.MemberCount.points[1][2], header.SearchBox, "Guild count should ignore visible controls outside the frame")
+			V:AssertEqual(guild.ListInset.points[1][2], guild.GuildName, "Guild roster surface should start below its title")
+			V:Assert(header.SecondarySortDropdown.hidden, "Guild should hide the unused secondary sorter")
+		end,
+	})
+
+	self:RegisterTest("ui", "GuildFrame_HeaderOwnsRosterAnchor", {
+		description = "Global scrollbar geometry must preserve the Guild header offset, including an empty MOTD",
+		condition = function()
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			return BFL.IsRetail and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
+		end,
+		action = function(V)
+			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			local guild = BetterFriendsFrame and BetterFriendsFrame.GuildFrame
+			if not (FriendsUI and GuildFrame and guild and guild.FeatureBar and guild.ScrollBox) then
+				V:Skip("Guild frame is not available")
+				return
+			end
+
+			local oldMOTD = GuildFrame.guildMOTDText
+			local ok, err = pcall(function()
+				GuildFrame.guildMOTDText = ""
+				GuildFrame:UpdateGuildFeatureBar()
+				if not guild.FeatureBar:IsShown() then
+					V:Skip("Guild header is not available outside a guild")
+					return
+				end
+				FriendsUI:ApplyModernScrollBarGeometry()
+				local _, relativeTo, relativePoint = guild.ScrollBox:GetPoint(1)
+				V:AssertEqual(relativeTo, guild.FeatureBar, "Guild roster should anchor below the unified header")
+				V:AssertEqual(relativePoint, "BOTTOMLEFT", "Guild roster should use the header's bottom edge")
+			end)
+			GuildFrame.guildMOTDText = oldMOTD
+			GuildFrame:UpdateGuildFeatureBar()
+			if not ok then error(err, 0) end
+		end,
+	})
+
+	self:RegisterTest("ui", "GuildFrame_NewsFilterKeepsViewButtonsStable", {
+		description = "The reserved Guild News filter slot should keep the MOTD, info, and news buttons stationary",
+		action = function(V)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			local function NewButton()
+				return {
+					ClearAllPoints = function(self) self.point = nil end,
+					SetPoint = function(self, ...) self.point = { ... } end,
+				}
+			end
+			local bar = {
+				motdButton = NewButton(),
+				infoButton = NewButton(),
+				newsButton = NewButton(),
+				newsFilterButton = NewButton(),
+			}
+			GuildFrame:LayoutGuildHeaderButtons({}, bar, true, true, true)
+			local motdAnchor = { unpack(bar.motdButton.point) }
+			local infoAnchor = { unpack(bar.infoButton.point) }
+			local newsAnchor = { unpack(bar.newsButton.point) }
+			-- Switching the filter's visibility does not alter the reserved slot;
+			-- both non-News and News modes therefore use the same layout input.
+			GuildFrame:LayoutGuildHeaderButtons({}, bar, true, true, true)
+			V:AssertEqual(bar.newsFilterButton.point[1], "TOPRIGHT", "News filter should own the right edge")
+			V:AssertEqual(bar.newsFilterButton.point[2], bar, "Guild view buttons should stay inside their own header row")
+			V:AssertEqual(bar.newsButton.point[2], bar.newsFilterButton, "News view button should sit directly left of its filter")
+			V:AssertEqual(bar.motdButton.point[2], motdAnchor[2], "MOTD button should keep its anchor")
+			V:AssertEqual(bar.infoButton.point[2], infoAnchor[2], "Info button should keep its anchor")
+			V:AssertEqual(bar.newsButton.point[2], newsAnchor[2], "News button should keep its anchor")
+		end,
+	})
+
+	self:RegisterTest("ui", "GuildFrame_ProfessionsUseNestedFilterMenu", {
+		description = "Profession choices should live in a nested entry inside the shared Guild filter",
+		action = function(V)
+			local GuildFrame = BFL:GetModule("GuildFrame")
+			local GuildRosterData = BFL:GetModule("GuildRosterData")
+			local GuildActions = BFL:GetModule("GuildActions")
+			local oldHasClubInfo = GuildRosterData.HasClubMemberInfoAPI
+			local oldGetCatalog = GuildRosterData.GetProfessionCatalog
+			local oldPopulateFilter = GuildActions.PopulateFilterMenu
+			local oldPopulateSimple = BFL.PopulateSimpleMenu
+			local oldProfession = GuildFrame.professionFilterID
+			local captured
+			local ok, err = pcall(function()
+				GuildRosterData.HasClubMemberInfoAPI = function() return true end
+				GuildRosterData.GetProfessionCatalog = function()
+					return {
+						{ id = 171, name = "Alchemy" },
+						{ id = 164, name = "Blacksmithing" },
+					}
+				end
+				GuildActions.PopulateFilterMenu = function() end
+				BFL.PopulateSimpleMenu = function(_, items)
+					captured = type(items) == "function" and items() or items
+					return true
+				end
+				GuildFrame.professionFilterID = 171
+				GuildFrame:PopulateFilterMenu({})
+
+				V:AssertNotNil(captured and captured[1], "Guild filter should append a profession submenu")
+				V:AssertEqual(
+					captured[1].text,
+					PROFESSIONS_COLUMN_LABEL or PROFESSIONS or (BFL.L and BFL.L.FRIEND_TAGS_BLIZZARD_PROFESSIONS) or "Professions",
+					"Profession submenu should use Blizzard's label"
+				)
+				V:AssertEqual(#captured[1].children, 3, "Profession submenu should include reset plus available professions")
+				V:Assert(captured[1].children[2].checked(), "Current profession should be selected independently of online status")
+			end)
+			GuildRosterData.HasClubMemberInfoAPI = oldHasClubInfo
+			GuildRosterData.GetProfessionCatalog = oldGetCatalog
+			GuildActions.PopulateFilterMenu = oldPopulateFilter
+			BFL.PopulateSimpleMenu = oldPopulateSimple
+			GuildFrame.professionFilterID = oldProfession
+			if not ok then error(err, 0) end
 		end,
 	})
 end

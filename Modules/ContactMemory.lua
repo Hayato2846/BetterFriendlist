@@ -8,7 +8,7 @@ local ContactMemory = BFL:RegisterModule("ContactMemory", {})
 local CONTACT_MEMORY_VERSION = 1
 local PLAYER_PREFIX = "player:"
 local BNET_PREFIX = "bnet:"
-local SETTINGS_DESIGNER_PAGE_ID = "advanced.beta"
+local SETTINGS_DESIGNER_PAGE_ID = "privacy.notes"
 
 local DEFAULT_SETTINGS = {
 	showTooltipSection = true,
@@ -212,7 +212,7 @@ function ContactMemory:GetEnabledSetting()
 end
 
 function ContactMemory:IsEnabled()
-	return self:GetEnabledSetting() and BetterFriendlistDB and BetterFriendlistDB.enableBetaFeatures == true
+	return self:GetEnabledSetting()
 end
 
 function ContactMemory:SetEnabled(enabled, refreshCallback)
@@ -280,10 +280,6 @@ function ContactMemory:RegisterSettingsDesignerControls(app, options)
 		})
 	end
 
-	local function IsBetaEnabled()
-		return type(BetterFriendlistDB) == "table" and BetterFriendlistDB.enableBetaFeatures == true
-	end
-
 	local function IsContactMemoryEnabled()
 		return ContactMemory:IsEnabled()
 	end
@@ -293,11 +289,10 @@ function ContactMemory:RegisterSettingsDesignerControls(app, options)
 		groupID = "contactMemory",
 		groupTitle = groupTitle,
 		type = "toggle",
-		label = LocaleValue("CONTACT_MEMORY_SETTINGS_ENABLE", "Private Notes (Beta)"),
+		label = LocaleValue("CONTACT_MEMORY_SETTINGS_ENABLE", "Private Notes"),
 		description = LocaleValue("CONTACT_MEMORY_SETTINGS_ENABLE_DESC", "Adds local private notes for friends and ignored players."),
 		default = false,
 		order = 200,
-		visibleWhen = IsBetaEnabled,
 		refreshOnChange = true,
 		keywords = { "contact", "memory", "notes", "friends", "ignore" },
 		getValue = function()
@@ -317,7 +312,6 @@ function ContactMemory:RegisterSettingsDesignerControls(app, options)
 		description = LocaleValue("CONTACT_MEMORY_SETTINGS_TOOLTIPS_DESC", "Show private notes in supported friend and ignore tooltips."),
 		default = true,
 		order = 210,
-		visibleWhen = IsBetaEnabled,
 		parentCheck = IsContactMemoryEnabled,
 		refreshOnChange = true,
 		keywords = { "contact", "memory", "tooltip", "notes" },
@@ -338,7 +332,6 @@ function ContactMemory:RegisterSettingsDesignerControls(app, options)
 		description = LocaleValue("CONTACT_MEMORY_SETTINGS_HIDE_STREAMER_DESC", "Hide private notes while Streamer Mode is active."),
 		default = true,
 		order = 220,
-		visibleWhen = IsBetaEnabled,
 		parentCheck = IsContactMemoryEnabled,
 		refreshOnChange = true,
 		keywords = { "contact", "memory", "streamer", "privacy", "notes" },
@@ -402,6 +395,9 @@ function ContactMemory:NormalizePlayerName(name, realm)
 	local ContactIdentity = BFL:GetModule("ContactIdentity")
 	if ContactIdentity and ContactIdentity.NormalizePlayerName then
 		return ContactIdentity:NormalizePlayerName(name, realm)
+	end
+	if BFL.NormalizePlayerIdentityName then
+		return BFL.NormalizePlayerIdentityName(name, realm)
 	end
 	name = CleanString(name)
 	realm = CleanString(realm)

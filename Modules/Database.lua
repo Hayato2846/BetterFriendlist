@@ -146,7 +146,9 @@ local defaults = {
 	-- Beta Features
 	enableBetaFeatures = false, -- Enable experimental Beta features (default: OFF)
 	enableSettingsCenterBeta = false, -- Use the LibSettingsDesigner Settings Center beta (default: OFF)
-	externalMenuBridgeEnabled = false, -- Add supported addon actions to supported BFL context menus (default: OFF)
+	-- Stable optional features
+	externalMenuBridgeEnabled = true, -- Add supported addon actions to supported BFL context menus (default: ON)
+	externalMenuBridgeDefaultMigrationVersion = 1, -- v2.9.1 one-time enablement; later user choices remain untouched
 	contactMemory = {
 		version = 1,
 		enabled = false,
@@ -370,6 +372,26 @@ local VALID_THEMES = {
 }
 
 local THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION = 1
+local EXTERNAL_MENU_BRIDGE_DEFAULT_MIGRATION_VERSION = 1
+
+function DB:ApplyExternalMenuBridgeDefaultMigration(database)
+	database = database or BetterFriendlistDB
+	if type(database) ~= "table" then
+		return false
+	end
+
+	local migrationVersion = tonumber(database.externalMenuBridgeDefaultMigrationVersion) or 0
+	if migrationVersion >= EXTERNAL_MENU_BRIDGE_DEFAULT_MIGRATION_VERSION then
+		return false
+	end
+
+	-- v2.9.1 deliberately enables the stable bridge once for every existing
+	-- profile, including profiles that explicitly disabled its former beta
+	-- setting. The version marker ensures a later user opt-out is preserved.
+	database.externalMenuBridgeEnabled = true
+	database.externalMenuBridgeDefaultMigrationVersion = EXTERNAL_MENU_BRIDGE_DEFAULT_MIGRATION_VERSION
+	return true
+end
 
 local function GetColorComponent(color, namedKey, indexedKey)
 	if type(color) ~= "table" then
@@ -539,6 +561,8 @@ function DB:Initialize()
 	if not BetterFriendlistDB then
 		BetterFriendlistDB = {}
 	end
+
+	self:ApplyExternalMenuBridgeDefaultMigration(BetterFriendlistDB)
 
 	-- The short-lived Appear Offline Broker action moved into the existing
 	-- Battle.net status dropdown. Keep old profiles from retaining a dead click action.

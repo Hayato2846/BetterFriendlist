@@ -2312,14 +2312,17 @@ function FriendsUI:OpenRequestDeclineMenu(button)
 				end
 			end,
 		}
-		items[#items + 1] = {
-			text = BLOCK_INVITES or "Block Invites",
-			func = function()
-				if BNSetBlocked then
-					BNSetBlocked(inviteID, true)
-				end
-			end,
-		}
+		if not BFL.CanBlockBNetFriendInvite or BFL.CanBlockBNetFriendInvite(button.friendLevel) then
+			items[#items + 1] = {
+				text = BLOCK_INVITES or "Block Invites",
+				destructive = true,
+				func = function()
+					if BFL.SetBNetBlocked then
+						BFL.SetBNetBlocked(inviteID, true)
+					end
+				end,
+			}
+		end
 	end
 	BFL.OpenSimpleContextMenu(button, "BFL_ModernFriendRequestDeclineDropdown", items)
 end
@@ -2382,19 +2385,24 @@ function FriendsUI:SetupRequestDeclineButton(declineButton)
 		InitializeScaledRequestMenuElement(report)
 
 		local modeSupportsStaticPopups = not (C_Glue and C_Glue.IsOnGlueScreen and C_Glue.IsOnGlueScreen())
-		if modeSupportsStaticPopups then
-			local block = rootDescription:CreateButton(BLOCK_INVITES or "Block Invites", function()
-				local inviteInfo = C_BattleNet
-					and C_BattleNet.GetFriendInviteInfo
-					and C_BattleNet.GetFriendInviteInfo(dropdown.inviteIndex)
-				local inviteID = inviteInfo and inviteInfo.inviteID or dropdown.inviteID
-				local accountName = inviteInfo and inviteInfo.accountName or dropdown.accountName
+		local inviteInfo = GetInviteInfo(dropdown.inviteIndex)
+		local friendLevel = inviteInfo and inviteInfo.friendLevel or dropdown.friendLevel
+		if modeSupportsStaticPopups
+			and (not BFL.CanBlockBNetFriendInvite or BFL.CanBlockBNetFriendInvite(friendLevel))
+		then
+			local createButton = BFL.CreateMenuButton or function(root, text, callback)
+				return root:CreateButton(text, callback)
+			end
+			local block = createButton(rootDescription, BLOCK_INVITES or "Block Invites", function()
+				local currentInviteInfo = GetInviteInfo(dropdown.inviteIndex)
+				local inviteID = currentInviteInfo and currentInviteInfo.inviteID or dropdown.inviteID
+				local accountName = currentInviteInfo and currentInviteInfo.accountName or dropdown.accountName
 				if StaticPopup_Show then
 					StaticPopup_Show("CONFIRM_BLOCK_INVITES", accountName, nil, inviteID)
-				elseif BNSetBlocked then
-					BNSetBlocked(inviteID, true)
+				elseif BFL.SetBNetBlocked then
+					BFL.SetBNetBlocked(inviteID, true)
 				end
-			end)
+			end, { destructive = true })
 			InitializeScaledRequestMenuElement(block)
 		end
 	end)
@@ -2426,6 +2434,7 @@ function FriendsUI:InitializeRequestCard(button, elementData)
 	button.DeclineButton.inviteIndex = button.inviteIndex
 	button.DeclineButton.inviteID = button.inviteID
 	button.DeclineButton.accountName = button.accountName
+	button.DeclineButton.friendLevel = elementData.friendLevel
 	self:SetupRequestDeclineButton(button.DeclineButton)
 	ApplyAtlasTexture(button.Background, self:IsTitleInvite(elementData.friendLevel) and "friends-card-default" or "friends-card-battleNet")
 	self:StyleRequestCard(button)
@@ -3563,10 +3572,17 @@ function FriendsUI:ApplyModernScrollBarGeometry()
 
 	local guild = frame.GuildFrame
 	if guild and guild.ScrollBox then
-		guild.ScrollBox:ClearAllPoints()
-		guild.ScrollBox:SetPoint("TOPLEFT", guild.ListInset, "TOPLEFT", 4, -4)
-		guild.ScrollBox:SetPoint("BOTTOMRIGHT", guild.ListInset, "BOTTOMRIGHT", -MODERN_SCROLL_BOX_RIGHT_INSET, 4)
-		AnchorModernScrollBar(guild.ScrollBar, guild.ScrollBox, nil, nil, referenceWidth)
+		local GuildFrame = BFL:GetModule("GuildFrame")
+		if GuildFrame and GuildFrame.UpdateGuildListAnchors then
+			-- Guild owns the vertical list start because its unified MOTD/News/Info
+			-- area can sit above the roster. Do not overwrite that anchor here.
+			GuildFrame:UpdateGuildListAnchors()
+		else
+			guild.ScrollBox:ClearAllPoints()
+			guild.ScrollBox:SetPoint("TOPLEFT", guild.ListInset, "TOPLEFT", 4, -4)
+			guild.ScrollBox:SetPoint("BOTTOMRIGHT", guild.ListInset, "BOTTOMRIGHT", -MODERN_SCROLL_BOX_RIGHT_INSET, 4)
+			AnchorModernScrollBar(guild.ScrollBar, guild.ScrollBox, nil, nil, referenceWidth)
+		end
 	end
 
 	self:LayoutRequestsFrame()
@@ -4352,19 +4368,10 @@ function FriendsUI:RestoreLegacyLayout()
 			GuildFrame._lastLayoutWidth = nil
 			GuildFrame:UpdateLayout()
 		end
-		-- Guild's XML OnLoad can run while the saved style is Modern. Rebuild
-		-- the v2.7.0 rail explicitly so a cold Modern -> Legacy switch does not
-		-- inherit the narrow SocialUI gutter captured during startup.
-		if guild.ScrollBox and guild.ListInset then
-			guild.ScrollBox:ClearAllPoints()
-			guild.ScrollBox:SetPoint("TOPLEFT", guild.ListInset, "TOPLEFT", 4, -4)
-			guild.ScrollBox:SetPoint("BOTTOMRIGHT", guild.ListInset, "BOTTOMRIGHT", -22, 2)
-		end
-		if guild.ScrollBar and guild.ScrollBox then
-			guild.ScrollBar:ClearAllPoints()
-			guild.ScrollBar:SetWidth(22)
-			guild.ScrollBar:SetPoint("TOPLEFT", guild.ScrollBox, "TOPRIGHT", 0, 0)
-			guild.ScrollBar:SetPoint("BOTTOMLEFT", guild.ScrollBox, "BOTTOMRIGHT", 0, 0)
+		-- Guild's XML OnLoad can run while the saved style is Modern. Let the
+		-- Guild module restore both the Legacy rail and its feature-bar offset.
+		if GuildFrame and GuildFrame.UpdateGuildListAnchors then
+			GuildFrame:UpdateGuildListAnchors()
 		end
 	end
 	self:RestoreLegacyRaidGeometry()
@@ -7423,7 +7430,10 @@ function FriendsUI:RegisterTests()
 						V:AssertEqual(who.EditBox.Instructions:GetMaxLines(), 2, "Legacy Who restores the two-line search instructions")
 						V:AssertEqual(
 							who.EditBox.Instructions:GetText(),
-							who.EditBox.instructionText or WHO_LIST_SEARCH_INSTRUCTIONS or "",
+							who.EditBox.instructionText
+								or (BFL.L and BFL.L.WHO_LIST_SEARCH_INSTRUCTIONS)
+								or SEARCH
+								or "",
 							"Legacy Who restores its original search placeholder"
 						)
 					end
@@ -7777,6 +7787,17 @@ function FriendsUI:Initialize()
 			self:OnGameRulesChanged()
 		end, 10)
 	end)
+	for _, event in ipairs({ "ALERT_AGE_VERIFICATION_RESTRICTED", "CHAT_DISABLED_CHANGED" }) do
+		pcall(function()
+			BFL:RegisterEventCallback(event, function()
+				-- Menus evaluate the restriction live when opened; refresh owned rows
+				-- as well so no stale chat action survives a synchronous state change.
+				if BFL.ForceRefreshFriendsList then
+					BFL:ForceRefreshFriendsList()
+				end
+			end, 10)
+		end)
+	end
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		if self.pendingStyle then
 			if BetterFriendsFrame and BetterFriendsFrame:IsShown() then

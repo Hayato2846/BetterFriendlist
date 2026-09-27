@@ -187,6 +187,12 @@ local function CreateClassicMenuDescription(parentItem, rootItems)
 		return AddItem(item)
 	end
 
+	function rootDescription:CreateRedHighlightButton(text, onSelected)
+		-- UIDropDownMenu has no destructive-button variant. Keep the action
+		-- available and let Retail/Forever use the native red presentation.
+		return self:CreateButton(text, onSelected)
+	end
+
 	function rootDescription:CreateCheckbox(text, isSelected, onSelected)
 		local item = {
 			text = text or "",
@@ -388,6 +394,57 @@ local function SetSimpleMenuElementEnabled(element, enabled)
 	end
 end
 
+local function ResolveSimpleMenuTooltip(item)
+	if not item then
+		return nil
+	end
+	local tooltip = item.tooltip
+	if type(tooltip) == "function" then
+		local ok, value = pcall(tooltip, item)
+		tooltip = ok and value or nil
+	end
+	if type(tooltip) ~= "string" or tooltip == "" then
+		return nil
+	end
+	return tooltip
+end
+
+local function ApplySimpleMenuItemTooltip(element, item)
+	local tooltip = ResolveSimpleMenuTooltip(item)
+	if not (element and tooltip and element.SetTooltip) then
+		return
+	end
+	element:SetTooltip(function(menuTooltip)
+		menuTooltip:SetText(item.tooltipTitle or item.text or "", 1, 1, 1)
+		local color = item.tooltipIsWarning == false and HIGHLIGHT_FONT_COLOR or RED_FONT_COLOR
+		if color then
+			menuTooltip:AddLine(tooltip, color.r, color.g, color.b, true)
+		else
+			menuTooltip:AddLine(tooltip, 1, 0.25, 0.25, true)
+		end
+	end)
+end
+
+function Compat.CreateMenuButton(rootDescription, text, callback, options)
+	if not (rootDescription and rootDescription.CreateButton) then
+		return nil
+	end
+	options = options or {}
+	local createButton = options.destructive and rootDescription.CreateRedHighlightButton
+		or rootDescription.CreateButton
+	local element = createButton(rootDescription, text or "", callback)
+	if options.enabled ~= nil then
+		SetSimpleMenuElementEnabled(element, options.enabled == true)
+	end
+	ApplySimpleMenuItemTooltip(element, {
+		text = text,
+		tooltipTitle = options.tooltipTitle,
+		tooltip = options.tooltip,
+		tooltipIsWarning = options.tooltipIsWarning,
+	})
+	return element
+end
+
 function Compat.StyleSimpleMenuCheckbox(element)
 	if not (BFL.IsClassic and element and element.AddInitializer) then
 		return
@@ -490,6 +547,7 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 			elseif GetSimpleMenuChildren(item) then
 				local element = rootDescription:CreateButton(item.text or "")
 				ApplySimpleMenuItemIcon(element, item)
+				ApplySimpleMenuItemTooltip(element, item)
 				Compat.PopulateSimpleMenu(element, GetSimpleMenuChildren(item))
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
@@ -505,6 +563,7 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 					return RunSimpleMenuItem(item, value)
 				end, item.value)
 				ApplySimpleMenuItemIcon(element, item)
+				ApplySimpleMenuItemTooltip(element, item)
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
 					if enabled == nil then
@@ -520,6 +579,7 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 				end)
 				Compat.StyleSimpleMenuCheckbox(element)
 				ApplySimpleMenuItemIcon(element, item)
+				ApplySimpleMenuItemTooltip(element, item)
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
 					if enabled == nil then
@@ -528,10 +588,13 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 					SetSimpleMenuElementEnabled(element, enabled)
 				end
 			else
-				local element = rootDescription:CreateButton(item.text or "", function()
+				local createButton = item.destructive and rootDescription.CreateRedHighlightButton
+					or rootDescription.CreateButton
+				local element = createButton(rootDescription, item.text or "", function()
 					return RunSimpleMenuItem(item, item.value)
 				end)
 				ApplySimpleMenuItemIcon(element, item)
+				ApplySimpleMenuItemTooltip(element, item)
 				if item.disabled ~= nil or item.enabled ~= nil then
 					local enabled = item.enabled
 					if enabled == nil then
@@ -600,6 +663,13 @@ function Compat.OpenSimpleContextMenu(owner, name, itemsOrFactory)
 					info.notCheckable = true
 				end
 				ApplyIconProfileToClassicMenuItem(info, item.iconProfile)
+				local tooltip = ResolveSimpleMenuTooltip(item)
+				if tooltip then
+					info.tooltipTitle = item.tooltipTitle or item.text or ""
+					info.tooltipText = tooltip
+					info.tooltipWhileDisabled = true
+					info.tooltipOnButton = true
+				end
 				if itemType ~= "title" and not children then
 					info.func = function()
 						RunSimpleMenuItem(item, item.value)
@@ -1238,6 +1308,188 @@ local function SafeBooleanAPICall(apiFunction, fallback, ...)
 	return value == true
 end
 
+-- Forever moved Battle.net block mutations into C_BattleNet. Keep the legacy
+-- global only as an older-client fallback and contain restricted/secret input.
+function Compat.CanSetBNetBlocked()
+	return (C_BattleNet and type(C_BattleNet.SetBlocked) == "function")
+		or type(BNSetBlocked) == "function"
+end
+
+function Compat.SetBNetBlocked(bnetIDAccount, blocked)
+	if bnetIDAccount == nil or (BFL.IsSecret and BFL:IsSecret(bnetIDAccount)) then
+		return false
+	end
+	if type(bnetIDAccount) == "string" then
+		bnetIDAccount = tonumber(bnetIDAccount)
+	end
+	if type(bnetIDAccount) ~= "number" then
+		return false
+	end
+	local setter = C_BattleNet and C_BattleNet.SetBlocked or BNSetBlocked
+	if type(setter) ~= "function" then
+		return false
+	end
+	local ok = pcall(setter, bnetIDAccount, blocked == true)
+	return ok == true
+end
+
+function Compat.CanBlockBNetFriendInvite(friendLevel)
+	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
+	return titleLevel == nil or friendLevel ~= titleLevel
+end
+
+function Compat.IsAgeVerificationRestricted()
+	local api = C_SocialRestrictions and C_SocialRestrictions.IsAgeVerificationRestricted
+	if type(api) ~= "function" then
+		return false
+	end
+	local ok, restricted = pcall(api)
+	if not ok or (BFL.IsSecret and BFL:IsSecret(restricted)) then
+		-- The capability exists, so an unreadable restriction state must not
+		-- open a communication path that Blizzard may have disabled.
+		return true
+	end
+	return restricted == true
+end
+
+function Compat.IsAgeVerificationRestrictedMinor()
+	if not Compat.IsAgeVerificationRestricted() then
+		return false
+	end
+	local api = C_SocialRestrictions and C_SocialRestrictions.IsAgeVerificationRestrictedMinor
+	return SafeBooleanAPICall(api, false)
+end
+
+function Compat.GetAgeVerificationRestrictionTooltip()
+	if not Compat.IsAgeVerificationRestricted() then
+		return nil
+	end
+	if Compat.IsAgeVerificationRestrictedMinor() then
+		return AGE_RESTRICTED_CHAT_MINOR_TOOLTIP or CHAT_DISABLED
+	end
+	return AGE_RESTRICTED_CHAT_UNVERIFIED_TOOLTIP or CHAT_DISABLED
+end
+
+function Compat.CanSendWhisper()
+	return not Compat.IsAgeVerificationRestricted()
+end
+
+function Compat.AreRegionalUniqueNamesEnabled()
+	return SafeBooleanAPICall(RegionalUniqueNamesEnabled, false)
+end
+
+local function IsSafeNameValue(value)
+	return type(value) == "string"
+		and value ~= ""
+		and not (BFL.IsSecret and BFL:IsSecret(value))
+end
+
+local function TrimNameValue(value)
+	if not IsSafeNameValue(value) then
+		return nil
+	end
+	value = value:match("^%s*(.-)%s*$")
+	return value ~= "" and value or nil
+end
+
+function Compat.GetUnmodifiedUnitFullName(unit)
+	if NameUtil and type(NameUtil.GetUnmodifiedUnitFullName) == "function" then
+		local ok, fullName = pcall(NameUtil.GetUnmodifiedUnitFullName, unit)
+		if ok and IsSafeNameValue(fullName) then
+			return fullName
+		end
+	end
+	if type(UnitNameUnmodified) ~= "function" then
+		return nil
+	end
+	local ok, name, realmOrSurname = pcall(UnitNameUnmodified, unit)
+	if not ok or not IsSafeNameValue(name) then
+		return nil
+	end
+	if IsSafeNameValue(realmOrSurname) then
+		return Compat.NormalizePlayerName(name, realmOrSurname)
+	end
+	return name
+end
+
+-- Return only an actual realm as the second value. On regional-unique-name
+-- clients the second name part is a surname, so the full identity stays intact.
+function Compat.SplitPlayerName(fullName)
+	fullName = TrimNameValue(fullName)
+	if not fullName then
+		return nil, nil
+	end
+	if Compat.AreRegionalUniqueNamesEnabled() then
+		return fullName, nil
+	end
+	if NameUtil and type(NameUtil.SplitPlayerNameIntoParts) == "function" then
+		local ok, name, realm = pcall(NameUtil.SplitPlayerNameIntoParts, fullName)
+		if ok and IsSafeNameValue(name) and IsSafeNameValue(realm) then
+			return name, realm
+		end
+	end
+	local name, realm = fullName:match("^(.-)%-(.+)$")
+	return name or fullName, realm
+end
+
+function Compat.GetPlayerNameWithoutRealm(fullName)
+	local name = Compat.SplitPlayerName(fullName)
+	return name
+end
+
+function Compat.ReplaceSurnameSeparatorWithLinkSeparator(fullName)
+	fullName = TrimNameValue(fullName)
+	if not fullName then
+		return nil
+	end
+	local api = C_NameUtil and C_NameUtil.ReplaceSurnameSeparatorWithLinkSeparator
+	if type(api) == "function" then
+		local ok, converted = pcall(api, fullName)
+		if ok and IsSafeNameValue(converted) then
+			return converted
+		end
+	end
+	return fullName
+end
+
+function Compat.NormalizePlayerName(name, realmOrSurname, fallbackRealm)
+	name = TrimNameValue(name)
+	realmOrSurname = TrimNameValue(realmOrSurname)
+	if not name then
+		return nil
+	end
+
+	if Compat.AreRegionalUniqueNamesEnabled() then
+		if realmOrSurname and not name:find("-", 1, true)
+			and NameUtil and type(NameUtil.GetFullNameWithoutRealm) == "function"
+		then
+			local ok, fullName = pcall(NameUtil.GetFullNameWithoutRealm, name, realmOrSurname)
+			if ok and IsSafeNameValue(fullName) then
+				return fullName
+			end
+		end
+		return name
+	end
+
+	if name:find("-", 1, true) then
+		local characterName, realmName = name:match("^(.-)%-(.+)$")
+		if characterName and realmName then
+			return characterName .. "-" .. realmName:gsub("%s+", "")
+		end
+		return name
+	end
+
+	local realm = realmOrSurname or TrimNameValue(fallbackRealm)
+	if not realm and type(GetNormalizedRealmName) == "function" then
+		local ok, currentRealm = pcall(GetNormalizedRealmName)
+		realm = ok and TrimNameValue(currentRealm) or nil
+	end
+	if realm then
+		return name .. "-" .. realm:gsub("%s+", "")
+	end
+	return name
+end
+
 function Compat.IsBattleNetFriendsListSupported()
 	if not (C_BattleNet and C_BattleNet.GetFriendAccountInfo) then
 		return false
@@ -1586,6 +1838,32 @@ end
 
 function Compat.GetAtlasInfo(atlasName)
 	return GetAtlasInfo(atlasName)
+end
+
+local function GetSetTextureForbiddenAspect()
+	if Compat._testSetTextureForbiddenAspect ~= nil then
+		return Compat._testSetTextureForbiddenAspect or nil
+	end
+	return Enum and Enum.ForbiddenAspect and Enum.ForbiddenAspect.SetTexture or nil
+end
+
+-- Safely mutate textures that may be owned by Blizzard or another addon.
+-- Retail 12.1.0 can forbid SetTexture-family operations per object; older
+-- clients do not expose the aspect and continue through the protected call.
+function Compat.TrySetColorTexture(texture, r, g, b, a)
+	if not texture or type(texture.SetColorTexture) ~= "function" then
+		return false
+	end
+
+	local setTextureAspect = GetSetTextureForbiddenAspect()
+	if setTextureAspect ~= nil and type(texture.HasAnyForbiddenAspects) == "function" then
+		local ok, isForbidden = pcall(texture.HasAnyForbiddenAspects, texture, setTextureAspect)
+		if not ok or (BFL.IsSecret and BFL:IsSecret(isForbidden)) or isForbidden == true then
+			return false
+		end
+	end
+
+	return pcall(texture.SetColorTexture, texture, r, g, b, a)
 end
 
 -- Set texture with atlas fallback support
@@ -2319,6 +2597,27 @@ local function RequestTitleFriendInviteConfirmation(name)
 	return ok == true
 end
 
+local function RequestBattleTagFriendInviteByIDConfirmation(bnetIDAccount, accountName)
+	if not BFL.IsRetail
+		or not EventRegistry
+		or not EventRegistry.TriggerEvent
+		or not EnsureAddOnLoadedCompat("Blizzard_AddFriend")
+		or not BattleNetInviteFrame
+		or not BattleNetInviteFrame.OnBattleTagFriendInviteByIDRequested
+	then
+		return false
+	end
+
+	local ok = pcall(
+		EventRegistry.TriggerEvent,
+		EventRegistry,
+		"BattleNetInviteFrame.BattleTagFriendInviteByIDRequested",
+		bnetIDAccount,
+		accountName
+	)
+	return ok == true
+end
+
 -- Send a title-friend invite on Retail 12.1+ through Blizzard's confirmation
 -- frame. Older Retail builds and Classic retain the direct/legacy fallbacks.
 -- This wrapper must only be called from a hardware-event path because the
@@ -2335,6 +2634,30 @@ function Compat.SendTitleFriendInviteByName(name)
 		return ok == true
 	end
 	return Compat.AddFriend(name)
+end
+
+-- Upgrade a Forever Title friend through Blizzard's confirmation surface.
+-- This wrapper must be invoked from a hardware-event menu callback.
+function Compat.SendBattleTagFriendInviteByID(bnetIDAccount, accountName)
+	if bnetIDAccount == nil
+		or (BFL.IsSecret and (BFL:IsSecret(bnetIDAccount) or BFL:IsSecret(accountName)))
+	then
+		return false
+	end
+	if type(bnetIDAccount) == "string" then
+		bnetIDAccount = tonumber(bnetIDAccount)
+	end
+	if type(bnetIDAccount) ~= "number" then
+		return false
+	end
+	if RequestBattleTagFriendInviteByIDConfirmation(bnetIDAccount, accountName) then
+		return true
+	end
+	if type(BNSendFriendInviteByID) == "function" then
+		local ok = pcall(BNSendFriendInviteByID, bnetIDAccount)
+		return ok == true
+	end
+	return false
 end
 
 function Compat.AreTitleFriendCustomNamesEnabled()
@@ -2860,9 +3183,8 @@ function BFL.GetGuildMOTD()
 		return guildMOTDCache
 	end
 
-	if BFL.IsActionRestricted and BFL:IsActionRestricted() then
-		return ""
-	end
+	-- This is a read-only getter. Broad action restrictions must not hide the
+	-- header text; restricted clients are handled by the secure call below.
 	if IsInGuild then
 		local okInGuild, inGuild = pcall(IsInGuild)
 		if okInGuild and not inGuild then
@@ -2970,6 +3292,7 @@ BFL.InitializeMultiSelectDropdown = Compat.InitializeMultiSelectDropdown
 BFL.RefreshDropdown = Compat.RefreshDropdown
 BFL.HasAtlas = Compat.HasAtlas
 BFL.GetAtlasInfo = Compat.GetAtlasInfo
+BFL.TrySetColorTexture = Compat.TrySetColorTexture
 BFL.SetTextureOrAtlas = Compat.SetTextureOrAtlas
 BFL.GetAtlasMarkup = Compat.GetAtlasMarkup
 BFL.GetAtlasOrTextureMarkup = Compat.GetAtlasOrTextureMarkup
@@ -2981,6 +3304,7 @@ BFL.GetRoleIconMarkup = Compat.GetRoleIconMarkup
 BFL.SetRoleIconTexture = Compat.SetRoleIconTexture
 BFL.ShowMenuTooltip = Compat.ShowMenuTooltip
 BFL.HideMenuTooltip = Compat.HideMenuTooltip
+BFL.CreateMenuButton = Compat.CreateMenuButton
 BFL.PopulateSimpleMenu = Compat.PopulateSimpleMenu
 BFL.OpenSimpleContextMenu = Compat.OpenSimpleContextMenu
 BFL.StyleSimpleMenuCheckbox = Compat.StyleSimpleMenuCheckbox
@@ -3000,8 +3324,22 @@ BFL.CanSearchBattleNetFriends = Compat.CanSearchBattleNetFriends
 BFL.SearchBattleNetFriends = Compat.SearchBattleNetFriends
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
+BFL.CanSetBNetBlocked = Compat.CanSetBNetBlocked
+BFL.SetBNetBlocked = Compat.SetBNetBlocked
+BFL.CanBlockBNetFriendInvite = Compat.CanBlockBNetFriendInvite
+BFL.IsAgeVerificationRestricted = Compat.IsAgeVerificationRestricted
+BFL.IsAgeVerificationRestrictedMinor = Compat.IsAgeVerificationRestrictedMinor
+BFL.GetAgeVerificationRestrictionTooltip = Compat.GetAgeVerificationRestrictionTooltip
+BFL.CanSendWhisper = Compat.CanSendWhisper
+BFL.AreRegionalUniqueNamesEnabled = Compat.AreRegionalUniqueNamesEnabled
+BFL.GetUnmodifiedUnitFullName = Compat.GetUnmodifiedUnitFullName
+BFL.SplitPlayerName = Compat.SplitPlayerName
+BFL.GetPlayerNameWithoutRealm = Compat.GetPlayerNameWithoutRealm
+BFL.ReplaceSurnameSeparatorWithLinkSeparator = Compat.ReplaceSurnameSeparatorWithLinkSeparator
+BFL.NormalizePlayerIdentityName = Compat.NormalizePlayerName
 BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled
 BFL.SendTitleFriendInviteByName = Compat.SendTitleFriendInviteByName
+BFL.SendBattleTagFriendInviteByID = Compat.SendBattleTagFriendInviteByID
 BFL.AreTitleFriendCustomNamesEnabled = Compat.AreTitleFriendCustomNamesEnabled
 BFL.IsTitleFriend = Compat.IsTitleFriend
 BFL.IsOfflineTitleFriend = Compat.IsOfflineTitleFriend

@@ -2216,7 +2216,7 @@ function RAF:RecruitListButton_SetupRecruit(button, recruitInfo)
 			button.InfoText:SetTextColor(GRAY_FONT_COLOR:GetRGB())
 		end
 	else
-		button.Background:SetColorTexture(FRIENDS_OFFLINE_BACKGROUND_COLOR:GetRGBA())
+		button.Background:SetColorTexture(BFL.FRIENDS_OFFLINE_BACKGROUND_COLOR:GetRGBA())
 		button.InfoText:SetTextColor(GRAY_FONT_COLOR:GetRGB())
 
 		if recruitInfo.subStatus == Enum.RafRecruitSubStatus.Inactive then

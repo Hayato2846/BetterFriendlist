@@ -1141,7 +1141,7 @@
 					</EditBox>
 					
 					<!-- Column Dropdown -->
-					<DropdownButton name="$parentColumnDropdown" parentKey="ColumnDropdown" inherits="WowStyle1DropdownTemplate" mixin="WhoFrameColumnDropdownMixin" frameStrata="HIGH">
+					<DropdownButton name="$parentColumnDropdown" parentKey="ColumnDropdown" inherits="WowStyle1DropdownTemplate" mixin="BetterFriendlistWhoFrameColumnDropdownMixin" frameStrata="HIGH">
 						<NormalFont style="BetterFriendlistFontHighlightSmall"/>
 						<HighlightFont style="BetterFriendlistFontHighlightSmall"/>
 						<DisabledFont style="BetterFriendlistFontDisableSmall"/>
@@ -1276,12 +1276,6 @@
 					</OnLoad>
 					<OnShow>
 						C_FriendList.SetWhoToUi(true)
-						if FriendsFrame then
-							FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
-							if FriendsFrame.WhoFrame then
-								FriendsFrame.WhoFrame:Hide()
-							end
-						end
 						if EventRegistry then
 							EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
 								if BetterWhoFrame_InvalidateFontCache then
@@ -1295,9 +1289,6 @@
 					<OnHide>
 						if EventRegistry then
 							EventRegistry:UnregisterCallback("TextSizeManager.OnTextScaleUpdated", self)
-						end
-						if FriendsFrame then
-							FriendsFrame:RegisterEvent("WHO_LIST_UPDATE")
 						end
 						C_FriendList.SetWhoToUi(false)
 					</OnHide>

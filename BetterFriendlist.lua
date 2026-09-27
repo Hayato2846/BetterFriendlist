@@ -80,15 +80,6 @@ local function InitializeManagers()
 	end
 end
 
--- Define color constants if they don't exist (used by Recent Allies)
--- Note: Blizzard uses FRIENDS_OFFLINE_BACKGROUND_COLOR (with S), not FRIEND_OFFLINE_BACKGROUND_COLOR
-if not FRIENDS_WOW_BACKGROUND_COLOR then
-	FRIENDS_WOW_BACKGROUND_COLOR = CreateColor(0.101961, 0.149020, 0.196078, 1)
-end
-if not FRIENDS_OFFLINE_BACKGROUND_COLOR then
-	FRIENDS_OFFLINE_BACKGROUND_COLOR = CreateColor(0.35, 0.35, 0.35, 1)
-end
-
 -- ========================================
 -- Global Functions (for XML OnClick handlers)
 -- ========================================
@@ -1130,11 +1121,6 @@ local function LocalizeUI()
 		return
 	end
 
-	-- Ensure Global Strings for XML usage (Literals in XML)
-	_G.RAF_NEXT_REWARD_HELP_TEXT = L.RAF_NEXT_REWARD_HELP
-	_G.WHO_LIST_SEARCH_INSTRUCTIONS = L.WHO_LIST_SEARCH_INSTRUCTIONS
-	_G.WHO_LIST_LEVEL_TOOLTIP = L.WHO_LEVEL_FORMAT
-
 	-- Tabs (Main Frame)
 	if frame.FriendsTabHeader then
 		if frame.FriendsTabHeader.Tab1 then
@@ -2043,8 +2029,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				BetterFriendsFrame_InitQuickFilterDropdown()
 			end
 
-			-- COMBAT FIX: ESC key via UISpecialFrames
-			-- Add our frame to UISpecialFrames so it closes on ESC
+			-- Install Escape handling. Forever uses a frame-local handler because
+			-- its Group Finder bootstrap shares the UISpecialFrames close stack.
 			if BetterFriendsFrame then
 				if BFL.AddUniqueUISpecialFrame then
 					BFL:AddUniqueUISpecialFrame("BetterFriendsFrame")
@@ -2882,11 +2868,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						end
 
 						if not friendUID then
-							local targetName = contextName
-							if string.find(targetName, "-") then
-								local tName, tRealm = strsplit("-", targetName, 2)
-								targetName = tName .. "-" .. tRealm:gsub("%s+", "")
-							end
+							local targetName = BFL.NormalizePlayerIdentityName
+								and BFL.NormalizePlayerIdentityName(contextName)
+								or contextName
 
 							local normalized = BFL:NormalizeWoWFriendName(targetName)
 							if not BFL:IsActionRestricted() and BFL.GetWoWFriendInfo(normalized or targetName) then
@@ -3574,6 +3558,25 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				)
 			end
 
+			local function BFL_AddUpgradeTitleFriendButton(rootDescription, contextData)
+				if not (contextData and contextData.bnetIDAccount
+					and BFL.AreTitleFriendsEnabled and BFL.AreTitleFriendsEnabled()
+					and BFL.SendBattleTagFriendInviteByID)
+				then
+					return
+				end
+				local accountInfo = BFL_GetBNetAccountInfo(contextData)
+				if not (accountInfo and BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo)) then
+					return
+				end
+				local createButton = BFL.CreateMenuButton or function(root, text, callback)
+					return root:CreateButton(text, callback)
+				end
+				createButton(rootDescription, SEND_BATTLETAG_REQUEST or "Send BattleTag Request", function()
+					BFL.SendBattleTagFriendInviteByID(contextData.bnetIDAccount, accountInfo.accountName)
+				end)
+			end
+
 			local function BFL_AddRecentAllyNativeButtons(rootDescription, contextData)
 				if not BFL.HasRecentAllies then
 					return
@@ -3591,10 +3594,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					and C_RecentAllies.CanSetRecentAllyNote
 					and C_RecentAllies.CanSetRecentAllyNote(guid)
 				then
+					local characterData = recentAllyData.characterData
+					local noteName = BFL.AreRegionalUniqueNamesEnabled
+						and BFL.AreRegionalUniqueNamesEnabled()
+						and characterData.fullName
+						or characterData.name
 					rootDescription:CreateButton(RECENT_ALLIES_MENU_BUTTON_LABEL_SET_NOTE or SET_NOTE or "Set Note", function()
 						StaticPopup_Show(
 							"SET_RECENT_ALLY_NOTE",
-							recentAllyData.characterData.name,
+							noteName,
 							nil,
 							recentAllyData
 						)
@@ -3721,11 +3729,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_AddRemoveFriendButton(rootDescription, contextData, isBNet)
+				local createButton = BFL.CreateMenuButton or function(root, text, callback)
+					return root:CreateButton(text, callback)
+				end
 				if isBNet then
 					if not contextData.bnetIDAccount then
 						return
 					end
-					rootDescription:CreateButton(BNET_REMOVE_FRIEND or REMOVE_FRIEND or "Remove Friend", function()
+					createButton(rootDescription, BNET_REMOVE_FRIEND or REMOVE_FRIEND or "Remove Friend", function()
 						local displayName = BFL_GetContextDisplayName(contextData, true)
 						local confirmation = REMOVE_FRIEND_CONFIRMATION or BATTLETAG_REMOVE_FRIEND_CONFIRMATION
 						local prompt = displayName
@@ -3736,24 +3747,30 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 						end
 						StaticPopup_Show("CONFIRM_REMOVE_BN_FRIEND", prompt, nil, contextData.bnetIDAccount)
-					end)
+					end, { destructive = true })
 					return
 				end
 
 				local fullName = BFL_GetContextFullName(contextData)
 				if fullName and BFL_HasFriendListContext(contextData) then
-					rootDescription:CreateButton(REMOVE_FRIEND or "Remove Friend", function()
+					createButton(rootDescription, REMOVE_FRIEND or "Remove Friend", function()
 						BFL_ShowRemoveWoWFriendPrompt(fullName)
-					end)
+					end, { destructive = true })
 				end
 			end
 
 			local function BFL_AddIgnoreOrBlockButton(rootDescription, contextData, isBNet)
 				if isBNet then
-					if not contextData.bnetIDAccount or not BNSetBlocked then
+					if not contextData.bnetIDAccount
+						or not BFL.CanSetBNetBlocked
+						or not BFL.CanSetBNetBlocked()
+					then
 						return
 					end
-					rootDescription:CreateButton(BN_BLOCK_FRIEND or BLOCK_COMMUNICATION or IGNORE or "Block", function()
+					local createButton = BFL.CreateMenuButton or function(root, text, callback)
+						return root:CreateButton(text, callback)
+					end
+					createButton(rootDescription, BN_BLOCK_FRIEND or BLOCK_COMMUNICATION or IGNORE or "Block", function()
 						local displayName = BFL_GetContextDisplayName(contextData, true)
 						local prompt = displayName
 						if BLOCK_FRIEND_CONFIRMATION then
@@ -3767,7 +3784,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							button1 = ACCEPT,
 							button2 = CANCEL,
 							OnAccept = function()
-								BNSetBlocked(contextData.bnetIDAccount, true)
+								BFL.SetBNetBlocked(contextData.bnetIDAccount, true)
 							end,
 							timeout = 0,
 							whileDead = 1,
@@ -3775,13 +3792,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							preferredIndex = 3,
 						}
 						StaticPopup_Show("BFL_CONFIRM_BLOCK_BNET_FRIEND", prompt)
-					end)
+					end, { destructive = true })
 					return
 				end
 
 				local fullName = BFL_GetContextFullName(contextData)
 				if fullName and C_FriendList and C_FriendList.AddOrDelIgnore then
-					if fullName == UnitNameUnmodified("player") then
+					local playerFullName = BFL.GetUnmodifiedUnitFullName
+						and BFL.GetUnmodifiedUnitFullName("player")
+						or UnitNameUnmodified("player")
+					if fullName == playerFullName then
 						return
 					end
 					local label = C_FriendList.IsOnIgnoredList and C_FriendList.IsOnIgnoredList(fullName) and IGNORE_REMOVE
@@ -3865,7 +3885,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 				local fullName = BFL_GetContextFullName(contextData)
-				if not fullName or fullName == UnitNameUnmodified("player") then
+				local playerFullName = BFL.GetUnmodifiedUnitFullName
+					and BFL.GetUnmodifiedUnitFullName("player")
+					or UnitNameUnmodified("player")
+				if not fullName or fullName == playerFullName then
 					return
 				end
 				local canShow = false
@@ -3928,6 +3951,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						BFL_AddSetNoteButton(rootDescription, contextData, isBNet)
 						if isBNet then
 							BFL_AddSetCustomTitleFriendNameButton(rootDescription, contextData)
+							BFL_AddUpgradeTitleFriendButton(rootDescription, contextData)
 						end
 					end
 					if isRecentAlly then
@@ -3943,13 +3967,24 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
 
 					if ((not isOffline) or isBNet) and not isOfflineTitleFriend then
-						rootDescription:CreateButton(WHISPER or "Whisper", function()
+						local canWhisper = not BFL.CanSendWhisper or BFL.CanSendWhisper()
+						local restrictionTooltip = not canWhisper
+							and BFL.GetAgeVerificationRestrictionTooltip
+							and BFL.GetAgeVerificationRestrictionTooltip()
+						local createButton = BFL.CreateMenuButton or function(root, text, callback)
+							return root:CreateButton(text, callback)
+						end
+						createButton(rootDescription, WHISPER or "Whisper", function()
 							if isBNet then
 								BFL:SecureSendBNetTell(contextData.name, contextData.bnetIDAccount)
 							else
 								BFL:SecureSendTell(BFL_GetContextFullName(contextData))
 							end
-						end)
+						end, {
+							enabled = canWhisper,
+							tooltip = restrictionTooltip,
+							tooltipTitle = WHISPER or "Whisper",
+						})
 					end
 
 					if not isOffline then
