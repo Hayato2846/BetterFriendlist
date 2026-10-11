@@ -30,6 +30,48 @@ local CLASS_ID_TO_FILE = {
 
 local MAX_CLASS_ID = 13
 
+function ClassUtils:GetAvailableClassIDs()
+	local function IsSafeID(value)
+		return not (BFL.IsSecret and BFL:IsSecret(value))
+			and type(value) == "number" and value > 0 and value % 1 == 0
+	end
+	local result, seen = {}, {}
+	local function AddID(value)
+		if IsSafeID(value) and not seen[value] then
+			seen[value] = true
+			result[#result + 1] = value
+		end
+	end
+	local api = C_SpecializationInfo and C_SpecializationInfo.GetAllClassIDs
+	if type(api) == "function" then
+		local ok, ids = pcall(api)
+		if ok and not (BFL.IsSecret and BFL:IsSecret(ids)) and type(ids) == "table" then
+			for _, classID in ipairs(ids) do AddID(classID) end
+			if #result > 0 then
+				table.sort(result)
+				return result
+			end
+		end
+	end
+
+	-- Classic can have fewer classes than its highest valid ID (Druid is 11).
+	-- Probe the known ID range, not just the count, and keep actual API results.
+	if type(GetClassInfo) ~= "function" then return nil end
+	local maxID = MAX_CLASS_ID
+	if type(GetNumClasses) == "function" then
+		local ok, count = pcall(GetNumClasses)
+		if ok and IsSafeID(count) then maxID = math.max(maxID, count) end
+	end
+	for candidateID = 1, maxID do
+		local ok, name, _, classID = pcall(GetClassInfo, candidateID)
+		if ok and not (BFL.IsSecret and BFL:IsSecret(name)) and type(name) == "string" and name ~= "" then
+			if not (BFL.IsSecret and BFL:IsSecret(classID)) then AddID(classID or candidateID) end
+		end
+	end
+	table.sort(result)
+	return result
+end
+
 local function IsKnownClassFile(classFile)
 	return classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] ~= nil
 end

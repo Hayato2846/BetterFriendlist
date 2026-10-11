@@ -234,18 +234,19 @@ function WhoFrame:GetWhoClassFilters()
 	if self._testWhoClassFilters then
 		return self._testWhoClassFilters
 	end
-	if type(GetNumClasses) ~= "function" or type(GetClassInfo) ~= "function" then
+	if type(GetClassInfo) ~= "function" or not BFL.ClassUtils then
 		return nil
 	end
-	local ok, count = pcall(GetNumClasses)
-	if not ok or type(count) ~= "number" or (BFL.IsSecret and BFL:IsSecret(count)) then
+	local classIDs = BFL.ClassUtils:GetAvailableClassIDs()
+	if not classIDs then
 		return nil
 	end
 	local result = {}
-	for index = 1, count do
-		local infoOK, name, _classFile, classID = pcall(GetClassInfo, index)
-		if infoOK and type(name) == "string" and type(classID) == "number"
-			and not (BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(classID)))
+	for _, availableID in ipairs(classIDs) do
+		local infoOK, name, _classFile, classID = pcall(GetClassInfo, availableID)
+		local safeInfo = not (BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(classID)))
+		if safeInfo then classID = classID or availableID end
+		if infoOK and safeInfo and type(name) == "string" and name ~= "" and type(classID) == "number"
 		then
 			result[#result + 1] = { name = name, ID = classID }
 		end
@@ -1088,7 +1089,7 @@ function WhoFrame:ApplyModernSearchBuilderLayout()
 	flyout:SetPoint("TOPLEFT", whoFrame.ListInset or whoFrame, "TOPLEFT", 4, -2)
 	flyout:SetPoint("TOPRIGHT", whoFrame.ListInset or whoFrame, "TOPRIGHT", -4, -2)
 	flyout:SetHeight(242)
-	flyout:SetFrameStrata(whoFrame:GetFrameStrata())
+	flyout:SetFrameStrata(BFL.GetSafeFrameStrata(whoFrame))
 	flyout:SetFrameLevel(whoFrame:GetFrameLevel() + 3)
 	self:ApplyModernSearchBuilderStyle()
 	whoFrame.BFL_ModernBuilderHeight = flyout:IsShown() and 246 or 0
@@ -1114,7 +1115,7 @@ function WhoFrame:RestoreLegacySearchBuilderLayout()
 		flyout:SetPoint("BOTTOMLEFT", whoFrame.ListInset, "BOTTOMLEFT", 0, 60)
 		flyout:SetPoint("BOTTOMRIGHT", whoFrame.ListInset, "BOTTOMRIGHT", 0, 60)
 		flyout:SetHeight(235)
-		flyout:SetFrameStrata(whoFrame:GetFrameStrata())
+		flyout:SetFrameStrata(BFL.GetSafeFrameStrata(whoFrame))
 		local editBox = whoFrame.EditBox
 		if editBox then
 			flyout:SetFrameLevel(editBox:GetFrameLevel() + 10)
@@ -4566,7 +4567,7 @@ function WhoFrame:SetBuilderDocked(docked)
 			self.builderDockBtn:ClearAllPoints()
 			if container.CloseButton then
 				self.builderDockBtn:SetPoint("RIGHT", container.CloseButton, "LEFT", -2, 0)
-				self.builderDockBtn:SetFrameStrata(container.CloseButton:GetFrameStrata())
+				self.builderDockBtn:SetFrameStrata(BFL.GetSafeFrameStrata(container.CloseButton))
 				self.builderDockBtn:SetFrameLevel(container.CloseButton:GetFrameLevel())
 			else
 				self.builderDockBtn:SetPoint("TOPRIGHT", container, "TOPRIGHT", -28, -4)
@@ -4600,7 +4601,7 @@ function WhoFrame:SetBuilderDocked(docked)
 		-- Undock: restore original flyout position inside WhoFrame
 		flyout:SetParent(whoFrame)
 		flyout:ClearAllPoints()
-		flyout:SetFrameStrata(whoFrame:GetFrameStrata())
+		flyout:SetFrameStrata(BFL.GetSafeFrameStrata(whoFrame))
 		local editBox = whoFrame.EditBox
 		if editBox then
 			flyout:SetFrameLevel(editBox:GetFrameLevel() + 10)

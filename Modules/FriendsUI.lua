@@ -2312,12 +2312,12 @@ function FriendsUI:OpenRequestDeclineMenu(button)
 				end
 			end,
 		}
-		if not BFL.CanBlockBNetFriendInvite or BFL.CanBlockBNetFriendInvite(button.friendLevel) then
+		if BFL.CanBlockBNetFriendInviteByIndex(button.inviteIndex, inviteID) then
 			items[#items + 1] = {
 				text = BLOCK_INVITES or "Block Invites",
 				destructive = true,
 				func = function()
-					if BFL.SetBNetBlocked then
+					if BFL.CanBlockBNetFriendInviteByIndex(button.inviteIndex, inviteID) and BFL.SetBNetBlocked then
 						BFL.SetBNetBlocked(inviteID, true)
 					end
 				end,
@@ -2385,18 +2385,20 @@ function FriendsUI:SetupRequestDeclineButton(declineButton)
 		InitializeScaledRequestMenuElement(report)
 
 		local modeSupportsStaticPopups = not (C_Glue and C_Glue.IsOnGlueScreen and C_Glue.IsOnGlueScreen())
-		local inviteInfo = GetInviteInfo(dropdown.inviteIndex)
-		local friendLevel = inviteInfo and inviteInfo.friendLevel or dropdown.friendLevel
+		local expectedInviteID = dropdown.inviteID
 		if modeSupportsStaticPopups
-			and (not BFL.CanBlockBNetFriendInvite or BFL.CanBlockBNetFriendInvite(friendLevel))
+			and BFL.CanBlockBNetFriendInviteByIndex(dropdown.inviteIndex, expectedInviteID)
 		then
 			local createButton = BFL.CreateMenuButton or function(root, text, callback)
 				return root:CreateButton(text, callback)
 			end
 			local block = createButton(rootDescription, BLOCK_INVITES or "Block Invites", function()
 				local currentInviteInfo = GetInviteInfo(dropdown.inviteIndex)
-				local inviteID = currentInviteInfo and currentInviteInfo.inviteID or dropdown.inviteID
-				local accountName = currentInviteInfo and currentInviteInfo.accountName or dropdown.accountName
+				if not BFL.CanBlockBNetFriendInviteByIndex(dropdown.inviteIndex, expectedInviteID) then
+					return
+				end
+				local inviteID = currentInviteInfo and currentInviteInfo.inviteID
+				local accountName = currentInviteInfo and currentInviteInfo.accountName
 				if StaticPopup_Show then
 					StaticPopup_Show("CONFIRM_BLOCK_INVITES", accountName, nil, inviteID)
 				elseif BFL.SetBNetBlocked then
@@ -2565,8 +2567,8 @@ function FriendsUI:PerformContactAction()
 		if QuickJoin and QuickJoin.JoinQueue then
 			QuickJoin:JoinQueue()
 		end
-	elseif chrome.action == "add_friend" and AddFriendFrame_Show then
-		AddFriendFrame_Show()
+	elseif chrome.action == "add_friend" then
+		BFL.ShowAddFriendDialog()
 	elseif chrome.action == "guild_actions" and _G.BFL_GuildFrame_ShowActionsMenu then
 		_G.BFL_GuildFrame_ShowActionsMenu(self.root and self.root.BottomActionBar.AddFriendButton)
 	end

@@ -457,6 +457,7 @@ local function GetFieldValue(friend, field)
 	elseif field == "game" then
 		return friend.gameName or (GetGameInfo(friend) and GetGameInfo(friend).richPresence) or GetClient(friend)
 	elseif field == "wowProject" then
+		if friend.type == "wow" then return WOW_PROJECT_ID end
 		return GetGameInfo(friend) and GetGameInfo(friend).wowProjectID
 	elseif field == "multiAccount" then
 		local count = friend.numGameAccounts or (friend.gameAccounts and #friend.gameAccounts) or 0
@@ -510,6 +511,8 @@ local function GetMultiAccountFilterValues(friend, field)
 		AddUniqueFilterValue(values, seen, GetClient(friend))
 	elseif field == "game" then
 		AddUniqueFilterValue(values, seen, friend.gameName)
+	elseif field == "wowProject" and friend.type == "wow" then
+		AddUniqueFilterValue(values, seen, WOW_PROJECT_ID)
 	end
 
 	if friend.type ~= "bnet" then
@@ -878,6 +881,22 @@ local function BuiltinQuickFilter_Retail(friend)
 	end)
 end
 
+local function BuiltinQuickFilter_Forever(friend)
+	if friend and friend.type == "wow" then
+		return BFL.IsForever == true and IsFriendOnline(friend)
+	end
+	local wowClient = BNET_CLIENT_WOW or "WoW"
+	-- Retail and Classic do not define Camelot's project constant, but can
+	-- still receive Battle.net presence for its project ID.
+	local foreverProjectID = WOW_PROJECT_CAMELOT or 18
+	return HasOnlineGameAccount(friend, function(gameAccountInfo)
+		return not IsSecretValue(gameAccountInfo.clientProgram)
+			and not IsSecretValue(gameAccountInfo.wowProjectID)
+			and gameAccountInfo.clientProgram == wowClient
+			and gameAccountInfo.wowProjectID == foreverProjectID
+	end)
+end
+
 local function BuiltinQuickFilter_InGame(friend)
 	if friend and friend.type == "wow" then
 		return IsFriendOnline(friend)
@@ -960,6 +979,13 @@ local BUILTIN_QUICK_FILTERS = {
 		icon = BFL_ICON_PREFIX .. "filter-retail",
 		order = 80,
 		evaluator = BuiltinQuickFilter_Retail,
+	},
+	{
+		id = "forever",
+		labelKey = "FILTER_FOREVER",
+		icon = BFL_ICON_PREFIX .. "filter-wow",
+		order = 85,
+		evaluator = BuiltinQuickFilter_Forever,
 	},
 	{
 		id = "ingame",
@@ -1911,6 +1937,15 @@ local function GetBuiltinFilterAST(id)
 			children = {
 				GetBuiltinFilterAST("wow"),
 				{ type = "condition", field = "wowProject", op = "is", value = WOW_PROJECT_MAINLINE or WOW_PROJECT_ID or 1 },
+			},
+		}
+	elseif id == "forever" then
+		return {
+			type = "group",
+			op = "AND",
+			children = {
+				GetBuiltinFilterAST("wowonline"),
+				{ type = "condition", field = "wowProject", op = "is", value = WOW_PROJECT_CAMELOT or 18 },
 			},
 		}
 	elseif id == "ingame" then

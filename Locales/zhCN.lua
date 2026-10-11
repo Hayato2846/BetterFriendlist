@@ -416,6 +416,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.GROUPS_DIALOG_TITLE = "群组为 %s"
 	L.MENU_COPY_CHARACTER_NAME = "复制角色名称"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "复制角色名称"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "要将%s从好友列表中移除吗？"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -887,6 +888,7 @@ BFL:RegisterLocale("zhCN", function()
 	L.FILTER_BNET = "战网"
 	L.FILTER_HIDE_AFK = "隐藏暂离/勿扰"
 	L.FILTER_RETAIL = "正式版"
+	L.FILTER_FOREVER = "仅 WoW Forever"
 	L.FILTER_INGAME = "游戏中"
 	L.FILTER_IN_QUEUE = "队列中"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "可加入队列"

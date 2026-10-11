@@ -13,6 +13,26 @@ local function HasFrameMethod(frame, methodName)
 	return frame ~= nil and type(frame[methodName]) == "function"
 end
 
+local SAFE_FRAME_STRATA = {
+	BACKGROUND = true, LOW = true, MEDIUM = true, HIGH = true,
+	DIALOG = true, FULLSCREEN = true, FULLSCREEN_DIALOG = true, TOOLTIP = true,
+}
+
+-- Never propagate a secret Blizzard frame property into addon-owned overlays.
+function Compat.GetSafeFrameStrata(frame, fallback)
+	if (BFL.IsSecret and BFL:IsSecret(fallback)) or type(fallback) ~= "string" or not SAFE_FRAME_STRATA[fallback] then
+		fallback = "HIGH"
+	end
+	if not HasFrameMethod(frame, "GetFrameStrata") then
+		return fallback
+	end
+	local ok, strata = pcall(frame.GetFrameStrata, frame)
+	if not ok or (BFL.IsSecret and BFL:IsSecret(strata)) then
+		return fallback
+	end
+	return type(strata) == "string" and SAFE_FRAME_STRATA[strata] and strata or fallback
+end
+
 ------------------------------------------------------------
 -- C_AddOns Compatibility
 ------------------------------------------------------------
@@ -117,6 +137,7 @@ local function CreateClassicMenuDescription(parentItem, rootItems)
 	rootItems = rootItems or {}
 
 	local rootDescription = {}
+	local queuedItems
 
 	local function GetTargetItems()
 		if parentItem then
@@ -130,8 +151,36 @@ local function CreateClassicMenuDescription(parentItem, rootItems)
 	end
 
 	local function AddItem(item)
-		table.insert(GetTargetItems(), item)
+		local items = GetTargetItems()
+		if queuedItems then
+			for _, queuedItem in ipairs(queuedItems) do
+				table.insert(items, queuedItem)
+			end
+			queuedItems = nil
+		end
+		table.insert(items, item)
 		return CreateClassicMenuDescription(item)
+	end
+
+	local function QueueItem(item, clearQueue)
+		if clearQueue or not queuedItems then
+			queuedItems = {}
+		end
+		table.insert(queuedItems, item)
+	end
+
+	-- Match Blizzard's deferred sections: only commit a heading when an action
+	-- follows it, and discard an empty section when the next section is queued.
+	function rootDescription:ClearQueuedDescriptions()
+		queuedItems = nil
+	end
+
+	function rootDescription:QueueTitle(text, _color, clearQueue)
+		QueueItem({ text = text or "", isTitle = true, notCheckable = true }, clearQueue)
+	end
+
+	function rootDescription:QueueDivider(clearQueue)
+		QueueItem({ text = "", disabled = true, notCheckable = true }, clearQueue)
 	end
 
 	function rootDescription:SetEnabled(enabled)
@@ -1333,9 +1382,83 @@ function Compat.SetBNetBlocked(bnetIDAccount, blocked)
 	return ok == true
 end
 
+-- Native Classic FriendsFrame forbids cross-realm invites in every Classic
+-- flavor. Camelot uses Mainline rules instead, so it must not inherit that gate.
+function Compat.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID)
+	if not gameAccountInfo or not playerRealmID then
+		return false
+	end
+	return BFL.IsClassic == true and gameAccountInfo.realmID ~= playerRealmID
+end
+
+-- Older FriendsFrame helpers depend on faction/realm locals initialized by
+-- its OnShow. BFL keeps that frame hidden, so prefer the stateless native API.
+function Compat.GetBNetInviteTooltipInfo(friendIndex)
+	local util = FriendsListUtil
+	local restrictionTypes = BattleNetFriendPartyInviteRestrictionType
+	local restrictionPriority = BattleNetFriendPartyInviteRestrictionPriority
+	if not util or type(util.GetBattleNetFriendInviteInfo) ~= "function"
+		or type(util.GetGameAccountPartyInviteRestriction) ~= "function"
+		or type(util.GetBattleNetFriendPartyInviteRestrictionText) ~= "function"
+		or not restrictionTypes or not restrictionPriority
+		or not C_BattleNet or not C_BattleNet.GetFriendNumGameAccounts or not C_BattleNet.GetFriendGameAccountInfo
+	then
+		return nil
+	end
+	local ok, info = pcall(util.GetBattleNetFriendInviteInfo, friendIndex)
+	local restrictionOK, restrictionText = pcall(function()
+		-- A valid account wins; otherwise show the highest-priority native reason.
+		-- Do not seed with None: Retail's aggregate helper can mask real blocks.
+		local restriction = restrictionTypes.NoGameAccounts
+		for accountIndex = 1, C_BattleNet.GetFriendNumGameAccounts(friendIndex) do
+			local accountInfo = C_BattleNet.GetFriendGameAccountInfo(friendIndex, accountIndex)
+			local accountRestriction = util.GetGameAccountPartyInviteRestriction(accountInfo)
+			if accountRestriction == restrictionTypes.None then
+				return ""
+			end
+			if (restrictionPriority[accountRestriction] or 0) > (restrictionPriority[restriction] or 0) then
+				restriction = accountRestriction
+			end
+		end
+		return util.GetBattleNetFriendPartyInviteRestrictionText(restriction)
+	end)
+	if not ok or type(info) ~= "table" or not restrictionOK then
+		return nil
+	end
+	return info, restrictionText
+end
+
 function Compat.CanBlockBNetFriendInvite(friendLevel)
+	if BFL.IsSecret and BFL:IsSecret(friendLevel) then
+		return false
+	end
 	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
-	return titleLevel == nil or friendLevel ~= titleLevel
+	if titleLevel == nil then
+		return true -- Older clients do not publish friend-level metadata.
+	end
+	return type(friendLevel) == "number" and friendLevel ~= titleLevel
+end
+
+function Compat.CanBlockBNetAccount(accountInfo)
+	if not accountInfo or (BFL.IsSecret and BFL:IsSecret(accountInfo.bnetAccountID)) then
+		return false
+	end
+	return accountInfo.bnetAccountID ~= nil and Compat.CanBlockBNetFriendInvite(accountInfo.friendLevel)
+end
+
+-- Revalidate the index and ID when a menu action runs: request indices can
+-- move while the menu is open, and cached metadata must not authorize a block.
+function Compat.CanBlockBNetFriendInviteByIndex(inviteIndex, expectedInviteID)
+	if (BFL.IsSecret and (BFL:IsSecret(inviteIndex) or BFL:IsSecret(expectedInviteID)))
+		or not inviteIndex or not expectedInviteID
+	then
+		return false
+	end
+	local ok, info = pcall(Compat.GetBNetFriendInviteInfo, inviteIndex)
+	if not ok or not info or (BFL.IsSecret and BFL:IsSecret(info.inviteID)) then
+		return false
+	end
+	return info.inviteID == expectedInviteID and Compat.CanBlockBNetFriendInvite(info.friendLevel)
 end
 
 function Compat.IsAgeVerificationRestricted()
@@ -1379,9 +1502,73 @@ function Compat.AreRegionalUniqueNamesEnabled()
 end
 
 local function IsSafeNameValue(value)
-	return type(value) == "string"
+	return not (BFL.IsSecret and BFL:IsSecret(value))
+		and type(value) == "string"
 		and value ~= ""
-		and not (BFL.IsSecret and BFL:IsSecret(value))
+end
+
+-- Display only; do not use this to rewrite GUIDs, contact keys or whisper IDs.
+function Compat.FormatPlayerDisplayName(name, realmName, separator)
+	if not IsSafeNameValue(name) then
+		return nil
+	end
+	if Compat.AreRegionalUniqueNamesEnabled() or not IsSafeNameValue(realmName) then
+		return name
+	end
+	if separator then
+		return name .. separator .. realmName
+	end
+	local ok, fullName = pcall(string.format, FULL_PLAYER_NAME or "%s-%s", name, realmName)
+	return ok and fullName or name
+end
+
+function Compat.GetCopyCharacterName(name, realmName, surname)
+	if not IsSafeNameValue(name) then
+		return nil
+	end
+	if Compat.AreRegionalUniqueNamesEnabled() then
+		if IsSafeNameValue(surname) and not name:find("-", 1, true) then
+			if NameUtil and type(NameUtil.GetFullNameWithoutRealm) == "function" then
+				local ok, fullName = pcall(NameUtil.GetFullNameWithoutRealm, name, surname)
+				if ok and IsSafeNameValue(fullName) and fullName ~= name then
+					return fullName
+				end
+			end
+			return name .. "-" .. surname
+		end
+		return name
+	end
+	if name:find("-", 1, true) then
+		return name
+	end
+	return Compat.FormatPlayerDisplayName(name, realmName)
+end
+
+function Compat.GetBNetRemoveFriendPrompt(accountInfo, displayName)
+	if not IsSafeNameValue(displayName) then
+		return nil
+	end
+	local confirmation = BFL.L.DIALOG_REMOVE_FRIEND_CONFIRMATION
+	if accountInfo and not (BFL.IsSecret and BFL:IsSecret(accountInfo)) then
+		local levels = Enum and Enum.BattleNetFriendLevel
+		local level = accountInfo.friendLevel
+		local isBattleTag = accountInfo.isBattleTagFriend
+		local safeLevel = not (BFL.IsSecret and BFL:IsSecret(level)) and type(level) == "number"
+		local safeBattleTag = not (BFL.IsSecret and BFL:IsSecret(isBattleTag)) and type(isBattleTag) == "boolean"
+		if safeLevel and levels and levels.Title and level == levels.Title then
+			confirmation = REMOVE_TITLE_FRIEND_CONFIRMATION or confirmation
+		elseif (safeLevel and levels and levels.BattleTag and level == levels.BattleTag)
+			or (safeBattleTag and isBattleTag)
+		then
+			confirmation = BATTLETAG_REMOVE_FRIEND_CONFIRMATION or confirmation
+		elseif (safeLevel and levels and levels.RealID and level == levels.RealID)
+			or (safeBattleTag and not isBattleTag and not (levels and levels.Title))
+		then
+			confirmation = REMOVE_FRIEND_CONFIRMATION or confirmation
+		end
+	end
+	local ok, prompt = pcall(string.format, confirmation, displayName)
+	return ok and prompt or displayName
 end
 
 local function TrimNameValue(value)
@@ -2636,6 +2823,27 @@ function Compat.SendTitleFriendInviteByName(name)
 	return Compat.AddFriend(name)
 end
 
+-- Delegate opening, input handling and request selection to Blizzard. The
+-- display/link surname format does not define the API's accepted input format.
+function Compat.ShowAddFriendDialog()
+	if BFL.IsRetail and type(AddFriendFrame_Show) ~= "function" then
+		EnsureAddOnLoadedCompat("Blizzard_AddFriend")
+	end
+	if type(AddFriendFrame_Show) == "function" then
+		AddFriendFrame_Show()
+		return true
+	end
+	if not BFL.IsRetail and type(FriendsFrameAddFriendButton_OnClick) == "function" then
+		FriendsFrameAddFriendButton_OnClick()
+		return true
+	end
+	if Compat.CanUseWoWFriendList() and type(StaticPopup_Show) == "function" then
+		StaticPopup_Show("ADD_FRIEND")
+		return true
+	end
+	return false
+end
+
 -- Upgrade a Forever Title friend through Blizzard's confirmation surface.
 -- This wrapper must be invoked from a hardware-event menu callback.
 function Compat.SendBattleTagFriendInviteByID(bnetIDAccount, accountName)
@@ -3318,6 +3526,9 @@ BFL.CanSetAppearOffline = Compat.CanSetAppearOffline
 BFL.SetMyBNetStatus = Compat.SetMyBNetStatus
 BFL.GetBNetFriendInfo = Compat.GetBNetFriendInfo
 BFL.GetBNetFriendGameAccountInfo = Compat.GetBNetFriendGameAccountInfo
+BFL.GetSafeFrameStrata = Compat.GetSafeFrameStrata
+BFL.IsBNetInviteRealmRestricted = Compat.IsBNetInviteRealmRestricted
+BFL.GetBNetInviteTooltipInfo = Compat.GetBNetInviteTooltipInfo
 BFL.IsBattleNetFriendsListSupported = Compat.IsBattleNetFriendsListSupported
 BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
 BFL.CanSearchBattleNetFriends = Compat.CanSearchBattleNetFriends
@@ -3327,11 +3538,17 @@ BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
 BFL.CanSetBNetBlocked = Compat.CanSetBNetBlocked
 BFL.SetBNetBlocked = Compat.SetBNetBlocked
 BFL.CanBlockBNetFriendInvite = Compat.CanBlockBNetFriendInvite
+BFL.CanBlockBNetAccount = Compat.CanBlockBNetAccount
+BFL.CanBlockBNetFriendInviteByIndex = Compat.CanBlockBNetFriendInviteByIndex
 BFL.IsAgeVerificationRestricted = Compat.IsAgeVerificationRestricted
 BFL.IsAgeVerificationRestrictedMinor = Compat.IsAgeVerificationRestrictedMinor
 BFL.GetAgeVerificationRestrictionTooltip = Compat.GetAgeVerificationRestrictionTooltip
 BFL.CanSendWhisper = Compat.CanSendWhisper
 BFL.AreRegionalUniqueNamesEnabled = Compat.AreRegionalUniqueNamesEnabled
+BFL.FormatPlayerDisplayName = Compat.FormatPlayerDisplayName
+BFL.GetCopyCharacterName = Compat.GetCopyCharacterName
+BFL.GetBNetRemoveFriendPrompt = Compat.GetBNetRemoveFriendPrompt
+BFL.ShowAddFriendDialog = Compat.ShowAddFriendDialog
 BFL.GetUnmodifiedUnitFullName = Compat.GetUnmodifiedUnitFullName
 BFL.SplitPlayerName = Compat.SplitPlayerName
 BFL.GetPlayerNameWithoutRealm = Compat.GetPlayerNameWithoutRealm

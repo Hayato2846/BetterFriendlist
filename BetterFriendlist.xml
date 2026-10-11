@@ -2676,20 +2676,7 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						-- Use Blizzard's Add Friend Frame (identical to FriendsFrame)
-						if not AddFriendFrame then
-						LoadAddOn("Blizzard_FriendsFrame")
-						end
-						if AddFriendFrame then
-						AddFriendEntryFrame_Init(true)
-						AddFriendFrame.editFocus = AddFriendNameEditBox
-						StaticPopupSpecial_Show(AddFriendFrame)
-						if GetCVarBool("addFriendInfoShown") then
-						AddFriendFrame:ShowEntry()
-						else
-						AddFriendFrame:ShowInfo()
-						end
-						end
+						BFL.ShowAddFriendDialog()
 					</OnClick>
 				</Scripts>
 			</Button>

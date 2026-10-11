@@ -18,22 +18,26 @@ _G.BFL = BFL
 local tocVersion = select(4, GetBuildInfo()) -- Interface number (for example 120105 or 16001)
 BFL.TOCVersion = tocVersion
 
-function BFL.ResolveClientFlavor(interfaceVersion, projectID, mainlineProjectID, classicProjectID)
+function BFL.ResolveClientFlavor(interfaceVersion, projectID, mainlineProjectID, classicProjectID, camelotProjectID)
 	local interfaceNumber = tonumber(interfaceVersion) or 0
+	local isExplicitClassic = classicProjectID ~= nil and projectID == classicProjectID
+	-- Forever now publishes WOW_PROJECT_CAMELOT rather than WOW_PROJECT_MAINLINE.
+	-- It still uses the Mainline UI/API family; retain the 1.60 fallback for older builds.
+	local isForever = not isExplicitClassic
+		and ((camelotProjectID ~= nil and projectID == camelotProjectID)
+			or (interfaceNumber >= 16000 and interfaceNumber < 17000))
 	local hasProjectIdentity = projectID ~= nil and mainlineProjectID ~= nil
-	local isMainline = hasProjectIdentity and projectID == mainlineProjectID
+	local isMainline = isForever or (hasProjectIdentity and projectID == mainlineProjectID)
 	if not hasProjectIdentity then
 		-- Compatibility fallback for test harnesses and unusually early loading only.
-		isMainline = interfaceNumber >= 100000
-			or (interfaceNumber >= 16000 and interfaceNumber < 17000) -- Forever 1.60.x
+		isMainline = isForever or interfaceNumber >= 100000
 	end
 
-	local isExplicitClassic = classicProjectID ~= nil and projectID == classicProjectID
 	local isClassic = not isMainline and (isExplicitClassic or interfaceNumber < 100000)
 	return {
 		isMainline = isMainline,
 		isClassic = isClassic,
-		isForever = isMainline and interfaceNumber >= 16000 and interfaceNumber < 17000,
+		isForever = isForever,
 		isClassicEra = isClassic and interfaceNumber < 20000,
 		isTBCClassic = isClassic and interfaceNumber >= 20000 and interfaceNumber < 30000,
 		isWrathClassic = isClassic and interfaceNumber >= 30000 and interfaceNumber < 40000,
@@ -48,7 +52,8 @@ local clientFlavor = BFL.ResolveClientFlavor(
 	tocVersion,
 	WOW_PROJECT_ID,
 	WOW_PROJECT_MAINLINE,
-	WOW_PROJECT_CLASSIC
+	WOW_PROJECT_CLASSIC,
+	WOW_PROJECT_CAMELOT
 )
 BFL.IsMainline = clientFlavor.isMainline
 BFL.IsClassic = clientFlavor.isClassic

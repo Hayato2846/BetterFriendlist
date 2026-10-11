@@ -3004,7 +3004,7 @@ function ElvUISkin:SkinClassicMainFrameShell(E, S, frame)
 	shell:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
 	shell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
 	if shell.SetFrameStrata and frame.GetFrameStrata then
-		shell:SetFrameStrata(frame:GetFrameStrata())
+		shell:SetFrameStrata(BFL.GetSafeFrameStrata(frame))
 	end
 	if shell.SetFrameLevel and frame.GetFrameLevel then
 		shell:SetFrameLevel(math.max((frame:GetFrameLevel() or 1), 0))

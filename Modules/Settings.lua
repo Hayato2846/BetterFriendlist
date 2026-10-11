@@ -7763,7 +7763,7 @@ function Settings:EnsureFilterSortEditorPanel()
 		parentFrame = customHost.editorParent or customHost.tab or anchorFrame
 		frame.BFL_SettingsCenterBuilderSkin = customHost.settingsCenter == true
 		frame:SetParent(parentFrame)
-		frame:SetFrameStrata((anchorFrame.GetFrameStrata and anchorFrame:GetFrameStrata()) or "HIGH")
+		frame:SetFrameStrata(BFL.GetSafeFrameStrata(anchorFrame))
 		frame:SetFrameLevel(((anchorFrame.GetFrameLevel and anchorFrame:GetFrameLevel()) or 1) + 4)
 		frame:ClearAllPoints()
 		frame:SetPoint("LEFT", parentFrame, "LEFT", 14, 0)
@@ -7833,7 +7833,7 @@ function Settings:EnsureFilterSortEditorPanel()
 
 	frame.BFL_SettingsCenterBuilderSkin = nil
 	frame:SetParent(anchorFrame)
-	frame:SetFrameStrata(anchorFrame:GetFrameStrata() or "HIGH")
+	frame:SetFrameStrata(BFL.GetSafeFrameStrata(anchorFrame))
 	frame:SetFrameLevel((anchorFrame:GetFrameLevel() or 1) + 10)
 	frame:ClearAllPoints()
 	if customHost then

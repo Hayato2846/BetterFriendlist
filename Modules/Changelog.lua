@@ -63,6 +63,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+BetterFriendlist 2.9.2 adds a WoW Forever filter and fixes greyed-out group invites, along with a few smaller fixes.
+
+### All WoW Versions
+
+#### Fixed
+- **Group Invites** - Fixed cases where Invite was greyed out in a Battle.net friend's right-click menu, including friends on other realms in WoW Forever. The character picker also handles friends with multiple WoW accounts.
+- **Remove Friend** - The confirmation now uses the correct wording for WoW, BattleTag, and Real ID friends.
+- **Changelog** - The current version's draft notes now appear in both in-game changelog views.
+- **Invite Tooltip** - Offline friends now show a red offline message. Fixed incorrect faction warnings and added available group activity details when requesting to join.
+- **Context Menu** - Empty Interact headings are no longer shown when no actions are available, including offline Title friends.
+- **Friend List** - Fixed missing updates when reopening the friends list after changes while it was closed.
+- **Who Class Filters** - Fixed missing class options on some clients, including Druids on Classic.
+- **Settings and Skins** - Fixed errors that could occur when Settings, Who, or an addon skin accessed UI details restricted by Blizzard.
+
+### Retail Midnight & WoW Forever
+
+#### Fixed
+- **Battle.net Blocking** - Block actions are now hidden for Title friends or when the required account details are missing. Friend requests are checked again before an account is blocked.
+- **Title Friend Colors** - Online Title friends also use class colors in name-only layouts when enabled. Offline names stay gray.
+
+### WoW Forever
+
+#### Added
+- **WoW Forever Filter** - A new quick filter shows friends playing WoW Forever in the friends list and Data Broker.
+
+#### Fixed
+- **Character Names** - Friends' character menus, Copy Character Name, and Quick Join no longer add unnecessary realm names. Forever surnames are kept in player links.
+- **Add Friend** - BFL now opens Blizzard's Add Friend window in Forever, including its handling of Title friend requests.
+- **Title Friend Names** - Title friends show the character name once in the default layout. Custom names are still shown if they differ from the character name.
+- **Friend List** - Fixed an empty friend list after login or reloading when a title friend appeared first.
+
+---
+
 ## [2.9.1]        - 2026-09-27
 
 BetterFriendlist 2.9.1 adds new Guild tools, updates the Settings Center, and fixes several Who and Group Finder problems.
@@ -249,16 +284,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 
 ---
 
-## [2.8.1]        - 2026-08-14
-
-### Fixed
-- **Raid Info** - The Raid Info button is visible again in Dark and Custom themes, and its window now opens at the correct distance in both Modern and Legacy layouts.
-- **Compact Mode** - Friend cards once again fit their visible content without leaving unnecessary empty space.
-
----
-
----
-
 *Older versions archived. Full history available in git.*
 ]]
 
@@ -326,7 +351,7 @@ local function FormatInline(text)
 	return text
 end
 
-local function ParseChangelog(text, includeUndated)
+local function ParseChangelog(text, currentVersion)
 	local entries = {}
 	local currentEntry = nil
 
@@ -341,10 +366,12 @@ local function ParseChangelog(text, includeUndated)
 			date = ""
 		end
 
-		if version and (date ~= "" or includeUndated == true) then -- Maintain legacy behavior unless callers opt into draft/undated entries.
-			-- Actually, let's stick closer to original logic but allow extra spaces
-			-- Trim date just in case
+		if version then
 			date = date:match("^%s*(.-)%s*$")
+			local isDraft = date == ""
+			if (version == "DRAFT" or version == "Unreleased") and currentVersion then
+				version = currentVersion
+			end
 			if date == "" then
 				date = L.SETTINGS_CENTER_CHANGELOG_DRAFT or "Draft"
 			end
@@ -355,6 +382,7 @@ local function ParseChangelog(text, includeUndated)
 			currentEntry = {
 				version = version,
 				date = date,
+				isDraft = isDraft,
 				blocks = {},
 			}
 		elseif currentEntry then
@@ -506,9 +534,15 @@ function Changelog:GetSupportLinks()
 	return links
 end
 
+function Changelog:GetEntries()
+	-- Both views show the same draft/release list. Drafts retain their badge and
+	-- use the installed version rather than hiding behind a literal DRAFT title.
+	return ParseChangelog(CHANGELOG_TEXT, BFL.VERSION)
+end
+
 function Changelog:GetSettingsCenterEntries(limit)
 	local entries = {}
-	for index, entryData in ipairs(ParseChangelog(CHANGELOG_TEXT, true)) do
+	for index, entryData in ipairs(self:GetEntries()) do
 		if limit and #entries >= limit then
 			break
 		end
@@ -1057,7 +1091,7 @@ function Changelog:CreateChangelogWindow()
 	content:SetSize(560, 1000) -- Height will be adjusted
 	scrollFrame:SetScrollChild(content)
 
-	local entries = ParseChangelog(CHANGELOG_TEXT)
+	local entries = self:GetEntries()
 	local entryFrames = {}
 	local previousFrame = nil
 

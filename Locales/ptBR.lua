@@ -564,6 +564,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.GROUPS_DIALOG_TITLE = "Grupos para %s"
 	L.MENU_COPY_CHARACTER_NAME = "Copiar nome do personagem"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copiar nome do personagem"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "Remover %s da sua lista de amigos?"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -1022,6 +1023,7 @@ BFL:RegisterLocale("ptBR", function()
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Sem AFK"
 	L.FILTER_RETAIL = "Retail"
+	L.FILTER_FOREVER = "Apenas WoW Forever"
 	L.FILTER_INGAME = "Em um jogo"
 	L.FILTER_IN_QUEUE = "Na fila"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "Disponível para fila"

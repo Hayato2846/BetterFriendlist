@@ -566,6 +566,7 @@ BFL:RegisterLocale("esMX", function()
 	L.MENU_DEFAULT_FOCUS = "Predeterminado (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Grupos para %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copiar nombre del personaje"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "¿Quitar a %s de tu lista de amigos?"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -1030,6 +1031,7 @@ BFL:RegisterLocale("esMX", function()
 	L.FILTER_BNET = "Solo Battle.net"
 	L.FILTER_HIDE_AFK = "Ocultar AFK/ND"
 	L.FILTER_RETAIL = "Solo Retail"
+	L.FILTER_FOREVER = "Solo WoW Forever"
 	L.FILTER_INGAME = "En un juego"
 	L.FILTER_IN_QUEUE = "En cola"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "Disponible para cola"

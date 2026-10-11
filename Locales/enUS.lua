@@ -576,6 +576,7 @@ local function LoadEnUS()
 	L.MENU_DEFAULT_FOCUS = "Default (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Groups for %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Copy Character Name"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "Remove %s from your friends list?"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -1063,6 +1064,7 @@ local function LoadEnUS()
 	L.FILTER_BNET = "Battle.net Only"
 	L.FILTER_HIDE_AFK = "Hide AFK/DND"
 	L.FILTER_RETAIL = "Retail Only"
+	L.FILTER_FOREVER = "WoW Forever Only"
 	L.FILTER_INGAME = "In A Game"
 	L.FILTER_IN_QUEUE = "In Queue"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "Available for Queue"

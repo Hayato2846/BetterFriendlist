@@ -360,11 +360,14 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 	local hasName = name ~= nil
 	if not hasName then
 		name = ""
-	elseif normalizedRealmName and normalizedRealmName ~= "" then
-		name = FULL_PLAYER_NAME:format(name, normalizedRealmName)
+	else
+		name = BFL.FormatPlayerDisplayName(name, normalizedRealmName) or name
 	end
 
 	local linkName = name
+	if hasName and BFL.AreRegionalUniqueNamesEnabled() then
+		linkName = BFL.ReplaceSurnameSeparatorWithLinkSeparator(name) or name
+	end
 	local playerLink
 
 	if hasName then

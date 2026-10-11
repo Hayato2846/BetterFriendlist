@@ -2126,11 +2126,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							if accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.characterName then
 								local charName = accountInfo.gameAccountInfo.characterName
 								local realmName = accountInfo.gameAccountInfo.realmName
-								if realmName and realmName ~= "" then
-									copyNameText = charName .. "-" .. realmName
-								else
-									copyNameText = charName
-								end
+								copyNameText = BFL.GetCopyCharacterName(charName, realmName)
 							end
 
 							-- 2. Try BattleTag (if Valid and Character Name failed, or as backup)
@@ -2154,14 +2150,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					-- 4. Fallback to contextData.name (Generic)
 					if not copyNameText or copyNameText == "" then
 						if not BFL:IsSecret(contextData.name) and contextData.name then
-							copyNameText = contextData.name
-							if not string.find(copyNameText, "-") then
-								if not BFL:IsSecret(contextData.server) and contextData.server and contextData.server ~= "" then
-									copyNameText = copyNameText .. "-" .. contextData.server
-								elseif not BFL:IsSecret(contextData.realm) and contextData.realm and contextData.realm ~= "" then
-									copyNameText = copyNameText .. "-" .. contextData.realm
-								end
+							local realmName
+							if not BFL:IsSecret(contextData.server) and contextData.server and contextData.server ~= "" then
+								realmName = contextData.server
+							elseif not BFL:IsSecret(contextData.realm) then
+								realmName = contextData.realm
 							end
+							copyNameText = BFL.GetCopyCharacterName(contextData.name, realmName, contextData.surname)
 						end
 
 						-- Special handling for Who List
@@ -2169,7 +2164,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							local index = contextData.whoIndex or contextData.index
 							local info = C_FriendList.GetWhoInfo(index)
 							if info and info.fullName then
-								copyNameText = info.fullName
+								copyNameText = BFL.GetCopyCharacterName(info.fullName)
 							end
 						end
 					end
@@ -2351,12 +2346,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 									local displayText = entry.text or "Unknown"
 									local charName = entry.raw and entry.raw.characterName or "Unknown"
 									local realmName = entry.raw and entry.raw.realmName or ""
-									local copyText
-									if realmName ~= "" then
-										copyText = charName .. "-" .. realmName
-									else
-										copyText = charName
-									end
+									local copyText = BFL.GetCopyCharacterName(charName, realmName)
 									elementDescription:CreateButton(displayText, BuildCopyHandler(copyText))
 								end
 							else
@@ -2392,12 +2382,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								local displayText = entry.text or "Unknown"
 								local charName = entry.raw and entry.raw.characterName or "Unknown"
 								local realmName = entry.raw and entry.raw.realmName or ""
-								local copyText
-								if realmName ~= "" then
-									copyText = charName .. "-" .. realmName
-								else
-									copyText = charName
-								end
+								local copyText = BFL.GetCopyCharacterName(charName, realmName)
 								submenu:CreateButton(displayText, BuildCopyHandler(copyText))
 							end
 						end
@@ -3701,15 +3686,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_ShowRemoveWoWFriendPrompt(fullName)
-				local prompt = fullName
-				if REMOVE_FRIEND_CONFIRMATION then
-					local ok, text = pcall(string.format, REMOVE_FRIEND_CONFIRMATION, fullName)
-					if ok then
-						prompt = text
-					end
-				elseif CONFIRM_REMOVE_WOW_FRIEND then
-					prompt = CONFIRM_REMOVE_WOW_FRIEND
-				end
+				local ok, text = pcall(string.format, L.DIALOG_REMOVE_FRIEND_CONFIRMATION, fullName)
+				local prompt = ok and text or fullName
 
 				StaticPopupDialogs["BFL_CONFIRM_REMOVE_WOW_FRIEND"] = {
 					text = "%s",
@@ -3738,15 +3716,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					createButton(rootDescription, BNET_REMOVE_FRIEND or REMOVE_FRIEND or "Remove Friend", function()
 						local displayName = BFL_GetContextDisplayName(contextData, true)
-						local confirmation = REMOVE_FRIEND_CONFIRMATION or BATTLETAG_REMOVE_FRIEND_CONFIRMATION
-						local prompt = displayName
-						if confirmation then
-							local ok, text = pcall(string.format, confirmation, displayName)
-							if ok then
-								prompt = text
-							end
+						local accountInfo = BFL_GetBNetAccountInfo(contextData)
+						if C_BattleNet and C_BattleNet.GetAccountInfoByID then
+							local ok, info = pcall(C_BattleNet.GetAccountInfoByID, contextData.bnetIDAccount)
+							accountInfo = ok and info or nil
 						end
-						StaticPopup_Show("CONFIRM_REMOVE_BN_FRIEND", prompt, nil, contextData.bnetIDAccount)
+						local prompt = BFL.GetBNetRemoveFriendPrompt(accountInfo, displayName)
+						if prompt then
+							StaticPopup_Show("CONFIRM_REMOVE_BN_FRIEND", prompt, nil, contextData.bnetIDAccount)
+						end
 					end, { destructive = true })
 					return
 				end
@@ -3761,9 +3739,20 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 			local function BFL_AddIgnoreOrBlockButton(rootDescription, contextData, isBNet)
 				if isBNet then
+					local function CanBlockAccount()
+						local accountInfo
+						if C_BattleNet and C_BattleNet.GetAccountInfoByID then
+							local ok, info = pcall(C_BattleNet.GetAccountInfoByID, contextData.bnetIDAccount)
+							accountInfo = ok and info or nil
+						else
+							accountInfo = BFL_GetBNetAccountInfo(contextData)
+						end
+						return BFL.CanBlockBNetAccount(accountInfo)
+					end
 					if not contextData.bnetIDAccount
 						or not BFL.CanSetBNetBlocked
 						or not BFL.CanSetBNetBlocked()
+						or not CanBlockAccount()
 					then
 						return
 					end
@@ -3771,6 +3760,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						return root:CreateButton(text, callback)
 					end
 					createButton(rootDescription, BN_BLOCK_FRIEND or BLOCK_COMMUNICATION or IGNORE or "Block", function()
+						if not CanBlockAccount() then return end
 						local displayName = BFL_GetContextDisplayName(contextData, true)
 						local prompt = displayName
 						if BLOCK_FRIEND_CONFIRMATION then
@@ -3784,7 +3774,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							button1 = ACCEPT,
 							button2 = CANCEL,
 							OnAccept = function()
-								BFL.SetBNetBlocked(contextData.bnetIDAccount, true)
+								if CanBlockAccount() then
+									BFL.SetBNetBlocked(contextData.bnetIDAccount, true)
+								end
 							end,
 							timeout = 0,
 							whileDead = 1,
@@ -3961,8 +3953,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						BFL_AddViewBNetFriendsButton(rootDescription, contextData)
 					end
 
-					rootDescription:CreateDivider()
-					rootDescription:CreateTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_INTERACT or "Interact")
+					rootDescription:QueueDivider(true)
+					rootDescription:QueueTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_INTERACT or "Interact")
 
 					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
 
@@ -3993,8 +3985,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddViewHousesButton(rootDescription, contextData, isBNet)
 
-					rootDescription:CreateDivider()
-					rootDescription:CreateTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_OTHER or "Other")
+					rootDescription:QueueDivider(true)
+					rootDescription:QueueTitle(UNIT_FRAME_DROPDOWN_SUBSECTION_TITLE_OTHER or "Other")
 
 					BFL_AddDeleteCommunityMessageButton(rootDescription, contextData)
 					if isBNet and isFriendMenu then
@@ -4800,7 +4792,7 @@ BFL.ShowMultiAccountInvitePicker = ShowMultiAccountInvitePicker
 -- TravelPass Button Handlers
 function BetterFriendsList_TravelPassButton_OnClick(self)
 	local friendData = self.friendData
-	if not friendData then
+	if not friendData or friendData.connected == false then
 		return
 	end
 	if friendData.type == "wow" then
@@ -4836,10 +4828,11 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 	-- USE BLIZZARD LOGIC (Retail)
 	-- Fixes "Join" button not working (Request vs Invite) and Cross-Faction logic
-	if FriendsFrame_InviteOrRequestToJoin and FriendsFrame_SetupTravelPassDropdown then
+	if FriendsFrame_InviteOrRequestToJoin then
 		-- Check Valid Game Accounts (Ported from FriendsFrame.lua)
 		local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
 		local numValidGameAccounts = 0
+		local validGameAccounts = {}
 		local lastGameAccountID, lastGameAccountGUID
 		local playerFactionGroup = UnitFactionGroup("player")
 		local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
@@ -4847,30 +4840,20 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 		for i = 1, numGameAccounts do
 			local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
-			local isValid = true
-
-			-- Basic checks
-			if gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then
-				isValid = false
-			end
-			if gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
-				isValid = false
-			end
-			if gameAccountInfo.realmID == 0 then
-				isValid = false
-			end
-			if isValid and BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
-				isValid = false
-			end
-			if not gameAccountInfo.isInCurrentRegion then
-				isValid = false
-			end
-			if not gameAccountInfo.playerGuid then
-				isValid = false
-			end
+			-- Account indices can disappear between the row update and this click.
+			local isValid = gameAccountInfo
+				and gameAccountInfo.isOnline ~= false
+				and gameAccountInfo.clientProgram == BNET_CLIENT_WOW
+				and gameAccountInfo.wowProjectID == WOW_PROJECT_ID
+				and gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0
+				and not BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID)
+				and gameAccountInfo.isInCurrentRegion
+				and gameAccountInfo.playerGuid and gameAccountInfo.gameAccountID
 
 			-- Cross-faction checks
-			if isValid and gameAccountInfo.factionName ~= playerFactionGroup then
+			if isValid and gameAccountInfo.factionName and playerFactionGroup
+				and gameAccountInfo.factionName ~= playerFactionGroup
+			then
 				if C_QuestSession and C_QuestSession.Exists() then
 					isValid = false
 				elseif
@@ -4888,6 +4871,8 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			end
 
 			if isValid then
+				gameAccountInfo.bflIsInvitable = true
+				validGameAccounts[#validGameAccounts + 1] = gameAccountInfo
 				numValidGameAccounts = numValidGameAccounts + 1
 				lastGameAccountID = gameAccountInfo.gameAccountID
 				lastGameAccountGUID = gameAccountInfo.playerGuid
@@ -4897,10 +4882,10 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 		if numValidGameAccounts == 1 then
 			-- Single valid account: Auto-Invite or Request Join
 			FriendsFrame_InviteOrRequestToJoin(lastGameAccountGUID, lastGameAccountID)
-		else
-			-- Multiple valid (or 0 valid): Show Dropdown
-			-- Blizzard's dropdown logic handles the "0 valid" case by showing disabled buttons
-			FriendsFrame_SetupTravelPassDropdown(actualIndex, self)
+		elseif numValidGameAccounts > 1 then
+			-- The native dropdown relies on hidden FriendsFrame faction/realm locals.
+			-- Our existing picker uses the accounts validated against live data above.
+			ShowMultiAccountInvitePicker(validGameAccounts, self)
 		end
 		return
 	end
@@ -4989,6 +4974,19 @@ local function AddSocialQueueGroupMembersToTooltip(tooltip, guid)
 		return
 	end
 
+	-- New SocialUI tooltips include queued activities and available roles.
+	-- Reuse Blizzard's builder on our own tooltip; its LFG listing already
+	-- contains group members, so do not repeat them below.
+	local queues = C_SocialQueue.GetGroupQueues and C_SocialQueue.GetGroupQueues(group)
+	if queues and #queues > 0 and SocialQueueUtil_SetTooltip then
+		local hasRelationship = SocialQueueUtil_HasRelationshipWithLeader
+			and SocialQueueUtil_HasRelationshipWithLeader(group) or false
+		SocialQueueUtil_SetTooltip(tooltip, nil, queues, true, hasRelationship)
+		if queues[1].queueData and queues[1].queueData.queueType == "lfglist" then
+			return
+		end
+	end
+
 	local members = C_SocialQueue.GetGroupMembers(group)
 	if not members then
 		return
@@ -5034,12 +5032,19 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	end
 
 	BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
+	-- Offline is the reason, even if the API retains an old GUID/game account.
+	-- Modern cards also show this disabled button for offline Title friends.
+	if friendData.connected == false then
+		BFL_Tooltip:SetText(TRAVEL_PASS_INVITE or GROUP_INVITE or INVITE)
+		BFL_Tooltip:AddLine(
+			SOCIAL_UI_FRIENDS_LIST_PARTY_BUTTON_OFFLINE_TOOLTIP or PLAYER_OFFLINE or L.RECENT_ALLIES_PLAYER_OFFLINE,
+			RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true
+		)
+		BFL_Tooltip:Show()
+		return
+	end
 	if friendData.type == "wow" then
-		if friendData.connected then
-			BFL_Tooltip:SetText(GROUP_INVITE or TRAVEL_PASS_INVITE or "Invite to Group")
-		else
-			BFL_Tooltip:SetText(FRIEND_OFFLINE or PLAYER_OFFLINE or "Offline", 0.6, 0.6, 0.6)
-		end
+		BFL_Tooltip:SetText(GROUP_INVITE or TRAVEL_PASS_INVITE or INVITE)
 		BFL_Tooltip:Show()
 		return
 	end
@@ -5063,20 +5068,20 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	end
 
 	if not actualIndex then
-		BFL_Tooltip:SetText("Error", RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b)
+		BFL_Tooltip:SetText(TRAVEL_PASS_INVITE or GROUP_INVITE or INVITE)
+		BFL_Tooltip:AddLine(
+			GetBFLInviteRestrictionText(BFL_INVITE_RESTRICTION_INFO),
+			RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true
+		)
 		BFL_Tooltip:Show()
 		return
 	end
 
-	-- USE BLIZZARD LOGIC (Retail 11.0+)
-	if
-		FriendsFrame_GetDisplayedInviteTypeAndGuid
-		and FriendsFrame_GetInviteRestriction
-		and FriendsFrame_GetInviteRestrictionText
-	then
-		local inviteType, guid, factionName = FriendsFrame_GetDisplayedInviteTypeAndGuid(actualIndex)
-		local restriction = FriendsFrame_GetInviteRestriction(actualIndex)
-		local restrictionText = FriendsFrame_GetInviteRestrictionText(restriction)
+	-- Use the native helpers that read current player data, not FriendsFrame's
+	-- OnShow-initialized locals (that frame normally stays hidden with BFL).
+	local inviteInfo, restrictionText = BFL.GetBNetInviteTooltipInfo(actualIndex)
+	if inviteInfo then
+		local inviteType, guid, factionName = inviteInfo.inviteType, inviteInfo.playerGUID, inviteInfo.factionName
 		local hasRestriction = restrictionText and restrictionText ~= ""
 
 		if inviteType and inviteTypeToButtonText[inviteType] then
@@ -5087,9 +5092,12 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 				HIGHLIGHT_FONT_COLOR.b
 			)
 
-			if inviteTypeIsCrossFaction[inviteType] and factionName then
+			if inviteTypeIsCrossFaction[inviteType] and factionName
+				and C_PartyInfo and C_PartyInfo.CanFormCrossFactionParties
+				and C_PartyInfo.CanFormCrossFactionParties()
+			then
 				local factionLabel = FACTION_LABELS_FROM_STRING[factionName]
-					or (factionName == "Horde" and FACTION_HORDE or FACTION_ALLIANCE)
+					or FACTION_NEUTRAL
 				if CROSS_FACTION_INVITE_TOOLTIP then
 					BFL_Tooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)
 				end
@@ -5125,11 +5133,27 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	local isCrossFaction = false
 	local factionName = nil
 	local displayedGuid = nil
+	local function GetFactionRestriction(gameAccountInfo)
+		if not gameAccountInfo.factionName or not playerFactionGroup
+			or gameAccountInfo.factionName == playerFactionGroup
+		then
+			return nil
+		end
+		if not BFL.IsClassic and C_QuestSession and C_QuestSession.Exists() then
+			return BFL_INVITE_RESTRICTION_QUEST_SESSION
+		end
+		if BFL.IsClassic or not C_PartyInfo or not C_PartyInfo.CanFormCrossFactionParties
+			or not C_PartyInfo.CanFormCrossFactionParties()
+		then
+			return BFL_INVITE_RESTRICTION_FACTION
+		end
+	end
 
 	for i = 1, numGameAccounts do
 		local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
 		if gameAccountInfo then
 			if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
+				local factionRestriction = GetFactionRestriction(gameAccountInfo)
 				if gameAccountInfo.playerGuid and not displayedGuid then
 					displayedGuid = gameAccountInfo.playerGuid
 				end
@@ -5161,34 +5185,44 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 						if not restriction then
 							restriction = BFL_INVITE_RESTRICTION_WOW_PROJECT_ID
 						end
+					elseif factionRestriction then
+						restriction = factionRestriction
 					elseif gameAccountInfo.realmID == 0 then
 						-- No realm info
 						if not restriction then
 							restriction = BFL_INVITE_RESTRICTION_INFO
 						end
-					elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+					elseif BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then
 						restriction = BFL_INVITE_RESTRICTION_REALM
 					elseif not gameAccountInfo.isInCurrentRegion then
 						-- Different region
 						restriction = BFL_INVITE_RESTRICTION_REGION
+					elseif not BFL.IsClassic and not CanInviteByGameMode(gameAccountInfo) then
+						restriction = BFL_INVITE_RESTRICTION_GAME_MODE
 					else
 						-- At least one valid WoW account that can be invited
 						restriction = BFL_INVITE_RESTRICTION_NONE
+						displayedGuid = gameAccountInfo.playerGuid or displayedGuid
 						break
 					end
+				elseif factionRestriction then
+					restriction = factionRestriction
 				elseif gameAccountInfo.realmID == 0 then
 					-- No realm info
 					if not restriction then
 						restriction = BFL_INVITE_RESTRICTION_INFO
 					end
-				elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+				elseif BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then
 					restriction = BFL_INVITE_RESTRICTION_REALM
 				elseif not gameAccountInfo.isInCurrentRegion then
 					-- Different region
 					restriction = BFL_INVITE_RESTRICTION_REGION
+				elseif not BFL.IsClassic and not CanInviteByGameMode(gameAccountInfo) then
+					restriction = BFL_INVITE_RESTRICTION_GAME_MODE
 				elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
 					-- Valid WoW account (no project ID check needed)
 					restriction = BFL_INVITE_RESTRICTION_NONE
+					displayedGuid = gameAccountInfo.playerGuid or displayedGuid
 					break
 				end
 			else
@@ -5205,10 +5239,6 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		restriction = BFL_INVITE_RESTRICTION_NO_GAME_ACCOUNTS
 	end
 
-	if FriendsFrame_GetPlayerGUIDFromIndex then
-		displayedGuid = FriendsFrame_GetPlayerGUIDFromIndex(actualIndex) or displayedGuid
-	end
-
 	local displayedInviteType = displayedGuid and GetDisplayedInviteType and GetDisplayedInviteType(displayedGuid) or nil
 	if displayedInviteType and isCrossFaction then
 		displayedInviteType = displayedInviteType .. "_CROSS_FACTION"
@@ -5223,7 +5253,10 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	BFL_Tooltip:SetText(tooltipText, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
 
 	-- Add cross-faction line
-	if isCrossFaction and factionName then
+	if isCrossFaction and factionName
+		and C_PartyInfo and C_PartyInfo.CanFormCrossFactionParties
+		and C_PartyInfo.CanFormCrossFactionParties()
+	then
 		local factionLabel = factionName == "Horde" and (FACTION_HORDE or "Horde") or (FACTION_ALLIANCE or "Alliance")
 		if CROSS_FACTION_INVITE_TOOLTIP then
 			BFL_Tooltip:AddLine(CROSS_FACTION_INVITE_TOOLTIP:format(factionLabel), nil, nil, nil, true)

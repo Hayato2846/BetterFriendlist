@@ -584,6 +584,7 @@ BFL:RegisterLocale("deDE", function()
 	L.MENU_DEFAULT_FOCUS = "Standard (Blizzard)"
 	L.GROUPS_DIALOG_TITLE = "Gruppen für %s"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Charakternamen kopieren"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "%s aus deiner Freundesliste entfernen?"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -995,6 +996,7 @@ BFL:RegisterLocale("deDE", function()
 	L.FILTER_OFFLINE = "Nur Offline"
 	L.FILTER_ONLINE = "Nur Online"
 	L.FILTER_RETAIL = "Nur Retail"
+	L.FILTER_FOREVER = "Nur WoW Forever"
 	L.FILTER_INGAME = "Im Spiel"
 	L.FILTER_IN_QUEUE = "In Warteschlange"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "Für Warteschlange verfügbar"

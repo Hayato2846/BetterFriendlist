@@ -513,6 +513,7 @@ BFL:RegisterLocale("koKR", function()
 	L.GROUPS_DIALOG_TITLE = "%s님의 그룹"
 	L.MENU_COPY_CHARACTER_NAME = "캐릭터 이름 복사"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "캐릭터 이름 복사"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "%s 님을 친구 목록에서 삭제하시겠습니까?"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -994,6 +995,7 @@ BFL:RegisterLocale("koKR", function()
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "No AFK"
 	L.FILTER_RETAIL = "Retail"
+	L.FILTER_FOREVER = "WoW Forever만"
 	L.FILTER_INGAME = "게임 중"
 	L.FILTER_IN_QUEUE = "대기열 참가 중"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "대기열 참가 가능"

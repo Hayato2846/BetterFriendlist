@@ -601,6 +601,14 @@ local function IsPreviewFriendOnline(friend, treatMobileAsOffline)
 	if not friend then
 		return false
 	end
+	if BetterFriendlistDB and BetterFriendlistDB.quickFilter == "forever" then
+		local registry = GetFilterSortRegistry()
+		if registry and registry.EvaluateQuickFilter and registry.NormalizeQuickFilterId
+			and registry:NormalizeQuickFilterId("forever") == "forever"
+		then
+			return registry:EvaluateQuickFilter("forever", friend)
+		end
+	end
 
 	local client = GetPreviewFriendClient(friend)
 	if treatMobileAsOffline and client == "BSAp" then
@@ -727,6 +735,25 @@ local function BuildFriendCountsCacheSignature(currentFilter)
 	}, "|")
 end
 
+local function GetBNetFilterGameAccounts(friendIndex)
+	local countAPI = (C_BattleNet and C_BattleNet.GetFriendNumGameAccounts) or BNGetNumFriendGameAccounts
+	if type(countAPI) ~= "function" or not BFL.GetBNetFriendGameAccountInfo then
+		return nil
+	end
+	local ok, count = pcall(countAPI, friendIndex)
+	if not ok or (BFL.IsSecret and BFL:IsSecret(count))
+		or type(count) ~= "number" or count < 0 or count % 1 ~= 0
+	then
+		return nil
+	end
+	local accounts = {}
+	for accountIndex = 1, count do
+		local infoOK, info = pcall(BFL.GetBNetFriendGameAccountInfo, friendIndex, accountIndex)
+		if infoOK and type(info) == "table" then accounts[#accounts + 1] = info end
+	end
+	return accounts
+end
+
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 	local Registry = GetFilterSortRegistry()
@@ -747,7 +774,7 @@ local function GetFilteredFriendCounts()
 	end
 
 	local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
-	local useRegistryFilter = resolvedFilter and resolvedFilter.isCustom
+	local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or currentFilter == "forever")
 
 	local wowFiltered, wowTotal, bnetFiltered, bnetTotal
 	if previewData and previewData.friends then
@@ -855,6 +882,9 @@ local function GetFilteredFriendCounts()
 							gameName = gameInfo.richPresence,
 							numGameAccounts = accountInfo.numGameAccounts,
 						}
+						if currentFilter == "forever" then
+							friendForRegistry.gameAccounts = GetBNetFilterGameAccounts(i)
+						end
 						passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
 					elseif currentFilter == "offline" then
 						passes = not isOnline
@@ -2166,6 +2196,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 							friend.numGameAccounts = isOnline and 1 or 0
 						end
 
+						if BetterFriendlistDB and BetterFriendlistDB.quickFilter == "forever" and not friend.gameAccounts then
+							friend.gameAccounts = GetBNetFilterGameAccounts(i)
+						end
+
 						ProcessFriend(friend)
 					end
 				end
@@ -2220,7 +2254,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 			currentFilter = Registry:NormalizeQuickFilterId(currentFilter)
 		end
 		local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
-		local useRegistryFilter = resolvedFilter and resolvedFilter.isCustom
+		local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or currentFilter == "forever")
 		if currentFilter ~= "all" then
 			for groupId, groupFriends in pairs(groupedFriends) do
 				local filteredFriends = {}

@@ -15,6 +15,9 @@ $compatAllowedPathPatterns = @(
     '^Utils/ClassicCompat\.lua$',
     '^Modules/TestSuite\.lua$',
     '^Modules/MenuBridge\.lua$',
+    # This standalone test runs Blizzard's native queue helpers in a mocked
+    # environment. tools/ is excluded from deployment and release packages.
+    '^tools/BFL-ContextMenuSectionsSmoke\.lua$',
     '^Libs/LibSettingsDesigner/'
 )
 

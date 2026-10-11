@@ -276,6 +276,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.GROUPS_DIALOG_TITLE = "群組為 %s"
 	L.MENU_COPY_CHARACTER_NAME = "複製角色名稱"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "複製角色名稱"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "要將%s從好友名單中移除嗎？"
 
 	L.TOOLTIP_DROP_TO_ADD = "釋放以新增到分組"
 	L.TOOLTIP_HOLD_SHIFT = "按住 Shift 以保留在其他分組中"
@@ -856,6 +857,7 @@ BFL:RegisterLocale("zhTW", function()
 	L.FILTER_WOW = "WoW"
 	L.FILTER_BNET = "戰網"
 	L.FILTER_RETAIL = "正式版"
+	L.FILTER_FOREVER = "僅 WoW Forever"
 	L.FILTER_INGAME = "遊戲中"
 	L.FILTER_IN_QUEUE = "佇列中"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "可加入佇列"

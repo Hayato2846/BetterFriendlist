@@ -14235,27 +14235,218 @@ function TestSuite:Initialize()
 	self:RegisterBNetFriendInfoNoOpTest()
 	self:RegisterEventCompatibilityTests()
 	self:RegisterForeverCompatibilityTests()
+	self:RegisterForeverSocialCompatibilityTests()
+	self:RegisterForeverQuickFilterTests()
 	self:Register1215CompatibilityTests()
 	self:RegisterLateUITests(); self:RegisterRaidInteractionTest(); self:RegisterPreviewFriendTagsTest(); self:RegisterGuildNewsRefreshTest(); self:RegisterGuildHeaderLayoutTest()
 	BFL:DebugPrint("|cff00ccff[BFL TestSuite]|r Initialized with " .. self:GetTestCount() .. " tests")
 end
 
+function TestSuite:RegisterForeverQuickFilterTests()
+	self:RegisterTest("filter", "Registry_ForeverQuickFilterContracts", {
+		description = "Forever filters online project-18 accounts on every client without changing Retail",
+		action = function(V)
+			local registry = BFL:GetModule("FilterSortRegistry")
+			if not registry then V:Skip("FilterSortRegistry not loaded"); return end
+			local originalDB, originalForever = BetterFriendlistDB, BFL.IsForever
+			local originalProject, originalCamelot, originalIsSecret = WOW_PROJECT_ID, WOW_PROJECT_CAMELOT, BFL.IsSecret
+			local secret = {}
+			local ok, err = pcall(function()
+				BetterFriendlistDB = { enableBetaFeatures = false, quickFilter = "forever" }
+				WOW_PROJECT_CAMELOT = nil -- Retail and Classic do not define this constant.
+				BFL.IsSecret = function(_, value) return rawequal(value, secret) end
+				registry:InvalidateCaches()
+				V:AssertEqual(registry:NormalizeQuickFilterId("forever"), "forever", "The built-in is stable without Beta")
+				local retailIndex, foreverIndex
+				for index, entry in ipairs(registry:GetVisibleQuickFilters()) do
+					if entry.id == "retail" then retailIndex = index end
+					if entry.id == "forever" then foreverIndex = index end
+				end
+				V:Assert(retailIndex and foreverIndex == retailIndex + 1, "Forever appears next to Retail")
+				local function bnet(projectID, client, online)
+					return { type = "bnet", connected = true, gameAccountInfo = {
+						clientProgram = client or "WoW", wowProjectID = projectID, isOnline = online ~= false,
+					} }
+				end
+				V:Assert(registry:EvaluateQuickFilter("forever", bnet(18)), "Project 18 matches without a local Camelot constant")
+				V:Assert(not registry:EvaluateQuickFilter("forever", bnet(1)), "Retail does not match Forever")
+				V:Assert(not registry:EvaluateQuickFilter("retail", bnet(18)), "Forever does not redefine Retail")
+				V:Assert(registry:EvaluateQuickFilter("retail", bnet(1)), "Retail keeps matching its own project")
+				for _, projectID in ipairs({ 2, 5, 11, 14, 19 }) do
+					V:Assert(not registry:EvaluateQuickFilter("forever", bnet(projectID)), "Classic project " .. projectID .. " is not Forever")
+				end
+				V:Assert(not registry:EvaluateQuickFilter("forever", bnet(nil)), "Unknown project IDs fail closed")
+				V:Assert(not registry:EvaluateQuickFilter("forever", bnet(18, "App")), "App-only presence is not Forever")
+				V:Assert(not registry:EvaluateQuickFilter("forever", bnet(18, "WoW", false)), "Offline game accounts do not match")
+				V:Assert(not registry:EvaluateQuickFilter("forever", bnet(secret)), "Secret project IDs are not compared")
+				V:Assert(not registry:EvaluateQuickFilter("forever", bnet(18, secret)), "Secret client identifiers are not compared")
+				local multi = bnet(1)
+				multi.gameAccounts = { multi.gameAccountInfo, bnet(18).gameAccountInfo }
+				V:Assert(registry:EvaluateQuickFilter("forever", multi), "A secondary Forever login matches")
+				V:Assert(registry:EvaluateQuickFilter("retail", multi), "The same contact can match Retail too")
+				local inactive = bnet(1)
+				inactive.gameAccounts = { bnet(18, "WoW", false).gameAccountInfo }
+				V:Assert(not registry:EvaluateQuickFilter("forever", inactive), "Other online projects do not authorize an offline Forever account")
+				WOW_PROJECT_ID, BFL.IsForever = 18, true
+				V:Assert(registry:EvaluateQuickFilter("forever", { type = "wow", connected = true }), "Local online Forever friends match")
+				V:Assert(not registry:EvaluateQuickFilter("forever", { type = "wow", connected = false }), "Local offline friends do not match")
+				for _, projectID in ipairs({ 1, 2, 5, 19 }) do
+					WOW_PROJECT_ID, BFL.IsForever = projectID, false
+					V:Assert(not registry:EvaluateQuickFilter("forever", { type = "wow", connected = true }), "Local project " .. projectID .. " is not Forever")
+				end
+				WOW_PROJECT_ID, BFL.IsForever = 18, true
+				BetterFriendlistDB.enableBetaFeatures = true
+				local copyID = registry:CreateCustomQuickFilter("forever")
+				V:Assert(registry:EvaluateQuickFilter(copyID, bnet(18)), "A copied filter retains the Forever project rule")
+				V:Assert(not registry:EvaluateQuickFilter(copyID, bnet(1)), "A copied filter is not a generic online filter")
+				V:Assert(registry:EvaluateQuickFilter(copyID, { type = "wow", connected = true }), "Copied project rules recognize local WoW friends")
+			end)
+			BetterFriendlistDB, BFL.IsForever = originalDB, originalForever
+			WOW_PROJECT_ID, WOW_PROJECT_CAMELOT, BFL.IsSecret = originalProject, originalCamelot, originalIsSecret
+			registry:InvalidateCaches()
+			if not ok then error(err, 0) end
+		end,
+	})
+end
+
+function TestSuite:RegisterForeverSocialCompatibilityTests()
+	self:RegisterTest("data", "Forever_TitleBlockMetadataContracts", {
+		description = "Title and incomplete modern metadata cannot authorize Battle.net blocking",
+		action = function(V)
+			local originalEnum, originalAPI, originalIsSecret = Enum, C_BattleNet, BFL.IsSecret
+			local secret = {}
+			local info = { inviteID = 42, friendLevel = 2 }
+			local ok, err = pcall(function()
+				Enum = { BattleNetFriendLevel = { Title = 1 } }
+				BFL.IsSecret = function(_, value) return rawequal(value, secret) end
+				C_BattleNet = { GetFriendInviteInfo = function() return info end }
+				V:Assert(not BFL.CanBlockBNetFriendInvite(nil), "Missing modern metadata fails closed")
+				V:Assert(not BFL.CanBlockBNetFriendInvite(secret), "Secret friend levels fail closed")
+				V:Assert(not BFL.CanBlockBNetAccount({ bnetAccountID = 10, friendLevel = 1 }), "Title accounts cannot be blocked")
+				V:Assert(BFL.CanBlockBNetAccount({ bnetAccountID = 10, friendLevel = 2 }), "Normal accounts remain blockable")
+				V:Assert(not BFL.CanBlockBNetAccount({ bnetAccountID = 10 }), "Incomplete modern accounts fail closed")
+				V:Assert(BFL.CanBlockBNetFriendInviteByIndex(1, 42), "Unchanged eligible request remains blockable")
+				V:Assert(not BFL.CanBlockBNetFriendInviteByIndex(secret, 42), "Secret request indices fail closed")
+				V:Assert(not BFL.CanBlockBNetFriendInviteByIndex(1, secret), "Secret expected request IDs fail closed")
+				info.inviteID = 43
+				V:Assert(not BFL.CanBlockBNetFriendInviteByIndex(1, 42), "Recycled request indices cannot block another sender")
+				info.inviteID, info.friendLevel = 42, 1
+				V:Assert(not BFL.CanBlockBNetFriendInviteByIndex(1, 42), "Changed Title metadata is rechecked")
+				info = nil
+				V:Assert(not BFL.CanBlockBNetFriendInviteByIndex(1, 42), "Disappeared requests fail closed")
+				Enum = {}
+				V:Assert(BFL.CanBlockBNetFriendInvite(nil), "Legacy clients retain blocking without friend levels")
+			end)
+			Enum, C_BattleNet, BFL.IsSecret = originalEnum, originalAPI, originalIsSecret
+			if not ok then error(err, 0) end
+		end,
+	})
+	self:RegisterTest("data", "Forever_WhoClassIDEnumeration", {
+		description = "WHO covers sparse Classic class IDs and future API-provided IDs",
+		action = function(V)
+			local originalAPI, originalInfo, originalCount = C_SpecializationInfo, GetClassInfo, GetNumClasses
+			local ok, err = pcall(function()
+				GetNumClasses = function() return 2 end
+				GetClassInfo = function(id)
+					if id == 1 then return "Warrior", "WARRIOR", id end
+					if id == 11 then return "Druid", "DRUID", id end
+					if id == 20 then return "Future class", "FUTURE", id end
+				end
+				C_SpecializationInfo = { GetAllClassIDs = function() return { 20, 11, 1, 11, 0 } end }
+				local ids = BFL.ClassUtils:GetAvailableClassIDs()
+				V:AssertEqual(#ids, 3, "Modern enumeration removes duplicate and invalid IDs")
+				V:AssertEqual(ids[3], 20, "API-provided future IDs are not limited to the fallback range")
+				local who = BFL:GetModule("WhoFrame")
+				local filters = who.GetWhoClassFilters({})
+				V:AssertEqual(filters[3].ID, 20, "WHO uses the authoritative enumeration")
+				C_SpecializationInfo = nil
+				ids = BFL.ClassUtils:GetAvailableClassIDs()
+				V:AssertEqual(#ids, 2, "Classic fallback includes valid class IDs beyond the count")
+				V:AssertEqual(ids[2], 11, "Druid is not dropped by a count-based loop")
+				C_SpecializationInfo = { GetAllClassIDs = function() error("unavailable") end }
+				V:AssertEqual(BFL.ClassUtils:GetAvailableClassIDs()[2], 11, "API errors retain the Classic fallback")
+			end)
+			C_SpecializationInfo, GetClassInfo, GetNumClasses = originalAPI, originalInfo, originalCount
+			if not ok then error(err, 0) end
+		end,
+	})
+	self:RegisterTest("data", "Forever_RegionalDisplayNames", {
+		description = "Regional names keep surnames without appending realm labels",
+		action = function(V)
+			local originalRegional, originalFormat = RegionalUniqueNamesEnabled, FULL_PLAYER_NAME
+			local ok, err = pcall(function()
+				RegionalUniqueNamesEnabled = function() return true end
+				V:AssertEqual(BFL.FormatPlayerDisplayName("Ada-Lovelace", "Realm"), "Ada-Lovelace", "Surname identity remains intact")
+				V:AssertEqual(BFL.FormatPlayerDisplayName("Ada-Lovelace", "Realm", " - "), "Ada-Lovelace", "Account pickers omit redundant realms")
+				RegionalUniqueNamesEnabled = function() return false end
+				FULL_PLAYER_NAME = "%s-%s"
+				V:AssertEqual(BFL.FormatPlayerDisplayName("Ada", "Realm"), "Ada-Realm", "Traditional full-name display is unchanged")
+				V:AssertEqual(BFL.FormatPlayerDisplayName("Ada", "Realm", " - "), "Ada - Realm", "Traditional picker display is unchanged")
+				V:AssertEqual(BFL.FormatPlayerDisplayName("Ada", nil), "Ada", "Missing realms do not produce trailing separators")
+			end)
+			RegionalUniqueNamesEnabled, FULL_PLAYER_NAME = originalRegional, originalFormat
+			if not ok then error(err, 0) end
+		end,
+	})
+	self:RegisterTest("data", "Forever_SecretFrameStrata", {
+		description = "Secret, invalid and inaccessible frame strata use a safe addon-owned fallback",
+		action = function(V)
+			local originalIsSecret = BFL.IsSecret
+			local secret = setmetatable({}, { __tostring = function() error("secret inspected") end })
+			local ok, err = pcall(function()
+				BFL.IsSecret = function(_, value) return rawequal(value, secret) end
+				V:AssertEqual(BFL.GetSafeFrameStrata({ GetFrameStrata = function() return "DIALOG" end }), "DIALOG", "Public strata retain the source layer")
+				V:AssertEqual(BFL.GetSafeFrameStrata({ GetFrameStrata = function() return secret end }), "HIGH", "Secret strata are not propagated")
+				V:AssertEqual(BFL.GetSafeFrameStrata({ GetFrameStrata = function() error("restricted") end }, "DIALOG"), "DIALOG", "Getter errors use the chosen fallback")
+				V:AssertEqual(BFL.GetSafeFrameStrata({ GetFrameStrata = function() return "invalid" end }), "HIGH", "Unknown strata cannot reach SetFrameStrata")
+				V:AssertEqual(BFL.GetSafeFrameStrata(nil), "HIGH", "Absent frames fail softly")
+				V:AssertEqual(BFL.GetSafeFrameStrata(nil, secret), "HIGH", "The fallback itself must not be secret")
+			end)
+			BFL.IsSecret = originalIsSecret
+			if not ok then error(err, 0) end
+		end,
+	})
+end
+
 function TestSuite:RegisterForeverCompatibilityTests()
 	self:RegisterTest("data", "Forever_ClientFamilyMatrix", {
 		description = "Forever remains Mainline despite its 1.60 interface number while Classic families keep their existing routing",
-			action = function(V)
-			local forever = BFL.ResolveClientFlavor(16001, 1, 1, 2)
+		action = function(V)
+			local forever = BFL.ResolveClientFlavor(16001, 18, 1, 2, 18)
 			V:Assert(forever.isMainline and forever.isForever and not forever.isClassic, "Forever project identity resolves to Mainline")
+			local legacyForever = BFL.ResolveClientFlavor(16001, 1, 1, 2)
+			V:Assert(legacyForever.isMainline and legacyForever.isForever, "Pre-Camelot Forever builds retain Mainline routing")
+			local missingCamelotConstant = BFL.ResolveClientFlavor(16001, 18, 1, 2)
+			V:Assert(missingCamelotConstant.isForever and not missingCamelotConstant.isClassic, "The 1.60 fallback works without the Camelot constant")
 			local fallbackForever = BFL.ResolveClientFlavor(16001, nil, nil, nil)
 			V:Assert(fallbackForever.isMainline and fallbackForever.isForever and not fallbackForever.isClassic, "Forever fallback never resolves as Classic")
 			local midnight = BFL.ResolveClientFlavor(120105, 1, 1, 2)
 			V:Assert(midnight.isMainline and midnight.isMidnight and not midnight.isForever, "Midnight Standard resolves as Mainline")
 			local era = BFL.ResolveClientFlavor(11509, 2, 1, 2)
 			V:Assert(era.isClassic and era.isClassicEra and not era.isMainline, "Classic Era remains Classic")
-			local anniversary = BFL.ResolveClientFlavor(20506, 2, 1, 2)
+			local anniversary = BFL.ResolveClientFlavor(20506, 5, 1, 2)
 			V:Assert(anniversary.isClassic and anniversary.isTBCClassic, "Anniversary remains in the Classic 2.x family")
-			local mists = BFL.ResolveClientFlavor(50504, 2, 1, 2)
+			local mists = BFL.ResolveClientFlavor(50504, 19, 1, 2)
 			V:Assert(mists.isClassic and mists.isMoPClassic, "Mists Classic remains Classic")
+		end,
+	})
+
+	self:RegisterTest("data", "Forever_BNetInviteRealmGate", {
+		description = "Forever uses Mainline realm rules while all actual Classic clients retain their native realm gate",
+		action = function(V)
+			local originalIsClassic = BFL.IsClassic
+			local ok, err = pcall(function()
+				BFL.IsClassic = false
+				V:Assert(not BFL.IsBNetInviteRealmRestricted({ wowProjectID = 18, realmID = 200 }, 100), "Forever accepts another realm")
+				V:Assert(not BFL.IsBNetInviteRealmRestricted({ wowProjectID = 1, realmID = 200 }, 100), "Retail accepts another realm")
+				BFL.IsClassic = true
+				for _, projectID in ipairs({ 2, 5, 11, 14, 19 }) do
+					V:Assert(BFL.IsBNetInviteRealmRestricted({ wowProjectID = projectID, realmID = 200 }, 100), "Classic project " .. projectID .. " blocks another realm")
+					V:Assert(not BFL.IsBNetInviteRealmRestricted({ wowProjectID = projectID, realmID = 100 }, 100), "Classic project " .. projectID .. " accepts the same realm")
+				end
+			end)
+			BFL.IsClassic = originalIsClassic
+			if not ok then error(err) end
 		end,
 	})
 
@@ -15076,7 +15267,7 @@ function TestSuite:Register1215CompatibilityTests()
 				if titleLevel ~= nil then
 					V:Assert(not BFL.CanBlockBNetFriendInvite(titleLevel), "Title friend requests cannot expose Block Invites")
 				end
-				V:Assert(BFL.CanBlockBNetFriendInvite(nil), "Legacy requests without friend levels remain blockable")
+				V:AssertEqual(BFL.CanBlockBNetFriendInvite(nil), titleLevel == nil, "Only legacy clients without friend-level support allow missing metadata")
 
 				C_SocialRestrictions = {
 					IsAgeVerificationRestricted = function() return true end,

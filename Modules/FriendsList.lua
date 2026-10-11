@@ -193,6 +193,8 @@ local friendGroups = {}
 -- Race condition protection
 local isUpdatingFriendsList = false
 local hasPendingUpdate = false
+-- Declare before the OnShow callbacks so they read this local dirty flag.
+local needsRenderOnShow = true
 
 -- ========================================
 -- PERFY OPTIMIZATION (Phase 2A): Named Event Callbacks
@@ -360,10 +362,6 @@ end
 -- Performance Caches (Phase 9.7)
 local uidCache = {} -- Interned strings for UIDs (bnet_Tag123)
 local displayFormatBlueprint = nil -- Parsed structure for fast string building
-
--- Dirty flag: Set when data changes while frame is hidden
--- When true, next time frame is shown, we need to re-render
-local needsRenderOnShow = true -- Default to true to force initial render
 
 -- Selected friend for "Send Message" button (matching Blizzard's FriendsFrame)
 FriendsList.selectedFriend = nil
@@ -760,6 +758,19 @@ local function GetSafeBNetAccountName(accountInfo)
 		return nil
 	end
 	return accountName
+end
+
+local function IsBNetFriendIdentityReady(accountInfo)
+	if not accountInfo then
+		return false
+	end
+	-- Title friends do not expose a BattleTag. Their loaded account ID is the
+	-- identity used below; waiting for a BattleTag would block every friend.
+	if BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo) then
+		return not BFL:IsSecret(accountInfo.bnetAccountID) and type(accountInfo.bnetAccountID) == "number"
+	end
+	local battleTag = accountInfo.battleTag
+	return not BFL:IsSecret(battleTag) and type(battleTag) == "string" and battleTag ~= ""
 end
 
 local function AreSafeValuesEqual(left, right)
@@ -3109,7 +3120,7 @@ function FriendsList:BuildAccountDisplay(gameAccountInfo)
 		}
 	end
 
-	local charName = gameAccountInfo.characterName or "Unknown"
+	local charName = BFL.FormatPlayerDisplayName(gameAccountInfo.characterName) or UNKNOWN or "Unknown"
 	local realmName = gameAccountInfo.realmName or ""
 
 	local classFile = GetAccountClassFile(gameAccountInfo)
@@ -3119,12 +3130,7 @@ function FriendsList:BuildAccountDisplay(gameAccountInfo)
 		coloredName = RAID_CLASS_COLORS[classFile]:WrapTextInColorCode(charName)
 	end
 
-	local text
-	if realmName ~= "" then
-		text = coloredName .. " - " .. realmName
-	else
-		text = coloredName
-	end
+	local text = BFL.FormatPlayerDisplayName(coloredName, realmName, " - ")
 
 	local restriction = gameAccountInfo.bflRestriction or gameAccountInfo.inviteRestriction
 	local restrictionNone = INVITE_RESTRICTION_NONE
@@ -3234,7 +3240,7 @@ local function GetFriendUID(friend)
 			end
 			return cached
 		else
-			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
+			-- Title friends have no BattleTag and use their account ID here.
 			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
 		end
 	else
@@ -3921,6 +3927,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	local rawBattleTag = friend.battleTag
 	local rawAccountName = friend.accountName
 	local rawTitleCustomName = friend.titleCustomName
+	local hasPublicClassData = not BFL:IsSecret(friend.className)
+		and not BFL:IsSecret(friend.classID) and not BFL:IsSecret(friend.classFile)
+		and not BFL:IsSecret(friend.classFileName) and not BFL:IsSecret(friend.classFilename)
 
 	-- CACHE CHECK (Persistent with Validation)
 	if not self.displayNameCache[uid] then
@@ -3933,6 +3942,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	if
 		cacheEntry
 		and not BFL:IsSecret(rawAccountName)
+		and not BFL:IsSecret(rawTitleCustomName)
+		and hasPublicClassData
 		and cacheEntry.format == format
 		and cacheEntry.showRealmName == showRealmName
 		and cacheEntry.colorClassNames == colorClassNames
@@ -3944,6 +3955,13 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.rawAccountName == rawAccountName
 		and cacheEntry.rawBattleTag == rawBattleTag
 		and cacheEntry.rawTitleCustomName == rawTitleCustomName
+		and cacheEntry.friendLevel == friend.friendLevel
+		and cacheEntry.connected == friend.connected
+		and cacheEntry.className == friend.className
+		and cacheEntry.classID == friend.classID
+		and cacheEntry.classFile == friend.classFile
+		and cacheEntry.classFileName == friend.classFileName
+		and cacheEntry.classFilename == friend.classFilename
 		and cacheEntry.nicknameVersion == nicknameVersion
 		and cacheEntry.characterName == friend.characterName
 	then -- Phase 6: Check version instead of value
@@ -3954,6 +3972,16 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	-- Fetch nickname now if we haven't already (lazy load)
 	local DB = GetDB()
 	local nickname = DB and DB:GetNickname(uid) or ""
+	local titleCustomName = not BFL:IsSecret(rawTitleCustomName)
+		and type(rawTitleCustomName) == "string" and rawTitleCustomName ~= "" and rawTitleCustomName or nil
+	local titleCharacterName
+	if not forSorting and not isStreamerMode and friend.type == "bnet"
+		and BFL.IsTitleFriend and BFL.IsTitleFriend(friend)
+		and not BFL:IsSecret(friend.characterName)
+		and type(friend.characterName) == "string" and friend.characterName ~= ""
+	then
+		titleCharacterName = friend.characterName
+	end
 
 	local name = "Unknown"
 	local battletag = rawBattleTag or ""
@@ -4004,8 +4032,11 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		else
 			-- DISPLAY MODE: Follow Blizzard's BNet_GetBNetAccountName pattern
 			-- accountName is a kString. If nil/empty, fall back to short BattleTag.
-			if rawTitleCustomName and rawTitleCustomName ~= "" and not BFL:IsSecret(rawTitleCustomName) then
-				name = rawTitleCustomName
+			if titleCustomName then
+				name = titleCustomName
+			elseif titleCharacterName then
+				-- Title identity is the character, not the potentially encoded account label.
+				name = titleCharacterName
 			elseif rawAccountName then
 				name = rawAccountName
 			else
@@ -4042,6 +4073,22 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	-- 2. Replace Tokens (case-insensitive)
 	local result = format
+	-- Collapse the standard Title name/character pair by friend type. Raw account
+	-- labels can render identically without being equal; only explicit aliases matter.
+	if titleCharacterName then
+		local aliasLabel, characterLabel = titleCustomName, titleCharacterName
+		if aliasLabel and BFL.AreRegionalUniqueNamesEnabled() then
+			aliasLabel = aliasLabel:gsub("-", " ")
+			characterLabel = characterLabel:gsub("-", " ")
+		end
+		if not aliasLabel or aliasLabel == characterLabel then
+			local nameToken = "%%[Nn][Aa][Mm][Ee]%%"
+			local characterToken = "%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%"
+			local function keepCharacter() return "%character%" end
+			result = result:gsub(nameToken .. "%s*%(%s*" .. characterToken .. "%s*%)", keepCharacter)
+			result = result:gsub(characterToken .. "%s*%(%s*" .. nameToken .. "%s*%)", keepCharacter)
+		end
+	end
 
 	-- Smart Fallback Logic:
 	if
@@ -4057,6 +4104,18 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and not HasTokenCaseInsensitive(result, "name")
 	then
 		battletag = name
+	end
+
+	-- A name-only Title layout still represents the character. Color just its
+	-- label, without adding the realm/icons of %character% or coloring offline names.
+	if titleCharacterName and friend.connected and colorClassNames and hasPublicClassData
+		and result:match("^%s*%%[Nn][Aa][Mm][Ee]%%%s*$")
+	then
+		local classFile = GetClassFileForFriend(friend)
+		local classColor = classFile and RAID_CLASS_COLORS[classFile]
+		if classColor then
+			name = "|c" .. (classColor.colorStr or "ffffffff") .. name .. "|r"
+		end
 	end
 
 	-- Replace tokens case-insensitively
@@ -4210,6 +4269,13 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		rawBattleTag = rawBattleTag,
 		rawAccountName = rawAccountName,
 		rawTitleCustomName = rawTitleCustomName,
+		friendLevel = friend.friendLevel,
+		connected = friend.connected,
+		className = friend.className,
+		classID = friend.classID,
+		classFile = friend.classFile,
+		classFileName = friend.classFileName,
+		classFilename = friend.classFilename,
 		characterName = friend.characterName, -- Phase 22b: Cache invalidation for character changes
 	}
 
@@ -5250,10 +5316,9 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		local titleFriendCustomNamesEnabled = BFL.AreTitleFriendCustomNamesEnabled
 			and BFL.AreTitleFriendCustomNamesEnabled()
 
-		-- BNet data completeness check: After login/reload, the first API responses
-		-- may lack battleTags (returns nil/empty). Without battleTags, friend UIDs
-		-- won't match DB group assignments, causing all friends to show under "No Group".
-		-- Skip this render and wait for the next FRIENDLIST_UPDATE with complete data.
+		-- Wait for the first account's identity after login/reload. Normal BNet
+		-- friends need their BattleTag for saved groups; Title friends use an
+		-- account ID and must not wait for a BattleTag they never expose.
 		if not self.bnetDataReady then
 			if numBNetTotal == 0 then
 				-- After login/reload, BNGetNumFriends() may temporarily return 0
@@ -5274,7 +5339,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 				return
 			else
 				local firstInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(1)
-				if firstInfo and firstInfo.battleTag and firstInfo.battleTag ~= "" then
+				if IsBNetFriendIdentityReady(firstInfo) then
 					self.bnetDataReady = true
 					-- Cancel zero fallback timer if it was pending from a previous call
 					if self.bnetZeroFallbackTimer then
@@ -5499,7 +5564,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_ID
 									elseif gameAccountInfo.realmID == 0 then
 										accountRestriction = INVITE_RESTRICTION_INFO
-									elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+									elseif BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then
 										accountRestriction = INVITE_RESTRICTION_REALM
 									elseif not gameAccountInfo.isInCurrentRegion then
 										accountRestriction = INVITE_RESTRICTION_REGION
@@ -5525,22 +5590,20 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 										-- If no sub-restriction found, this account is invitable
 										if not accountRestriction then
 											accountRestriction = INVITE_RESTRICTION_NONE
-											if invitableAccounts then
-												invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
-											end
+											invitableAccounts = invitableAccounts or {}
+											invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
 										end
 									end
 								elseif gameAccountInfo.realmID == 0 then
 									accountRestriction = INVITE_RESTRICTION_INFO
-								elseif BFL.IsClassic and playerRealmID and gameAccountInfo.realmID ~= playerRealmID then
+								elseif BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then
 									accountRestriction = INVITE_RESTRICTION_REALM
 								elseif not gameAccountInfo.isInCurrentRegion then
 									accountRestriction = INVITE_RESTRICTION_REGION
 								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
 									accountRestriction = INVITE_RESTRICTION_NONE
-									if invitableAccounts then
-										invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
-									end
+									invitableAccounts = invitableAccounts or {}
+									invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
 								end
 
 								-- Track best restriction across all accounts
@@ -5562,10 +5625,6 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 									if not restriction or accountRestriction > (restriction or 0) then
 										restriction = accountRestriction
 									end
-									if accountRestriction == INVITE_RESTRICTION_NONE and not invitableAccounts then
-										-- Single-account shortcut: break early
-										break
-									end
 								end
 							else
 								if not restriction then
@@ -5575,7 +5634,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 						end
 					end
 
-					-- Store multi-account data on friend object
+					-- Keep invitable accounts even for a single login: the custom context
+					-- menu and fallback invite button consume this same validated list.
 					friend.gameAccounts = gameAccounts
 					friend.invitableAccounts = invitableAccounts
 					friend.numInvitableAccounts = invitableAccounts and #invitableAccounts or 0
@@ -10353,7 +10413,7 @@ function FriendsList:UpdateInviteButton(button, data)
 				return
 			end
 
-			local inviteID, accountName, friendLevel
+			local inviteID, accountName
 
 			-- Get invite info from mock or real API
 			if BFL.MockFriendInvites.enabled then
@@ -10361,14 +10421,12 @@ function FriendsList:UpdateInviteButton(button, data)
 				if mockInvite then
 					inviteID = mockInvite.inviteID
 					accountName = mockInvite.accountName
-					friendLevel = mockInvite.friendLevel
 				end
 			else
 				local inviteInfo = BFL.GetBNetFriendInviteInfo and BFL.GetBNetFriendInviteInfo(parent.inviteIndex)
 				if inviteInfo then
 					inviteID = inviteInfo.inviteID
 					accountName = inviteInfo.accountName
-					friendLevel = inviteInfo.friendLevel
 				end
 			end
 
@@ -10420,12 +10478,12 @@ function FriendsList:UpdateInviteButton(button, data)
 						end
 					end,
 				}
-				if not BFL.CanBlockBNetFriendInvite or BFL.CanBlockBNetFriendInvite(friendLevel) then
+				if inviteID == parent.inviteID and BFL.CanBlockBNetFriendInviteByIndex(parent.inviteIndex, inviteID) then
 					items[#items + 1] = {
 						text = BLOCK_INVITES or "Block Invites",
 						destructive = true,
 						func = function()
-							if BFL.SetBNetBlocked then
+							if BFL.CanBlockBNetFriendInviteByIndex(parent.inviteIndex, inviteID) and BFL.SetBNetBlocked then
 								BFL.SetBNetBlocked(inviteID, true)
 							end
 						end,

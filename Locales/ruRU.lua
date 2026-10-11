@@ -525,6 +525,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.GROUPS_DIALOG_TITLE = "Группы для %s"
 	L.MENU_COPY_CHARACTER_NAME = "Копировать имя персонажа"
 	L.COPY_CHARACTER_NAME_POPUP_TITLE = "Копировать имя персонажа"
+	L.DIALOG_REMOVE_FRIEND_CONFIRMATION = "Удалить %s из списка друзей?"
 
 	-- ========================================
 	-- TOOLTIPS
@@ -1009,6 +1010,7 @@ BFL:RegisterLocale("ruRU", function()
 	L.FILTER_BNET = "BNet"
 	L.FILTER_HIDE_AFK = "Не AFK"
 	L.FILTER_RETAIL = "Основная версия"
+	L.FILTER_FOREVER = "Только WoW Forever"
 	L.FILTER_INGAME = "В игре"
 	L.FILTER_IN_QUEUE = "В очереди"
 	L.FILTER_AVAILABLE_FOR_QUEUE = "Доступен для очереди"

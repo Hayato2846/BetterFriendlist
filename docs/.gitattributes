@@ -1,0 +1,2 @@
+# Keep PDFs binary, including on Git for Windows installations using astextplain.
+*.pdf binary

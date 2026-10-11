@@ -1316,38 +1316,7 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						-- Try to use the advanced AddFriendFrame if available (matches Retail behavior)
-						if not AddFriendFrame then
-							LoadAddOn("Blizzard_FriendsFrame")
-						end
-
-						local name = GetUnitName("target", true);
-						if ( UnitIsPlayer("target") and UnitCanCooperate("player", "target") and not C_FriendList.GetFriendInfo(name) ) then
-							C_FriendList.AddFriend(name);
-							PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON);
-						else
-							local _, battleTag, _, _, _, _, isRIDEnabled = BNGetInfo();
-							if ( ( battleTag or isRIDEnabled ) and BNFeaturesEnabledAndConnected() ) then
-								if AddFriendEntryFrame_Collapse then
-									AddFriendEntryFrame_Collapse(true);
-								end
-								if AddFriendNameEditBox then
-									AddFriendFrame.editFocus = AddFriendNameEditBox;
-								end
-								StaticPopupSpecial_Show(AddFriendFrame);
-								if ( GetCVarBool("addFriendInfoShown") ) then
-									if AddFriendFrame_ShowEntry then
-										AddFriendFrame_ShowEntry();
-									end
-								else
-									if AddFriendFrame_ShowInfo then
-										AddFriendFrame_ShowInfo();
-									end
-								end
-							else
-								StaticPopup_Show("ADD_FRIEND");
-							end
-						end
+						BFL.ShowAddFriendDialog()
 					</OnClick>
 				</Scripts>
 			</Button>
