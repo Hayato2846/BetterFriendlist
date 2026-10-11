@@ -93,7 +93,7 @@ BetterFriendlist 2.9.2 adds a WoW Forever filter and fixes greyed-out group invi
 #### Fixed
 - **Character Names** - Friends' character menus, Copy Character Name, and Quick Join no longer add unnecessary realm names. Forever surnames are kept in player links.
 - **Add Friend** - BFL now opens Blizzard's Add Friend window in Forever, including its handling of Title friend requests.
-- **Title Friend Names** - Title friends show the character name once in the default layout. Custom names are still shown if they differ from the character name.
+- **Title Friend Names** - Title friends show the character name once in the default layout and friend tooltip. Custom names are still shown in the list if they differ from the character name.
 - **Friend List** - Fixed an empty friend list after login or reloading when a title friend appeared first.
 
 ---

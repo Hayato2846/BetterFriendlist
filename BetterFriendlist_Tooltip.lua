@@ -7,6 +7,7 @@ local _, BFL = ...
 local ShowSafeRetailBNetTooltip
 local AddContactMemoryTooltipLines
 local ResizeFriendsTooltipForMeasuredLines
+local SetPrimaryGameAccountNameAsHeader
 
 local function RaiseNativeFriendsTooltipLayer()
 	if BFL.RaiseFriendTooltipLayer and FriendsTooltip then
@@ -38,6 +39,7 @@ if not BFL.IsClassic then
 				return
 			end
 
+			SetPrimaryGameAccountNameAsHeader(false)
 			FriendsListButtonMixin.OnEnter(self)
 
 			-- Re-anchor tooltip to the actual visible button (Blizzard anchored to proxyButton)
@@ -132,6 +134,30 @@ local function HideTooltipLine(line)
 	if line then
 		line:SetText("")
 		line:Hide()
+	end
+end
+
+local primaryGameAccountNamePoints
+SetPrimaryGameAccountNameAsHeader = function(useAsHeader)
+	local line = FriendsTooltipGameAccount1Name
+	if not (line and FriendsTooltipHeader) then
+		return
+	end
+	if useAsHeader then
+		if not primaryGameAccountNamePoints then
+			primaryGameAccountNamePoints = {}
+			for index = 1, line:GetNumPoints() do
+				primaryGameAccountNamePoints[index] = { line:GetPoint(index) }
+			end
+		end
+		line:ClearAllPoints()
+		line:SetPoint(FriendsTooltipHeader:GetPoint(1))
+	elseif primaryGameAccountNamePoints then
+		line:ClearAllPoints()
+		for _, point in ipairs(primaryGameAccountNamePoints) do
+			line:SetPoint(unpack(point))
+		end
+		primaryGameAccountNamePoints = nil
 	end
 end
 
@@ -463,11 +489,26 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 	local numGameAccounts = 0
 	local battleTag = SafeString(friendData.battleTag, nil)
 	local gameAccountInfo = GetPrimaryGameAccount(friendData)
+	local connected = SafeBool(friendData.connected, false)
+	local isTitleFriend = BFL.IsTitleFriend and BFL.IsTitleFriend(friendData)
+	local showGameAccount = gameAccountInfo and GetGameAccountField(gameAccountInfo, "gameAccountID", nil)
+		and (not isTitleFriend or (connected
+			and SafeBool(GetGameAccountField(gameAccountInfo, "isOnline", connected), false)
+			and SafeString(GetGameAccountField(gameAccountInfo, "characterName", nil), nil)))
+	local showTitleCharacter = isTitleFriend and showGameAccount
 
-	local anchor = SetTooltipLine(FriendsTooltipHeader, nil, GetSafeDisplayName(friendData))
-	SetFontStringColor(FriendsTooltipHeader, SafeBool(friendData.connected, false) and FRIENDS_BNET_NAME_COLOR or FRIENDS_GRAY_COLOR)
+	-- Title friends have no separate account identity to repeat above the character.
+	-- Keep the existing class-colored character details, without an empty header gap.
+	SetPrimaryGameAccountNameAsHeader(showTitleCharacter)
+	local anchor
+	if showTitleCharacter then
+		HideTooltipLine(FriendsTooltipHeader)
+	else
+		anchor = SetTooltipLine(FriendsTooltipHeader, nil, GetSafeDisplayName(friendData))
+		SetFontStringColor(FriendsTooltipHeader, connected and FRIENDS_BNET_NAME_COLOR or FRIENDS_GRAY_COLOR)
+	end
 
-	if gameAccountInfo and GetGameAccountField(gameAccountInfo, "gameAccountID", nil) then
+	if showGameAccount then
 		if ShouldSafeGameAccountShowRichPresence(gameAccountInfo) then
 			local characterName = GetSafeFormattedCharacterName(
 				GetGameAccountField(gameAccountInfo, "characterName", nil),
@@ -688,6 +729,7 @@ function BetterFriendsList_Button_OnEnter(self)
 		return
 	end
 
+	SetPrimaryGameAccountNameAsHeader(false)
 	local friendData = self.friendData
 	local tooltip = FriendsTooltip
 	local FriendsList = BFL and BFL:GetModule("FriendsList")
@@ -845,6 +887,7 @@ end
 -- Button OnLeave handler
 function BetterFriendsList_Button_OnLeave(self)
 	BFL_Tooltip:Hide()
+	SetPrimaryGameAccountNameAsHeader(false)
 	local tooltip = FriendsTooltip
 	tooltip.button = nil
 	tooltip:Hide()
