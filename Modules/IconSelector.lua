@@ -503,7 +503,7 @@ function IconSelector:CreateFrame()
 	frame.inner = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.inner:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
 	frame.inner:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -14, 10)
-	frame.inner:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame.inner, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -597,7 +597,7 @@ function IconSelector:AcquireButton(index)
 
 	button = CreateFrame("Button", nil, frame.content, "BackdropTemplate")
 	button:SetSize(42, 42)
-	button:SetBackdrop({
+	BFL.SetOwnedBackdrop(button, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,

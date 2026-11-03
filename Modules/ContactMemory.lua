@@ -945,7 +945,7 @@ function ContactMemory:EnsureNoteDialog()
 	local inputBackdrop = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	inputBackdrop:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -60)
 	inputBackdrop:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 54)
-	inputBackdrop:SetBackdrop({
+	BFL.SetOwnedBackdrop(inputBackdrop, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,

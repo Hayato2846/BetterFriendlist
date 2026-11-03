@@ -5,6 +5,36 @@ local ADDON_NAME, BFL = ...
 local L = BFL.L
 local Changelog = BFL:RegisterModule("Changelog", {})
 
+local FONT_FLAGS = "SLUG"
+
+local function ApplyChangelogFont(fontString)
+	if not fontString or not BFL.FontManager then
+		return
+	end
+	local font, size, flags = fontString:GetFont()
+	if flags ~= BFL.FontManager:GetFontFlags(FONT_FLAGS) then
+		BFL.FontManager:SafeSetFont(fontString, font, size, FONT_FLAGS)
+	end
+end
+
+local function CreateChangelogText(parent, template)
+	local fontString = parent:CreateFontString(nil, "OVERLAY", template)
+	ApplyChangelogFont(fontString)
+	return fontString
+end
+
+-- The Settings Center creates fresh text when an entry is expanded.
+function Changelog:ApplyContentFonts(frame)
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType("FontString") then
+			ApplyChangelogFont(region)
+		end
+	end
+	for _, child in ipairs({ frame:GetChildren() }) do
+		self:ApplyContentFonts(child)
+	end
+end
+
 local changelogFrame = nil
 local SUPPORT_LINKS = {
 	{ id = "discord", url = "https://discord.gg/dpaV8vh3w3" },
@@ -60,6 +90,59 @@ All notable changes to BetterFriendlist will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [3.0.0]        - 2026-11-03
+
+BetterFriendlist 3.0.0 adds saved Who searches, an option to show friends' alts in tooltips, and smoother scrolling on Retail and Forever.
+
+### All WoW Versions
+
+#### Added
+- **Known Characters** - You can now link alts to a friend and show them in their tooltip. You can add characters yourself or let BFL remember characters it sees your Battle.net friends play. Both options are off by default, and the list stays hidden in Streamer Mode.
+- **Who Searches** - Use the star next to the search box to save up to 12 searches or pick a recent one. You can edit it before hitting Search, and you can clear or turn off your search history.
+- **Friend Tooltips** - Tooltips now show whether someone is a WoW, BattleTag, or Real ID friend when that info is available.
+
+#### Improved
+- **Themes** - Dark and Custom now draw many of their flat borders the same way, including in Settings and the Friend Tag Editor. Each theme keeps its own colors.
+- **Changelog** - Drag the bottom-right corner to make the window wider or taller. It remembers your size the next time you open it.
+- **Settings Center** - Clicking a search result highlights the setting it takes you to. Pages with tabs no longer repeat the tab name above the settings, and the Note Cleanup descriptions have room to wrap without covering the buttons.
+
+#### Fixed
+- **Recently Added** - Long-time friends no longer show up as newly added while your friends list is still loading or after a reconnect.
+- **Faction Icons** - Faction icons now show up with name-only and BattleTag-only layouts when enabled.
+- **Settings and Setup** - Support links copy in full, window size fields have room for the whole number, and filters stay inside the list while you drag them. Checkbox borders in Dark and Custom and the borders on the setup summary are more even.
+- **Group Actions** - Fixed errors when promoting someone or changing the group type in combat, and when blocking Battle.net friends while Blizzard restricts the action.
+- **Who and Friend Tooltips** - Saved searches keep their wording when you open them in the Search Builder. Friend details no longer stick around when the game reuses a tooltip.
+
+### Retail Midnight & WoW Forever
+
+#### Added
+- **Smooth Scrolling** - The friends list now scrolls smoothly by default in both the Modern and Legacy layouts.
+- **Recent Allies** - Click a player to see what you did together and how long ago. You can also see their latest activities in the tooltip.
+
+#### Improved
+- **Changelog** - The changelog window now uses backgrounds from the Modern friends list when that layout is active.
+
+#### Fixed
+- **Recent Allies** - Fixed errors when details about another player are hidden, including in the pin tooltip. Preview entries can no longer trigger real player actions.
+- **Modern Friends Window** - Side tab icons and the Who scrollbar stay lined up when you switch tabs. In Dark and Custom, disabled buttons are easier to spot, and the Streamer Mode header and Raid help text are less bright. The Guild filter only shows its selection once.
+- **Streamer Mode** - If a Title friend has no BattleTag, the friends list and right-click menu show their character name.
+- **Who Search** - Class and race filters work again on clients where those searches could fail.
+- **Raid Tab** - The Raid tab follows the game's availability rules, and promotion buttons respect who can promote group members.
+- **Guild Roster** - You can still open the guild list when the game temporarily hides extra details like professions.
+
+### WoW Forever
+
+#### Fixed
+- **Quick Join** - Quick Join unlocks with Group Finder at level 10. If it isn't available yet, the setting shows why.
+- **Global Friend Sync** - Saved names keep their surnames, and BFL skips your own character. If you have saved friends left to invite, use the globe next to Add New Friend. Add All opens Blizzard's confirmations one at a time.
+
+### WoW 12.1.7 PTR
+
+#### Compatibility
+- **PTR Support** - Updated BetterFriendlist and the Menu Bridge for the 12.1.7 PTR.
 
 ---
 
@@ -277,11 +360,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 
 ---
 
-## [2.8.2]        - 2026-08-15
-
-### Fixed
-- **EllesmereUI Theme** - Faction-colored friend backgrounds in the Modern interface are now softer and easier to read.
-
 ---
 
 *Older versions archived. Full history available in git.*
@@ -482,6 +560,7 @@ local function ShowCopyDialog(url, title)
 		text = title or "Copy URL",
 		button1 = "Close",
 		hasEditBox = true,
+		maxLetters = 0,
 		editBoxWidth = editBoxWidth,
 		OnShow = function(self)
 			self.EditBox:SetText(url)
@@ -844,12 +923,144 @@ function Changelog:Show()
 	self:ToggleChangelog()
 end
 
+local function CreateSupportButton(frame, parent, link, modern)
+	local template = modern and "SharedButtonTemplate" or "UIPanelButtonTemplate"
+	local button = CreateFrame("Button", nil, parent, template)
+	button:SetText(link.label)
+	local label = button:GetFontString()
+	ApplyChangelogFont(label)
+	if modern and label then
+		label:ClearAllPoints()
+		label:SetPoint("LEFT", 25, 0)
+		label:SetPoint("RIGHT", -7, 0)
+		label:SetJustifyH("CENTER")
+		for _, event in ipairs({ "OnShow", "OnEnter", "OnLeave", "OnEnable", "OnDisable" }) do
+			button:HookScript(event, function(owner)
+				ApplyChangelogFont(owner:GetFontString())
+			end)
+		end
+	end
+
+	local icon = button:CreateTexture(nil, "ARTWORK")
+	icon:SetSize(14, 14)
+	icon:SetPoint("LEFT", 10, 0)
+	table.insert(frame.BFL_AccentTextures, icon)
+
+	local mask = button:CreateMaskTexture()
+	mask:SetSize(14, 14)
+	mask:SetPoint("LEFT", 10, 0)
+	mask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\" .. link.icon .. ".blp")
+	icon:AddMaskTexture(mask)
+
+	button:SetScript("OnClick", function()
+		ShowCopyDialog(link.url, link.popup)
+	end)
+	return button
+end
+
+local function RefreshSupportButtons(frame, modern)
+	for _, link in ipairs(frame.BFL_SupportLinks) do
+		if modern and not link.modernButton then
+			link.modernButton = CreateSupportButton(frame, link.button:GetParent(), link, true)
+			link.modernButton:SetPoint("CENTER", link.button)
+			link.modernButton:SetSize(link.button:GetWidth(), 30)
+		end
+		link.button:SetShown(not modern)
+		if link.modernButton then
+			link.modernButton:SetShown(modern)
+		end
+	end
+end
+
+local function RefreshChangelogBackgrounds(frame)
+	local FriendsUI = BFL.IsMainline and BFL:GetModule("FriendsUI")
+	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
+	local modern = FriendsUI and FriendsUI:IsModernActive()
+		and (theme == "blizzard" or theme == "dark" or theme == "custom")
+	modern = not not modern
+	if not modern and frame.BFL_ModernChangelog == nil then
+		return
+	end
+	RefreshSupportButtons(frame, modern and theme == "blizzard")
+	local inset = frame.MainInset
+	if frame.BFL_ModernChangelog ~= modern then
+		frame.BFL_ModernChangelog = modern
+		inset:ClearAllPoints()
+		inset:SetPoint("TOPLEFT", frame, "TOPLEFT", modern and 4 or 10, -25)
+		inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 5)
+		frame.BFL_HeaderBackground:SetShown(not modern)
+		frame.BFL_HeaderLine:SetShown(not modern)
+	end
+	if theme == "blizzard" then
+		-- The outer window supplies the edge. A second rim splits the Modern surface.
+		inset:SetBackdropBorderColor(0.4, 0.4, 0.4, modern and 0 or 0.8)
+	end
+	local backgrounds = frame.BFL_ModernBackgrounds
+	if modern and not backgrounds then
+		local body = inset:CreateTexture(nil, "BACKGROUND", nil, 1)
+		body:SetAllPoints()
+
+		local topFade = inset:CreateTexture(nil, "BACKGROUND", nil, 2)
+		topFade:SetPoint("TOPLEFT", body, "TOPLEFT")
+		topFade:SetPoint("TOPRIGHT", body, "TOPRIGHT")
+		local bottomFade = inset:CreateTexture(nil, "BACKGROUND", nil, 2)
+		bottomFade:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT")
+		bottomFade:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT")
+
+		local header = frame.BFL_HeaderLine:GetParent()
+		local divider = header:CreateTexture(nil, "ARTWORK")
+		divider:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 5, -1)
+		divider:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", -5, -1)
+		divider:SetTexelSnappingBias(0)
+		divider:SetSnapToPixelGrid(false)
+		if BFL.HasAtlas("perks-divider-short") and BFL.SetTextureOrAtlas(divider, "perks-divider-short") then
+			divider:SetHeight(3)
+		else
+			divider:SetColorTexture(1, 1, 1, 0.28)
+			divider:SetHeight(1)
+		end
+
+		local function LoadFade(texture, atlas)
+			local loaded = BFL.HasAtlas(atlas) and BFL.SetTextureOrAtlas(texture, atlas, nil, true)
+			if loaded then
+				texture:SetHeight(math.min(texture:GetHeight(), 140))
+			end
+			return loaded
+		end
+
+		backgrounds = {
+			body = body,
+			divider = divider,
+			topFade = topFade,
+			bottomFade = bottomFade,
+			hasTopFade = LoadFade(topFade, "friends-frame-toptexbg"),
+			hasBottomFade = LoadFade(bottomFade, "friends-frame-bottomtexbg"),
+		}
+		frame.BFL_ModernBackgrounds = backgrounds
+	end
+	if not backgrounds then
+		return
+	end
+
+	local useAtlas = modern and theme == "blizzard"
+	backgrounds.body:SetShown(modern)
+	backgrounds.divider:SetShown(modern)
+	backgrounds.topFade:SetShown(useAtlas and backgrounds.hasTopFade or false)
+	backgrounds.bottomFade:SetShown(useAtlas and backgrounds.hasBottomFade or false)
+	if modern then
+		local palette = FriendsUI:GetModernThemeColors(theme)
+		backgrounds.body:SetColorTexture(unpack(palette.background))
+		backgrounds.divider:SetVertexColor(unpack(palette.border))
+	end
+end
+
 function Changelog:RefreshAccentColors()
 	self:RefreshPortraitIndicator()
 
 	if not changelogFrame then
 		return
 	end
+	RefreshChangelogBackgrounds(changelogFrame)
 
 	local accentR, accentG, accentB = GetAccentColor(1, 0.82, 0, 1)
 	local secondaryAccentR, secondaryAccentG, secondaryAccentB = GetSecondaryAccentColor()
@@ -911,20 +1122,93 @@ function Changelog:RegisterTests()
 	})
 end
 
+local function EnableChangelogResize(frame)
+	local minWidth, minHeight = 600, 500
+	local function UpdateBounds()
+		local maxWidth = math.max(minWidth, UIParent:GetWidth())
+		local maxHeight = math.max(minHeight, UIParent:GetHeight())
+		if frame.SetResizeBounds then
+			frame:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
+		else
+			frame:SetMinResize(minWidth, minHeight)
+			frame:SetMaxResize(maxWidth, maxHeight)
+		end
+		return maxWidth, maxHeight
+	end
+
+	frame:SetResizable(true)
+	frame:SetClampedToScreen(true)
+	local maxWidth, maxHeight = UpdateBounds()
+	local DB = BFL:GetModule("DB")
+	local size = DB and DB:Get("changelogWindowSize")
+	if type(size) ~= "table" then
+		size = {}
+	end
+	frame:SetSize(
+		math.max(minWidth, math.min(maxWidth, tonumber(size.width) or minWidth)),
+		math.max(minHeight, math.min(maxHeight, tonumber(size.height) or minHeight))
+	)
+	frame:ClearAllPoints()
+	frame:SetPoint("CENTER", UIParent, "CENTER", tonumber(size.x) or 0, tonumber(size.y) or 0)
+
+	local grip = CreateFrame("Button", nil, frame)
+	grip:SetSize(16, 16)
+	grip:SetPoint("BOTTOMRIGHT", -3, 3)
+	grip:SetFrameLevel(frame:GetFrameLevel() + 10)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight", "ADD")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+
+	local dragMode
+	local function StopDrag()
+		if not dragMode then
+			return
+		end
+		dragMode = nil
+		frame:StopMovingOrSizing()
+		frame:SetUserPlaced(false)
+		if DB then
+			local x, y = frame:GetCenter()
+			local screenX, screenY = UIParent:GetCenter()
+			DB:Set("changelogWindowSize", {
+				width = frame:GetWidth(),
+				height = frame:GetHeight(),
+				x = x and screenX and x - screenX or size.x,
+				y = y and screenY and y - screenY or size.y,
+			})
+		end
+	end
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", function()
+		frame:StartMoving()
+		dragMode = "move"
+	end)
+	frame:SetScript("OnDragStop", StopDrag)
+	grip:SetScript("OnMouseDown", function(_, button)
+		if button == "LeftButton" then
+			UpdateBounds()
+			frame:StartSizing("BOTTOMRIGHT")
+			dragMode = "resize"
+		end
+	end)
+	grip:SetScript("OnMouseUp", function()
+		if dragMode == "resize" then
+			StopDrag()
+		end
+	end)
+	frame:HookScript("OnHide", StopDrag)
+end
+
 function Changelog:CreateChangelogWindow()
 	-- Use ButtonFrameTemplate to match Settings window
 	local frame = CreateFrame("Frame", "BetterFriendlistChangelogFrame", UIParent, "ButtonFrameTemplate")
 	frame.BFL_AccentTextures = {}
 	frame.BFL_AccentFontStrings = {}
 	frame.BFL_SecondaryAccentFontStrings = {}
-	frame:SetSize(600, 500)
-	frame:SetPoint("CENTER")
 	frame:SetFrameStrata("DIALOG")
 	frame:EnableMouse(true)
 	frame:SetMovable(true)
-	frame:RegisterForDrag("LeftButton")
-	frame:SetScript("OnDragStart", frame.StartMoving)
-	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	EnableChangelogResize(frame)
 
 	-- Setup ButtonFrameTemplate features
 	if frame.portrait then
@@ -947,6 +1231,7 @@ function Changelog:CreateChangelogWindow()
 	end
 
 	SetTitle(frame, L.CHANGELOG_TITLE)
+	ApplyChangelogFont(frame.TitleText or (frame.TitleContainer and frame.TitleContainer.TitleText))
 
 	-- Create MainInset to match Settings style
 	local mainInset = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -971,89 +1256,50 @@ function Changelog:CreateChangelogWindow()
 
 	-- Background for header
 	local headerBg = headerFrame:CreateTexture(nil, "BACKGROUND")
+	frame.BFL_HeaderBackground = headerBg
 	headerBg:SetAllPoints()
 	headerBg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 
 	-- Separator line
 	local headerLine = headerFrame:CreateTexture(nil, "ARTWORK")
+	frame.BFL_HeaderLine = headerLine
 	headerLine:SetHeight(1)
 	headerLine:SetPoint("BOTTOMLEFT", 0, 0)
 	headerLine:SetPoint("BOTTOMRIGHT", 0, 0)
 	headerLine:SetColorTexture(0.4, 0.4, 0.4, 0.8)
 
-	-- Intro Text
-	local headerText = headerFrame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
-	headerText:SetPoint("LEFT", 10, 0)
+	local headerGroup = CreateFrame("Frame", nil, headerFrame)
+	headerGroup:SetPoint("CENTER")
+	local buttonWidth, buttonGap = 130, 10
+	local headerText = CreateChangelogText(headerGroup, "BetterFriendlistFontNormal")
+	headerText:SetPoint("LEFT")
+	headerText:SetJustifyH("LEFT")
 	headerText:SetText(L.CHANGELOG_HEADER_COMMUNITY)
+	local labelWidth = math.min(math.ceil(headerText:GetStringWidth()), 150)
+	headerText:SetWidth(labelWidth)
+	headerGroup:SetSize(labelWidth + 3 * (buttonWidth + buttonGap), 24)
 
-	-- Discord Button (Rightmost)
-	local discordBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
-	frame.DiscordButton = discordBtn
-	discordBtn:SetSize(130, 24)
-	discordBtn:SetPoint("RIGHT", -10, 0)
-	discordBtn:SetText(L.CHANGELOG_DISCORD)
-
-	local dcIcon = discordBtn:CreateTexture(nil, "ARTWORK")
-	dcIcon:SetSize(14, 14)
-	dcIcon:SetPoint("LEFT", 10, 0)
-	dcIcon:SetColorTexture(GetAccentColor(1, 0.82, 0, 1))
-	table.insert(frame.BFL_AccentTextures, dcIcon)
-
-	local dcMask = discordBtn:CreateMaskTexture()
-	dcMask:SetSize(14, 14)
-	dcMask:SetPoint("LEFT", 10, 0)
-	dcMask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\discord.blp")
-	dcIcon:AddMaskTexture(dcMask)
-
-	discordBtn:SetScript("OnClick", function()
-		ShowCopyDialog("https://discord.gg/dpaV8vh3w3", L.CHANGELOG_POPUP_DISCORD)
-	end)
-
-	-- GitHub Button (Left of Discord)
-	local githubBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
-	frame.GitHubButton = githubBtn
-	githubBtn:SetSize(130, 24)
-	githubBtn:SetPoint("RIGHT", discordBtn, "LEFT", -10, 0)
-	githubBtn:SetText(L.CHANGELOG_GITHUB)
-
-	local ghIcon = githubBtn:CreateTexture(nil, "ARTWORK")
-	ghIcon:SetSize(14, 14)
-	ghIcon:SetPoint("LEFT", 10, 0)
-	ghIcon:SetColorTexture(GetAccentColor(1, 0.82, 0, 1))
-	table.insert(frame.BFL_AccentTextures, ghIcon)
-
-	local ghMask = githubBtn:CreateMaskTexture()
-	ghMask:SetSize(14, 14)
-	ghMask:SetPoint("LEFT", 10, 0)
-	ghMask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\github.blp")
-	ghIcon:AddMaskTexture(ghMask)
-
-	githubBtn:SetScript("OnClick", function()
-		ShowCopyDialog("https://github.com/Hayato2846/BetterFriendlist/issues", L.CHANGELOG_POPUP_GITHUB)
-	end)
-
-	-- Ko-fi Button (Left of GitHub)
-	local kofiBtn = CreateFrame("Button", nil, headerFrame, "UIPanelButtonTemplate")
-	frame.KoFiButton = kofiBtn
-	kofiBtn:SetSize(130, 24)
-	kofiBtn:SetPoint("RIGHT", githubBtn, "LEFT", -10, 0)
-	kofiBtn:SetText(L.CHANGELOG_SUPPORT)
-
-	local kofiIcon = kofiBtn:CreateTexture(nil, "ARTWORK")
-	kofiIcon:SetSize(14, 14)
-	kofiIcon:SetPoint("LEFT", 10, 0)
-	kofiIcon:SetColorTexture(GetAccentColor(1, 0.82, 0, 1))
-	table.insert(frame.BFL_AccentTextures, kofiIcon)
-
-	local kofiMask = kofiBtn:CreateMaskTexture()
-	kofiMask:SetSize(14, 14)
-	kofiMask:SetPoint("LEFT", 10, 0)
-	kofiMask:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\kofi.blp")
-	kofiIcon:AddMaskTexture(kofiMask)
-
-	kofiBtn:SetScript("OnClick", function()
-		ShowCopyDialog("https://ko-fi.com/hayato2846", L.CHANGELOG_POPUP_SUPPORT)
-	end)
+	frame.BFL_SupportLinks = {
+		{ key = "DiscordButton", icon = "discord", label = L.CHANGELOG_DISCORD,
+			url = "https://discord.gg/dpaV8vh3w3", popup = L.CHANGELOG_POPUP_DISCORD },
+		{ key = "GitHubButton", icon = "github", label = L.CHANGELOG_GITHUB,
+			url = "https://github.com/Hayato2846/BetterFriendlist/issues", popup = L.CHANGELOG_POPUP_GITHUB },
+		{ key = "KoFiButton", icon = "kofi", label = L.CHANGELOG_SUPPORT,
+			url = "https://ko-fi.com/hayato2846", popup = L.CHANGELOG_POPUP_SUPPORT },
+	}
+	local previousButton
+	for _, link in ipairs(frame.BFL_SupportLinks) do
+		local button = CreateSupportButton(frame, headerGroup, link, false)
+		button:SetSize(buttonWidth, 24)
+		if previousButton then
+			button:SetPoint("RIGHT", previousButton, "LEFT", -buttonGap, 0)
+		else
+			button:SetPoint("RIGHT")
+		end
+		link.button = button
+		frame[link.key] = button
+		previousButton = button
+	end
 
 	-- ScrollFrame
 	local scrollFrame
@@ -1088,27 +1334,29 @@ function Changelog:CreateChangelogWindow()
 
 	-- Content
 	local content = CreateFrame("Frame", nil, scrollFrame)
-	content:SetSize(560, 1000) -- Height will be adjusted
+	content:SetSize(math.max(1, frame:GetWidth() - 47), 1)
 	scrollFrame:SetScrollChild(content)
 
 	local entries = self:GetEntries()
 	local entryFrames = {}
+	local reflowEntries = {}
 	local previousFrame = nil
 
 	for i, entryData in ipairs(entries) do
 		local entryFrame = CreateFrame("Frame", nil, content)
-		entryFrame:SetWidth(530)
 
 		if previousFrame then
 			entryFrame:SetPoint("TOPLEFT", previousFrame, "BOTTOMLEFT", 0, -5)
 		else
 			entryFrame:SetPoint("TOPLEFT", 0, -5)
 		end
+		entryFrame:SetPoint("RIGHT", content, "RIGHT", -8, 0)
 
 		-- Header
 		local header = CreateFrame("Button", nil, entryFrame)
-		header:SetSize(530, 20)
+		header:SetHeight(20)
 		header:SetPoint("TOPLEFT")
+		header:SetPoint("RIGHT", entryFrame)
 
 		-- Icon
 		local icon = header:CreateTexture(nil, "ARTWORK")
@@ -1117,12 +1365,12 @@ function Changelog:CreateChangelogWindow()
 		icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-right.blp")
 
 		-- Title
-		local title = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		local title = CreateChangelogText(header, "BetterFriendlistFontNormal")
 		title:SetPoint("LEFT", icon, "RIGHT", 5, 0)
 		title:SetText(string.format(L.CHANGELOG_HEADER_VERSION, entryData.version))
 
 		-- Date
-		local dateLabel = header:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
+		local dateLabel = CreateChangelogText(header, "BetterFriendlistFontNormal")
 		dateLabel:SetWidth(85) -- Fixed width for alignment (fits YYYY-MM-DD)
 		dateLabel:SetJustifyH("LEFT") -- Left align for clean column start
 		dateLabel:SetPoint("RIGHT", header, "RIGHT", -5, 0)
@@ -1130,76 +1378,68 @@ function Changelog:CreateChangelogWindow()
 
 		-- Content
 		local entryContent = CreateFrame("Frame", nil, entryFrame)
-		entryContent:SetWidth(530)
 		entryContent:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -5)
+		entryContent:SetPoint("RIGHT", entryFrame)
 
-		local currentY = -5
+		local rows = {}
 		for _, block in ipairs(entryData.blocks) do
-			if block.type == "h1" then
-				local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontLarge")
-				fs:SetPoint("TOPLEFT", 10, currentY)
-				fs:SetWidth(510)
-				fs:SetJustifyH("LEFT")
-				fs:SetText(block.content)
-				currentY = currentY - fs:GetStringHeight() - 10
-			elseif block.type == "h3" then
-				local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
-				fs:SetPoint("TOPLEFT", 10, currentY)
-				fs:SetWidth(510)
-				fs:SetJustifyH("LEFT")
-				fs:SetText(block.content)
-				fs:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
-				table.insert(frame.BFL_AccentFontStrings, fs)
-				currentY = currentY - fs:GetStringHeight() - 5
-			elseif block.type == "h4" then
-				local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
-				fs:SetPoint("TOPLEFT", 10, currentY)
-				fs:SetWidth(510)
-				fs:SetJustifyH("LEFT")
-				fs:SetText(block.content)
-				fs:SetTextColor(GetSecondaryAccentColor())
-				table.insert(frame.BFL_SecondaryAccentFontStrings, fs)
-				currentY = currentY - fs:GetStringHeight() - 5
-			elseif block.type == "separator" then
-				local tex = entryContent:CreateTexture(nil, "ARTWORK")
-				tex:SetTexture("Interface\\Common\\UI-TooltipDivider-Transparent")
-				tex:SetPoint("TOPLEFT", 10, currentY)
-				tex:SetSize(510, 8)
-				currentY = currentY - 15
-			elseif block.type == "list_item" then
-				-- Bullet
-				local bullet = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-				bullet:SetPoint("TOPLEFT", 15, currentY)
-				bullet:SetText("•")
-
-				-- Text
-				local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-				fs:SetPoint("TOPLEFT", 30, currentY)
-				fs:SetWidth(490)
-				fs:SetJustifyH("LEFT")
-				fs:SetText(block.content)
-
-				currentY = currentY - math.max(fs:GetStringHeight(), bullet:GetStringHeight()) - 5
-			else -- text
-				local fs = entryContent:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
-				fs:SetPoint("TOPLEFT", 10, currentY)
-				fs:SetWidth(510)
-				fs:SetJustifyH("LEFT")
-				fs:SetText(block.content)
-				currentY = currentY - fs:GetStringHeight() - 5
+			local region, bullet
+			if block.type == "separator" then
+				region = entryContent:CreateTexture(nil, "ARTWORK")
+				region:SetTexture("Interface\\Common\\UI-TooltipDivider-Transparent")
+				region:SetHeight(8)
+			else
+				local template = "BetterFriendlistFontHighlight"
+				if block.type == "h1" then
+					template = "BetterFriendlistFontLarge"
+				elseif block.type == "h3" or block.type == "h4" then
+					template = "BetterFriendlistFontNormal"
+				end
+				region = CreateChangelogText(entryContent, template)
+				region:SetJustifyH("LEFT")
+				region:SetText(block.content)
+				if block.type == "h3" then
+					region:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+					table.insert(frame.BFL_AccentFontStrings, region)
+				elseif block.type == "h4" then
+					region:SetTextColor(GetSecondaryAccentColor())
+					table.insert(frame.BFL_SecondaryAccentFontStrings, region)
+				elseif block.type == "list_item" then
+					bullet = CreateChangelogText(entryContent, "BetterFriendlistFontHighlight")
+					bullet:SetText("•")
+				end
 			end
+			rows[#rows + 1] = { region = region, bullet = bullet, kind = block.type }
 		end
 
-		local contentHeight = math.abs(currentY)
-		entryContent:SetHeight(contentHeight)
+		local function LayoutEntry(width)
+			local y = -5
+			for _, row in ipairs(rows) do
+				local left = row.bullet and 30 or 10
+				local region = row.region
+				region:ClearAllPoints()
+				region:SetPoint("TOPLEFT", left, y)
+				region:SetWidth(math.max(1, width - left - 10))
+				local height = row.kind == "separator" and 8 or region:GetStringHeight()
+				if row.bullet then
+					row.bullet:ClearAllPoints()
+					row.bullet:SetPoint("TOPLEFT", 15, y)
+					height = math.max(height, row.bullet:GetStringHeight())
+				end
+				local gap = row.kind == "h1" and 10 or (row.kind == "separator" and 7 or 5)
+				y = y - height - gap
+			end
+			entryContent:SetHeight(-y)
+			entryFrame:SetHeight(25 - y)
+		end
 
 		-- Toggle Logic
 		local isExpanded = (i == 1)
 
 		local function UpdateState()
 			if isExpanded then
+				LayoutEntry(content:GetWidth() - 8)
 				entryContent:Show()
-				entryFrame:SetHeight(20 + 5 + contentHeight)
 				icon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\chevron-down.blp")
 			else
 				entryContent:Hide()
@@ -1214,6 +1454,11 @@ function Changelog:CreateChangelogWindow()
 			RecalculateHeight(content, entryFrames)
 		end)
 
+		reflowEntries[i] = function(width)
+			if isExpanded then
+				LayoutEntry(width)
+			end
+		end
 		UpdateState()
 
 		table.insert(entryFrames, entryFrame)
@@ -1221,6 +1466,16 @@ function Changelog:CreateChangelogWindow()
 	end
 
 	RecalculateHeight(content, entryFrames)
+	scrollFrame:HookScript("OnSizeChanged", function(_, width)
+		if width <= 8 or width == content:GetWidth() then
+			return
+		end
+		content:SetWidth(width)
+		for _, reflow in ipairs(reflowEntries) do
+			reflow(width - 8)
+		end
+		RecalculateHeight(content, entryFrames)
+	end)
 
 	changelogFrame = frame
 	self:RefreshAccentColors()

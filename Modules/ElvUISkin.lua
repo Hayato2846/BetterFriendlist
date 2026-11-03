@@ -3020,7 +3020,7 @@ function ElvUISkin:SkinClassicMainFrameShell(E, S, frame)
 		shell.backdrop:SetAllPoints(shell)
 	end
 	if shell.SetBackdrop then
-		shell:SetBackdrop({
+		BFL.SetOwnedBackdrop(shell, {
 			bgFile = "Interface\\Buttons\\WHITE8X8",
 			edgeFile = "Interface\\Buttons\\WHITE8X8",
 			edgeSize = 1,

@@ -419,7 +419,7 @@ function FriendTagEditor:EnsureFrame()
 	frame.leftPane:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
 	frame.leftPane:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 14, 10)
 	frame.leftPane:SetWidth(LEFT_WIDTH)
-	frame.leftPane:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame.leftPane, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -430,7 +430,7 @@ function FriendTagEditor:EnsureFrame()
 	frame.rightPane = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.rightPane:SetPoint("TOPLEFT", frame.leftPane, "TOPRIGHT", 12, 0)
 	frame.rightPane:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -14, 10)
-	frame.rightPane:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame.rightPane, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -533,7 +533,7 @@ function FriendTagEditor:RefreshList()
 		row:RegisterForDrag("LeftButton")
 		row.tagId = def.id
 		row.orderIndex = index
-		row:SetBackdrop({
+		BFL.SetOwnedBackdrop(row, {
 			bgFile = "Interface\\Buttons\\WHITE8X8",
 			edgeFile = "Interface\\Buttons\\WHITE8X8",
 			edgeSize = 1,
@@ -917,7 +917,7 @@ function FriendTagEditor:CreatePreview(parent, y)
 	preview:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
 	preview:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
 	preview:SetHeight(40)
-	preview:SetBackdrop({
+	BFL.SetOwnedBackdrop(preview, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -1039,7 +1039,7 @@ function FriendTagEditor:CreateIconControls(parent, y)
 	local previewHolder = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	previewHolder:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
 	previewHolder:SetSize(32, 32)
-	previewHolder:SetBackdrop({
+	BFL.SetOwnedBackdrop(previewHolder, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -1193,7 +1193,7 @@ function FriendTagEditor:CreateColorControl(parent, y, stateKey, labelText, butt
 	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
 	button:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
 	button:SetSize(28, 24)
-	button:SetBackdrop({
+	BFL.SetOwnedBackdrop(button, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,

@@ -20,7 +20,10 @@ local function check(value, message) assertions = assertions + 1; assert(value, 
 local function equal(actual, expected, message)
 	check(actual == expected, message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
 end
-local BFL = { L = {}, VERSION = "2.9.2", modules = {}, IsRetail = true, IsForever = true, IsClassic = false }
+local version = assert(read(repo, "BetterFriendlist.toc"):match("## Version:%s*([^%s]+)"))
+local bridgeVersion = read(repo, "!BetterFriendlist_MenuBridge/!BetterFriendlist_MenuBridge.toc"):match("## Version:%s*([^%s]+)")
+equal(bridgeVersion, version, "Both addon manifests use the same version")
+local BFL = { L = {}, VERSION = version, modules = {}, IsRetail = true, IsForever = true, IsClassic = false }
 function BFL:RegisterModule(name, module) self.modules[name] = module; return module end
 function BFL:GetModule(name) return self.modules[name] end
 function BFL:RegisterLocale() end
@@ -49,17 +52,19 @@ execute(read(repo, "Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
 
 -- The same parsed entries feed the standalone window and Settings Center.
 local changelogSource = read(repo, "Modules/Changelog.lua")
-local parseChangelog = execute(changelogSource .. "\nreturn ParseChangelog", "Modules/Changelog.lua")
+local parseChangelog, enableChangelogResize =
+	execute(changelogSource .. "\nreturn ParseChangelog, EnableChangelogResize", "Modules/Changelog.lua")
 local changelog = BFL:GetModule("Changelog")
 local entries = changelog:GetEntries()
-equal(entries[1].version, "2.9.2", "Current release matches the installed version")
-equal(entries[1].date, "2026-10-11", "The current release shows its release date")
-check(not entries[1].isDraft and #entries[1].blocks > 0, "The current release has its own content and is no longer a draft")
-equal(entries[2].version, "2.9.1", "Previous release is preserved")
-check(not entries[2].isDraft and entries[2].date:match("^%d%d%d%d%-%d%d%-%d%d$"), "Released dates are preserved")
+local released, previous = entries[1], entries[2]
+equal(released.version, version, "The newest release matches both manifests")
+equal(released.date, "2026-11-03", "The new release date is shown")
+check(not released.isDraft and #released.blocks > 0, "Released notes keep their content and release state")
+equal(previous.version, "2.9.2", "The previous release is preserved")
+equal(previous.date, "2026-10-11", "The previous release date is preserved")
 local settingsEntries = changelog:GetSettingsCenterEntries(2)
-equal(settingsEntries[1].title, "Version 2.9.2", "Settings Center shows the numeric version too")
-equal(settingsEntries[1].rightText, "2026-10-11", "Settings Center shows the release date instead of the draft label")
+equal(settingsEntries[1].title, "Version " .. version, "Settings Center shows the installed version")
+equal(settingsEntries[1].rightText, entries[1].date, "Settings Center preserves the matching draft or release date")
 check(settingsEntries[1].defaultExpanded and not settingsEntries[2].defaultExpanded, "Only the newest entry starts expanded")
 equal(#changelog:GetSettingsCenterEntries(0), 0, "The entry limit is honored")
 equal(#changelog:GetSettingsCenterEntries(1), 1, "A one-entry limit includes the current release")
@@ -73,6 +78,59 @@ equal(#parsed[2].blocks, 1, "Release content excludes the following draft")
 equal(parsed[3].version, "2.9.2", "Unreleased headings follow the same installed-version rule")
 local markdownRelease = between(read(repo, "CHANGELOG.md"), "## [2.9.2]", "## [2.9.1]")
 equal(between(changelogSource, "## [2.9.2]", "## [2.9.1]"), markdownRelease, "Embedded release notes match CHANGELOG.md")
+
+local savedSize = { width = 1600, height = 620, x = -42, y = 18 }
+local savedWrites = 0
+BFL.modules.DB = {
+	Get = function() return savedSize end,
+	Set = function(_, key, value)
+		equal(key, "changelogWindowSize", "The changelog window geometry uses its existing save key")
+		savedSize = value
+		savedWrites = savedWrites + 1
+	end,
+}
+local function NewResizeWidget()
+	local widget = { scripts = {} }
+	function widget:SetSize(width, height) self.width, self.height = width, height end
+	function widget:GetWidth() return self.width end
+	function widget:GetHeight() return self.height end
+	function widget:SetPoint(_, _, _, x, y) self.x, self.y = x, y end
+	function widget:GetCenter() return self.x, self.y end
+	function widget:GetFrameLevel() return 1 end
+	function widget:SetScript(event, script) self.scripts[event] = script end
+	widget.HookScript = widget.SetScript
+	return setmetatable(widget, { __index = function() return function() end end })
+end
+local resizeFrame = NewResizeWidget()
+local grip = NewResizeWidget()
+env.UIParent = NewResizeWidget()
+env.UIParent:SetSize(1200, 900)
+env.UIParent:SetPoint("CENTER", nil, nil, 600, 450)
+env.CreateFrame = function() return grip end
+enableChangelogResize(resizeFrame)
+equal(resizeFrame:GetWidth(), 1200, "Saved changelog width is capped to the current screen")
+equal(resizeFrame:GetHeight(), 620, "Saved changelog height is restored")
+equal(resizeFrame.x, -42, "Saved horizontal position is restored")
+equal(resizeFrame.y, 18, "Saved vertical position is restored")
+grip.scripts.OnMouseUp()
+equal(savedWrites, 0, "Mouse-up without resizing does not save")
+grip.scripts.OnMouseDown(grip, "LeftButton")
+resizeFrame:SetSize(940, 700)
+resizeFrame:SetPoint("CENTER", nil, nil, 570, 470)
+resizeFrame.scripts.OnHide()
+grip.scripts.OnMouseUp()
+equal(savedWrites, 1, "Closing during resize saves the size once")
+equal(savedSize.width, 940, "The new changelog width is persisted")
+equal(savedSize.height, 700, "The new changelog height is persisted")
+equal(savedSize.x, -30, "Resizing persists the horizontal offset from the screen center")
+equal(savedSize.y, 20, "Resizing persists the vertical offset from the screen center")
+resizeFrame.scripts.OnDragStart()
+resizeFrame:SetPoint("CENTER", nil, nil, 640, 435)
+resizeFrame.scripts.OnDragStop()
+equal(savedWrites, 2, "Moving the window saves its position")
+equal(savedSize.x, 40, "Moving persists the horizontal offset")
+equal(savedSize.y, -15, "Moving persists the vertical offset")
+BFL.modules.DB, env.UIParent, env.CreateFrame = nil, nil, nil
 
 -- Name formatting retains character styling, aliases, privacy and sort behavior.
 local nickname, regional, streamer = "", true, false
@@ -222,14 +280,19 @@ execute(read(statelessSource, "Interface/AddOns/Blizzard_FriendsFrame/Mainline/F
 execute(read(statelessSource, "Interface/AddOns/Blizzard_FriendsFrame/Mainline/FriendsListUtil.lua"), "Blizzard stateless invite helpers")
 local nativeUtil = env.FriendsListUtil
 
--- Reproduce the old cached-local failure before checking BFL's replacement.
+-- Compare the native hidden-frame helpers with BFL's stateless replacement.
 local nativeFrame = read(forever, "Interface/AddOns/Blizzard_FriendsFrame/Camelot/FriendsFrame.lua")
 execute(between(nativeFrame, "local INVITE_RESTRICTION_NO_GAME_ACCOUNTS =", "local FriendListEntries =")
 	.. "\nlocal playerFactionGroup, playerRealmID\n"
 	.. "local function CanInviteByGameMode() return true end\n"
 	.. between(nativeFrame, "function FriendsFrame_GetDisplayedInviteTypeAndGuid(", "local inviteTypeToButtonText ="), "Blizzard cached frame helpers")
 equal(env.FriendsFrame_GetDisplayedInviteTypeAndGuid(1), "INVITE_CROSS_FACTION", "Native hidden-frame cache reproduces the false cross-faction invite")
-equal(env.FriendsFrame_GetInviteRestrictionText(env.FriendsFrame_GetInviteRestriction(1)), "NOT_ALLIED", "Native hidden-frame cache reproduces the false faction restriction")
+-- Newer Forever builds read faction and realm inside the restriction check.
+-- The native displayed-invite helper above still uses the hidden frame's cache.
+local nativeRestriction = between(nativeFrame, "function FriendsFrame_GetInviteRestriction(", "function FriendsFrame_GetInviteRestrictionText(")
+local readsCurrentFaction = nativeRestriction:find('UnitFactionGroup("player")', 1, true) ~= nil
+equal(env.FriendsFrame_GetInviteRestrictionText(env.FriendsFrame_GetInviteRestriction(1)),
+	readsCurrentFaction and "" or "NOT_ALLIED", "Native faction restriction matches the source build")
 local info, restrictionText = BFL.GetBNetInviteTooltipInfo(1)
 equal(info.inviteType, "INVITE", "Stateless helper reads the actual player faction")
 equal(restrictionText, "", "Same-faction Forever account is not blocked")

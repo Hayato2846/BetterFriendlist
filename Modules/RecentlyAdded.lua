@@ -8,10 +8,6 @@ local function GetDB()
 	return BFL:GetModule("DB")
 end
 
-local function GetGroups()
-	return BFL:GetModule("Groups")
-end
-
 -- ========================================
 -- Duration Calculation
 -- ========================================
@@ -119,44 +115,52 @@ end
 -- Snapshot Diffing
 -- ========================================
 
--- Build a set of all current friend UIDs by iterating WoW API directly
-function RecentlyAdded:BuildCurrentFriendSnapshot()
+-- Return nil when any expected identity is still loading or unreadable.
+local function BuildBNetSnapshot()
+	local getInfo = BFL.Compat and BFL.Compat.GetBNetFriendInfo
+	if not BNGetNumFriends or not getInfo or (BNConnected and not BNConnected()) then
+		return
+	end
+
 	local snapshot = {}
-
-	-- BNet friends
-	if BNGetNumFriends then
-		local numBNet = select(1, BNGetNumFriends()) or 0
-		local getInfo = (BFL.Compat and BFL.Compat.GetBNetFriendInfo)
-			or (C_BattleNet and C_BattleNet.GetFriendAccountInfo)
-		if getInfo then
-			for i = 1, numBNet do
-				local accountInfo = getInfo(i)
-				if accountInfo and accountInfo.battleTag and accountInfo.battleTag ~= "" then
-					snapshot["bnet_" .. accountInfo.battleTag] = true
-				end
-			end
+	local count = BNGetNumFriends()
+	if BFL:IsSecret(count) or type(count) ~= "number" then
+		return
+	end
+	for i = 1, count do
+		local accountInfo = getInfo(i)
+		local battleTag = accountInfo and accountInfo.battleTag
+		if not BFL:IsSecret(battleTag) and type(battleTag) == "string" and battleTag ~= "" then
+			snapshot["bnet_" .. battleTag] = true
+		elseif not (accountInfo and BFL.IsTitleFriend and BFL.IsTitleFriend(accountInfo)) then
+			return
 		end
 	end
-
-	-- WoW friends
-	if BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList() then
-		local numWoW = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-		for i = 1, numWoW do
-			local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
-			if friendInfo and friendInfo.name then
-				local normalizedName = BFL:NormalizeWoWFriendName(friendInfo.name)
-				if normalizedName then
-					snapshot["wow_" .. normalizedName] = true
-				end
-			end
-		end
-	end
-
 	return snapshot
 end
 
+local function BuildWoWSnapshot()
+	if not (BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList()) then
+		return
+	end
+
+	local snapshot = {}
+	for i = 1, BFL.GetNumWoWFriends() do
+		local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
+		local name = friendInfo and friendInfo.name
+		local normalizedName = not BFL:IsSecret(name) and BFL:NormalizeWoWFriendName(name)
+		if not normalizedName then
+			return
+		end
+		snapshot["wow_" .. normalizedName] = true
+	end
+	return snapshot
+end
+
+local snapshotBuilders = { bnet = BuildBNetSnapshot, wow = BuildWoWSnapshot }
+
 -- Compare current snapshot against stored known UIDs and record new friends
-function RecentlyAdded:PerformSnapshotDiff()
+function RecentlyAdded:PerformSnapshotDiff(source, settleBaseline)
 	if not BetterFriendlistDB then
 		return
 	end
@@ -179,30 +183,36 @@ function RecentlyAdded:PerformSnapshotDiff()
 		BetterFriendlistDB.recentlyAddedTimestamps = {}
 	end
 
-	local currentSnapshot = self:BuildCurrentFriendSnapshot()
 	local knownUIDs = BetterFriendlistDB.knownFriendUIDs
 	local timestamps = BetterFriendlistDB.recentlyAddedTimestamps
 	local now = time()
 	local changed = false
 
-	-- Detect NEW friends (in current but not in known)
-	for uid in pairs(currentSnapshot) do
-		if not knownUIDs[uid] then
-			knownUIDs[uid] = true
-			timestamps[uid] = now
-			changed = true
+	for kind, buildSnapshot in pairs(snapshotBuilders) do
+		if not source or source == kind then
+			local snapshot = buildSnapshot()
+			self.incomplete[kind] = snapshot == nil
+			if snapshot then
+				for uid in pairs(snapshot) do
+					if not knownUIDs[uid] then
+						knownUIDs[uid] = true
+						if self.ready[kind] then
+							timestamps[uid] = now
+							changed = true
+						end
+					end
+				end
+				-- A startup zero can mean the service has yet to load. Wait for
+				-- a populated list before treating unknown identities as additions.
+				if settleBaseline and next(snapshot) then
+					self.ready[kind] = true
+				end
+			end
 		end
 	end
 
-	-- Detect REMOVED friends (in known but not in current)
-	for uid in pairs(knownUIDs) do
-		if not currentSnapshot[uid] then
-			knownUIDs[uid] = nil
-			timestamps[uid] = nil
-			changed = true
-		end
-	end
-
+	-- Snapshot absence alone cannot confirm that a friendship ended.
+	-- Keep known identities so partial lists cannot turn them into new friends.
 	-- Prune expired timestamps
 	local duration = self:GetDurationSeconds()
 	for uid, ts in pairs(timestamps) do
@@ -221,60 +231,60 @@ end
 -- Initialization
 -- ========================================
 
-function RecentlyAdded:Initialize()
+function RecentlyAdded:UpdateSource(source)
 	local DB = GetDB()
-	if not DB or not BetterFriendlistDB then
+	if not DB or not DB:Get("enableRecentlyAddedGroup", false) then
 		return
 	end
 
-	-- Ensure tables exist
-	if not BetterFriendlistDB.knownFriendUIDs then
-		BetterFriendlistDB.knownFriendUIDs = {}
-	end
-	if not BetterFriendlistDB.recentlyAddedTimestamps then
-		BetterFriendlistDB.recentlyAddedTimestamps = {}
+	self:PerformSnapshotDiff(source)
+	if self.ready[source] then
+		return
 	end
 
-	-- First activation: if knownFriendUIDs is empty and feature is enabled,
-	-- populate with all current friends so the group starts empty
-	if DB:Get("enableRecentlyAddedGroup", false) then
-		if not next(BetterFriendlistDB.knownFriendUIDs) then
-			local snapshot = self:BuildCurrentFriendSnapshot()
-			for uid in pairs(snapshot) do
-				BetterFriendlistDB.knownFriendUIDs[uid] = true
-			end
-		end
+	-- Allow successive startup updates to settle before finalizing the baseline.
+	if self.baselineTimers[source] then
+		self.baselineTimers[source]:Cancel()
 	end
+	local timer = C_Timer.NewTimer(1, function()
+		self.baselineTimers[source] = nil
+		self:PerformSnapshotDiff(source, true)
+	end)
+	self.baselineTimers[source] = timer
+end
 
-	-- Register event callbacks with priority 5 (before FriendsList at priority 10)
-	-- so timestamps are updated before BuildDisplayList reads them
+function RecentlyAdded:Initialize()
+	self.ready = {}
+	self.incomplete = {}
+	self.baselineTimers = {}
+	self:OnFeatureEnabled()
+
+	-- Update timestamps before FriendsList builds its display list (priority 10).
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
-		self:PerformSnapshotDiff()
+		self:UpdateSource("wow")
 	end, 5)
 	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function()
-		self:PerformSnapshotDiff()
+		self:UpdateSource("bnet")
+	end, 5)
+	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
+		if not self.ready.bnet or self.incomplete.bnet then
+			self:UpdateSource("bnet")
+		end
+	end, 5)
+	BFL:RegisterEventCallback("BN_CONNECTED", function()
+		self:UpdateSource("bnet")
+	end, 5)
+	BFL:RegisterEventCallback("BN_DISCONNECTED", function()
+		self.ready.bnet = nil
+		if self.baselineTimers.bnet then
+			self.baselineTimers.bnet:Cancel()
+			self.baselineTimers.bnet = nil
+		end
 	end, 5)
 end
 
--- Called when the feature is toggled on in settings
 function RecentlyAdded:OnFeatureEnabled()
-	if not BetterFriendlistDB then
-		return
-	end
-
-	-- Populate known UIDs with current friends so group starts empty
-	if not BetterFriendlistDB.knownFriendUIDs then
-		BetterFriendlistDB.knownFriendUIDs = {}
-	end
-
-	if not next(BetterFriendlistDB.knownFriendUIDs) then
-		local snapshot = self:BuildCurrentFriendSnapshot()
-		for uid in pairs(snapshot) do
-			BetterFriendlistDB.knownFriendUIDs[uid] = true
-		end
-	end
-
-	if not BetterFriendlistDB.recentlyAddedTimestamps then
-		BetterFriendlistDB.recentlyAddedTimestamps = {}
-	end
+	wipe(self.ready)
+	self:UpdateSource("wow")
+	self:UpdateSource("bnet")
 end

@@ -141,6 +141,7 @@ function BFL:IsFriendsTabAllowed(tabIndex)
 		return not self:IsGameRuleActive("DisableRaidGroups")
 	elseif tabIndex == 4 then
 		return not self:IsGameRuleActive("DisableQuickJoin")
+			and (not self.GetQuickJoinGroupFinderAccess or self.GetQuickJoinGroupFinderAccess())
 	end
 	return true
 end
@@ -217,6 +218,9 @@ function BFL:GetCompatibilityDiagnostics()
 			editMode = self.HasEditMode == true,
 			guildPreferredPlaySettings = preferredPlaySettingsAvailable == true,
 			battleNetBlockAPI = self.CanSetBNetBlocked and self.CanSetBNetBlocked() or false,
+			realIDFriendsEnabled = self.AreRealIDFriendsEnabled and self.AreRealIDFriendsEnabled() or false,
+			raidListSupported = self.IsRaidListSupported and self.IsRaidListSupported() or false,
+			raidListEnabled = self.IsRaidListEnabled and self.IsRaidListEnabled() or false,
 			ageVerificationRestrictions = C_SocialRestrictions ~= nil
 				and type(C_SocialRestrictions.IsAgeVerificationRestricted) == "function",
 			regionalUniqueNames = self.AreRegionalUniqueNamesEnabled

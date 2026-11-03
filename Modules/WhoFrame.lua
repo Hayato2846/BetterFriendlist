@@ -191,21 +191,17 @@ function WhoFrame:HasStructuredWhoFilters()
 	if self._testStructuredWhoFilters ~= nil then
 		return self._testStructuredWhoFilters == true
 	end
-	-- Build 1.60.1.70009 accepts Blizzard's structured filter payload but
-	-- rejects an addon-created third argument. Keep BFL's own Who UI and use
-	-- its established text-query path on Forever.
-	if BFL.IsForever then
-		return false
-	end
-	local api = GetFriendListAPI(self)
-	return api ~= nil
-		and type(api.SendWho) == "function"
-		and type(api.GetWhoRaceFilters) == "function"
+	-- API presence and Blizzard-owned payloads do not prove addon access.
+	-- Forever rejects addon-created tables; PTR 12.1.7 has the same restriction
+	-- metadata. Enable only in tests until an in-client addon test proves access.
+	return false
 end
 
--- Forever deliberately keeps the legacy two-argument call. Other clients can
--- use the structured third argument when their API exposes that capability.
+-- Production always keeps the proven two-argument call inside the user's
+-- hardware event. The structured path below exists for contract tests only.
 function WhoFrame:DispatchWhoRequest(text, origin, filters)
+	if BFL.IsSecret and (BFL:IsSecret(text) or BFL:IsSecret(origin)) then return false end
+	if text ~= nil and type(text) ~= "string" then return false end
 	local requestText = text or ""
 	local requestOrigin = origin
 	if requestOrigin == nil and Enum and Enum.SocialWhoOrigin then
@@ -1906,6 +1902,13 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 	if not self:IsAvailable() then
 		return
 	end
+	if (BFL.IsSocialActionRestricted and BFL.IsSocialActionRestricted())
+		or (BFL.IsSecret and (BFL:IsSecret(text) or BFL:IsSecret(origin)))
+		or (text ~= nil and type(text) ~= "string")
+		or (origin ~= nil and type(origin) ~= "number")
+	then
+		return false
+	end
 	-- Throttle: Prevent queries faster than the server allows
 	local now = GetTime()
 	if self.lastWhoSendTime and (now - self.lastWhoSendTime < WHO_COOLDOWN) then
@@ -1918,12 +1921,18 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 	if (not text or text == "") and not filters then
 		-- Use default Who command if no text provided
 		local level = UnitLevel("player")
+		local zone, levelCap = GetRealZoneText(), GetMaxPlayerLevel()
+		if (BFL.IsSecret and (BFL:IsSecret(level) or BFL:IsSecret(zone) or BFL:IsSecret(levelCap)))
+			or type(level) ~= "number" or type(zone) ~= "string" or type(levelCap) ~= "number"
+			or level ~= level or level <= 0 or level == math.huge
+			or levelCap ~= levelCap or levelCap <= 0 or levelCap == math.huge
+		then return false end
 		local minLevel = level - 3
 		if minLevel <= 0 then
 			minLevel = 1
 		end
-		local maxLevel = math.min(level + 3, GetMaxPlayerLevel())
-		text = 'z-"' .. GetRealZoneText() .. '" ' .. minLevel .. "-" .. maxLevel
+		local maxLevel = math.min(level + 3, levelCap)
+		text = 'z-"' .. zone .. '" ' .. minLevel .. "-" .. maxLevel
 	end
 
 	-- Record send time and set pending state
@@ -1963,7 +1972,10 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 	-- CRITICAL: Set Who routing IMMEDIATELY before each SendWho call
 	C_FriendList.SetWhoToUi(true)
 
-	return self:DispatchWhoRequest(text, origin, filters)
+	local sent = self:DispatchWhoRequest(text, origin, filters)
+	local searches = BFL:GetModule("WhoSearches")
+	if sent and searches then searches:Record(text) end
+	return sent
 end
 
 -- Show "Searching..." in the totals area while waiting for results
@@ -2319,13 +2331,6 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 	-- Always update currentSort when preserveDirection is true (for re-sorting)
 	if preserveDirection then
 		BetterFriendsFrame.WhoFrame.currentSort = sortType
-	end
-
-	-- Forever's SortWho accepts an explicit direction. Apply it before reading
-	-- the result array, then retain BFL's stable secondary/tertiary local sort.
-	local friendListAPI = GetFriendListAPI(self)
-	if self:HasStructuredWhoFilters() and friendListAPI and type(friendListAPI.SortWho) == "function" then
-		pcall(friendListAPI.SortWho, sortType, BetterFriendsFrame.WhoFrame.sortAscending == true)
 	end
 
 	-- Client-side sort: Get all WHO data and sort it locally
@@ -2730,10 +2735,12 @@ function WhoFrame:HandleCtrlClick(button)
 	local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
 	if editBox then
 		editBox:SetText(searchText)
-		editBox:ClearFocus()
 	end
 
+	-- Use the same widget-sourced text path as the builder/Refresh on Forever.
+	searchText = self:ResolveBuilderDispatchRequest(editBox, searchText)
 	self:SendWhoRequest(searchText)
+	if editBox then editBox:ClearFocus() end
 end
 
 -- ========================================
@@ -3853,6 +3860,8 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	icon:SetPoint("CENTER")
 	SetModernBFLIconColor(icon, 0.7, 0.7, 0.7, 1)
 	toggleBtn.icon = icon
+	local searches = BFL:GetModule("WhoSearches")
+	if searches then searches:AttachButton(editBox, toggleBtn) end
 
 	toggleBtn:SetScript("OnEnter", function(self)
 		SetModernBFLIconColor(self.icon, 1, 1, 1, 1)
@@ -4790,6 +4799,7 @@ function WhoFrame:ApplyQueryToBuilder(query)
 	end
 
 	local parsed = self:ParseWhoQuery(query)
+	self.builder.importedQuery, self.builder.importedFieldsQuery = nil, nil
 	self.applyingBuilderQuery = true
 	if self.builder.nameInput then self.builder.nameInput:SetText(parsed.name) end
 	if self.builder.guildInput then self.builder.guildInput:SetText(parsed.guild) end
@@ -4810,6 +4820,10 @@ function WhoFrame:ApplyQueryToBuilder(query)
 		self.builder.RebuildRaceDropdown()
 	end
 	self.applyingBuilderQuery = false
+	-- The builder has narrower fields than free-form Who syntax. Preserve the
+	-- exact imported text (including long names/unknown terms) until a field edit.
+	self.builder.importedFieldsQuery = self:ComposeBuilderQuery()
+	self.builder.importedQuery = query
 	self:UpdateBuilderPreview()
 	return true
 end
@@ -4863,7 +4877,14 @@ function WhoFrame:ComposeBuilderQuery(options)
 		table.insert(parts, extraQuery)
 	end
 
-	return table.concat(parts, " ")
+	local query = table.concat(parts, " ")
+	if not options.omitClass and not options.omitRace and self.builder.importedQuery then
+		if query == self.builder.importedFieldsQuery then
+			return self.builder.importedQuery
+		end
+		self.builder.importedQuery, self.builder.importedFieldsQuery = nil, nil
+	end
+	return query
 end
 
 function WhoFrame:BuildBuilderRequest()

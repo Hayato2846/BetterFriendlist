@@ -1754,7 +1754,13 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 		end)
 	end
 
-	-- Expose Checkboxes for Skinning
+	-- The dark skin draws one border for each checkbox in this grid.
+	if leftCheck then
+		leftCheck.BFL_SettingsGridCheck = true
+	end
+	if rightCheck then
+		rightCheck.BFL_SettingsGridCheck = true
+	end
 	holder.LeftCheckbox = leftCheck
 	holder.RightCheckbox = rightCheck
 

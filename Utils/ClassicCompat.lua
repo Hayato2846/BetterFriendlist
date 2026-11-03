@@ -739,7 +739,7 @@ end
 -- Retail 11.0+: UnitPopup_OpenMenu(menuType, contextData)
 -- Classic: UnitPopup_ShowMenu(dropdown, which, unit, name, userData)
 
-function Compat.OpenUnitPopupMenu(menuType, contextData)
+local function PrepareUnitPopupContext(menuType, contextData)
 	-- Mark BFL-created menu contexts directly. Global flags are fragile because
 	-- Menu.ModifyMenu callbacks may run in an order we do not control.
 	if contextData then
@@ -748,14 +748,18 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
 
 	-- Streamer Mode Interception for Context Menu Header (Added 2026-02-01)
 	if BFL.StreamerMode and BFL.StreamerMode:IsActive() and contextData then
+		if menuType == "BN_FRIEND" or menuType == "BN_FRIEND_OFFLINE" then
+			contextData.bfl_streamerDisplayName = UNKNOWN or "Unknown"
+		end
 		local FriendsList = BFL:GetModule("FriendsList")
 		if FriendsList and FriendsList.friendsList then
 			local friend = nil
 
 			-- 1. Try BNet ID (Most reliable for BNet)
-			if contextData.bnetIDAccount then
+			local bnetIDAccount = contextData.bnetIDAccount
+			if not BFL:IsSecret(bnetIDAccount) and bnetIDAccount then
 				for _, f in ipairs(FriendsList.friendsList) do
-					if f.type == "bnet" and f.bnetAccountID == contextData.bnetIDAccount then
+					if f.type == "bnet" and not BFL:IsSecret(f.bnetAccountID) and f.bnetAccountID == bnetIDAccount then
 						friend = f
 						break
 					end
@@ -808,6 +812,10 @@ function Compat.OpenUnitPopupMenu(menuType, contextData)
 		end
 	end
 
+end
+
+function Compat.OpenUnitPopupMenu(menuType, contextData)
+	PrepareUnitPopupContext(menuType, contextData)
 	if UnitPopup_OpenMenu then
 		-- Retail: Modern API
 		UnitPopup_OpenMenu(menuType, contextData)
@@ -979,7 +987,9 @@ end
 function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeight)
 	options = options or {}
 	if Compat.IsModernDropdown(dropdown) then
-		if dropdown.SetSelectionTranslator then
+		if options.getCombinedSelectionText and dropdown.SetSelectionText then
+			dropdown:SetSelectionText(options.getCombinedSelectionText)
+		elseif dropdown.SetSelectionTranslator then
 			dropdown:SetSelectionTranslator(function(selection)
 				return GetDropdownSelectionText(options, selection and selection.data, selection and selection.text)
 			end)
@@ -1357,6 +1367,64 @@ local function SafeBooleanAPICall(apiFunction, fallback, ...)
 	return value == true
 end
 
+-- These checks do not grant secure execution or a hardware event. Callers must
+-- still satisfy each API's restrictions; this helper never queues an action.
+function Compat.IsSocialActionRestricted()
+	if InCombatLockdown and InCombatLockdown() then
+		return true
+	end
+	if BFL.IsActionRestricted then
+		local ok, restricted = pcall(BFL.IsActionRestricted, BFL)
+		return not ok or (BFL.IsSecret and BFL:IsSecret(restricted)) or restricted == true
+	end
+	return false
+end
+
+function Compat.IsRaidListSupported()
+	local api = C_PartyInfo and C_PartyInfo.IsRaidListSupported
+	return type(api) ~= "function" or SafeBooleanAPICall(api, false)
+end
+
+function Compat.IsRaidListEnabled()
+	local api = C_PartyInfo and C_PartyInfo.IsRaidListEnabled
+	return type(api) ~= "function" or SafeBooleanAPICall(api, false)
+end
+
+function Compat.CanPromoteToLeader()
+	local api = C_PartyInfo and C_PartyInfo.CanPromoteToLeader
+	return type(api) ~= "function" or SafeBooleanAPICall(api, false)
+end
+
+function Compat.AreRealIDFriendsEnabled()
+	if C_BattleNet and type(C_BattleNet.AreRealIDFriendsEnabled) == "function" then
+		return SafeBooleanAPICall(C_BattleNet.AreRealIDFriendsEnabled, false)
+	end
+	-- BNGetInfo's seventh return is the legacy Real ID capability.
+	if type(BNGetInfo) == "function" then
+		local ok, _, _, _, _, _, _, enabled = pcall(BNGetInfo)
+		return ok and not (BFL.IsSecret and BFL:IsSecret(enabled)) and enabled == true
+	end
+	return false
+end
+
+function Compat.GetBNetFriendLevelLabel(friendLevel)
+	if BFL.IsSecret and BFL:IsSecret(friendLevel) then
+		return nil
+	end
+	local levels = Enum and Enum.BattleNetFriendLevel
+	if type(friendLevel) ~= "number" or not levels then
+		return nil
+	end
+	if levels.Title and friendLevel == levels.Title then
+		return BFL.L.FRIEND_TYPE_WOW
+	elseif levels.BattleTag and friendLevel == levels.BattleTag then
+		return BFL.L.FRIEND_TYPE_BATTLETAG
+	elseif levels.RealID and friendLevel == levels.RealID then
+		return BFL.L.FRIEND_TYPE_REAL_ID
+	end
+	return nil
+end
+
 -- Forever moved Battle.net block mutations into C_BattleNet. Keep the legacy
 -- global only as an older-client fallback and contain restricted/secret input.
 function Compat.CanSetBNetBlocked()
@@ -1365,13 +1433,16 @@ function Compat.CanSetBNetBlocked()
 end
 
 function Compat.SetBNetBlocked(bnetIDAccount, blocked)
-	if bnetIDAccount == nil or (BFL.IsSecret and BFL:IsSecret(bnetIDAccount)) then
+	if Compat.IsSocialActionRestricted()
+		or (BFL.IsSecret and (BFL:IsSecret(bnetIDAccount) or BFL:IsSecret(blocked)))
+		or bnetIDAccount == nil
+	then
 		return false
 	end
 	if type(bnetIDAccount) == "string" then
 		bnetIDAccount = tonumber(bnetIDAccount)
 	end
-	if type(bnetIDAccount) ~= "number" then
+	if type(bnetIDAccount) ~= "number" or bnetIDAccount <= 0 or bnetIDAccount % 1 ~= 0 then
 		return false
 	end
 	local setter = C_BattleNet and C_BattleNet.SetBlocked or BNSetBlocked
@@ -1829,8 +1900,35 @@ function Compat.IsSocialQueueSupported()
 	return C_SocialQueue.GetAllGroups ~= nil
 end
 
+function Compat.GetQuickJoinGroupFinderAccess()
+	if not BFL.IsForever or not C_LFGInfo then
+		return true
+	end
+
+	-- Match Blizzard's LFD micro button on Forever's premade-only Group Finder.
+	local canUseGroupFinder = C_LFGInfo.CanPlayerUseGroupFinder
+	local vanillaStyle = Enum and Enum.PremadeGroupFinderStyle and Enum.PremadeGroupFinderStyle.Vanilla
+	if vanillaStyle ~= nil and C_LFGList and C_LFGList.GetPremadeGroupFinderStyle then
+		local ok, style = pcall(C_LFGList.GetPremadeGroupFinderStyle)
+		if not ok or (BFL.IsSecret and BFL:IsSecret(style)) then
+			return false
+		end
+		if style == vanillaStyle then
+			canUseGroupFinder = C_LFGInfo.CanPlayerUsePremadeGroup
+		end
+	end
+	if not canUseGroupFinder then
+		return true
+	end
+	local ok, canUse, reason = pcall(canUseGroupFinder)
+	if not ok or (BFL.IsSecret and BFL:IsSecret(canUse)) then
+		return false
+	end
+	return canUse == true, reason
+end
+
 function Compat.IsSocialQueueEnabled()
-	if not Compat.IsSocialQueueSupported() then
+	if not Compat.IsSocialQueueSupported() or not Compat.GetQuickJoinGroupFinderAccess() then
 		return false
 	end
 	if C_SocialQueue.IsSystemEnabled then
@@ -2731,8 +2829,7 @@ end
 
 function Compat.AreTitleFriendsEnabled()
 	if C_BattleNet and C_BattleNet.AreTitleFriendsEnabled then
-		local ok, enabled = pcall(C_BattleNet.AreTitleFriendsEnabled)
-		return ok and enabled == true
+		return SafeBooleanAPICall(C_BattleNet.AreTitleFriendsEnabled, false)
 	end
 	return false
 end
@@ -2764,13 +2861,18 @@ local function EnsureAddOnLoadedCompat(addOnName)
 	return IsAddOnLoadedCompat(addOnName)
 end
 
-local function RequestTitleFriendInviteConfirmation(name)
+local function RequestTitleFriendInviteConfirmation(name, requireIdleDialog)
 	if not BFL.IsRetail
 		or not EventRegistry
 		or not EventRegistry.TriggerEvent
 		or not EnsureAddOnLoadedCompat("Blizzard_AddFriend")
 		or not BattleNetInviteFrame
 		or not BattleNetInviteFrame.OnTitleFriendInviteByNameRequested
+	then
+		return false
+	end
+	if requireIdleDialog and ((BattleNetInviteFrame.IsForbidden and BattleNetInviteFrame:IsForbidden())
+		or BattleNetInviteFrame:IsShown())
 	then
 		return false
 	end
@@ -2781,7 +2883,18 @@ local function RequestTitleFriendInviteConfirmation(name)
 		"BattleNetInviteFrame.TitleFriendInviteByNameRequested",
 		name
 	)
+	if requireIdleDialog then
+		return ok == true and BattleNetInviteFrame:IsShown() and BattleNetInviteFrame or false
+	end
 	return ok == true
+end
+
+-- Opens only the Blizzard confirmation. The native Send button owns the invite.
+function Compat.RequestTitleFriendInviteConfirmation(name)
+	if IsSafeNameValue(name) and Compat.AreTitleFriendsEnabled() then
+		return RequestTitleFriendInviteConfirmation(name, true)
+	end
+	return false
 end
 
 local function RequestBattleTagFriendInviteByIDConfirmation(bnetIDAccount, accountName)
@@ -2810,7 +2923,7 @@ end
 -- This wrapper must only be called from a hardware-event path because the
 -- title-friend API is restricted and only accepts untainted arguments.
 function Compat.SendTitleFriendInviteByName(name)
-	if not name or (BFL.IsSecret and BFL:IsSecret(name)) then
+	if not IsSafeNameValue(name) then
 		return false
 	end
 	if Compat.AreTitleFriendsEnabled() and C_BattleNet and C_BattleNet.SendTitleFriendInviteByName then
@@ -2871,23 +2984,31 @@ end
 function Compat.AreTitleFriendCustomNamesEnabled()
 	if C_BattleNet and C_BattleNet.AreTitleFriendCustomNamesEnabled then
 		local ok, enabled = pcall(C_BattleNet.AreTitleFriendCustomNamesEnabled)
-		return ok and enabled == true
+		return ok and not (BFL.IsSecret and BFL:IsSecret(enabled)) and enabled == true
 	end
 	return false
 end
 
 function Compat.IsTitleFriend(accountInfo)
-	return accountInfo
-		and Enum
-		and Enum.BattleNetFriendLevel
-		and accountInfo.friendLevel == Enum.BattleNetFriendLevel.Title
+	if (BFL.IsSecret and BFL:IsSecret(accountInfo)) or type(accountInfo) ~= "table" then return false end
+	if BFL.IsSecret and BFL:IsSecret(accountInfo.friendLevel) then
+		return false
+	end
+	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
+	return titleLevel ~= nil and accountInfo.friendLevel == titleLevel
 end
 
 function Compat.IsOfflineTitleFriend(accountInfoOrFriend, isOffline)
-	if not accountInfoOrFriend then
+	if (BFL.IsSecret and (BFL:IsSecret(accountInfoOrFriend) or BFL:IsSecret(isOffline))) or type(accountInfoOrFriend) ~= "table" then
 		return false
 	end
-	local accountInfo = accountInfoOrFriend.accountInfo or accountInfoOrFriend
+	local accountInfo = accountInfoOrFriend.accountInfo
+	if BFL.IsSecret and BFL:IsSecret(accountInfo) then return false end
+	accountInfo = accountInfo or accountInfoOrFriend
+	if type(accountInfo) ~= "table" then return false end
+	if BFL.IsSecret and (BFL:IsSecret(accountInfoOrFriend.friendLevel) or BFL:IsSecret(accountInfo.friendLevel)) then
+		return false
+	end
 	local friendLevel = accountInfoOrFriend.friendLevel or accountInfo.friendLevel
 	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
 	if not titleLevel or friendLevel ~= titleLevel then
@@ -2896,6 +3017,9 @@ function Compat.IsOfflineTitleFriend(accountInfoOrFriend, isOffline)
 	if isOffline ~= nil then
 		return isOffline == true
 	end
+	if BFL.IsSecret and (BFL:IsSecret(accountInfoOrFriend.connected) or BFL:IsSecret(accountInfoOrFriend.isOnline)) then
+		return false
+	end
 	if accountInfoOrFriend.connected ~= nil then
 		return accountInfoOrFriend.connected == false
 	end
@@ -2903,7 +3027,8 @@ function Compat.IsOfflineTitleFriend(accountInfoOrFriend, isOffline)
 		return accountInfoOrFriend.isOnline == false
 	end
 	local gameAccountInfo = accountInfo.gameAccountInfo
-	return gameAccountInfo ~= nil and gameAccountInfo.isOnline == false
+	if (BFL.IsSecret and BFL:IsSecret(gameAccountInfo)) or type(gameAccountInfo) ~= "table" then return false end
+	return not (BFL.IsSecret and BFL:IsSecret(gameAccountInfo.isOnline)) and gameAccountInfo.isOnline == false
 end
 
 function Compat.GetCustomTitleFriendName(id)
@@ -2926,29 +3051,45 @@ end
 
 -- Invite a unit to party
 function Compat.InviteUnit(name)
+	if (BFL.IsSecret and BFL:IsSecret(name))
+		or type(name) ~= "string" or name == ""
+	then
+		return false
+	end
 	if C_PartyInfo and C_PartyInfo.InviteUnit then
 		C_PartyInfo.InviteUnit(name)
+		return true
 	elseif InviteUnit then
 		InviteUnit(name)
+		return true
 	end
+	return false
 end
 
 -- Convert party to raid
 function Compat.ConvertToRaid()
+	if Compat.IsSocialActionRestricted() then return false end
 	if C_PartyInfo and C_PartyInfo.ConvertToRaid then
 		C_PartyInfo.ConvertToRaid()
+		return true
 	elseif ConvertToRaid then
 		ConvertToRaid()
+		return true
 	end
+	return false
 end
 
 -- Convert raid to party
 function Compat.ConvertToParty()
+	if Compat.IsSocialActionRestricted() then return false end
 	if C_PartyInfo and C_PartyInfo.ConvertToParty then
 		C_PartyInfo.ConvertToParty()
+		return true
 	elseif ConvertToParty then
 		ConvertToParty()
+		return true
 	end
+	return false
 end
 
 -- Request invite from unit (Retail only usually)
@@ -3004,10 +3145,18 @@ function Compat.ConfirmReadyCheck(isReady)
 end
 
 local function GetExactPlayerNameForPartyAction(nameOrUnit)
-	if type(nameOrUnit) ~= "string" or nameOrUnit == "" then
-		return nameOrUnit, false
+	if (BFL.IsSecret and BFL:IsSecret(nameOrUnit)) or type(nameOrUnit) ~= "string" or nameOrUnit == "" then
+		return nil, false
 	end
-	if not (UnitExists and UnitExists(nameOrUnit)) then
+	local exists = false
+	if type(UnitExists) == "function" then
+		local ok, value = pcall(UnitExists, nameOrUnit)
+		if not ok or (BFL.IsSecret and BFL:IsSecret(value)) or type(value) ~= "boolean" then
+			return nil, false
+		end
+		exists = value
+	end
+	if not exists then
 		return nameOrUnit, false
 	end
 
@@ -3015,21 +3164,28 @@ local function GetExactPlayerNameForPartyAction(nameOrUnit)
 	if UnitFullName then
 		name, realm = UnitFullName(nameOrUnit)
 	end
+	if BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(realm)) then return nil, false end
 	if not name and UnitName then
 		name, realm = UnitName(nameOrUnit)
 	end
-	if not name or name == "" then
-		return nameOrUnit, false
+	if BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(realm)) then return nil, false end
+	if type(name) ~= "string" or name == "" or name == UNKNOWN or name == UNKNOWNOBJECT then
+		return nil, false
 	end
 	if not realm or realm == "" then
-		realm = GetNormalizedRealmName and GetNormalizedRealmName() or nil
+		if GetNormalizedRealmName then realm = GetNormalizedRealmName() end
 	end
+	if (BFL.IsSecret and BFL:IsSecret(realm)) or (realm ~= nil and type(realm) ~= "string") then return nil, false end
 
 	local isSameRealm = false
 	if UnitRealmRelationship and LE_REALM_RELATION_SAME then
-		isSameRealm = UnitRealmRelationship(nameOrUnit) == LE_REALM_RELATION_SAME
+		local relationship = UnitRealmRelationship(nameOrUnit)
+		if BFL.IsSecret and BFL:IsSecret(relationship) then return nil, false end
+		isSameRealm = relationship == LE_REALM_RELATION_SAME
 	elseif realm and GetNormalizedRealmName then
-		isSameRealm = realm == GetNormalizedRealmName()
+		local playerRealm = GetNormalizedRealmName()
+		if BFL.IsSecret and BFL:IsSecret(playerRealm) then return nil, false end
+		isSameRealm = realm == playerRealm
 	end
 
 	if realm and realm ~= "" and not isSameRealm then
@@ -3039,6 +3195,7 @@ local function GetExactPlayerNameForPartyAction(nameOrUnit)
 end
 
 function Compat.PromoteToAssistant(name, exactNameMatch)
+	if Compat.IsSocialActionRestricted() or (BFL.IsSecret and BFL:IsSecret(exactNameMatch)) then return false end
 	local exactName, exactFromUnit = GetExactPlayerNameForPartyAction(name)
 	if exactName == nil or exactName == "" then
 		return false
@@ -3057,6 +3214,11 @@ function Compat.PromoteToAssistant(name, exactNameMatch)
 end
 
 function Compat.PromoteToLeader(name, exactNameMatch)
+	if Compat.IsSocialActionRestricted() or not Compat.CanPromoteToLeader()
+		or (BFL.IsSecret and BFL:IsSecret(exactNameMatch))
+	then
+		return false
+	end
 	local exactName, exactFromUnit = GetExactPlayerNameForPartyAction(name)
 	if exactName == nil or exactName == "" then
 		return false
@@ -3075,6 +3237,7 @@ function Compat.PromoteToLeader(name, exactNameMatch)
 end
 
 function Compat.DemoteAssistant(name, exactNameMatch)
+	if Compat.IsSocialActionRestricted() or (BFL.IsSecret and BFL:IsSecret(exactNameMatch)) then return false end
 	local exactName, exactFromUnit = GetExactPlayerNameForPartyAction(name)
 	if exactName == nil or exactName == "" then
 		return false
@@ -3093,6 +3256,7 @@ function Compat.DemoteAssistant(name, exactNameMatch)
 end
 
 function Compat.SetEveryoneIsAssistant(isAssistant)
+	if Compat.IsSocialActionRestricted() or (BFL.IsSecret and BFL:IsSecret(isAssistant)) then return false end
 	isAssistant = not not isAssistant
 	if C_PartyInfo and C_PartyInfo.SetEveryoneIsAssistant then
 		C_PartyInfo.SetEveryoneIsAssistant(isAssistant)
@@ -3479,6 +3643,7 @@ BFL.OpenContextMenu = function(button, menuType, contextData, name)
 		contextData.ownerFrame = contextData.ownerFrame or button
 	end
 	if BFL.HasSecretValues and BFL.OpenBetterFriendlistContextMenu then
+		PrepareUnitPopupContext(menuType, contextData)
 		if BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name) then
 			return
 		end
@@ -3536,6 +3701,12 @@ BFL.SearchBattleNetFriends = Compat.SearchBattleNetFriends
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
 BFL.CanSetBNetBlocked = Compat.CanSetBNetBlocked
+BFL.IsSocialActionRestricted = Compat.IsSocialActionRestricted
+BFL.IsRaidListSupported = Compat.IsRaidListSupported
+BFL.IsRaidListEnabled = Compat.IsRaidListEnabled
+BFL.CanPromoteToLeader = Compat.CanPromoteToLeader
+BFL.AreRealIDFriendsEnabled = Compat.AreRealIDFriendsEnabled
+BFL.GetBNetFriendLevelLabel = Compat.GetBNetFriendLevelLabel
 BFL.SetBNetBlocked = Compat.SetBNetBlocked
 BFL.CanBlockBNetFriendInvite = Compat.CanBlockBNetFriendInvite
 BFL.CanBlockBNetAccount = Compat.CanBlockBNetAccount
@@ -3556,6 +3727,7 @@ BFL.ReplaceSurnameSeparatorWithLinkSeparator = Compat.ReplaceSurnameSeparatorWit
 BFL.NormalizePlayerIdentityName = Compat.NormalizePlayerName
 BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled
 BFL.SendTitleFriendInviteByName = Compat.SendTitleFriendInviteByName
+BFL.RequestTitleFriendInviteConfirmation = Compat.RequestTitleFriendInviteConfirmation
 BFL.SendBattleTagFriendInviteByID = Compat.SendBattleTagFriendInviteByID
 BFL.AreTitleFriendCustomNamesEnabled = Compat.AreTitleFriendCustomNamesEnabled
 BFL.IsTitleFriend = Compat.IsTitleFriend
@@ -3567,6 +3739,7 @@ BFL.IsRAFSystemEnabled = Compat.IsRAFSystemEnabled
 BFL.CanSummonRAFFriend = Compat.CanSummonRAFFriend
 BFL.IsSocialQueueSupported = Compat.IsSocialQueueSupported
 BFL.IsSocialQueueEnabled = Compat.IsSocialQueueEnabled
+BFL.GetQuickJoinGroupFinderAccess = Compat.GetQuickJoinGroupFinderAccess
 
 -- Friend/Group Operations
 BFL.IsLegacyFriendSystemEnabled = Compat.IsLegacyFriendSystemEnabled

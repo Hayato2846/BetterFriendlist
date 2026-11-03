@@ -41,7 +41,7 @@ local function check(value, message) assertions = assertions + 1; assert(value, 
 local function equal(actual, expected, message)
 	check(actual == expected, message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
 end
-local regional, connected, titleEnabled = true, true, true
+local regional, connected, titleEnabled, realIDEnabled = true, true, true, true
 env.RegionalUniqueNamesEnabled = function() return regional end
 env.BNFeaturesEnabledAndConnected = function() return connected end
 env.BNGetInfo = function() return nil, "MyTag#1234", nil, nil, nil, nil, true end
@@ -49,6 +49,10 @@ env.C_AddOns = { IsAddOnLoaded = function() return true end }
 local sentTitles, sentAccounts, addedLegacy, errors = {}, {}, {}, {}
 env.C_BattleNet = {
 	AreTitleFriendsEnabled = function() return titleEnabled end,
+	AreRealIDFriendsEnabled = function() return realIDEnabled end,
+	GetFriendLevelFromInviteText = function(text)
+		return text:find("@", 1, true) and env.Enum.BattleNetFriendLevel.RealID or env.Enum.BattleNetFriendLevel.Title
+	end,
 	SendTitleFriendInviteByName = function(name) sentTitles[#sentTitles + 1] = name end,
 }
 env.BNSendFriendInvite = function(name) sentAccounts[#sentAccounts + 1] = name end
@@ -98,6 +102,8 @@ local function widget()
 	function value:Enable() self.enabled = true end
 	function value:Disable() self.enabled = false end
 	function value:IsEnabled() return self.enabled end
+	function value:SetEnabled(enabled) self.enabled = enabled end
+	function value:SetShown(shown) self.visible = shown end
 	return value
 end
 local function option()
@@ -108,7 +114,9 @@ function env.AddFriendFrame:Layout() end
 env.AddFriendEntryFrame = widget()
 env.AddFriendEntryFrame.OptionsContainer = { LeftTextContainer = option(), RightTextContainer = option(), OrLabel = widget() }
 env.AddFriendInfoFrame = widget()
-env.AddFriendInfoFrame.InfoContainer = { RightTextContainer = option() }
+env.AddFriendInfoFrame.InfoContainer = { LeftTextContainer = option(), RightTextContainer = option() }
+env.AddFriendFrame.InfoFrame = env.AddFriendInfoFrame
+env.AddFriendFrame.EntryFrame = { EditBoxContainer = { ErrorMessage = widget() } }
 env.AddFriendNameEditBox, env.AddFriendNameEditBoxFill, env.AddFriendEntryFrameAcceptButton = widget(), widget(), widget()
 function env.AddFriendNameEditBox:SetText(text)
 	self.text = text
@@ -154,6 +162,15 @@ end
 equal(sentTitles[2], "Ada-Lovelace", "Native canonical character spelling is not rewritten")
 equal(sentAccounts[1], "Tag#1234", "Native BattleTag handling is preserved")
 equal(sentAccounts[2], "ada@example.com", "Native email handling is preserved")
+realIDEnabled = false
+BFL.ShowAddFriendDialog()
+env.AddFriendNameEditBox:SetText("ada@example.com")
+check(not env.AddFriendEntryFrameAcceptButton:IsEnabled(), "The native dialog disables Real ID input when unavailable")
+check(env.AddFriendFrame.EntryFrame.EditBoxContainer.ErrorMessage.visible, "The native dialog shows its Real ID restriction")
+env.AddFriendNameEditBox:SetText("Tag#1234")
+check(env.AddFriendEntryFrameAcceptButton:IsEnabled(), "BattleTag input remains usable without Real ID")
+check(not env.AddFriendFrame.EntryFrame.EditBoxContainer.ErrorMessage.visible, "The native restriction clears for allowed input")
+realIDEnabled = true
 equal(env.AddFriendFrame_Show, nativeShow, "BFL does not replace Blizzard's opener")
 equal(env.AddFriendFrame_Accept, nativeAccept, "BFL does not hook or replace Blizzard's submit handler")
 local nameXML = read(forever, "Interface/AddOns/Blizzard_AddFriend/AddFriendTemplates.xml")
@@ -233,6 +250,140 @@ before = #sentTitles
 pendingCallback()
 equal(#sentTitles, before + 1, "Confirming sends one context request")
 equal(sentTitles[#sentTitles], "Ada-Lovelace", "Context request keeps its canonical identity")
+
+-- Global Friend Sync uses the complete Forever name for saved and live entries.
+BFL.Modules = BFL.modules
+execute(read(repo, "Modules/GlobalSync.lua"), "Global Friend Sync")
+local sync = BFL:GetModule("GlobalSync")
+local rows, tick, delayed = {}, nil, nil
+local clock, locked, failedAdd = 100, false, false
+env.time = function() return clock end
+env.GetNormalizedRealmName = function() return "MyRealm" end
+env.UnitName = function() return "Ada", "Lovelace" end
+env.UnitFactionGroup = function() return "Alliance" end
+env.C_ChatInfo = { InChatMessagingLockdown = function() return locked end }
+env.C_Timer = {
+	NewTimer = function(_, callback) delayed = callback; return {} end,
+	NewTicker = function(_, callback)
+		tick = function() callback({ Cancel = function() end }) end
+		return {}
+	end,
+}
+env.C_FriendList.GetNumFriends = function() return #rows end
+env.C_FriendList.GetFriendInfoByIndex = function(index) return rows[index] end
+env.C_FriendList.AddFriend = function(name)
+	if failedAdd then error("blocked") end
+	addedLegacy[#addedLegacy + 1] = name
+end
+env.BetterFriendlistDB = {
+	enableGlobalSync = true,
+	enableGlobalSyncDeletion = true,
+	GlobalFriends = { Alliance = {} },
+}
+sync.attemptedAdds = {}
+local stored = env.BetterFriendlistDB.GlobalFriends.Alliance
+regional, titleEnabled = true, false
+check(not sync:ShouldAddFriend("Ada-Lovelace"), "Forever rejects the current character including surname")
+check(sync:ShouldAddFriend("Ada-Byron"), "A different surname is a different character")
+rows = { { name = "Grace-Hopper", notes = secret, guid = secret } }
+sync:ExportFriends("Alliance", "MyRealm")
+equal(stored["Grace-Hopper"].notes, nil, "A secret note stays out of the database")
+equal(stored["Grace-Hopper"].guid, nil, "A secret GUID stays out of the database")
+equal(select(2, sync:GetFriendNameAndRealm("Grace-Hopper")), nil, "The surname is not a realm")
+rows = { secret }
+sync:ImportFriends("Alliance", "MyRealm")
+equal(tick, nil, "A restricted roster cannot be treated as an empty list")
+rows = {}
+sync:ImportFriends("Alliance", "MyRealm")
+locked = true
+tick()
+equal(sync.attemptedAdds["Grace-Hopper"], nil, "A queue paused by lockdown does not consume the attempt")
+locked, failedAdd = false, true
+sync:ImportFriends("Alliance", "MyRealm")
+tick()
+equal(sync.attemptedAdds["Grace-Hopper"], nil, "A blocked native call does not consume the attempt")
+failedAdd = false
+sync:ImportFriends("Alliance", "MyRealm")
+tick()
+equal(addedLegacy[#addedLegacy], "Grace-Hopper", "Retry sends the full Forever name unchanged")
+rows = { { name = "Grace-Hopper" }, { name = "Ada-Byron" } }
+sync:ExportFriends("Alliance", "MyRealm")
+sync:ReconcileIndexRemoval("MyRealm")
+local hooks = {}
+env.hooksecurefunc = function(_, key, callback) hooks[key] = callback end
+env.C_FriendList.RemoveFriendByIndex = function() end
+local nativeRemoveByIndex = env.C_FriendList.RemoveFriendByIndex
+sync:HookDeletionAPIs()
+equal(env.C_FriendList.RemoveFriendByIndex, nativeRemoveByIndex, "Global Sync leaves Blizzard's removal function in place")
+hooks.RemoveFriendByIndex(2)
+rows = { secret }
+sync:ReconcileIndexRemoval("MyRealm")
+check(not stored["Ada-Byron"].deleted, "A protected snapshot cannot confirm an index removal")
+rows = { { name = "Grace-Hopper" } }
+sync:ReconcileIndexRemoval("MyRealm")
+check(stored["Ada-Byron"].deleted and not stored["Grace-Hopper"].deleted, "Only the missing full name is marked as deleted")
+
+titleEnabled = true
+local dialogShown = false
+local inviteDialog = env.BattleNetInviteFrame
+local closeHook, sendHook, nextPrompt
+inviteDialog.IsShown = function() return dialogShown end
+inviteDialog.HookScript = function(_, _, callback) closeHook = callback end
+inviteDialog.SendButton = { HookScript = function(_, _, callback) sendHook = callback end }
+inviteDialog.InviteeName = { GetText = function() return pendingName end }
+env.C_Timer.After = function(_, callback) nextPrompt = callback end
+local function CloseInvite(confirmed)
+	if confirmed then pendingCallback() end
+	dialogShown = false
+	closeHook(inviteDialog)
+	if confirmed then sendHook() end
+	local callback = nextPrompt
+	nextPrompt = nil
+	return callback
+end
+local originalConfirm = env.BattleNetInviteFrame.ShowInviteConfirmation
+env.BattleNetInviteFrame.ShowInviteConfirmation = function(...)
+	dialogShown = true
+	originalConfirm(...)
+end
+local lastPrompt = pendingName
+before = #sentTitles
+sync:PerformSync()
+equal(pendingName, lastPrompt, "Title Friends background sync opens no dialog")
+equal(#sentTitles, before, "Title Friends background sync sends no invitations")
+check(sync:RestoreStoredFriend("Alliance", "Grace-Hopper"), "A database action opens Blizzard confirmation")
+equal(pendingName, "Grace-Hopper", "Blizzard receives the full Forever name")
+stored["Katherine-Johnson"] = {}
+check(not sync:RestoreStoredFriend("Alliance", "Katherine-Johnson"), "A second click cannot replace a pending confirmation")
+equal(pendingName, "Grace-Hopper", "The original confirmation keeps its target")
+equal(#sentTitles, before, "Opening a confirmation never sends an invitation")
+titleEnabled = secret
+check(not sync:RestoreStoredFriend("Alliance", "Katherine-Johnson"), "An unreadable Title Friends flag prevents friend actions")
+titleEnabled = true
+CloseInvite(false)()
+stored["Ada-Lovelace"] = {}
+env.BNGetNumFriends = function() return 1 end
+env.C_BattleNet.GetFriendAccountInfo = function()
+	return { friendLevel = 3, gameAccountInfo = { characterName = "Katherine-Johnson" } }
+end
+stored["Alan-Turing"] = {}
+local pending = sync:GetPendingTitleFriends()
+equal(table.concat(pending, ","), "Alan-Turing,Grace-Hopper",
+	"Only missing, non-deleted friends other than the current character are listed")
+check(sync:StartTitleInvites(pending), "Add All opens the first native confirmation")
+equal(pendingName, "Alan-Turing", "First candidate opens without sending")
+equal(#sentTitles, before, "The queue opens dialogs without sending invitations")
+local advance = CloseInvite(true)
+equal(pendingName, "Alan-Turing", "The second dialog waits for the first click and hide handlers")
+advance()
+equal(pendingName, "Grace-Hopper", "The second candidate opens after the first dialog closes")
+equal(#sentTitles, before + 1, "Only the native confirmation sent an invitation")
+CloseInvite(false)()
+equal(table.concat(sync:GetPendingTitleFriends(), ","), "Grace-Hopper",
+	"A cancelled invite remains in the list while a confirmed request is suppressed for the session")
+env.BNGetNumFriends, env.C_BattleNet.GetFriendAccountInfo = nil, nil
+env.BattleNetInviteFrame.ShowInviteConfirmation = originalConfirm
+env.BetterFriendlistDB, env.C_ChatInfo, env.C_Timer = nil, nil, nil
 
 -- Exercise the production copy handler for focused accounts and plain contexts.
 local legacy = read(repo, "BetterFriendlist.lua")

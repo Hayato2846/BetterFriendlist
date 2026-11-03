@@ -206,7 +206,7 @@ function SettingsDesigner:SetFriendTabSettingsBackdrop(frame, mode, alternate)
 	if not frame.SetBackdrop then
 		return
 	end
-	frame:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -233,8 +233,9 @@ function SettingsDesigner:SetFriendTabSettingsTooltip(owner, title, description)
 		end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(title or "", 1, 0.82, 0)
-		if description and description ~= "" then
-			GameTooltip:AddLine(description, 1, 1, 1, true)
+		local text = type(description) == "function" and description() or description
+		if type(text) == "string" and text ~= "" then
+			GameTooltip:AddLine(text, 1, 1, 1, true)
 		end
 		GameTooltip:Show()
 	end)
@@ -272,7 +273,7 @@ function SettingsDesigner:RenderFriendTabSettings(parent)
 
 	local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	panel:SetAllPoints(parent)
-	panel:SetBackdrop({
+	BFL.SetOwnedBackdrop(panel, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -285,7 +286,7 @@ function SettingsDesigner:RenderFriendTabSettings(parent)
 	header:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
 	header:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -10)
 	header:SetHeight(self.FRIEND_TAB_SETTINGS_HEADER_HEIGHT)
-	header:SetBackdrop({
+	BFL.SetOwnedBackdrop(header, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -430,7 +431,7 @@ function SettingsDesigner:RenderFriendTabSettings(parent)
 		row.IconWell = CreateFrame("Frame", nil, row, "BackdropTemplate")
 		row.IconWell:SetSize(32, 32)
 		row.IconWell:SetPoint("LEFT", row.Order, "RIGHT", 9, 0)
-		row.IconWell:SetBackdrop({
+		BFL.SetOwnedBackdrop(row.IconWell, {
 			bgFile = "Interface\\Buttons\\WHITE8X8",
 			edgeFile = "Interface\\Buttons\\WHITE8X8",
 			edgeSize = 1,
@@ -557,10 +558,13 @@ function SettingsDesigner:RenderFriendTabSettings(parent)
 				SettingsDesigner:SetFriendTabSettingsTooltip(
 					row.VisibleCheck,
 					entry.label or entry.id,
-					T(
-						"SETTINGS_FRIEND_TABS_ORDER_DESC",
-						"Drag tabs into the desired order. Use each row's switch to show or hide that tab."
-					)
+					function()
+						return (FriendsUI and FriendsUI:GetFriendTabAvailabilityReason(entry.id))
+							or T(
+								"SETTINGS_FRIEND_TABS_ORDER_DESC",
+								"Drag tabs into the desired order. Use each row's switch to show or hide that tab."
+							)
+					end
 				)
 				row:Show()
 			else
@@ -699,6 +703,7 @@ local function ShowSupportURL(label, url)
 		text = label or T("SETTINGS_CENTER_SUPPORT_COPY_LINKS", "Copy Links"),
 		button1 = CLOSE or "Close",
 		hasEditBox = true,
+		maxLetters = 0,
 		editBoxWidth = editBoxWidth,
 		OnShow = function(self)
 			self.EditBox:SetText(url or "")
@@ -1481,7 +1486,7 @@ local function ApplyCustomBackdrop(frame, bg, border)
 	if not (frame and frame.SetBackdrop) then
 		return
 	end
-	frame:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame, {
 		bgFile = "Interface\\Buttons\\WHITE8x8",
 		edgeFile = "Interface\\Buttons\\WHITE8x8",
 		tile = false,
@@ -1708,7 +1713,7 @@ function SettingsDesigner:RenderFriendsUIStyle(parent, _, _, state)
 	local FriendsUI = self:GetFriendsUI()
 	local entries = {
 		labels = {
-			T("SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern (Retail 12.1)"),
+			T("SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern"),
 			T("SETTINGS_FRIENDS_UI_STYLE_LEGACY", "Legacy"),
 		},
 		values = { "modern", "legacy" },
@@ -2145,9 +2150,22 @@ local function GetGroupTitle(pageID, groupID)
 	return pageGroups and groupID and pageGroups[groupID] or nil
 end
 
-local function AddGroup(pageID, id, title, order)
+local function AddGroup(pageID, id, title, order, columns)
 	RememberGroupTitle(pageID, id, title)
-	app:RegisterGroup(pageID, { id = id, title = title, order = order })
+	app:RegisterGroup(pageID, { id = id, title = title, order = order, columns = columns })
+end
+
+local function AddInlineHint(pageID, groupID, id, label, order, color, visibleWhen)
+	app:RegisterControl(pageID, {
+		id = id,
+		groupID = groupID,
+		groupTitle = GetGroupTitle(pageID, groupID),
+		type = "inlinehint",
+		label = label,
+		order = order,
+		textColor = color,
+		visibleWhen = visibleWhen,
+	})
 end
 
 local function RegisterPage(data)
@@ -2166,8 +2184,6 @@ local function AddToggle(pageID, data)
 		type = "toggle",
 		label = data.label,
 		description = data.desc,
-		descriptionColor = data.descriptionColor,
-		alwaysShowDescription = data.alwaysShowDescription,
 		default = data.default,
 		order = data.order,
 		parentCheck = data.parentCheck,
@@ -2702,18 +2718,7 @@ end
 
 local function OpenSettingsCategory(categoryID)
 	return function()
-		local frame = ConfigUI and ConfigUI.GetFrame and ConfigUI:GetFrame(APP_ID)
-		local state = frame and frame._LibSettingsDesignerState
-		if state and state.SetCategory then
-			state:SetCategory(categoryID)
-			return
-		end
-		SettingsDesigner:Show()
-		frame = ConfigUI and ConfigUI.GetFrame and ConfigUI:GetFrame(APP_ID)
-		state = frame and frame._LibSettingsDesignerState
-		if state and state.SetCategory then
-			state:SetCategory(categoryID)
-		end
+		SettingsDesigner:Show(categoryID)
 	end
 end
 
@@ -3346,7 +3351,7 @@ local function RegisterFriendsPages()
 		title = T("SETTINGS_TAB_GENERAL", "General"),
 		description = T(
 			"SETTINGS_FRIENDS_UI_STYLE_DESC",
-			"Choose the Retail 12.1 layout or the previous BetterFriendlist layout."
+			"Choose the Modern layout or the previous BetterFriendlist layout."
 		),
 		iconKey = "bfl-friends-display",
 		order = 80,
@@ -3360,7 +3365,7 @@ local function RegisterFriendsPages()
 		groupTitle = T("SETTINGS_FRIENDS_UI_STYLE_HEADER", "Friendlist UI"),
 		type = "custom",
 		label = T("SETTINGS_FRIENDS_UI_STYLE", "Interface Style"),
-		description = T("SETTINGS_FRIENDS_UI_STYLE_DESC", "Choose the Retail 12.1 layout or the previous BetterFriendlist layout."),
+		description = T("SETTINGS_FRIENDS_UI_STYLE_DESC", "Choose the Modern layout or the previous BetterFriendlist layout."),
 		default = BFL.IsRetail and "modern" or "legacy",
 		order = 100,
 		visibleWhen = function() return BFL.IsRetail == true end,
@@ -4298,8 +4303,16 @@ local function RegisterBrokerPages()
 
 	RegisterPage({ id = "broker.sync", category = "broker", title = T("SETTINGS_CENTER_PAGE_SYNC", "Sync"), iconKey = "bfl-broker-sync-page", mainToggleID = "enableGlobalSync", order = 120, newTagID = "broker.sync" })
 	AddGroup("broker.sync", "global", T("SETTINGS_TAB_GLOBAL_SYNC", "Global Friend Sync"), 100)
-	AddToggle("broker.sync", { key = "enableGlobalSync", group = "global", label = T("SETTINGS_GLOBAL_SYNC_ENABLE", "Enable Global Friend Sync"), desc = T("SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP", "Automatically sync friends from other realms to this character."), default = false, order = 100, after = function(value) local GlobalSync = BFL:GetModule("GlobalSync"); if value and GlobalSync and GlobalSync.OnFriendListUpdate then GlobalSync:OnFriendListUpdate() end end, refreshOnChange = true })
-	AddToggle("broker.sync", { key = "enableGlobalSyncDeletion", group = "global", label = T("SETTINGS_GLOBAL_SYNC_DELETION", "Enable Deletion"), desc = T("SETTINGS_GLOBAL_SYNC_DELETION_DESC", "Allow Global Sync to remove friends marked as deleted."), default = false, order = 110, parentCheck = function() return GetDB("enableGlobalSync", false) end })
+	local function UsesTitleFriends()
+		local GlobalSync = BFL:GetModule("GlobalSync")
+		return GlobalSync and GlobalSync:UsesTitleFriends() == true
+	end
+	local function ShowLegacySyncControls()
+		return not UsesTitleFriends()
+	end
+	AddInlineHint("broker.sync", "global", "titleFriendsSync", L.SETTINGS_GLOBAL_SYNC_TITLE_FRIENDS, 90, nil, UsesTitleFriends)
+	AddToggle("broker.sync", { key = "enableGlobalSync", group = "global", label = T("SETTINGS_GLOBAL_SYNC_ENABLE", "Enable Global Friend Sync"), desc = T("SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP", "Automatically sync friends from other realms to this character."), default = false, order = 100, visibleWhen = ShowLegacySyncControls, after = function(value) local GlobalSync = BFL:GetModule("GlobalSync"); if value and GlobalSync and GlobalSync.OnFriendListUpdate then GlobalSync:OnFriendListUpdate() end end, refreshOnChange = true })
+	AddToggle("broker.sync", { key = "enableGlobalSyncDeletion", group = "global", label = T("SETTINGS_GLOBAL_SYNC_DELETION", "Enable Deletion"), desc = T("SETTINGS_GLOBAL_SYNC_DELETION_DESC", "Allow Global Sync to remove friends marked as deleted."), default = false, order = 110, visibleWhen = ShowLegacySyncControls, parentCheck = function() return GetDB("enableGlobalSync", false) end })
 	AddGroup("broker.sync", "notes", T("SETTINGS_SYNC_GROUPS_HEADER", "Group Note Sync"), 200)
 	AddToggle("broker.sync", { key = "syncGroupsToNote", group = "notes", label = T("SETTINGS_SYNC_GROUPS_NOTE", "Sync Groups to Friend Note"), desc = T("SETTINGS_SYNC_GROUPS_NOTE_DESC", "Write group assignments into friend notes using FriendGroups format."), default = false, order = 200, newTagID = "syncGroupsToNote", after = function(value) if value then local NoteSync = BFL:GetModule("NoteSync"); if NoteSync and NoteSync.SyncAllFriends then NoteSync:SyncAllFriends() end else ShowNoteCleanupFrame("Show", "BetterFriendlistNoteCleanupWizard") end end })
 	RegisterPage({
@@ -4335,6 +4348,9 @@ local function RegisterPrivacyPages()
 	AddToggle("privacy.whisper", { key = "taintFreeWhisper", group = "whisper", label = T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), desc = T("SETTINGS_TAINT_FREE_WHISPER_DESC", "Use a BFL-owned whisper box without changing Blizzard chat."), default = false, order = 100, newTagID = "taintFreeWhisper", after = function(value) if not value and BFL.CloseTaintFreeWhisper then BFL:CloseTaintFreeWhisper(true) end end })
 
 	RegisterPage({ id = "privacy.notes", category = "privacy", title = T("CONTACT_MEMORY_TITLE", "Private Notes"), iconKey = "bfl-privacy-whisper", mainToggleID = "contactMemory.enabled", order = 120 })
+	RegisterPage({ id = "privacy.characters", category = "privacy", title = L.KC_TITLE, iconKey = "bfl-privacy-whisper", mainToggleID = "knownCharacters.enabled", order = 130, newTagID = "privacy.characters" })
+	local KnownCharacters = BFL:GetModule("KnownCharacters")
+	if KnownCharacters then KnownCharacters:RegisterSettingsDesignerControls(app) end
 end
 
 local function RegisterAdvancedPages()
@@ -4344,25 +4360,27 @@ local function RegisterAdvancedPages()
 	AddGroup("advanced.tools", "importexport", T("SETTINGS_EXPORT_HEADER", "Export / Import Settings"), 200)
 	AddButton("advanced.tools", { id = "export.settings", group = "importexport", label = T("BUTTON_EXPORT", "Export"), desc = T("SETTINGS_EXPORT_TOOLTIP", "Export your groups and friend assignments."), buttonText = T("BUTTON_EXPORT", "Export"), order = 200, onClick = function() CallSettingsDialog("ShowExportDialog", "exportFrame", "BetterFriendlistExportFrame") end })
 	AddButton("advanced.tools", { id = "import.settings", group = "importexport", label = T("SETTINGS_IMPORT_BTN", "Import"), desc = T("SETTINGS_IMPORT_TOOLTIP", "Import groups and friend assignments."), buttonText = T("SETTINGS_IMPORT_BTN", "Import"), order = 210, onClick = function() CallSettingsDialog("ShowImportDialog", "importFrame", "BetterFriendlistImportFrame") end })
-	AddGroup("advanced.tools", "cleanup", T("WIZARD_HEADER", "Note Cleanup"), 300)
-	AddButton("advanced.tools", { id = "cleanup.notes", group = "cleanup", label = T("WIZARD_BTN", "Note Cleanup Wizard"), desc = T("WIZARD_DESC", "Clean up FriendGroups-style suffixes from friend notes."), buttonText = T("WIZARD_BTN", "Note Cleanup Wizard"), order = 300, onClick = function() ShowNoteCleanupFrame("Show", "BetterFriendlistNoteCleanupWizard") end })
-	AddButton("advanced.tools", { id = "cleanup.backups", group = "cleanup", label = T("WIZARD_BACKUP_VIEWER", "Backup Viewer"), desc = T("WIZARD_BACKUP_VIEWER_DESC", "Review and restore note cleanup backups."), buttonText = T("WIZARD_BACKUP_VIEWER", "Backup Viewer"), order = 310, onClick = function() ShowNoteCleanupFrame("ShowBackupViewer", "BetterFriendlistNoteBackupViewer") end })
+	AddGroup("advanced.tools", "cleanup", T("WIZARD_HEADER", "Note Cleanup"), 300, 1)
+	AddInlineHint("advanced.tools", "cleanup", "cleanup.notes.hint",
+		T("WIZARD_DESC", "Clean up FriendGroups-style suffixes from friend notes."), 295)
+	AddButton("advanced.tools", { id = "cleanup.notes", group = "cleanup", label = T("WIZARD_BTN", "Note Cleanup Wizard"), order = 300, onClick = function() ShowNoteCleanupFrame("Show", "BetterFriendlistNoteCleanupWizard") end })
+	AddInlineHint("advanced.tools", "cleanup", "cleanup.backups.hint",
+		T("WIZARD_BACKUP_VIEWER_DESC", "Review and restore note cleanup backups."), 305)
+	AddButton("advanced.tools", { id = "cleanup.backups", group = "cleanup", label = T("WIZARD_BACKUP_VIEWER", "Backup Viewer"), order = 310, onClick = function() ShowNoteCleanupFrame("ShowBackupViewer", "BetterFriendlistNoteBackupViewer") end })
 	if BFL.HasSecretValues == true then
 		local MenuBridge = BFL:GetModule("MenuBridge")
 		local function IsMenuBridgeCompanionLoaded()
 			return MenuBridge and MenuBridge.IsCompanionAddOnLoaded and MenuBridge:IsCompanionAddOnLoaded() == true
 		end
-		local companionLoaded = IsMenuBridgeCompanionLoaded()
 		AddGroup("advanced.tools", "integrations", T("SETTINGS_EXTERNAL_MENU_BRIDGE", "External AddOn Menu Bridge"), 400)
+		AddInlineHint("advanced.tools", "integrations", "externalMenuBridge.requiresAddon",
+			T("SETTINGS_EXTERNAL_MENU_BRIDGE_REQUIRES_ADDON", "This setting can only be used when the BetterFriendlist Menu Bridge addon is also enabled."),
+			390, { 1, 0.22, 0.22, 1 }, function() return not IsMenuBridgeCompanionLoaded() end)
 		AddToggle("advanced.tools", {
 			key = "externalMenuBridgeEnabled",
 			group = "integrations",
 			label = T("SETTINGS_EXTERNAL_MENU_BRIDGE", "External AddOn Menu Bridge"),
-			desc = companionLoaded
-				and T("SETTINGS_EXTERNAL_MENU_BRIDGE_DESC", "Adds compatible AddOn actions to supported BetterFriendlist context menus.")
-				or T("SETTINGS_EXTERNAL_MENU_BRIDGE_REQUIRES_ADDON", "This setting can only be used when the BetterFriendlist Menu Bridge addon is also enabled."),
-			descriptionColor = not companionLoaded and { 1, 0.22, 0.22, 1 } or nil,
-			alwaysShowDescription = not companionLoaded,
+			desc = T("SETTINGS_EXTERNAL_MENU_BRIDGE_DESC", "Adds compatible AddOn actions to supported BetterFriendlist context menus."),
 			default = true,
 			order = 400,
 			isEnabled = IsMenuBridgeCompanionLoaded,
@@ -4552,11 +4570,7 @@ function SettingsDesigner:Register()
 		density = "compact",
 		sidePanel = false,
 		defaultControlColumns = 2,
-		settingRowStyle = function(_, state)
-			-- The companion-addon warning on Advanced > Tools intentionally uses
-			-- the descriptive row layout so its red dependency text stays visible.
-			return state and state.selectedPageID == "advanced.tools" and "standard" or "matrix"
-		end,
+		settingRowStyle = "matrix",
 		topbar = {
 			titleActions = {
 				{
@@ -4643,6 +4657,7 @@ function SettingsDesigner:Register()
 		dashboard = BuildDashboard,
 	})
 
+	app:BeginRegistrationBatch()
 	RegisterCategories()
 	RegisterFriendsPages()
 	RegisterAppearancePages()
@@ -4652,6 +4667,22 @@ function SettingsDesigner:Register()
 	RegisterPrivacyPages()
 	RegisterAdvancedPages()
 	RegisterHelpPages()
+	app:EndRegistrationBatch()
+
+	if hooksecurefunc and ConfigUI.RenderInfoPage then
+		hooksecurefunc(ConfigUI, "RenderInfoPage", function(state, page)
+			if state.app ~= app or page.id ~= "help.changelog" then
+				return
+			end
+			local Changelog = GetChangelogModule()
+			if not Changelog then
+				return
+			end
+			for _, frame in ipairs(state.contentFrames) do
+				Changelog:ApplyContentFonts(frame)
+			end
+		end)
+	end
 
 	self.registered = true
 	self.app = app
@@ -4713,7 +4744,7 @@ local function SetBackdrop(frame, bg, border)
 	if not frame or not frame.SetBackdrop then
 		return
 	end
-	frame:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame, {
 		bgFile = "Interface\\Buttons\\WHITE8x8",
 		edgeFile = "Interface\\Buttons\\WHITE8x8",
 		tile = false,
@@ -4875,7 +4906,7 @@ function SettingsDesigner:ApplySkin(reason)
 		-- The library's public Open path owns the complete frame-theme refresh.
 		-- Defer it out of the theme control callback so the current page can be
 		-- rebuilt safely without mutating the control that is still dispatching.
-		if frame:IsShown() and ConfigUI and ConfigUI.Open and not self.blizzardSkinRefreshPending then
+		if reason ~= "open" and frame:IsShown() and ConfigUI and ConfigUI.Open and not self.blizzardSkinRefreshPending then
 			local target = state and state.view == "page" and state.selectedPageID
 				or state and state.view == "dashboard" and "dashboard"
 				or nil

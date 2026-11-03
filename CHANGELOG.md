@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0]        - 2026-11-03
+
+BetterFriendlist 3.0.0 adds saved Who searches, an option to show friends' alts in tooltips, and smoother scrolling on Retail and Forever.
+
+### All WoW Versions
+
+#### Added
+- **Known Characters** - You can now link alts to a friend and show them in their tooltip. You can add characters yourself or let BFL remember characters it sees your Battle.net friends play. Both options are off by default, and the list stays hidden in Streamer Mode.
+- **Who Searches** - Use the star next to the search box to save up to 12 searches or pick a recent one. You can edit it before hitting Search, and you can clear or turn off your search history.
+- **Friend Tooltips** - Tooltips now show whether someone is a WoW, BattleTag, or Real ID friend when that info is available.
+
+#### Improved
+- **Themes** - Dark and Custom now draw many of their flat borders the same way, including in Settings and the Friend Tag Editor. Each theme keeps its own colors.
+- **Changelog** - Drag the bottom-right corner to make the window wider or taller. It remembers your size the next time you open it.
+- **Settings Center** - Clicking a search result highlights the setting it takes you to. Pages with tabs no longer repeat the tab name above the settings, and the Note Cleanup descriptions have room to wrap without covering the buttons.
+
+#### Fixed
+- **Recently Added** - Long-time friends no longer show up as newly added while your friends list is still loading or after a reconnect.
+- **Faction Icons** - Faction icons now show up with name-only and BattleTag-only layouts when enabled.
+- **Settings and Setup** - Support links copy in full, window size fields have room for the whole number, and filters stay inside the list while you drag them. Checkbox borders in Dark and Custom and the borders on the setup summary are more even.
+- **Group Actions** - Fixed errors when promoting someone or changing the group type in combat, and when blocking Battle.net friends while Blizzard restricts the action.
+- **Who and Friend Tooltips** - Saved searches keep their wording when you open them in the Search Builder. Friend details no longer stick around when the game reuses a tooltip.
+
+### Retail Midnight & WoW Forever
+
+#### Added
+- **Smooth Scrolling** - The friends list now scrolls smoothly by default in both the Modern and Legacy layouts.
+- **Recent Allies** - Click a player to see what you did together and how long ago. You can also see their latest activities in the tooltip.
+
+#### Improved
+- **Changelog** - The changelog window now uses backgrounds from the Modern friends list when that layout is active.
+
+#### Fixed
+- **Recent Allies** - Fixed errors when details about another player are hidden, including in the pin tooltip. Preview entries can no longer trigger real player actions.
+- **Modern Friends Window** - Side tab icons and the Who scrollbar stay lined up when you switch tabs. In Dark and Custom, disabled buttons are easier to spot, and the Streamer Mode header and Raid help text are less bright. The Guild filter only shows its selection once.
+- **Streamer Mode** - If a Title friend has no BattleTag, the friends list and right-click menu show their character name.
+- **Who Search** - Class and race filters work again on clients where those searches could fail.
+- **Raid Tab** - The Raid tab follows the game's availability rules, and promotion buttons respect who can promote group members.
+- **Guild Roster** - You can still open the guild list when the game temporarily hides extra details like professions.
+
+### WoW Forever
+
+#### Fixed
+- **Quick Join** - Quick Join unlocks with Group Finder at level 10. If it isn't available yet, the setting shows why.
+- **Global Friend Sync** - Saved names keep their surnames, and BFL skips your own character. If you have saved friends left to invite, use the globe next to Add New Friend. Add All opens Blizzard's confirmations one at a time.
+
+### WoW 12.1.7 PTR
+
+#### Compatibility
+- **PTR Support** - Updated BetterFriendlist and the Menu Bridge for the 12.1.7 PTR.
+
+---
+
 ## [2.9.2]        - 2026-10-11
 
 BetterFriendlist 2.9.2 adds a WoW Forever filter and fixes greyed-out group invites, along with a few smaller fixes.
@@ -220,11 +273,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 - **Favorite Icons** - BFL and Blizzard favorite icons now leave a more even gap between the character name and the following friend info.
 
 ---
-
-## [2.8.2]        - 2026-08-15
-
-### Fixed
-- **EllesmereUI Theme** - Faction-colored friend backgrounds in the Modern interface are now softer and easier to read.
 
 ---
 

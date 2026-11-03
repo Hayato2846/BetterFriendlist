@@ -84,6 +84,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Run this action.",
 		configCenterChange = "Change",
 		configCenterChanged = "changed",
+		configCenterChangedFilter = "Changed",
 		configCenterCheckboxDropdownFallbackDesc = "Enable this setting and choose its related option.",
 		configCenterColorFallbackDesc = "Choose a color for this setting.",
 		configCenterConfigure = "Configure",
@@ -138,6 +139,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Führe diese Aktion aus.",
 		configCenterChange = "Ändern",
 		configCenterChanged = "geändert",
+		configCenterChangedFilter = "Geändert",
 		configCenterCheckboxDropdownFallbackDesc = "Aktiviere diese Einstellung und wähle die zugehörige Option.",
 		configCenterColorFallbackDesc = "Wähle eine Farbe für diese Einstellung.",
 		configCenterConfigure = "Konfigurieren",
@@ -192,6 +194,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
 		configCenterChange = "Cambiar",
 		configCenterChanged = "cambiados",
+		configCenterChangedFilter = "Cambiados",
 		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
 		configCenterColorFallbackDesc = "Elige un color para este ajuste.",
 		configCenterConfigure = "Configurar",
@@ -246,6 +249,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
 		configCenterChange = "Cambiar",
 		configCenterChanged = "cambiados",
+		configCenterChangedFilter = "Cambiados",
 		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
 		configCenterColorFallbackDesc = "Elige un color para este ajuste.",
 		configCenterConfigure = "Configurar",
@@ -300,6 +304,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Exécute cette action.",
 		configCenterChange = "Modifier",
 		configCenterChanged = "modifiés",
+		configCenterChangedFilter = "Modifiés",
 		configCenterCheckboxDropdownFallbackDesc = "Activez ce réglage et choisissez l’option associée.",
 		configCenterColorFallbackDesc = "Choisissez une couleur pour ce réglage.",
 		configCenterConfigure = "Configurer",
@@ -354,6 +359,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Esegui questa azione.",
 		configCenterChange = "Cambia",
 		configCenterChanged = "modificate",
+		configCenterChangedFilter = "Modificate",
 		configCenterCheckboxDropdownFallbackDesc = "Attiva questa impostazione e scegli l’opzione correlata.",
 		configCenterColorFallbackDesc = "Scegli un colore per questa impostazione.",
 		configCenterConfigure = "Configura",
@@ -408,6 +414,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "이 동작을 실행합니다.",
 		configCenterChange = "변경",
 		configCenterChanged = "변경됨",
+		configCenterChangedFilter = "변경됨",
 		configCenterCheckboxDropdownFallbackDesc = "이 설정을 활성화하고 관련 옵션을 선택합니다.",
 		configCenterColorFallbackDesc = "이 설정에 사용할 색상을 선택합니다.",
 		configCenterConfigure = "구성",
@@ -462,6 +469,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Executa esta ação.",
 		configCenterChange = "Alterar",
 		configCenterChanged = "alteradas",
+		configCenterChangedFilter = "Alteradas",
 		configCenterCheckboxDropdownFallbackDesc = "Ative esta configuração e escolha a opção relacionada.",
 		configCenterColorFallbackDesc = "Escolha uma cor para esta configuração.",
 		configCenterConfigure = "Configurar",
@@ -516,6 +524,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "Выполнить это действие.",
 		configCenterChange = "Изменить",
 		configCenterChanged = "изменено",
+		configCenterChangedFilter = "Изменено",
 		configCenterCheckboxDropdownFallbackDesc = "Включите этот параметр и выберите связанную опцию.",
 		configCenterColorFallbackDesc = "Выберите цвет для этого параметра.",
 		configCenterConfigure = "Настроить",
@@ -570,6 +579,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "执行此操作。",
 		configCenterChange = "更改",
 		configCenterChanged = "已更改",
+		configCenterChangedFilter = "已更改",
 		configCenterCheckboxDropdownFallbackDesc = "启用此设置并选择相关选项。",
 		configCenterColorFallbackDesc = "为此设置选择颜色。",
 		configCenterConfigure = "配置",
@@ -624,6 +634,7 @@ lib.LOCALES = {
 		configCenterButtonFallbackDesc = "執行此動作。",
 		configCenterChange = "變更",
 		configCenterChanged = "已變更",
+		configCenterChangedFilter = "已變更",
 		configCenterCheckboxDropdownFallbackDesc = "啟用此設定並選擇相關選項。",
 		configCenterColorFallbackDesc = "為此設定選擇顏色。",
 		configCenterConfigure = "設定",
@@ -783,6 +794,7 @@ lib.DEFAULT_COLORS = lib.CopyThemeColorMap({
 	searchResultBorder = CARD_BORDER,
 	searchResultHoverBg = CARD_BG_HOVER,
 	searchResultHoverBorder = CARD_BORDER_HOVER,
+	searchHighlight = { 1, 0.72, 0.12, 0.32 },
 	disabledControlBg = DISABLED_CONTROL_BG,
 	disabledControlBorder = DISABLED_CONTROL_BORDER,
 	disabledRowBg = DISABLED_ROW_BG,
@@ -2223,11 +2235,28 @@ function lib.IsCompactDensity(state)
 	return state and state.density == "compact"
 end
 
-local function getSettingRowHeight(control, state)
+function lib._Internal.getInlineHintHeight(control, state, width)
+	local measure = state._inlineHintMeasure
+	if not measure then
+		measure = state.frame:CreateFontString(nil, "OVERLAY", FONT_TEXT)
+		measure:Hide()
+		state._inlineHintMeasure = measure
+	end
+	measure:SetWidth(math.max(1, (width or state.pageLeftWidth or 620) - 24))
+	measure:SetHeight(0)
+	measure:SetMaxLines(0)
+	measure:SetWordWrap(true)
+	measure:SetNonSpaceWrap(true)
+	measure:SetText(control.label or "")
+	return math.max(18, math.ceil(measure:GetStringHeight()) + 2) + 16
+end
+
+local function getSettingRowHeight(control, state, width)
+	if getControlType(control) == "inlinehint" then return lib._Internal.getInlineHintHeight(control, state, width) end
 	local layoutType = getControlLayoutType(control)
 	local controlType = getControlType(control)
 	if controlType == "sectionheader" then
-		return tonumber(control.height or control.rowHeight) or 38
+		return tonumber(control.height or control.rowHeight) or (control.headerStyle == "subtle" and 30 or 38)
 	end
 	if controlType == "custom" and type(control.getHeight) == "function" then
 		local ok, height = pcall(control.getHeight, state and state.app, control, state)
@@ -2238,9 +2267,6 @@ local function getSettingRowHeight(control, state)
 		return tonumber(control.height or control.rowHeight) or 220
 	end
 	if lib.IsCompactDensity(state) then
-		if control.alwaysShowDescription and hasUsefulDescription(control) and not lib._Internal.shouldUseMatrixRows(state) then
-			return BOOLEAN_ROW_HEIGHT
-		end
 		if lib._Internal.shouldUseMatrixRows(state) then
 			if controlType == "colorpalette" then
 				return lib.GetColorOverridesRowHeight(control, state and state.app)
@@ -4175,6 +4201,7 @@ function makeFlatButton(parent, text, width, height, iconSource, iconIsAtlas)
 end
 
 local function refreshControlRow(app, control, row)
+	if getControlType(control) == "inlinehint" then return end
 	local enabled = app:IsControlEnabled(control)
 	local matrixRows = lib._Internal.shouldUseMatrixRows(row and row._state)
 	local matrixBorder = { 0, 0, 0, 0 }
@@ -4474,6 +4501,7 @@ local function updateContentMetrics(state)
 	state.sidePanelMode = useSidePanel and "right" or nil
 	state.pageFixedHeader = useFixedHeader == true
 	state.matrixPageFixedHeader = useMatrixFixedHeader == true
+	state.matrixPageHeaderHeight = useMatrixFixedHeader and (#lib._Internal.collectPageGroups(state.app, page, nil) > 1 and 104 or 64) or nil
 	state.pageRightWidth = pageRightWidth
 	state.pageGap = useSidePanel and PAGE_GAP or 0
 	state.pageLeftOuterWidth = leftOuterWidth
@@ -4485,7 +4513,7 @@ local function updateContentMetrics(state)
 		local scrollBottomOffset = PAGE_LAYOUT.contentPad
 		if state.view == "page" and useFixedHeader then
 			scrollTopOffset = PAGE_LAYOUT.contentPad
-				+ (useMatrixFixedHeader and 104 or PAGE_LAYOUT.detailNavHeight)
+				+ (useMatrixFixedHeader and state.matrixPageHeaderHeight or PAGE_LAYOUT.detailNavHeight)
 				+ PAGE_LAYOUT.detailNavGap
 				+ PAGE_LAYOUT.scrollInset
 			scrollBottomOffset = PAGE_LAYOUT.scrollBottomPad
@@ -4658,7 +4686,44 @@ updateScrollFrameVisibility = function(scrollFrame)
 	end
 end
 
-function lib.ScrollToControlRow(state, controlID)
+function lib.CancelControlFocus(state)
+	state.controlFocusGeneration = (state.controlFocusGeneration or 0) + 1
+	if state.controlFocusAnimation then state.controlFocusAnimation:Stop() end
+	if state.controlFocusHighlight then state.controlFocusHighlight:Hide() end
+	state.controlFocusAnimation = nil
+	state.controlFocusHighlight = nil
+end
+
+function lib.FlashControlRow(state, row)
+	lib.CancelControlFocus(state)
+	local highlight = row._LibSettingsDesignerFocusHighlight
+	if not highlight then
+		highlight = row:CreateTexture(nil, "ARTWORK", nil, -1)
+		highlight:SetAllPoints(row)
+		local group = highlight:CreateAnimationGroup()
+		local phases = { { 0, 1, 0.15 }, { 1, 0.12, 0.35 }, { 0.12, 1, 0.15 }, { 1, 0, 0.8 } }
+		for order, phase in ipairs(phases) do
+			local alpha = group:CreateAnimation("Alpha")
+			alpha:SetOrder(order)
+			alpha:SetFromAlpha(phase[1])
+			alpha:SetToAlpha(phase[2])
+			alpha:SetDuration(phase[3])
+		end
+		group:SetScript("OnFinished", function() highlight:Hide() end)
+		group:SetScript("OnStop", function() highlight:Hide() end)
+		highlight.animation = group
+		row._LibSettingsDesignerFocusHighlight = highlight
+	end
+	local color = lib.ResolveThemeColors(state.app).searchHighlight or lib.DEFAULT_COLORS.searchHighlight
+	highlight:SetColorTexture(color[1], color[2], color[3], color[4])
+	state.controlFocusHighlight = highlight
+	state.controlFocusAnimation = highlight.animation
+	highlight:SetAlpha(0)
+	highlight:Show()
+	highlight.animation:Play()
+end
+
+function lib.ScrollToControlRow(state, controlID, highlightControl)
 	if not controlID or not state.frame or not state.frame.Scroll then
 		return
 	end
@@ -4677,6 +4742,7 @@ function lib.ScrollToControlRow(state, controlID)
 					scrollBar:SetValue(target)
 				end
 			end
+			if highlightControl then lib.FlashControlRow(state, row) end
 			return
 		end
 	end
@@ -4688,16 +4754,25 @@ function lib.FocusPendingControl(state)
 		return
 	end
 	state.pendingFocusControlID = nil
+	local highlightControl = state.pendingFocusHighlight == true
+	state.pendingFocusHighlight = nil
+	local generation = state.controlFocusGeneration
+	local rows = state.controlRows
+	local function focus()
+		-- Ignore deferred focus after a refresh, navigation, or window close.
+		if state.controlFocusGeneration ~= generation or state.controlRows ~= rows then return end
+		if not state.frame or not state.frame:IsShown() then return end
+		lib.ScrollToControlRow(state, controlID, highlightControl)
+	end
 	if _G.C_Timer and _G.C_Timer.After then
-		_G.C_Timer.After(0, function()
-			lib.ScrollToControlRow(state, controlID)
-		end)
+		_G.C_Timer.After(0, focus)
 	else
-		lib.ScrollToControlRow(state, controlID)
+		focus()
 	end
 end
 
 local function clearContent(state)
+	lib.CancelControlFocus(state)
 	lib.ReleaseAllCustomHandles(state)
 	clearFrameList(state.contentFrames)
 	state.controlRows = {}
@@ -4822,6 +4897,7 @@ function lib._Internal.openFullSearch(state, query)
 	end
 	query = tostring(query or "")
 	state.suppressSearchRender = true
+	state.suppressedSearchText = query
 	frame.SearchBox:SetText(query)
 	state.activeSearchQuery = query ~= "" and query or nil
 	state.view = "search"
@@ -6618,8 +6694,8 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width, x
 	local layoutType = getControlLayoutType(control)
 	local compact = lib.IsCompactDensity(state)
 	local matrixRows = lib._Internal.shouldUseMatrixRows(state)
-	local rowHeight = getSettingRowHeight(control, state)
 	local rowWidth = width or parent and (parent:GetWidth() - 24) or state.pageLeftWidth or state.contentWidth or 620
+	local rowHeight = getSettingRowHeight(control, state, rowWidth)
 	local row
 	if parent then
 		row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -6635,8 +6711,24 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width, x
 	row._state = state
 	state.controlRows = state.controlRows or {}
 	state.controlRows[#state.controlRows + 1] = { row = row, control = control }
+	if controlType == "inlinehint" then
+		local color = control.textColor or { 0.60, 0.86, 0.76, 1 }
+		local label = createText(row, FONT_TEXT, control.label or "", { color[1] or color.r or 0.60, color[2] or color.g or 0.86, color[3] or color.b or 0.76, color[4] or color.a or 1 })
+		label:SetPoint("TOPLEFT", row, "TOPLEFT", 12, -8)
+		label:SetSize(math.max(1, rowWidth - 24), rowHeight - 16)
+		label.Text:ClearAllPoints()
+		label.Text:SetPoint("TOPLEFT", label, "TOPLEFT")
+		label.Text:SetWidth(math.max(1, rowWidth - 24))
+		label.Text:SetHeight(0)
+		label.Text:SetMaxLines(0)
+		label.Text:SetWordWrap(true)
+		label.Text:SetNonSpaceWrap(true)
+		row:EnableMouse(false)
+		return row
+	end
 	if controlType == "sectionheader" then
-		local labelLeft = 4
+		local alignment = control.justifyH == "CENTER" and "CENTER" or control.justifyH == "RIGHT" and "RIGHT" or "LEFT"
+		local labelLeft = alignment == "CENTER" and 8 or 4
 		if control.icon or control.iconAtlas then
 			local icon = row:CreateTexture(nil, "ARTWORK")
 			icon:SetSize(18, 18)
@@ -6656,18 +6748,21 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width, x
 		label:SetPoint("RIGHT", row, "RIGHT", -8, 0)
 		label:SetHeight(20)
 		label.Text:SetJustifyV("MIDDLE")
+		label.Text:SetJustifyH(alignment)
 		if type(control.textColor) == "table" then
 			local color = control.textColor
 			setTextColor(label.Text, { color[1] or color.r or 1, color[2] or color.g or 1, color[3] or color.b or 1, color[4] or color.a or 1 })
 		else
-			setTextColor(label.Text, TEXT.main)
+			setTextColor(label.Text, control.headerStyle == "subtle" and TEXT.muted or TEXT.main)
 		end
-		local line = row:CreateTexture(nil, "ARTWORK")
-		preparePixelTexture(line)
-		line:SetColorTexture(ROW_SEPARATOR[1], ROW_SEPARATOR[2], ROW_SEPARATOR[3], 0.34)
-		line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 4)
-		line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -8, 4)
-		line:SetHeight(getPixelSize(row))
+		if control.headerStyle ~= "subtle" then
+			local line = row:CreateTexture(nil, "ARTWORK")
+			preparePixelTexture(line)
+			line:SetColorTexture(ROW_SEPARATOR[1], ROW_SEPARATOR[2], ROW_SEPARATOR[3], 0.34)
+			line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 4)
+			line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -8, 4)
+			line:SetHeight(getPixelSize(row))
+		end
 		if parent and parent._LibSettingsDesignerContentY then
 			row._LibSettingsDesignerContentY = parent._LibSettingsDesignerContentY + (yOffset or -42)
 		end
@@ -6710,9 +6805,9 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width, x
 	else
 		descText = ""
 	end
-	local desc = createText(row, FONT_MUTED, descText or "", control.descriptionColor or TEXT.muted)
+	local desc = createText(row, FONT_MUTED, descText or "", TEXT.muted)
 	desc.Text:SetWordWrap(true)
-	if compact and not control.alwaysShowDescription then
+	if compact then
 		desc:Hide()
 	end
 	local hasNewBadge = lib.IsControlNew(app, control)
@@ -6729,7 +6824,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width, x
 
 	if layoutType == "boolean" then
 		local booleanControlInset = hasInlineToggleColor and 130 or 88
-		if compact and not control.alwaysShowDescription then
+		if compact then
 			title:ClearAllPoints()
 			title:SetPoint("LEFT", row, "LEFT", textLeft, 0)
 			title:SetPoint("RIGHT", row, "RIGHT", reserveInlineNewBadge and rightInset(booleanControlInset + 66) or rightInset(booleanControlInset), 0)
@@ -6983,6 +7078,11 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width, x
 		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 		desc:SetHeight(control.description and control.description ~= "" and 24 or 1)
 		local top = control.description and control.description ~= "" and -68 or -48
+		if control.hideHeader then
+			title:Hide()
+			desc:Hide()
+			top = -12
+		end
 		local container = CreateFrame("Frame", nil, row, "BackdropTemplate")
 		container:SetPoint("TOPLEFT", row, "TOPLEFT", FIELD_CONTROL_LEFT, top)
 		container:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14)
@@ -8076,7 +8176,7 @@ function lib._Internal.addMatrixPageFixedHeader(state, page, groups)
 	local width = state.pageSectionWidth or state.pageLeftWidth or 420
 	local header = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
 	header:SetPoint("TOPLEFT", state.frame.ContentShell, "TOPLEFT", PAGE_LAYOUT.contentPad + PAGE_LAYOUT.columnInset, -PAGE_LAYOUT.contentPad)
-	header:SetSize(width, 104)
+	header:SetSize(width, state.matrixPageHeaderHeight or 104)
 	applyBackdrop(header, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, "detailSection")
 	if state.frame.Scroll and header.SetFrameLevel and state.frame.Scroll.GetFrameLevel then
 		header:SetFrameLevel((state.frame.Scroll:GetFrameLevel() or 1) + 3)
@@ -8548,6 +8648,7 @@ function lib._Internal.getGroupControlLayout(state, group, width)
 	local function isMatrixFullWidthControl(control)
 		local controlType = getControlType(control)
 		return controlType == "sectionheader"
+			or controlType == "inlinehint"
 			or controlType == "reorderlist"
 			or controlType == "colorpalette"
 			or controlType == "custom"
@@ -8558,7 +8659,7 @@ function lib._Internal.getGroupControlLayout(state, group, width)
 		while index <= #controls do
 			local control = controls[index]
 			if isMatrixFullWidthControl(control) then
-				local rowHeight = getSettingRowHeight(control, state)
+				local rowHeight = getSettingRowHeight(control, state, innerWidth)
 				entries[#entries + 1] = {
 					control = control,
 					column = 1,
@@ -8598,16 +8699,32 @@ function lib._Internal.getGroupControlLayout(state, group, width)
 		for _, control in ipairs(controls) do
 			local column = lib._Internal.getColumnIndex(control.column or control.layoutColumn or control.columnIndex, columnCount)
 				or lib._Internal.getShortestColumn(columnHeights, columnCount)
-			local rowHeight = getSettingRowHeight(control, state)
+			local fullWidth = getControlType(control) == "inlinehint" or getControlType(control) == "sectionheader"
+			if fullWidth then
+				column = 1
+				for index = 2, columnCount do columnHeights[1] = math.max(columnHeights[1], columnHeights[index]) end
+			end
+			local rowHeight = getSettingRowHeight(control, state, fullWidth and innerWidth or columnWidth)
 			entries[#entries + 1] = {
 				control = control,
 				column = column,
 				y = -(46 + columnHeights[column]),
 				height = rowHeight,
 				xOffset = sectionInset,
-				width = getControlType(control) == "sectionheader" and innerWidth or nil,
+				width = fullWidth and innerWidth or nil,
 			}
 			columnHeights[column] = columnHeights[column] + rowHeight + rowGap
+			if fullWidth then
+				for index = 2, columnCount do columnHeights[index] = columnHeights[1] end
+			end
+		end
+	end
+	for _, entry in ipairs(entries) do
+		local indent = math.min(48, math.max(0, tonumber(entry.control.indent) or 0))
+		if indent > 0 then
+			local columns = entry.width and 1 or columnCount
+			entry.xOffset = entry.xOffset + indent * (1 - ((entry.column or 1) - 1) / columns)
+			entry.width = math.max(1, (entry.width or columnWidth) - indent / columns)
 		end
 	end
 	local controlsHeight = 0
@@ -8625,7 +8742,8 @@ end
 
 function lib._Internal.addGroupSection(state, group, pagePath, layout)
 	local matrixRows = lib._Internal.shouldUseMatrixRows(state)
-	local collapsed = (not matrixRows) and state.collapsedGroups and state.collapsedGroups[group.id] == true
+	local hideHeader = state.tabbedGroupID == group.id or state.singleDefaultGroupID == group.id
+	local collapsed = (not hideHeader) and (not matrixRows) and state.collapsedGroups and state.collapsedGroups[group.id] == true
 	local customizedCount = lib.GetGroupCustomizedCount(state.app, group)
 	local sectionWidth = layout and tonumber(layout.width) or (state.pageSectionWidth or state.pageLeftWidth or 420)
 	local controlLayout = lib._Internal.getGroupControlLayout(state, group, sectionWidth)
@@ -8633,7 +8751,8 @@ function lib._Internal.addGroupSection(state, group, pagePath, layout)
 	if not collapsed then
 		controlsHeight = controlLayout.controlsHeight
 	end
-	local height = collapsed and 40 or (46 + controlsHeight + 14)
+	local headerOffset = hideHeader and 6 or 46
+	local height = collapsed and 40 or (headerOffset + controlsHeight + 14)
 	local section
 	if layout and layout.x and layout.y then
 		section = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
@@ -8654,6 +8773,7 @@ function lib._Internal.addGroupSection(state, group, pagePath, layout)
 	header:SetPoint("TOPLEFT", section, "TOPLEFT", 0, 0)
 	header:SetPoint("TOPRIGHT", section, "TOPRIGHT", 0, 0)
 	header:SetHeight(40)
+	header:SetShown(not hideHeader)
 	applyBackdrop(header, matrixRows and { 0, 0, 0, 0 } or DETAIL_COLORS.sectionHeaderBg, { 0, 0, 0, 0 }, "detailSection")
 	header.Text = header:CreateFontString(nil, "OVERLAY", FONT_HEADER)
 	header.Text:SetPoint("LEFT", header, "LEFT", 14, 0)
@@ -8701,7 +8821,7 @@ function lib._Internal.addGroupSection(state, group, pagePath, layout)
 		local columnGap = controlLayout.columnGap
 		for index, entry in ipairs(controlLayout.entries) do
 			local x = (entry.xOffset or 12) + ((entry.column or 1) - 1) * (columnWidth + columnGap)
-			local row = addSettingRow(state, entry.control, pagePath, section, entry.y, entry.width or columnWidth, x)
+			local row = addSettingRow(state, entry.control, pagePath, section, entry.y + (46 - headerOffset), entry.width or columnWidth, x)
 			if index == #controlLayout.entries and row.Separator then
 				row.Separator:Hide()
 			end
@@ -9308,6 +9428,10 @@ function lib._Internal.renderPage(state, pageID)
 		if not state.matrixPageFixedHeader then
 			activeGroupID = lib._Internal.addSectionTabs(state, page, groups)
 		end
+		state.tabbedGroupID = activeGroupID
+		if #groups == 1 and groups[1].id == "settings" and groups[1].title == (getLocale(app)["configCenterTitle"] or "Settings") then
+			state.singleDefaultGroupID = groups[1].id
+		end
 		local renderGroups = groups
 		if activeGroupID then
 			renderGroups = {}
@@ -9349,7 +9473,7 @@ function lib._Internal.renderSearch(state, query)
 			applyBackdrop(card, lib.ThemeColors.searchResultBg, lib.ThemeColors.searchResultBorder, "searchResult")
 			applyHoverState(card, lib.ThemeColors.searchResultBg, lib.ThemeColors.searchResultHoverBg, lib.ThemeColors.searchResultBorder, lib.ThemeColors.searchResultHoverBorder)
 			card:SetScript("OnMouseUp", function()
-				state:SetPage(control.pageID, control.focusID)
+				state:SetPage(control.pageID, control.focusID, true)
 			end)
 
 			local iconSource, iconIsAtlas = resolvePageIcon(app, page)
@@ -9381,7 +9505,7 @@ function lib._Internal.renderSearch(state, query)
 			local openButton = makeFlatButton(card, (L["configCenterOpenButton"] or "Open"), 74, 24)
 			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 8)
 			openButton:SetScript("OnClick", function()
-				state:SetPage(control.pageID, control.focusID)
+				state:SetPage(control.pageID, control.focusID, true)
 			end)
 			state.y = state.y - 8
 		else
@@ -9405,7 +9529,7 @@ function lib._Internal.renderSearch(state, query)
 			local openButton = makeFlatButton(card, (L["configCenterOpenButton"] or "Open"), 74, 24)
 			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 8)
 			openButton:SetScript("OnClick", function()
-				state:SetPage(control.pageID, control.id)
+				state:SetPage(control.pageID, control.id, true)
 			end)
 			state.y = state.y - 8
 		end
@@ -9505,7 +9629,7 @@ function lib._Internal.showSearchPreview(state, query)
 		row:SetScript("OnClick", function()
 			lib._Internal.hideSearchPreview(frame)
 			frame.SearchBox:ClearFocus()
-			state:SetPage(clickedPageID, clickedFocusID)
+			state:SetPage(clickedPageID, clickedFocusID, true)
 		end)
 		row:Show()
 		y = y - rowHeight
@@ -9619,7 +9743,7 @@ function lib._Internal.renderSearchLanding(state)
 
 	local filterRow = createContentFrame(state, 34)
 	lib._Internal.addSearchFilterButton(state, filterRow, 1, _G.ALL or "All", "all")
-	lib._Internal.addSearchFilterButton(state, filterRow, 2, L["configCenterChanged"] or "Changed", "changed")
+	lib._Internal.addSearchFilterButton(state, filterRow, 2, L["configCenterChangedFilter"] or "Changed", "changed")
 	lib._Internal.addSearchFilterButton(state, filterRow, 3, L["configCenterNew"] or "New", "new")
 	lib._Internal.addSearchFilterButton(state, filterRow, 4, L["configCenterEnabled"] or "Enabled", "enabled")
 	state.y = state.y - 8
@@ -9647,7 +9771,7 @@ function lib._Internal.renderSearchLanding(state)
 			local openButton = makeFlatButton(card, (L["configCenterOpenButton"] or "Open"), 74, 24)
 			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 8)
 			openButton:SetScript("OnClick", function()
-				state:SetPage(control.pageID, control.id)
+				state:SetPage(control.pageID, control.id, true)
 			end)
 			state.y = state.y - 8
 			shown = shown + 1
@@ -9664,6 +9788,7 @@ end
 local StateMixin = {}
 
 function StateMixin:RenderContent()
+	if self.app and self.app.FlushRegistrationSorts then self.app:FlushRegistrationSorts() end
 	local scrollBar = getScrollBar(self.frame and self.frame.Scroll)
 	if scrollBar and scrollBar.Hide then
 		if scrollBar.SetAlpha then scrollBar:SetAlpha(0) end
@@ -9677,6 +9802,8 @@ function StateMixin:RenderContent()
 	updateContentMetrics(self)
 	clearContent(self)
 	clearFixedContent(self)
+	self.tabbedGroupID = nil
+	self.singleDefaultGroupID = nil
 	self.groupCountHeaders = {}
 	self.groupDefaultsButtons = {}
 	local query = self.frame.SearchBox:GetText() or ""
@@ -10016,6 +10143,7 @@ function StateMixin:SetSearch(restoreScroll)
 	self.selectedPageID = nil
 	if self.frame.SearchBox:GetText() ~= "" then
 		self.suppressSearchRender = true
+		self.suppressedSearchText = ""
 		self.frame.SearchBox:SetText("")
 		self.suppressSearchRender = nil
 	end
@@ -10083,7 +10211,7 @@ function StateMixin:ResolveFocusControlID(page, focusID)
 	return nil, nil
 end
 
-function StateMixin:SetPage(pageID, focusControlID)
+function StateMixin:SetPage(pageID, focusControlID, highlightControl)
 	self.activeSearchQuery = nil
 	lib._Internal.hideSearchPreview(self.frame)
 	local page = self.app:GetPage(pageID)
@@ -10116,12 +10244,14 @@ function StateMixin:SetPage(pageID, focusControlID)
 		end
 		if resolvedControlID then
 			self.pendingFocusControlID = resolvedControlID
+			self.pendingFocusHighlight = highlightControl == true
 		else
 			self.pendingCustomFocusID = focusControlID
 		end
 	end
 	if self.frame.SearchBox:GetText() ~= "" then
 		self.suppressSearchRender = true
+		self.suppressedSearchText = ""
 		self.frame.SearchBox:SetText("")
 		self.suppressSearchRender = nil
 	end
@@ -10687,6 +10817,7 @@ local function createFrame(app)
 	frame._LibSettingsDesignerState = state
 	updateContentMetrics(state)
 	frame:SetScript("OnHide", function()
+		lib.CancelControlFocus(state)
 		lib._Internal.hideSearchPreview(frame)
 		lib.ReleaseAllCustomHandles(state)
 	end)
@@ -10698,6 +10829,13 @@ local function createFrame(app)
 		end
 		if frame.SearchClearButton then
 			frame.SearchClearButton:SetShown(query ~= "")
+		end
+		-- SetText notifications can arrive after navigation has rendered the target.
+		-- Acknowledge the expected value without rebuilding and cancelling focus.
+		if state.suppressedSearchText ~= nil then
+			local expected = state.suppressedSearchText
+			state.suppressedSearchText = nil
+			if query == expected then return end
 		end
 		if state.suppressSearchRender then
 			return

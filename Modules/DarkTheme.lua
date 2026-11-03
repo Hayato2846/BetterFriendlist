@@ -1825,6 +1825,10 @@ function DarkTheme:SkinModernVisibleMainContent(engine, frame)
 		SkinRaidAssistCheckButtonField(engine, control, "EveryoneAssistCheckbox")
 		SkinModernButtonField(engine, raid, "ConvertToRaidButton")
 		SkinModernButtonField(engine, raid, "RaidToolsButton")
+		if raid.NotInRaid then
+			-- Alpha also softens the inline colors in Blizzard's localized raid description.
+			engine:SetTextureAlpha(raid, raid.NotInRaid, 0.78)
+		end
 	end
 
 	local quickJoin = frame.QuickJoinFrame

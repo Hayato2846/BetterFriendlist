@@ -57,6 +57,13 @@ local CARD_BACKDROP = {
 	insets = { left = 3, right = 3, top = 3, bottom = 3 },
 }
 
+local SUMMARY_BACKDROP = {
+	bgFile = CARD_BACKDROP.bgFile,
+	edgeFile = "Interface\\Buttons\\WHITE8X8",
+	edgeSize = 1,
+	insets = { left = 1, right = 1, top = 1, bottom = 1 },
+}
+
 local PREVIEW_BACKDROP = {
 	bgFile = "Interface\\FrameGeneral\\UI-Background-Marble",
 	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -488,9 +495,9 @@ function AppearanceOnboarding:BuildStyleStep(parent)
 		{
 			value = STYLE_MODERN,
 			titleKey = "SETTINGS_FRIENDS_UI_STYLE_MODERN",
-			title = "Modern (Retail 12.1)",
+			title = "Modern",
 			descriptionKey = "ONBOARDING_STYLE_MODERN_DESC",
-			description = "Side navigation, modern friend cards, and the complete Retail 12.1 SocialUI experience.",
+			description = "Side navigation, modern friend cards, and faster access to social views.",
 			badgeKey = "ONBOARDING_RECOMMENDED",
 			badge = "Recommended",
 		},
@@ -686,7 +693,7 @@ function AppearanceOnboarding:RefreshLayoutOption(card)
 end
 
 function AppearanceOnboarding:CreateSummaryRow(parent, yOffset)
-	local row = CreateBackdropFrame("Frame", parent)
+	local row = CreateBackdropFrame("Frame", parent, SUMMARY_BACKDROP)
 	row:SetHeight(64)
 	row:SetPoint("TOPLEFT", 0, yOffset)
 	row:SetPoint("TOPRIGHT", 0, yOffset)
@@ -839,7 +846,7 @@ end
 function AppearanceOnboarding:GetStyleLabel(style)
 	local locale = GetL()
 	if style == STYLE_MODERN then
-		return GetLocalizedText(locale, "SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern (Retail 12.1)")
+		return GetLocalizedText(locale, "SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern")
 	end
 	return GetLocalizedText(locale, "SETTINGS_FRIENDS_UI_STYLE_LEGACY", "Legacy")
 end
@@ -1029,7 +1036,7 @@ function AppearanceOnboarding:RefreshStep()
 			GetLocalizedText(
 				locale,
 				"ONBOARDING_WELCOME_DESC",
-				"Retail 12.1 brings a fundamentally redesigned friendlist. Choose the interface that feels right for you."
+				"Choose the friends list layout that feels right for you."
 			)
 		)
 	elseif step == 2 then

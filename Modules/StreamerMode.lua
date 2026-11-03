@@ -166,6 +166,8 @@ function StreamerMode:UpdateAdjacentButtonAnchors()
 end
 
 function StreamerMode:UpdateState()
+	local KnownCharacters = BFL:GetModule("KnownCharacters")
+	if KnownCharacters and self:IsActive() then KnownCharacters:HideSurfaces() end
 	if not self.toggleButton then
 		-- Try to find it again (if loaded late)
 		if BetterFriendsFrame and BetterFriendsFrame.StreamerModeButton then

@@ -1098,8 +1098,7 @@ end
 -- Called from OnClick when modifier+button detected
 -- Must be called from hardware event to avoid ADDON_ACTION_FORBIDDEN
 function RaidFrame:HandleShortcutClick(button, clickedButton, modifier)
-	if InCombatLockdown() then
-		UIErrorsFrame:AddMessage("Cannot use shortcuts in combat", 1.0, 0.1, 0.1, 1.0)
+	if BFL.IsSocialActionRestricted() then
 		return false
 	end
 
@@ -1119,15 +1118,13 @@ function RaidFrame:HandleShortcutClick(button, clickedButton, modifier)
 			if data.modifier == modifier and data.button == clickedButton then
 				-- Execute action (ONLY Promote/Lead, MainTank/MainAssist handled via attributes)
 				if actionKey == "lead" then
-					BFL.PromoteToLeader(button.unit)
-					return true
+					return BFL.PromoteToLeader(button.unit)
 				elseif actionKey == "promote" then
 					if UnitIsGroupAssistant(button.unit) then
-						BFL.DemoteAssistant(button.unit)
+						return BFL.DemoteAssistant(button.unit)
 					else
-						BFL.PromoteToAssistant(button.unit)
+						return BFL.PromoteToAssistant(button.unit)
 					end
-					return true
 				end
 			end
 		end
@@ -1353,6 +1350,11 @@ function RaidFrame:UpdateConvertButton()
 	end
 
 	local button = frame.ConvertToRaidButton
+	if BFL.IsSocialActionRestricted() or not BFL.IsRaidListEnabled() then
+		button:Disable()
+		button.tooltip = L.GUILD_ACTION_RESTRICTED
+		return
+	end
 	local canControl = self:CanControlRaid() or (not IsInGroup()) -- Can create if solo
 	local inRaid = IsInRaid()
 	local inGroup = IsInGroup()
@@ -1511,6 +1513,10 @@ function RaidFrame:RegisterEvents()
 	-- Phase 8.2: Combat event to clear multi-selections
 	BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function(...)
 		RaidFrame:OnCombatStart(...)
+		RaidFrame:UpdateConvertButton()
+	end, 50)
+	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		RaidFrame:UpdateConvertButton()
 	end, 50)
 end
 
@@ -2416,8 +2422,7 @@ function RaidFrame:ConvertToRaid()
 		return false -- Already in raid
 	end
 
-	BFL.ConvertToRaid()
-	return true
+	return BFL.ConvertToRaid()
 end
 
 --- Convert to party
@@ -2433,8 +2438,7 @@ function RaidFrame:ConvertToParty()
 		return false -- Too many members for party
 	end
 
-	BFL.ConvertToParty()
-	return true
+	return BFL.ConvertToParty()
 end
 
 --- Initiate ready check
@@ -2479,8 +2483,7 @@ function RaidFrame:SetEveryoneIsAssistant(enabled)
 		return false
 	end
 
-	BFL.SetEveryoneIsAssistant(enabled)
-	return true
+	return BFL.SetEveryoneIsAssistant(enabled)
 end
 
 --- Check if everyone is assistant

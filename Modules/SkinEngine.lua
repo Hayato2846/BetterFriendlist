@@ -1559,6 +1559,30 @@ function SkinEngine:RefreshBackdropRenderer(frame)
 	self:CreateBackdrop(frame, backdrop.BFL_DarkRenderVariant or "panel", backdrop.BFL_DarkRenderInsets or ZERO_INSETS)
 end
 
+local SETTINGS_CHECK_BORDER_PIECES = {
+	"TopLeftCorner", "TopRightCorner", "BottomLeftCorner", "BottomRightCorner",
+	"TopEdge", "BottomEdge", "LeftEdge", "RightEdge",
+}
+
+local function AlignSettingsCheckBorder(backdrop)
+	for _, key in ipairs(SETTINGS_CHECK_BORDER_PIECES) do
+		local piece = backdrop[key]
+		if piece then
+			-- A solid edge has no texels to snap or repeat across a one-pixel strip.
+			piece:SetColorTexture(1, 1, 1, 1)
+			if piece.SetSnapToPixelGrid then
+				piece:SetSnapToPixelGrid(false)
+			end
+			if piece.SetTexelSnappingBias then
+				piece:SetTexelSnappingBias(0)
+			end
+			if piece.SetRoundLayoutToNearestPixel then
+				piece:SetRoundLayoutToNearestPixel(true)
+			end
+		end
+	end
+end
+
 function SkinEngine:CreateBackdrop(frame, variant, insets)
 	if not frame or IsForbidden(frame) or not CreateFrame then
 		return nil
@@ -1572,9 +1596,10 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 		local template = BackdropTemplateMixin and "BackdropTemplate" or nil
 		backdrop = CreateFrame("Frame", nil, frame, template)
 		backdrop:SetFrameLevel(math.max((frame:GetFrameLevel() or 1) - 1, 0))
-		if backdrop.SetBackdrop then
-			backdrop:SetBackdrop(BACKDROP)
-		else
+		if frame.BFL_SettingsGridCheck and backdrop.SetRoundLayoutToNearestPixel then
+			backdrop:SetRoundLayoutToNearestPixel(true)
+		end
+		if not backdrop.SetBackdrop then
 			backdrop.bg = backdrop:CreateTexture(nil, "BACKGROUND")
 			backdrop.bg:SetAllPoints()
 		end
@@ -1602,6 +1627,30 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 		and backdrop.BFL_DarkInsetTop == top
 		and backdrop.BFL_DarkInsetBottom == bottom
 	local bg, border = ResolveBackdropColors(variant)
+	local edgeSize = BACKDROP.edgeSize
+	local pixelBorder = frame.BFL_DarkPixelBorder or frame.BFL_SettingsGridCheck
+	if pixelBorder and PixelUtil and PixelUtil.GetNearestPixelSize then
+		edgeSize = PixelUtil.GetNearestPixelSize(edgeSize, backdrop:GetEffectiveScale(), 1)
+	end
+	if backdrop.SetBackdrop and backdrop.BFL_DarkEdgeSize ~= edgeSize then
+		local config = pixelBorder and {
+			bgFile = BACKDROP.bgFile,
+			edgeFile = BACKDROP.edgeFile,
+			edgeSize = edgeSize,
+			insets = { left = edgeSize, right = edgeSize, top = edgeSize, bottom = edgeSize },
+		} or BACKDROP
+		if frame.BFL_SettingsGridCheck then
+			backdrop:SetBackdrop(config)
+			AlignSettingsCheckBorder(backdrop)
+		elseif self:IsBFLFrame(frame) then
+			BFL.SetOwnedBackdrop(backdrop, config)
+		else
+			backdrop:SetBackdrop(config)
+		end
+		backdrop.BFL_DarkEdgeSize = edgeSize
+		backdrop.BFL_DarkAppliedBgColor = nil
+		backdrop.BFL_DarkAppliedBorderColor = nil
+	end
 	local colorVersion = self.themeColorVersion or 0
 	if
 		insetsMatch
@@ -1651,7 +1700,7 @@ function SkinEngine:CreateBackdrop(frame, variant, insets)
 	end
 	if backdrop.BFL_DarkVariant ~= variant or backdrop.BFL_DarkColorVersion ~= colorVersion then
 		backdrop.BFL_DarkVariant = variant
-		ApplyBackdropLines(backdrop, variant)
+		ApplyBackdropLines(backdrop, pixelBorder and "flat" or variant)
 	end
 	backdrop.BFL_DarkColorVersion = colorVersion
 	if not backdrop.IsShown or not backdrop:IsShown() then
@@ -2836,7 +2885,7 @@ function SkinEngine:SkinCompactCheckButton(checkButton)
 		marker = CreateFrame("Frame", nil, checkButton, template)
 		marker:EnableMouse(false)
 		if marker.SetBackdrop then
-			marker:SetBackdrop(BACKDROP)
+			BFL.SetOwnedBackdrop(marker, BACKDROP)
 		end
 		checkButton.BFL_DarkCheckMarker = marker
 		self:RegisterOverlay(checkButton, marker)
@@ -2915,7 +2964,7 @@ function SkinEngine:SkinCheckButton(checkButton)
 	if checkButton.GetNormalTexture then
 		local normalAlpha = checkButton.BFL_DarkCheckButtonNormalAlpha
 		if normalAlpha == nil then
-			normalAlpha = 0.25
+			normalAlpha = checkButton.BFL_SettingsGridCheck and 0 or 0.25
 		end
 		self:SetTextureAlpha(checkButton, checkButton:GetNormalTexture(), normalAlpha)
 	end
@@ -3028,7 +3077,7 @@ function SkinEngine:SkinDropdownIndicator(dropdown)
 		indicator:SetFrameLevel((dropdown:GetFrameLevel() or 1) + 1)
 	end
 	if indicator.SetBackdrop then
-		indicator:SetBackdrop(BACKDROP)
+		BFL.SetOwnedBackdrop(indicator, BACKDROP)
 		indicator:SetBackdropColor(UnpackColor(COLORS.controlDown))
 		indicator:SetBackdropBorderColor(UnpackColor(COLORS.borderSoft))
 	end
@@ -3121,7 +3170,7 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 	menu:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -2)
 
 	if menu.SetBackdrop then
-		menu:SetBackdrop(BACKDROP)
+		BFL.SetOwnedBackdrop(menu, BACKDROP)
 		menu:SetBackdropColor(UnpackColor(COLORS.panel))
 		menu:SetBackdropBorderColor(UnpackColor(COLORS.borderSoft))
 	end
@@ -3167,7 +3216,7 @@ function SkinEngine:RenderCustomDropdown(dropdown)
 		button.Check:SetText(selected and (data.useCheckboxes and "x" or "o") or "")
 		button.Check:SetTextColor(UnpackColor(COLORS.gold))
 		if button.SetBackdrop then
-			button:SetBackdrop(BACKDROP)
+			BFL.SetOwnedBackdrop(button, BACKDROP)
 			button:SetBackdropColor(UnpackColor(selected and COLORS.accentState or COLORS.panelSoft))
 			button:SetBackdropBorderColor(UnpackColor(selected and COLORS.accentSoft or COLORS.borderNone))
 		end
@@ -3427,7 +3476,7 @@ function SkinEngine:SkinScrollTextureThumb(scrollBar, thumb)
 			marker:SetFrameLevel((scrollBar:GetFrameLevel() or 1) + 2)
 		end
 		if marker.SetBackdrop then
-			marker:SetBackdrop(BACKDROP)
+			BFL.SetOwnedBackdrop(marker, BACKDROP)
 			SetBackdropColors(marker, COLORS.scrollThumb, COLORS.borderNone)
 		end
 		marker:Show()
@@ -3770,7 +3819,7 @@ function SkinEngine:SkinSliderThumb(slider, thumb)
 			marker:SetFrameLevel((slider:GetFrameLevel() or 1) + 2)
 		end
 		if marker.SetBackdrop then
-			marker:SetBackdrop(BACKDROP)
+			BFL.SetOwnedBackdrop(marker, BACKDROP)
 			marker:SetBackdropColor(UnpackColor(COLORS.sliderThumb))
 			marker:SetBackdropBorderColor(UnpackColor(COLORS.borderNone))
 		end

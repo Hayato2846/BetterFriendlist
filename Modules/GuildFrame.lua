@@ -1263,10 +1263,12 @@ function GuildFrame:CreateFilterDropdown(frame)
 		BFL.SetDropdownWidth(dropdown, 104)
 	end
 	if BFL.InitializeDropdown then
+		local function GetFilterSelectionText()
+			return self:GetFilterLabel(self.filterMode)
+		end
 		BFL.InitializeDropdown(dropdown, {
-			getSelectionText = function()
-				return self:GetFilterLabel(self.filterMode)
-			end,
+			getSelectionText = GetFilterSelectionText,
+			getCombinedSelectionText = GetFilterSelectionText,
 			populateRootDescription = function(rootDescription)
 				self:PopulateFilterMenu(rootDescription)
 			end,

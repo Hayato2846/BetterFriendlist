@@ -181,6 +181,18 @@ local function HideContactMemoryTooltipLines(tooltip)
 	end
 end
 
+local function HideKnownCharacterTooltipLines(tooltip)
+	for _, line in ipairs(tooltip and tooltip.KnownCharacterLines or {}) do HideTooltipLine(line) end
+end
+
+if FriendsTooltip and FriendsTooltip.HookScript then
+	FriendsTooltip:HookScript("OnHide", function(tooltip)
+		HideTooltipLine(tooltip.BFLFriendTypeLine)
+		HideContactMemoryTooltipLines(tooltip)
+		HideKnownCharacterTooltipLines(tooltip)
+	end)
+end
+
 local function EnsureContactMemoryTooltipLine(tooltip, index, fontObjectName)
 	local lines = GetContactMemoryTooltipLines(tooltip)
 	if not lines then
@@ -463,15 +475,61 @@ local function BuildGameAccountIconPrefix(clientProgram)
 	return ""
 end
 
+local function AddKnownCharacterFriendsTooltipLines(tooltip, friendData, anchor)
+	HideKnownCharacterTooltipLines(tooltip)
+	local KnownCharacters = BFL:GetModule("KnownCharacters")
+	local lines = KnownCharacters and KnownCharacters:GetTooltipLines(friendData)
+	if not lines then return nil end
+	tooltip.KnownCharacterLines = tooltip.KnownCharacterLines or {}
+	for index, text in ipairs(lines) do
+		local line = tooltip.KnownCharacterLines[index]
+		if not line then
+			line = tooltip:CreateFontString(nil, "ARTWORK", index == 1 and "FriendsFont_Normal" or "FriendsFont_Small")
+			line:SetJustifyH("LEFT"); line:SetJustifyV("TOP")
+			line:SetWordWrap(true)
+			if line.SetNonSpaceWrap then line:SetNonSpaceWrap(true) end
+			line:SetWidth(176)
+			tooltip.KnownCharacterLines[index] = line
+		end
+		anchor = SetContactMemoryTooltipLine(line, anchor or GetLastFriendsTooltipAnchor(), text,
+			index == 1 and -8 or -2, 1, index == 1 and 0.82 or 1, index == 1 and 0 or 1)
+	end
+	return anchor
+end
+
 AddContactMemoryTooltipLines = function(tooltip, friendData, anchor)
 	local ContactMemory = BFL:GetModule("ContactMemory")
+	local label = friendData and friendData.type == "bnet" and BFL.GetBNetFriendLevelLabel
+		and BFL.GetBNetFriendLevelLabel(friendData.friendLevel)
+	label = label or nil
 	if tooltip and tooltip == FriendsTooltip then
-		return AddContactMemoryFriendsTooltipLines(tooltip, friendData, anchor)
+		-- Addon-owned text only: do not replace native scripts, methods or data.
+		if not tooltip.BFLFriendTypeLine and label and tooltip.CreateFontString then
+			tooltip.BFLFriendTypeLine = tooltip:CreateFontString(nil, "ARTWORK", "FriendsFont_Small")
+			tooltip.BFLFriendTypeLine:SetJustifyH("LEFT")
+		end
+		local line = tooltip.BFLFriendTypeLine
+		if line then
+			HideTooltipLine(line)
+			if label then
+				line:ClearAllPoints()
+				line:SetWidth(176)
+				line:SetTextColor(0.6, 0.6, 0.6)
+				anchor = SetTooltipLine(line, anchor or GetLastFriendsTooltipAnchor(), label, -6)
+			end
+		end
+		local memoryAnchor = AddContactMemoryFriendsTooltipLines(tooltip, friendData, anchor)
+		return AddKnownCharacterFriendsTooltipLines(tooltip, friendData, memoryAnchor or anchor)
+			or memoryAnchor or (label and anchor)
 	end
+	if label and tooltip and tooltip.AddLine then tooltip:AddLine(label, 0.6, 0.6, 0.6) end
+	local added = label ~= nil and label ~= false
 	if ContactMemory and ContactMemory.AddTooltipLinesForFriend then
-		return ContactMemory:AddTooltipLinesForFriend(tooltip, friendData)
+		added = ContactMemory:AddTooltipLinesForFriend(tooltip, friendData) or added
 	end
-	return false
+	local KnownCharacters = BFL:GetModule("KnownCharacters")
+	if KnownCharacters then added = KnownCharacters:AddTooltipLines(tooltip, friendData) or added end
+	return added
 end
 
 ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
@@ -715,6 +773,8 @@ local function EnsureClassicFriendsTooltipHook()
 			RefreshFriendsTooltipAdditions(FriendsTooltip, button.friendData)
 		elseif FriendsTooltip.ContactMemoryLines then
 			HideContactMemoryTooltipLines(FriendsTooltip)
+			HideTooltipLine(FriendsTooltip.BFLFriendTypeLine)
+			HideKnownCharacterTooltipLines(FriendsTooltip)
 		end
 	end)
 
@@ -889,6 +949,11 @@ function BetterFriendsList_Button_OnLeave(self)
 	BFL_Tooltip:Hide()
 	SetPrimaryGameAccountNameAsHeader(false)
 	local tooltip = FriendsTooltip
+	-- Native tooltips reuse this frame without knowing about addon-owned lines.
+	-- Hiding only the parent would show stale contact/type text on the next hover.
+	HideTooltipLine(tooltip.BFLFriendTypeLine)
+	HideContactMemoryTooltipLines(tooltip)
+	HideKnownCharacterTooltipLines(tooltip)
 	tooltip.button = nil
 	tooltip:Hide()
 end

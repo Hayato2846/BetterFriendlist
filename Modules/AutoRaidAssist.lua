@@ -225,7 +225,7 @@ local function SetFrameBackdrop(frame, r, g, b, a, br, bg, bb, ba)
 	if not frame or not frame.SetBackdrop then
 		return
 	end
-	frame:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -251,7 +251,7 @@ local function ApplyInlineButtonStyle(button, state)
 		textColor = { 0.45, 0.43, 0.36, 1 }
 	end
 
-	button:SetBackdrop({
+	BFL.SetOwnedBackdrop(button, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,

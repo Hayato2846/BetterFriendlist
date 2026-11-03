@@ -11,6 +11,11 @@ local function IsSecretValue(value)
 	return BFL.HasSecretValues and BFL.IsSecret and BFL:IsSecret(value)
 end
 
+local function IsReadableTable(value)
+	return not IsSecretValue(value) and type(value) == "table"
+		and not (issecrettable and issecrettable(value))
+end
+
 local function SafeText(value, fallback)
 	if IsSecretValue(value) then
 		return fallback or ""
@@ -337,7 +342,7 @@ function GuildRosterData:GetClubMemberSnapshot()
 		return nil
 	end
 	local okMembers, memberIDs = pcall(C_Club.GetClubMembers, clubId)
-	if not okMembers or type(memberIDs) ~= "table" then
+	if not okMembers or not IsReadableTable(memberIDs) then
 		return nil
 	end
 
@@ -349,16 +354,18 @@ function GuildRosterData:GetClubMemberSnapshot()
 		memberIDByInfo = {},
 	}
 	for _, memberId in ipairs(memberIDs) do
-		local okInfo, info = pcall(C_Club.GetMemberInfo, clubId, memberId)
-		if okInfo and type(info) == "table" then
-			cache.memberIDByInfo[info] = memberId
-			local guid = info.guid
-			if not IsSecretValue(guid) and guid ~= nil then
-				cache.byGUID[guid] = info
-			end
-			local normalizedName = NormalizeMemberName(info.name)
-			if normalizedName then
-				cache.byName[normalizedName] = info
+		if not IsSecretValue(memberId) then
+			local okInfo, info = pcall(C_Club.GetMemberInfo, clubId, memberId)
+			if okInfo and IsReadableTable(info) then
+				cache.memberIDByInfo[info] = memberId
+				local guid = info.guid
+				if not IsSecretValue(guid) and guid ~= nil then
+					cache.byGUID[guid] = info
+				end
+				local normalizedName = NormalizeMemberName(info.name)
+				if normalizedName then
+					cache.byName[normalizedName] = info
+				end
 			end
 		end
 	end
@@ -383,9 +390,11 @@ function GuildRosterData:EnrichRosterWithClubInfo(members)
 		end
 		if info then
 			member.clubId = snapshot.clubId
-			member.memberId = info.memberId or snapshot.memberIDByInfo[info]
-			if (not member.guid or member.guid == "") and info.guid and not IsSecretValue(info.guid) then
-				member.guid = info.guid
+			local memberId = info.memberId
+			member.memberId = not IsSecretValue(memberId) and memberId or snapshot.memberIDByInfo[info]
+			local guid = info.guid
+			if (not member.guid or member.guid == "") and not IsSecretValue(guid) and guid then
+				member.guid = guid
 			end
 			member.profession1ID = SafeOptionalNumber(info.profession1ID)
 			member.profession1Rank = SafeOptionalNumber(info.profession1Rank)

@@ -2,6 +2,13 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "locale": "deDE",
+      "key": "SETTINGS_FRIENDS_UI_STYLE_MODERN",
+      "value": "Modern",
+      "checks": ["source-identical"],
+      "reason": "Modern is the German label for this interface style."
+    },
+    {
       "locale": "*",
       "key": "SETTINGS_THEME_ELVUI",
       "checks": ["source-identical", "english-language"],

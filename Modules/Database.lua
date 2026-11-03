@@ -160,6 +160,7 @@ local defaults = {
 			nextTagId = 1,
 		},
 	},
+	knownCharacters = { enabled = false, observeBattleNet = false, maxTooltipCharacters = 3, contacts = {} },
 	friendTagsSchemaVersion = 1,
 	friendTagSettings = {
 		enabled = true,
@@ -313,6 +314,7 @@ local defaults = {
 	whoSearchHistoryMax = 8, -- Maximum search history entries (default: 8)
 	whoDoubleClickAction = "whisper", -- Double-click action: whisper or invite (default: whisper)
 	whoSearchHistory = {}, -- Stored search history entries
+	whoSearchPresets = {}, -- Explicitly bookmarked text queries, capped by WhoSearches
 	whoSearchBuilderDocked = false, -- Search Builder docked mode (default: OFF, flyout overlay)
 
 	-- Migration tracking
@@ -322,6 +324,7 @@ local defaults = {
 	socialKeybindMigratedKeys = {}, -- Keys moved from TOGGLESOCIAL to BETTERFRIENDLIST_TOGGLE
 	themeSettingsIndependentDefaultsVersion = 1, -- Tracks independent Theme tab default derivation
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
+	changelogWindowSize = { width = 600, height = 500 },
 	version = BFL.Version,
 }
 

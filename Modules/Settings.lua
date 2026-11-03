@@ -2541,7 +2541,13 @@ function Settings:ExportSettings()
 	-- Deep copy the DB to ensure we capture EVERYTHING
 	-- This fulfills the requirement to export future settings automatically
 	local DB = GetDB()
-	local exportData = DB:InternalDeepCopy(BetterFriendlistDB)
+	-- Private character associations are local-only, not profile data. Exclude
+	-- before deep-copy/serialization, rather than copying private payloads first.
+	local publicData = {}
+	for key, value in pairs(BetterFriendlistDB) do
+		if key ~= "knownCharacters" then publicData[key] = value end
+	end
+	local exportData = DB:InternalDeepCopy(publicData)
 	-- Onboarding acknowledgement and reload-resume state belong to this installation
 	-- and must not suppress, resume, or re-open onboarding on an imported profile.
 	exportData.appearanceOnboardingVersion = nil
@@ -2595,6 +2601,7 @@ function Settings:ImportSettings(importString)
 		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V3 (Full) backup...")
 		local appearanceOnboardingVersion = BetterFriendlistDB.appearanceOnboardingVersion
 		local appearanceOnboardingResume = BetterFriendlistDB.appearanceOnboardingResume
+		local knownCharacters = BetterFriendlistDB.knownCharacters
 
 		-- Wipe the entire DB first, then apply import data.
 		-- This ensures keys that existed in the live DB but NOT in the export
@@ -2609,12 +2616,14 @@ function Settings:ImportSettings(importString)
 				and key ~= "version"
 				and key ~= "appearanceOnboardingVersion"
 				and key ~= "appearanceOnboardingResume"
+				and key ~= "knownCharacters"
 			then
 				BetterFriendlistDB[key] = value
 			end
 		end
 		BetterFriendlistDB.appearanceOnboardingVersion = appearanceOnboardingVersion
 		BetterFriendlistDB.appearanceOnboardingResume = appearanceOnboardingResume
+		BetterFriendlistDB.knownCharacters = knownCharacters
 
 		-- Explicitly handle version to prevent mismatches
 		-- We keep the current addon version in DB, not the one from export,
@@ -4277,8 +4286,9 @@ function Settings:RefreshFriendTabsTab()
 		owner:SetScript("OnEnter", function(self)
 			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 			BFL_Tooltip:SetText(title or "", 1, 0.82, 0)
-			if description and description ~= "" then
-				BFL_Tooltip:AddLine(description, 0.85, 0.85, 0.85, true)
+			local text = type(description) == "function" and description() or description
+			if type(text) == "string" and text ~= "" then
+				BFL_Tooltip:AddLine(text, 0.85, 0.85, 0.85, true)
 			end
 			BFL_Tooltip:Show()
 		end)
@@ -4414,7 +4424,11 @@ function Settings:RefreshFriendTabsTab()
 		SetTooltip(
 			row.VisibleCheck,
 			entry.label or entry.id,
-			L.SETTINGS_FRIEND_TABS_VISIBILITY_DESC or "Show or hide this tab in the Modern Friendlist."
+			function()
+				return FriendsUI:GetFriendTabAvailabilityReason(entry.id)
+					or L.SETTINGS_FRIEND_TABS_VISIBILITY_DESC
+					or "Show or hide this tab in the Modern Friendlist."
+			end
 		)
 
 		local conditional = entry.id == "friend_requests" or entry.id == "quick_join"
@@ -4486,6 +4500,11 @@ function Settings:RefreshFriendTabsTab()
 end
 
 -- Refresh General Tab with new component library
+local function CenterNumericInput(editBox)
+	editBox:SetTextInsets(6, 6, 0, 0)
+	editBox:SetJustifyH("CENTER")
+end
+
 function Settings:RefreshGeneralTab()
 	if not settingsFrame or not Components then
 		return
@@ -4523,7 +4542,7 @@ function Settings:RefreshGeneralTab()
 			L.SETTINGS_FRIENDS_UI_STYLE or "Interface Style",
 			{
 				labels = {
-					L.SETTINGS_FRIENDS_UI_STYLE_MODERN or "Modern (Retail 12.1)",
+					L.SETTINGS_FRIENDS_UI_STYLE_MODERN or "Modern",
 					L.SETTINGS_FRIENDS_UI_STYLE_LEGACY or "Legacy",
 				},
 				values = { "modern", "legacy" },
@@ -4549,7 +4568,7 @@ function Settings:RefreshGeneralTab()
 		)
 		styleDropdown:SetTooltip(
 			L.SETTINGS_FRIENDS_UI_STYLE or "Interface Style",
-			L.SETTINGS_FRIENDS_UI_STYLE_DESC or "Choose the Retail 12.1 layout or the previous BetterFriendlist layout."
+			L.SETTINGS_FRIENDS_UI_STYLE_DESC or "Choose the Modern layout or the previous BetterFriendlist layout."
 		)
 		table.insert(allFrames, styleDropdown)
 		table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5198,6 +5217,7 @@ function Settings:RefreshGeneralTab()
 				self:OnRecentlyAddedDurationValueChanged(num)
 			end
 		)
+		CenterNumericInput(durationInput.Input)
 		durationInput:SetTooltip(
 			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP or "Duration Value",
 			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC
@@ -5258,8 +5278,10 @@ function Settings:RefreshGeneralTab()
 					BFL:ForceRefreshFriendsList()
 				end
 			end, editBox, false)
-		end
+		end,
+		72
 	)
+	CenterNumericInput(widthInput.Input)
 	table.insert(allFrames, widthInput)
 
 	-- Frame Height Input
@@ -5280,8 +5302,10 @@ function Settings:RefreshGeneralTab()
 					BFL:ForceRefreshFriendsList()
 				end
 			end, editBox, false)
-		end
+		end,
+		72
 	)
+	CenterNumericInput(heightInput.Input)
 	table.insert(allFrames, heightInput)
 
 	-- Frame Scale Input
@@ -5298,8 +5322,10 @@ function Settings:RefreshGeneralTab()
 					BFL:ForceRefreshFriendsList()
 				end
 			end, editBox, true)
-		end
+		end,
+		72
 	)
+	CenterNumericInput(scaleInput.Input)
 	table.insert(allFrames, scaleInput)
 
 	-- Lock Window Checkbox
@@ -5461,6 +5487,11 @@ function Settings:RefreshContactMemoryTab()
 			or "Hide private notes while Streamer Mode is active.",
 	})
 	table.insert(allFrames, contactMemoryStreamerToggle)
+
+	local KnownCharacters = BFL:GetModule("KnownCharacters")
+	if KnownCharacters then
+		KnownCharacters:RegisterLegacyControls(tab, Components, allFrames)
+	end
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
@@ -7385,7 +7416,7 @@ local function BFL_Settings_ApplyBuilderButtonStyle(button, state)
 		border = { 0.20, 0.16, 0.08, 0.46 }
 		textColor = { 0.45, 0.43, 0.36, 1 }
 	end
-	button:SetBackdrop({
+	BFL.SetOwnedBackdrop(button, {
 		bgFile = "Interface\\Buttons\\WHITE8x8",
 		edgeFile = "Interface\\Buttons\\WHITE8x8",
 		tile = false,
@@ -7403,7 +7434,7 @@ local function BFL_Settings_ApplyBuilderPanelStyle(frame, bg, border)
 	if not (frame and frame.SetBackdrop) then
 		return
 	end
-	frame:SetBackdrop({
+	BFL.SetOwnedBackdrop(frame, {
 		bgFile = "Interface\\Buttons\\WHITE8x8",
 		edgeFile = "Interface\\Buttons\\WHITE8x8",
 		tile = false,
@@ -7519,7 +7550,7 @@ local function BFL_Settings_CreateEditorRow(parent, height, leftOffset, rightOff
 	row:SetPoint("LEFT", leftOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING, 0)
 	row:SetPoint("RIGHT", -(rightOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING), 0)
 	if row.SetBackdrop then
-		row:SetBackdrop({
+		BFL.SetOwnedBackdrop(row, {
 			bgFile = "Interface\\Buttons\\WHITE8x8",
 			edgeFile = "Interface\\Buttons\\WHITE8x8",
 			edgeSize = 1,
@@ -8325,18 +8356,23 @@ function Settings:RefreshFilterSortTab()
 			ghost:SetSize(math.max(160, ghost.text:GetStringWidth() + 55), selfRow:GetHeight())
 			ghost:Show()
 
-			local cursorX, cursorY = GetCursorPosition()
-			local scale = UIParent:GetEffectiveScale()
-			ghost:ClearAllPoints()
-			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
-			selfRow:SetAlpha(0.0)
-
-			ghost:SetScript("OnUpdate", function(g)
-				local cX, cY = GetCursorPosition()
-				local s = UIParent:GetEffectiveScale()
+			local function PositionGhost(g)
+				local cursorX, cursorY = GetCursorPosition()
+				local scale = UIParent:GetEffectiveScale()
+				local x = cursorX / scale
+				local left, right = selfRow:GetLeft(), selfRow:GetRight()
+				if left and right then
+					local rowScale = selfRow:GetEffectiveScale() / scale
+					local halfWidth = g:GetWidth() / 2
+					local minX, maxX = left * rowScale + halfWidth, right * rowScale - halfWidth
+					x = math.max(minX, math.min(x, maxX))
+				end
 				g:ClearAllPoints()
-				g:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cX / s, cY / s)
-			end)
+				g:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, cursorY / scale)
+			end
+			PositionGhost(ghost)
+			ghost:SetScript("OnUpdate", PositionGhost)
+			selfRow:SetAlpha(0.0)
 
 			selfRow:SetScript("OnUpdate", function(updateSelf)
 				for _, otherItem in ipairs(entryListItems) do
@@ -8755,6 +8791,9 @@ function Settings:RefreshFilterSortTab()
 						local valueBox = CreateFrame("EditBox", nil, valueHolder, "InputBoxTemplate")
 						valueBox:SetSize(106, 20)
 						valueBox:SetAutoFocus(false)
+						if fieldDef.type == "number" then
+							CenterNumericInput(valueBox)
+						end
 						valueBox:SetText(BFL_Settings_ValueToText(node.value))
 						valueBox:SetPoint("LEFT", 0, 0)
 						valueBox:SetScript("OnEnterPressed", function(selfBox)
@@ -10137,6 +10176,8 @@ end
 -- ===========================================
 function Settings:RefreshGlobalSyncTab()
 	local DB = GetDB()
+	local GlobalSync = BFL:GetModule("GlobalSync")
+	local titleFriends = GlobalSync and GlobalSync:UsesTitleFriends() == true
 	local tab = self:GetGlobalSyncTabHost()
 	if not tab or not DB then
 		return
@@ -10154,7 +10195,7 @@ function Settings:RefreshGlobalSyncTab()
 	-- Description
 	local desc = Components:CreateLabel(
 		tab,
-		L.SETTINGS_GLOBAL_SYNC_DESC or "Synchronize your WoW friends list across all characters on this account.",
+		titleFriends and L.SETTINGS_GLOBAL_SYNC_TITLE_FRIENDS or L.SETTINGS_GLOBAL_SYNC_DESC,
 		true
 	)
 	table.insert(allFrames, desc)
@@ -10184,9 +10225,13 @@ function Settings:RefreshGlobalSyncTab()
 		L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Sync",
 		L.SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP or "Automatically sync friends from other realms to this character."
 	)
-	table.insert(allFrames, enableSync)
+	if titleFriends then
+		enableSync:Hide()
+	else
+		table.insert(allFrames, enableSync)
+	end
 
-	if DB:Get("enableGlobalSync", false) then
+	if titleFriends or DB:Get("enableGlobalSync", false) then
 		-- Enable Deletion
 		local enableDeletion = Components:CreateCheckbox(
 			tab,
@@ -10206,7 +10251,11 @@ function Settings:RefreshGlobalSyncTab()
 			L.SETTINGS_GLOBAL_SYNC_DELETION_DESC
 				or "Allow the sync process to remove friends from your list if they are removed from the database."
 		)
-		table.insert(allFrames, enableDeletion)
+		if titleFriends then
+			enableDeletion:Hide()
+		else
+			table.insert(allFrames, enableDeletion)
+		end
 
 		-- Show Deleted Friends
 		local showDeleted = Components:CreateCheckbox(
@@ -10258,12 +10307,9 @@ function Settings:RefreshGlobalSyncTab()
 								bg:SetColorTexture(1, 1, 1, 0.05)
 							end
 
-							-- Parse Name and Realm
-							local name, realm = string.match(friendUID, "^(.+)%-(.+)$")
-							if not name then
-								name = friendUID
-								realm = "Unknown"
-							end
+							local name, realm = GlobalSync:GetFriendNameAndRealm(friendUID)
+							name = name or friendUID
+							realm = realm or ""
 
 							-- Name
 							local nameText = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
@@ -10302,79 +10348,25 @@ function Settings:RefreshGlobalSyncTab()
 							actionBtn:SetSize(20, 20)
 							actionBtn:SetPoint("RIGHT", -5, 0)
 
-							if value.deleted then
-								-- Restore Button
-								actionBtn:SetText("R")
-								actionBtn:SetScript("OnClick", function()
-									BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = nil
-									BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = nil
-									BetterFriendlistDB.GlobalFriends[faction][friendUID].restoring = true -- Flag for GlobalSync to restore note
-
-									-- Add back to friend list
-									BFL.AddFriend(friendUID)
-									BFL:DebugPrint("Restored " .. name .. " to friend list.")
-
-									self:RefreshGlobalSyncTab()
-								end)
-								actionBtn:SetScript("OnEnter", function(self)
-									BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-									BFL_Tooltip:SetText(L.TOOLTIP_RESTORE_FRIEND or "Restore Friend")
-									BFL_Tooltip:Show()
-								end)
-								actionBtn:SetScript("OnLeave", function()
-									BFL_Tooltip:Hide()
-								end)
-							else
-								-- Delete Button
-								actionBtn:SetText("X")
-								actionBtn:SetScript("OnClick", function()
-									-- Mark as deleted
-									BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
-									BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
-
-									-- Immediate deletion from friend list if enabled
-									if BetterFriendlistDB.enableGlobalSyncDeletion then
-										local removed = false
-										-- Check if friend exists in current list
-										for i = 1, ((BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)) do
-											local info = BFL.GetWoWFriendInfoByIndex(i)
-											if info then
-												-- Robust matching: Check GUID first, then Name-Realm, then Name
-												local match = false
-												if data.guid and info.guid and data.guid == info.guid then
-													match = true
-												elseif info.name == friendUID then
-													match = true
-												elseif info.name == name then
-													match = true
-												end
-
-												if match then
-													BFL.RemoveFriend(info.name) -- Use the name from the API
-													BFL:DebugPrint("Removed " .. info.name .. " from friend list.")
-													removed = true
-													break
-												end
-											end
-										end
-
-										if not removed then
-											-- Fallback: Try to remove by UID directly if not found in loop (e.g. offline/cache issue)
-											BFL.RemoveFriend(friendUID)
-										end
-									end
-
-									self:RefreshGlobalSyncTab()
-								end)
-								actionBtn:SetScript("OnEnter", function(self)
-									BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
-									BFL_Tooltip:SetText(L.TOOLTIP_DELETE_FRIEND or "Delete Friend")
-									BFL_Tooltip:Show()
-								end)
-								actionBtn:SetScript("OnLeave", function()
-									BFL_Tooltip:Hide()
-								end)
-							end
+							local restore = titleFriends or value.deleted
+							actionBtn:SetText(titleFriends and "+" or (restore and "R" or "X"))
+							actionBtn:SetScript("OnClick", function()
+								if restore then
+									GlobalSync:RestoreStoredFriend(faction, friendUID)
+								else
+									GlobalSync:DeleteStoredFriend(faction, friendUID)
+								end
+								self:RefreshGlobalSyncTab()
+							end)
+							actionBtn:SetScript("OnEnter", function(owner)
+								BFL_Tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+								BFL_Tooltip:SetText(titleFriends and L.BUTTON_ADD_FRIEND
+									or (restore and L.TOOLTIP_RESTORE_FRIEND or L.TOOLTIP_DELETE_FRIEND))
+								BFL_Tooltip:Show()
+							end)
+							actionBtn:SetScript("OnLeave", function()
+								BFL_Tooltip:Hide()
+							end)
 
 							-- Edit Button (Note)
 							local editBtn = CreateFrame("Button", nil, row)
@@ -10392,36 +10384,8 @@ function Settings:RefreshGlobalSyncTab()
 									end,
 									OnAccept = function(self)
 										local text = self.EditBox:GetText()
-										-- Update DB
-										BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = text
-
-										-- Update In-Game Friend Note if friend exists locally
-										for i = 1, ((BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)) do
-											local info = BFL.GetWoWFriendInfoByIndex(i)
-											if info then
-												-- Robust matching
-												local match = false
-												if data.guid and info.guid and data.guid == info.guid then
-													match = true
-												elseif info.name == friendUID then
-													match = true
-												elseif info.name == name then
-													match = true
-												end
-
-												if match then
-													BFL.SetFriendNotes(info.name, text)
-													BFL:DebugPrint("Updated note for " .. info.name)
-													break
-												end
-											end
-										end
-
-										-- Trigger sync to ensure consistency
-										local GlobalSync = BFL:GetModule("GlobalSync")
-										if GlobalSync then
-											GlobalSync:OnFriendListUpdate()
-										end
+										GlobalSync:SetStoredFriendNote(faction, friendUID, text)
+										GlobalSync:OnFriendListUpdate()
 									end,
 									timeout = 0,
 									whileDead = true,

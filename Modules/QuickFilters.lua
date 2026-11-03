@@ -386,14 +386,16 @@ function QuickFilters:InitDropdown(dropdown)
 	end
 
 	dropdown:SetWidth(UsesModernFriendsFilterLabel() and 92 or 51)
+	local function GetFilterSelectionText()
+		local GuildFrame = GetActiveGuildFrame()
+		if GuildFrame and GuildFrame.GetHeaderFilterIcon then
+			return GetGuildFilterSelectionText(GuildFrame:GetHeaderFilterIcon(), 16)
+		end
+		return GetFriendsFilterSelectionText(14)
+	end
 	BFL.InitializeDropdown(dropdown, {
-		getSelectionText = function()
-			local GuildFrame = GetActiveGuildFrame()
-			if GuildFrame and GuildFrame.GetHeaderFilterIcon then
-				return GetGuildFilterSelectionText(GuildFrame:GetHeaderFilterIcon(), 16)
-			end
-			return GetFriendsFilterSelectionText(14)
-		end,
+		getSelectionText = GetFilterSelectionText,
+		getCombinedSelectionText = GetFilterSelectionText,
 		populateRootDescription = function(rootDescription)
 			local GuildFrame = GetActiveGuildFrame()
 			if GuildFrame and GuildFrame.PopulateFilterMenu then

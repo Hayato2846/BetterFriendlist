@@ -1235,6 +1235,10 @@ pcall(frame.RegisterEvent, frame, "SOCIAL_UI_FRIENDS_LIST_SYSTEM_STATUS_UPDATED"
 pcall(frame.RegisterEvent, frame, "CONFIRM_BATTLE_NET_FRIEND_INVITE_SHOW")
 pcall(frame.RegisterEvent, frame, "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY")
 pcall(frame.RegisterEvent, frame, "LFG_LIST_SEARCH_RESULT_UPDATED")
+if BFL.IsForever then
+	frame:RegisterEvent("LFG_ENABLED_STATE_CHANGED")
+	frame:RegisterEvent("PLAYER_LEVEL_UP")
+end
 frame:RegisterEvent("GROUP_LEFT")
 frame:RegisterEvent("GROUP_JOINED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED") -- Entering combat
@@ -2915,6 +2919,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 				end
 
+				local KnownCharacters = BFL:GetModule("KnownCharacters")
+				if isOwnMenu and KnownCharacters and not BFL:IsSecret(friendData) then
+					KnownCharacters:PopulateMenu(rootDescription, friendData or {
+						battleTag = battleTag, type = (BFL:IsSecret(bnetIDAccount) or bnetIDAccount ~= nil) and "bnet" or "wow", name = contextName,
+					})
+				end
 				local ContactMemory = BFL:GetModule("ContactMemory")
 				if isOwnMenu and ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
 					local contactKey = friendData and ContactMemory:ResolveContactKeyFromFriend(friendData)
@@ -4280,13 +4290,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		or event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED"
 		or event == "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY"
 		or event == "LFG_LIST_SEARCH_RESULT_UPDATED"
+		or event == "LFG_ENABLED_STATE_CHANGED"
+		or event == "PLAYER_LEVEL_UP"
 		or event == "GROUP_LEFT"
 		or event == "GROUP_JOINED"
 	then
 		-- Update Quick Join tab counter when social queue changes
 		BFL.HasQuickJoin = BFL.IsSocialQueueSupported and BFL.IsSocialQueueSupported() or false
 		local QuickJoin = BFL:GetModule("QuickJoin")
-		if event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED" and QuickJoin and QuickJoin.OnSystemStatusUpdated then
+		if QuickJoin and QuickJoin.OnSystemStatusUpdated and (
+			event == "SOCIAL_UI_SOCIAL_QUEUE_SYSTEM_STATUS_UPDATED"
+			or event == "LFG_ENABLED_STATE_CHANGED"
+			or event == "PLAYER_LEVEL_UP"
+		) then
 			QuickJoin:OnSystemStatusUpdated()
 		elseif event == "LFG_LIST_REVEALED_CENSORED_ACTIVE_ENTRY" and QuickJoin and QuickJoin.Update then
 			QuickJoin:Update(true)

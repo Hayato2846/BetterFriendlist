@@ -26,7 +26,7 @@ end
 local function game(online)
 	return { isOnline = online, clientProgram = "WoW", wowProjectID = 18, characterName = "Ada Lovelace",
 		characterLevel = 0, realmID = 100, realmName = "Home", areaName = "Elwynn", factionName = "Alliance",
-		isInCurrentRegion = true, playerGuid = "Player-42", gameAccountID = 123, classID = 1 }
+		isInCurrentRegion = true, playerGuid = "Player-42", gameAccountID = 123, classID = 1, regionID = 3 }
 end
 local function title(id, online)
 	return { bnetAccountID = id or 42, accountName = "Ada Lovelace", battleTag = "", friendLevel = 3,
@@ -50,7 +50,8 @@ local function setup(accounts, options)
 	local timers, eventCallbacks, hooks = {}, {}, {}
 	function BFL:RegisterEventCallback(event, callback) eventCallbacks[event] = callback end
 	BFL.FontManager = { ResolveFontPath = function() return "TestFont" end, GetFontFlags = function() return "" end }
-	local settings = { quickFilter = "all", primarySort = "status", secondarySort = "name", colorClassNames = options.colorClassNames == true }
+	local settings = { quickFilter = "all", primarySort = "status", secondarySort = "name", colorClassNames = options.colorClassNames == true,
+		showFactionIcons = options.showFactionIcons == true, compactMode = options.compact == true }
 	BFL.modules.DB = {
 		Get = function(_, key, fallback) if not key then return settings end; if settings[key] ~= nil then return settings[key] end; return fallback end,
 		Set = function(_, key, value) settings[key] = value end,
@@ -63,11 +64,12 @@ local function setup(accounts, options)
 	local frame = { IsShown = function() return shown end, GetWidth = function() return 440 end,
 		HookScript = function(_, name, callback) hooks[name] = callback end }
 	local env = setmetatable({ BFL = BFL, BFL_LOCALE_ENUS = BFL.L, BetterFriendsFrame = frame,
-		BetterFriendlistDB = { friendGroups = {} }, SlashCmdList = {}, StaticPopupDialogs = {},
+		BetterFriendlistDB = { friendGroups = {}, knownCharacters = options.knownCharacters }, SlashCmdList = {}, StaticPopupDialogs = {},
 		Enum = { BattleNetFriendLevel = { BattleTag = 1, RealID = 2, Title = 3 }, GameMode = { Standard = 0 } },
 		BNET_CLIENT_WOW = "WoW", WOW_PROJECT_ID = 18, WOW_PROJECT_MAINLINE = 1, WOW_PROJECT_CLASSIC = 2,
 		UnitFactionGroup = function() return "Alliance" end, GetRealmID = function() return 100 end,
 		GetNormalizedRealmName = function() return "Home" end, GetRealmName = function() return "Home" end,
+		GetCurrentRegion = function() return 3 end, GetServerTime = function() return 1700000000 end,
 		GetCVarBool = function() return false end, BNGetNumFriendInvites = function() return 0 end,
 		C_PartyInfo = { CanFormCrossFactionParties = function() return false end },
 		C_QuestSession = { Exists = function() return false end },
@@ -76,7 +78,13 @@ local function setup(accounts, options)
 		RAID_CLASS_COLORS = { WARRIOR = { colorStr = "ffc79c6e" }, MAGE = { colorStr = "ff69ccf0" } },
 		wipe = function(value) for key in pairs(value) do value[key] = nil end; return value end,
 		strtrim = function(value) return value:match("^%s*(.-)%s*$") end,
+		strsplit = function(delimiter, value)
+			local first, last = value:find(delimiter, 1, true)
+			if first then return value:sub(1, first - 1), value:sub(last + 1) end
+			return value
+		end,
 	}, { __index = _G })
+	env._G = env
 	env.C_Timer = {
 		After = function(delay, callback) timers[#timers + 1] = { delay = delay, callback = callback } end,
 		NewTimer = function(delay, callback)
@@ -96,6 +104,7 @@ local function setup(accounts, options)
 	local function execute(content, label) return assert(load(content, "@" .. label, "t", env))("BetterFriendlist", BFL) end
 	execute(read("Locales/enUS.lua"), "Locales/enUS.lua")
 	execute(read("Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
+	execute(read("Modules/KnownCharacters.lua"), "Modules/KnownCharacters.lua")
 	execute(read("Utils/ClassUtils.lua"), "Utils/ClassUtils.lua")
 	execute(read("Modules/FilterSortRegistry.lua"), "Modules/FilterSortRegistry.lua")
 	execute(globalUIDSource, "BetterFriendlist global UID helper")
@@ -117,6 +126,40 @@ local function setup(accounts, options)
 		rows = function() return options.modern and list.scrollBox:GetDataProvider().rows or list.classicDisplayList end,
 	}
 end
+-- A layout switch replaces the view without rebinding the animated scroll pair.
+do
+	local context = setup({})
+	local bindings = 0
+	local function ScrollControl()
+		return {
+			SetInterpolateScroll = function(self, enabled) self.interpolate = enabled end,
+			SetView = function(self, view) self.view = view end,
+		}
+	end
+	local scrollBox, scrollBar = ScrollControl(), ScrollControl()
+	context.env.BetterFriendsFrame.ScrollFrame = { ScrollBox = scrollBox }
+	context.env.BetterFriendsFrame.MinimalScrollBar = scrollBar
+	context.env.CreateScrollBoxListLinearView = function()
+		return { SetElementFactory = function() end, SetElementExtentCalculator = function() end }
+	end
+	context.env.ScrollUtil = {
+		InitScrollBoxListWithScrollBar = function(box, bar, view)
+			check(box.interpolate and bar.interpolate, "Interpolation is enabled before Blizzard binds the pair")
+			bindings = bindings + 1
+			box:SetView(view)
+		end,
+	}
+	context.BFL.HasModernScrollBox = true
+	context.list:InitializeScrollBox()
+	check(scrollBox.interpolate and scrollBar.interpolate, "Both native scroll controls opt into interpolation")
+	equal(bindings, 1, "The scroll pair is bound on first initialization")
+	local firstView = scrollBox.view
+	context.list:InitializeScrollBox()
+	check(scrollBox.view ~= firstView, "A layout switch replaces the scroll view")
+	equal(bindings, 1, "A layout switch keeps the existing scroll binding")
+	check(scrollBox.interpolate and scrollBar.interpolate, "Interpolation survives the layout switch")
+end
+
 local function visibleCount(context)
 	local count = 0
 	for _, row in ipairs(context.rows() or {}) do if row.friend then count = count + 1 end end
@@ -176,6 +219,41 @@ for _, modern in ipairs({ false, true }) do
 	refresh("Ada Lovelace", "Offline Title remains gray", "|cff7f7f7fAda Lovelace|r")
 	account.gameAccountInfo.isOnline, account.gameAccountInfo.classID = true, 8
 	refresh("|cff69ccf0Ada Lovelace|r", "Reconnected Title uses its current class color")
+end
+for _, modern in ipairs({ false, true }) do
+	local account = title()
+	account.accountName = "Private Real-ID name"
+	local context = setup({ account }, { modern = modern, aliases = { [42] = "Private title alias" } })
+	context.BFL.StreamerMode = { IsActive = function() return true end }
+	context.list:UpdateFriendsList()
+	local friend = context.list.friendsList[1]
+	equal(friend.displayName, "Ada Lovelace", "Streamer Title fallback uses just the character")
+	for _, row in ipairs(context.rows()) do
+		if row.friend then equal(row.friend.displayName, "Ada Lovelace", "The list renders the safe Title fallback") end
+	end
+
+	local menuContext = { bnetIDAccount = 42, name = account.accountName }
+	local displayedTitle
+	context.BFL.HasSecretValues = true
+	context.BFL.OpenBetterFriendlistContextMenu = function(_, _, _, data)
+		displayedTitle = data.bfl_streamerDisplayName
+		return true
+	end
+	context.BFL.OpenContextMenu(nil, "BN_FRIEND", menuContext)
+	equal(displayedTitle, "Ada Lovelace", "BFL prepares the masked title before opening its own context menu")
+	context.BFL.OpenContextMenu(nil, "BN_FRIEND_OFFLINE", { bnetIDAccount = 99, name = account.accountName })
+	equal(displayedTitle, "Unknown", "An unmatched BNet menu cannot fall back to its raw account name")
+	equal(menuContext.name, account.accountName, "Whisper routing keeps its original target")
+
+	context.list.settingsCache.nameFormatString = "%name%"
+	friend.battleTag = "SafeTag#1234"
+	equal(context.list:GetDisplayName(friend), "SafeTag", "A readable BattleTag still takes priority")
+	friend.battleTag = protectedAccount
+	equal(context.list:GetDisplayName(friend), "Ada Lovelace", "An unreadable BattleTag uses the safe Title fallback")
+	friend.characterName = protectedAccount
+	equal(context.list:GetDisplayName(friend), "Unknown", "An unreadable character never falls back to the Real-ID name")
+	friend.characterName, friend.battleTag, friend.friendLevel = "Ada Lovelace", "", 2
+	equal(context.list:GetDisplayName(friend), "Unknown", "The fallback is limited to Title friends")
 end
 local delayed = setup({ normal("") })
 delayed.list:UpdateFriendsList()
@@ -241,5 +319,82 @@ for _, modern in ipairs({ false, true }) do
 	equal(#chunked.list.friendsList, 150, "Large Title-first lists finish collection")
 	equal(visibleCount(chunked), 150, "Large Title-first lists reach all visible rows")
 	check(chunked.list.chunkedFriendsListUpdate == nil, "The chunked worker completes")
+end
+-- Faction decoration belongs to the rendered row, not the presence of a
+-- particular name-format token. Run the real Modern/Legacy text path.
+for _, modern in ipairs({ false, true }) do
+	for _, format in ipairs({ "%name%", "%battletag%", "%name% (%character%)", "%character%" }) do
+		for _, compact in ipairs({ false, true }) do
+			local context = setup({ normal("Other#1234") }, { modern = modern, nameFormat = format,
+				showFactionIcons = true, compact = compact })
+			context.list:UpdateFriendsList()
+			local text = context.list:GetFormattedButtonText(context.list.friendsList[1])
+			local _, icons = text:gsub("PlusManz%-Alliance", "")
+			equal(icons, 1, "Enabled faction icons appear exactly once for every name preset and row style")
+		end
+	end
+end
+local factionContext = setup({ normal("Other#1234") }, { modern = true, showFactionIcons = true })
+factionContext.list:UpdateFriendsList()
+local factionFriend = factionContext.list.friendsList[1]
+local oldName = factionContext.list:GetDisplayName(factionFriend)
+local oldText = factionContext.list:GetFormattedButtonText(factionFriend)
+check(oldName:find("PlusManz-Alliance", 1, true) and oldText:find("PlusManz-Alliance", 1, true), "Both faction-sensitive caches are populated before switching faction")
+factionFriend.factionName, factionFriend.gameAccountInfo.factionName = "Horde", "Horde"
+local changedName = factionContext.list:GetDisplayName(factionFriend)
+check(changedName:find("PlusManz-Horde", 1, true) and not changedName:find("PlusManz-Alliance", 1, true), "Faction changes invalidate the persistent name cache")
+check(factionContext.list:GetFormattedButtonText(factionFriend):find("PlusManz-Horde", 1, true), "Faction changes also invalidate rendered row text")
+check(not factionContext.list:GetDisplayName(factionFriend, true):find("PlusManz", 1, true), "Sorting never receives faction markup")
+for _, faction in ipairs({ "Neutral", "", protectedAccount }) do
+	factionFriend.factionName, factionFriend.gameAccountInfo.factionName = faction, faction
+	local text = factionContext.list:GetFormattedButtonText(factionFriend)
+	check(not text:find("PlusManz", 1, true), "Unknown or secret factions never produce a guessed icon")
+end
+factionFriend.factionName, factionFriend.gameAccountInfo.factionName = nil, "Alliance"
+check(factionContext.list:GetFormattedButtonText(factionFriend):find("PlusManz-Alliance", 1, true), "Readable nested faction metadata is a valid fallback")
+factionFriend.gameAccountInfo = protectedAccount
+factionFriend.factionName = nil
+check(not factionContext.list:GetFriendFactionIcon(factionFriend):find("PlusManz", 1, true), "Secret game-account tables are never indexed for faction display")
+factionFriend.gameAccountInfo = game(true)
+factionFriend.factionName = "Alliance"
+factionContext.env.FriendListColorsAPI = { Format = function() return "External name" end }
+local BFL = factionContext.BFL
+BFL.SettingsVersion = (BFL.SettingsVersion or 1) + 1
+local externalText = factionContext.list:GetFormattedButtonText(factionFriend)
+check(externalText:find("External name", 1, true) and externalText:find("PlusManz-Alliance", 1, true), "External name formatters do not silently disable the faction setting")
+factionContext.env.FriendListColorsAPI.Format = function() return "|TInterface\\FriendsFrame\\PlusManz-Alliance:16:16|tExternal name" end
+BFL.SettingsVersion = BFL.SettingsVersion + 1
+local _, externalIcons = factionContext.list:GetFormattedButtonText(factionFriend):gsub("PlusManz%-Alliance", "")
+equal(externalIcons, 1, "An external formatter's existing faction icon is not duplicated")
+factionContext.env.FriendListColorsAPI = nil
+local wowFriend = { type = "wow", uid = "wow_Ada-Home", name = "Ada-Home", connected = true }
+check(not factionContext.list:GetFriendFactionIcon(wowFriend):find("PlusManz", 1, true), "WoW friends without faction metadata are not assigned the player's faction")
+wowFriend.factionName, wowFriend.characterName = "Alliance", "Ada"
+local wowName = factionContext.list:GetFormattedButtonText(wowFriend)
+local _, wowIcons = wowName:gsub("PlusManz%-Alliance", "")
+equal(wowIcons, 1, "A WoW row with known faction metadata also has only one icon")
+factionContext.env.InCombatLockdown = function() return true end
+BFL.SettingsVersion = BFL.SettingsVersion + 1
+check(factionContext.list:GetFormattedButtonText(wowFriend):find("PlusManz-Alliance", 1, true), "Read-only row formatting needs no protected action or combat-time mutation")
+local classicIcons = setup({ normal("Classic#1234") }, { classic = true, showFactionIcons = true, nameFormat = "%name%" })
+classicIcons.env.WOW_PROJECT_ID, classicIcons.accounts[1].gameAccountInfo.wowProjectID = 2, 2
+classicIcons.list:UpdateFriendsList()
+check(classicIcons.list:GetFormattedButtonText(classicIcons.list.friendsList[1]):find("PlusManz-Alliance", 1, true), "Classic uses the same metadata-only, legacy-texture fallback")
+for _, state in ipairs({ { enabled = false, online = true }, { enabled = true, online = false } }) do
+	local context = setup({ normal("Other#1234") }, { showFactionIcons = state.enabled, nameFormat = "%name%" })
+	context.accounts[1].gameAccountInfo.isOnline = state.online
+	context.list:UpdateFriendsList()
+	check(not context.list:GetFormattedButtonText(context.list.friendsList[1]):find("PlusManz", 1, true), "Disabled or unavailable live faction data leaves no stale icon")
+end
+for _, classic in ipairs({ false, true }) do
+	local snapshot = normal("Known#1234")
+	if classic then snapshot.gameAccountInfo.characterName, snapshot.gameAccountInfo.wowProjectID = "Ada", 2 end
+	local context = setup({ snapshot }, { classic = classic,
+		knownCharacters = { enabled = true, observeBattleNet = true, maxTooltipCharacters = 3, contacts = {} } })
+	if classic then context.env.WOW_PROJECT_ID = 2 end
+	context.list:UpdateFriendsList()
+	local entries = context.BFL.modules.KnownCharacters:GetEntries(context.list.friendsList[1])
+	equal(#entries, 1, "The actual Retail/Classic collection path passes its native account snapshot to KnownCharacters")
+	equal(entries[1].source, "observed", "Production collection stores an observed, not guessed, association")
 end
 io.write("[OK] FriendsList startup smoke: " .. assertions .. " assertions (complete production module; mocked C APIs/widgets)\n")

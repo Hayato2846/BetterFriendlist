@@ -2194,9 +2194,11 @@ end
 
 function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 	options = options or {}
-	if type(friend) ~= "table" or friend.type ~= "bnet" then
+	if IsSecret(friend) or type(friend) ~= "table" or friend.type ~= "bnet" then
 		return false, "notBNet"
 	end
+	local accountID = friend.bnetAccountID
+	if IsSecret(accountID) then return false, "restricted" end
 	local uid = self:GetFriendUID(friend)
 	if not uid then
 		return false, "missingUID"
@@ -2205,11 +2207,14 @@ function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 	local desired, enumTags = self:BuildSupportedBlizzardTagPayload(tagIds)
 
 	local db = self:NormalizeDB()
-	if self:AreBlizzardTagsEnabled() and friend.bnetAccountID then
+	if self:AreBlizzardTagsEnabled() and accountID then
 		if options.userInitiated ~= true then
 			return false, "notUserInitiated"
 		end
-		local ok = pcall(C_BattleNet.SetFriendTags, friend.bnetAccountID, enumTags)
+		if type(accountID) ~= "number" then
+			return false, "restricted"
+		end
+		local ok = pcall(C_BattleNet.SetFriendTags, accountID, enumTags)
 		if ok then
 			db.friendBlizzardTags[uid] = nil
 			self.pendingBlizzardTagSets = self.pendingBlizzardTagSets or {}

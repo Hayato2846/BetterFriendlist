@@ -2685,7 +2685,13 @@ function FriendsList:InitializeScrollBox()
 	if self.scrollBox and self.scrollBox.SetView then
 		self.scrollBox:SetView(view)
 	else
-		BFL.InitScrollBoxListWithScrollBar(scrollFrame.ScrollBox, scrollBar, view)
+		local scrollBox = scrollFrame.ScrollBox
+		-- Blizzard disables interpolation for the pair unless both opt in before binding.
+		if scrollBox.SetInterpolateScroll and scrollBar.SetInterpolateScroll then
+			scrollBox:SetInterpolateScroll(true)
+			scrollBar:SetInterpolateScroll(true)
+		end
+		BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 	end
 
 	-- Store reference for later use
@@ -3920,11 +3926,19 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		colorClassNames = true
 	end
 	local showFactionIcons = self.settingsCache.showFactionIcons or false
+	local factionIcon = showFactionIcons and self:GetFriendFactionIcon(friend) or ""
 	local nicknameVersion = BFL.NicknameCacheVersion or 0 -- Phase 6: Version Check
 
 	-- Inputs for validation
 	local rawName = friend.name
 	local rawBattleTag = friend.battleTag
+	if BFL:IsSecret(rawBattleTag) then
+		rawBattleTag = nil
+	end
+	local characterName = friend.characterName
+	if BFL:IsSecret(characterName) or type(characterName) ~= "string" then
+		characterName = ""
+	end
 	local rawAccountName = friend.accountName
 	local rawTitleCustomName = friend.titleCustomName
 	local hasPublicClassData = not BFL:IsSecret(friend.className)
@@ -3948,6 +3962,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.showRealmName == showRealmName
 		and cacheEntry.colorClassNames == colorClassNames
 		and cacheEntry.showFactionIcons == showFactionIcons
+		and cacheEntry.factionIcon == factionIcon
 		and cacheEntry.isStreamerMode == isStreamerMode
 		and cacheEntry.streamerNameFormat == streamerNameFormat
 		and cacheEntry.note == note
@@ -3963,7 +3978,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.classFileName == friend.classFileName
 		and cacheEntry.classFilename == friend.classFilename
 		and cacheEntry.nicknameVersion == nicknameVersion
-		and cacheEntry.characterName == friend.characterName
+		and cacheEntry.characterName == characterName
 	then -- Phase 6: Check version instead of value
 		return cacheEntry.result
 	end
@@ -3975,14 +3990,13 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	local titleCustomName = not BFL:IsSecret(rawTitleCustomName)
 		and type(rawTitleCustomName) == "string" and rawTitleCustomName ~= "" and rawTitleCustomName or nil
 	local titleCharacterName
-	if not forSorting and not isStreamerMode and friend.type == "bnet"
+	if not forSorting and friend.type == "bnet" and characterName ~= ""
 		and BFL.IsTitleFriend and BFL.IsTitleFriend(friend)
-		and not BFL:IsSecret(friend.characterName)
-		and type(friend.characterName) == "string" and friend.characterName ~= ""
 	then
-		titleCharacterName = friend.characterName
+		titleCharacterName = characterName
 	end
 
+	local streamerTitleFallback = false
 	local name = "Unknown"
 	local battletag = rawBattleTag or ""
 
@@ -4008,26 +4022,16 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 				name = BFL:GetSafeAccountName(rawAccountName, rawBattleTag)
 			end
 		elseif isStreamerMode then
-			-- [STREAMER MODE] %name% must NEVER resolve to Real ID (accountName)
-			-- Use safe alternatives based on streamer mode name format setting
-			local streamerNameMode = self.settingsCache.streamerModeNameFormat or "battletag"
-			if streamerNameMode == "nickname" then
-				local nick = DB and DB:GetNickname(uid) or ""
-				if nick ~= "" then
-					name = nick
-				else
-					-- Fallback to BattleTag if no nickname set
-					name = battletag ~= "" and battletag or "Unknown"
-				end
-			elseif streamerNameMode == "note" then
-				if note ~= "" then
-					name = note
-				else
-					name = battletag ~= "" and battletag or "Unknown"
-				end
-			else
-				-- Default: BattleTag (short, already processed above)
-				name = battletag ~= "" and battletag or "Unknown"
+			-- The streamer label must never come from the account name.
+			if streamerNameFormat == "nickname" and nickname ~= "" then
+				name = nickname
+			elseif streamerNameFormat == "note" and note ~= "" then
+				name = note
+			elseif battletag ~= "" then
+				name = battletag
+			elseif titleCharacterName then
+				name = titleCharacterName
+				streamerTitleFallback = true
 			end
 		else
 			-- DISPLAY MODE: Follow Blizzard's BNet_GetBNetAccountName pattern
@@ -4075,8 +4079,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	local result = format
 	-- Collapse the standard Title name/character pair by friend type. Raw account
 	-- labels can render identically without being equal; only explicit aliases matter.
-	if titleCharacterName then
-		local aliasLabel, characterLabel = titleCustomName, titleCharacterName
+	if titleCharacterName and (not isStreamerMode or streamerTitleFallback) then
+		local aliasLabel = not isStreamerMode and titleCustomName or nil
+		local characterLabel = titleCharacterName
 		if aliasLabel and BFL.AreRegionalUniqueNamesEnabled() then
 			aliasLabel = aliasLabel:gsub("-", " ")
 			characterLabel = characterLabel:gsub("-", " ")
@@ -4108,7 +4113,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	-- A name-only Title layout still represents the character. Color just its
 	-- label, without adding the realm/icons of %character% or coloring offline names.
-	if titleCharacterName and friend.connected and colorClassNames and hasPublicClassData
+	if titleCharacterName and (not isStreamerMode or streamerTitleFallback)
+		and friend.connected and colorClassNames and hasPublicClassData
 		and result:match("^%s*%%[Nn][Aa][Mm][Ee]%%%s*$")
 	then
 		local classFile = GetClassFileForFriend(friend)
@@ -4125,7 +4131,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
 
 	-- Phase 22b: Unified token system - all tokens available in name format
-	local character = friend.characterName or ""
+	local character = characterName
 	local realm = friend.realmName or ""
 
 	-- Apply class coloring, faction icon, timerunning, and realm to %character% token
@@ -4138,14 +4144,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		end
 
 		-- Faction icon
-		local showFactionIcons = self.settingsCache.showFactionIcons
-		if showFactionIcons and friend.factionName then
-			if friend.factionName == "Horde" then
-				decoratedChar = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. decoratedChar
-			elseif friend.factionName == "Alliance" then
-				decoratedChar = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. decoratedChar
-			end
-		end
+		decoratedChar = factionIcon .. decoratedChar
 
 		-- Realm name
 		if showRealmName and friend.realmName and friend.realmName ~= "" then
@@ -4261,6 +4260,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		showRealmName = showRealmName,
 		colorClassNames = colorClassNames,
 		showFactionIcons = showFactionIcons,
+		factionIcon = factionIcon,
 		isStreamerMode = isStreamerMode,
 		streamerNameFormat = streamerNameFormat,
 		note = note,
@@ -4276,10 +4276,30 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		classFile = friend.classFile,
 		classFileName = friend.classFileName,
 		classFilename = friend.classFilename,
-		characterName = friend.characterName, -- Phase 22b: Cache invalidation for character changes
+		characterName = characterName, -- Phase 22b: Cache invalidation for character changes
 	}
 
 	return result
+end
+
+-- Public display metadata only. In particular, a character-only WoW friend
+-- has no faction field in FriendInfo; never infer it from the player's faction.
+function FriendsList:GetFriendFactionIcon(friend)
+	if BFL:IsSecret(friend.connected) or friend.connected ~= true then return "" end
+	local faction = friend.factionName
+	if BFL:IsSecret(faction) then return "" end
+	if faction == nil or faction == "" then
+		local gameAccount = friend.gameAccountInfo
+		if BFL:IsSecret(gameAccount) or type(gameAccount) ~= "table" then return "" end
+		faction = gameAccount.factionName
+		if BFL:IsSecret(faction) then return "" end
+	end
+	if faction == "Horde" then
+		return "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t", faction
+	elseif faction == "Alliance" then
+		return "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t", faction
+	end
+	return ""
 end
 
 -- Update "Send Message" button state based on selection
@@ -5781,6 +5801,15 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 					end
 				end
 
+				local KnownCharacters = BFL:GetModule("KnownCharacters")
+				if KnownCharacters then
+					-- Keep atomic primary metadata separate from a preferred-account
+					-- selection. Independently indexed game rows are not identity proof.
+					friend.knownCharacterPrimary = accountInfo.gameAccountInfo
+					friend.knownCharacterAppearOffline = accountInfo.appearOffline
+					friend.knownCharacterIsFriend = accountInfo.isFriend
+					KnownCharacters:ObserveAccount(accountInfo)
+				end
 				if friendTagAssignmentChanged and FriendTags and FriendTags.InvalidateFriendAssignment then
 					FriendTags:InvalidateFriendAssignment(friend)
 				end
@@ -8730,6 +8759,8 @@ end
 -- This moves expensive string concatenation out of the render loop
 function FriendsList:GetFormattedButtonText(friend)
 	local DB = GetDB()
+	local factionIcon, factionName = self:GetFriendFactionIcon(friend)
+	if not self.settingsCache.showFactionIcons then factionIcon = "" end
 
 	-- [STREAMER MODE LOGIC INTEGRATED]
 	-- We removed the early return here to allow formatted names (e.g. Nicknames)
@@ -8744,6 +8775,7 @@ function FriendsList:GetFormattedButtonText(friend)
 	if
 		friend._cache_text_version == currentSettingsVersion
 		and friend._cache_text_compact == isCompactMode
+		and friend._cache_text_factionIcon == factionIcon
 		and friend._cache_text_line1
 	then
 		return friend._cache_text_line1, friend._cache_text_line2
@@ -8755,7 +8787,8 @@ function FriendsList:GetFormattedButtonText(friend)
 	local line1SuffixText = ""
 	local line2Text = ""
 
-	local displayName = friend.displayName or self:GetDisplayName(friend)
+	-- GetDisplayName validates its persistent cache, including faction changes.
+	local displayName = self:GetDisplayName(friend)
 
 	-- External Formatter Support (FriendListColors)
 	-- If FriendListColors is loaded, use it to format the name text (Line 1)
@@ -8800,7 +8833,7 @@ function FriendsList:GetFormattedButtonText(friend)
 			flcData.level = friend.level
 			flcData.className = friend.className
 			flcData.areaName = friend.areaName
-			flcData.factionName = friend.factionName
+			flcData.factionName = factionName
 			flcData.timerunningSeasonID = friend.timerunningSeasonID
 			flcData.gameAccountInfo = friend.gameAccountInfo
 		else
@@ -8824,9 +8857,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		local grayOtherFaction = self.settingsCache.grayOtherFaction or false
 
 		if friend.connected then
-			local isOppositeFaction = friend.factionName
-				and friend.factionName ~= playerFactionGroup
-				and friend.factionName ~= ""
+			local isOppositeFaction = factionName and factionName ~= playerFactionGroup
 			local shouldGray = grayOtherFaction and isOppositeFaction
 
 			if shouldGray then
@@ -8872,27 +8903,16 @@ function FriendsList:GetFormattedButtonText(friend)
 		-- WoW Friend
 		local playerFactionGroup = UnitFactionGroup("player")
 		local grayOtherFaction = self.settingsCache.grayOtherFaction
-		local showFactionIcons = self.settingsCache.showFactionIcons
 		local showRealmName = self.settingsCache.showRealmName
 
 		if friend.connected then
-			local isOppositeFaction = friend.factionName
-				and friend.factionName ~= playerFactionGroup
-				and friend.factionName ~= ""
+			local isOppositeFaction = factionName and factionName ~= playerFactionGroup
 			local shouldGray = grayOtherFaction and isOppositeFaction
 			if shouldGray and usedExternalFormatter then
 				local stripped = (line1Text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
 				line1Text = "|cff808080" .. stripped .. "|r"
 			elseif not usedExternalFormatter then
 				local characterName = displayName
-
-				if showFactionIcons and friend.factionName then
-					if friend.factionName == "Horde" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. characterName
-					elseif friend.factionName == "Alliance" then
-						characterName = "|TInterface\\FriendsFrame\\PlusManz-Alliance:12:12:0:0|t" .. characterName
-					end
-				end
 
 				local useClassColor = self.settingsCache.colorClassNames
 				if useClassColor == nil then
@@ -8941,6 +8961,14 @@ function FriendsList:GetFormattedButtonText(friend)
 		end
 	end
 
+	-- %character% normally owns the icon. Name-only/custom/external formats need
+	-- a row-level fallback, without duplicating an icon already in the name.
+	if factionIcon ~= "" and not line1Text:find("|TInterface\\FriendsFrame\\PlusManz-Alliance", 1, true)
+		and not line1Text:find("|TInterface\\FriendsFrame\\PlusManz-Horde", 1, true)
+	then
+		line1Text = factionIcon .. line1Text
+		if line1BaseText ~= "" then line1BaseText = factionIcon .. line1BaseText end
+	end
 	if line1BaseText == "" then
 		line1BaseText = line1Text
 	end
@@ -8948,6 +8976,7 @@ function FriendsList:GetFormattedButtonText(friend)
 	-- Store in cache
 	friend._cache_text_version = currentSettingsVersion
 	friend._cache_text_compact = isCompactMode
+	friend._cache_text_factionIcon = factionIcon
 	friend._cache_text_line1 = line1Text
 	friend._cache_text_line1_base = line1BaseText
 	friend._cache_text_line1_suffix = line1SuffixText

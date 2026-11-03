@@ -7,6 +7,188 @@ local ADDON_NAME, BFL = ...
 -- Register Module
 local RecentAllies = BFL:RegisterModule("RecentAllies", {})
 
+local function SafeValue(value, expectedType, fallback)
+	if (BFL.IsSecret and BFL:IsSecret(value)) or type(value) ~= expectedType then return fallback end
+	if expectedType == "string" and value == "" then return fallback end
+	if expectedType == "number" and (value ~= value or value == math.huge or value == -math.huge) then return fallback end
+	return value
+end
+
+local function SafeTable(value)
+	return SafeValue(value, "table", {})
+end
+
+-- Copy only documented, readable fields. Native results stay untouched, and
+-- secrets never enter comparisons, formatting, action arguments or storage.
+function RecentAllies:NormalizeAlly(value)
+	if (BFL.IsSecret and BFL:IsSecret(value)) or type(value) ~= "table" then return nil end
+	local character, state, interaction = SafeTable(value.characterData), SafeTable(value.stateData), SafeTable(value.interactionData)
+	local data = { characterData = {}, stateData = {}, interactionData = { interactions = {} } }
+	-- Keep BFL's preview marker across the private copy, never authorizing a
+	-- native menu or invite for synthetic identities.
+	data._isMock = SafeValue(value._isMock, "boolean", false)
+	for _, key in ipairs({ "guid", "name", "fullName", "realmName" }) do
+		data.characterData[key] = SafeValue(character[key], "string")
+	end
+	if not data.characterData.name and not data.characterData.fullName then return nil end
+	for _, key in ipairs({ "level", "classID", "raceID", "sex" }) do
+		data.characterData[key] = SafeValue(character[key], "number", 0)
+	end
+	for _, key in ipairs({ "isOnline", "isAFK", "isDND", "isConvertedLegacyFriend", "friendRequestSentThisSession", "hasFriendRequestPending" }) do
+		data.stateData[key] = SafeValue(state[key], "boolean", false)
+	end
+	data.stateData.currentLocation = SafeValue(state.currentLocation, "string")
+	data.stateData.pinExpirationDate = SafeValue(state.pinExpirationDate, "number")
+	data.interactionData.note = SafeValue(interaction.note, "string")
+	for index, entry in ipairs(SafeTable(interaction.interactions)) do
+		if index > 100 then break end
+		local raw = SafeTable(entry)
+		local description = SafeValue(raw.description, "string")
+		if description and description ~= "" then
+			local context = SafeTable(raw.contextData)
+			data.interactionData.interactions[#data.interactionData.interactions + 1] = {
+				type = SafeValue(raw.type, "number"), description = description,
+				timestamp = SafeValue(raw.timestamp, "number"),
+				contextData = {
+					locationName = SafeValue(context.locationName, "string"),
+					itemID = SafeValue(context.itemID, "number"),
+					activityDifficultyID = SafeValue(context.activityDifficultyID, "number"),
+					activityDifficultyLevel = SafeValue(context.activityDifficultyLevel, "number"),
+				},
+			}
+		end
+	end
+	-- Sort a private copy, putting undated entries last and retaining ties.
+	for index, entry in ipairs(data.interactionData.interactions) do entry.order = index end
+	table.sort(data.interactionData.interactions, function(a, b)
+		local left, right = a.timestamp or -1, b.timestamp or -1
+		if left ~= right then return left > right end
+		return a.order < b.order
+	end)
+	return data
+end
+
+function RecentAllies:NormalizeList(values)
+	local result = {}
+	for _, value in ipairs(SafeTable(values)) do
+		local ally = self:NormalizeAlly(value)
+		if ally then result[#result + 1] = ally end
+	end
+	return result
+end
+
+function RecentAllies:GetInteractionText(interaction)
+	local text = interaction.description
+	local context = interaction.contextData or {}
+	if context.locationName and context.locationName ~= "" then
+		text = text .. " — " .. context.locationName
+	end
+	if context.activityDifficultyLevel and context.activityDifficultyLevel > 0 then
+		text = text .. " (" .. context.activityDifficultyLevel .. ")"
+	end
+	return text
+end
+
+function RecentAllies:AddActivityTooltipLines(tooltip, interactions)
+	if #interactions == 0 then return end
+	GameTooltip_AddBlankLineToTooltip(tooltip)
+	GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_ACTIVITY)
+	GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_VIEW_HISTORY)
+	for index, interaction in ipairs(interactions) do
+		if index > 5 then break end
+		local timestamp = interaction.timestamp
+		local age = timestamp and SecondsToTime and SecondsToTime(math.max(0, GetServerTime() - timestamp))
+		local text = self:GetInteractionText(interaction)
+		if age then
+			tooltip:AddDoubleLine(text, age, 1, 1, 1, 0.6, 0.6, 0.6, true)
+		else
+			GameTooltip_AddHighlightLine(tooltip, text)
+		end
+	end
+end
+
+-- A read-only, addon-owned scroll surface keeps longer histories usable.
+-- Nothing is persisted and opening/closing it never performs a social action.
+function RecentAllies:ShowActivityHistory(button)
+	local data = self:NormalizeAlly(button.elementData)
+	if not data or #data.interactionData.interactions == 0 then
+		if self.activityFrame then self.activityFrame:Hide() end
+		return
+	end
+	local frame = self.activityFrame
+	if not frame then
+		-- Keep this ordinary display outside the social frame's secure hierarchy.
+		frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+		frame:SetSize(360, 300)
+		-- A direct anchor to BFL would join its protected Raid dependency chain.
+		-- Use a screen-coordinate snapshot outside combat, otherwise a safe default.
+		frame:SetPoint("CENTER", UIParent, "CENTER")
+		if not (InCombatLockdown and InCombatLockdown()) and BetterFriendsFrame then
+			local right = SafeValue(BetterFriendsFrame:GetRight(), "number")
+			local top = SafeValue(BetterFriendsFrame:GetTop(), "number")
+			local sourceScale = SafeValue(BetterFriendsFrame:GetEffectiveScale(), "number")
+			local targetScale = SafeValue(UIParent:GetEffectiveScale(), "number")
+			if right and top and sourceScale and targetScale and targetScale > 0 then
+				frame:ClearAllPoints()
+				frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", right * sourceScale / targetScale + 8, top * sourceScale / targetScale)
+			end
+		end
+		frame:SetClampedToScreen(true)
+		frame:SetFrameStrata("DIALOG")
+		frame:EnableMouse(true)
+		frame:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 } })
+		frame:SetBackdropColor(0.05, 0.05, 0.05, 1)
+		frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		frame.title:SetPoint("TOPLEFT", 14, -14)
+		frame.title:SetPoint("TOPRIGHT", -32, -14)
+		frame.title:SetJustifyH("LEFT")
+		local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+		close:SetPoint("TOPRIGHT", -2, -2)
+		close:SetScript("OnClick", function() frame:Hide() end)
+		local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+		scroll:SetPoint("TOPLEFT", 14, -40)
+		scroll:SetPoint("BOTTOMRIGHT", -32, 14)
+		local child = CreateFrame("Frame", nil, scroll)
+		child:SetWidth(310)
+		frame.text = child:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		frame.text:SetPoint("TOPLEFT")
+		frame.text:SetWidth(306)
+		frame.text:SetJustifyH("LEFT")
+		frame.text:SetJustifyV("TOP")
+		frame.text:SetWordWrap(true)
+		if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
+			BFL.FontManager:ApplyDefaultSlugToFontString(frame.title)
+			BFL.FontManager:ApplyDefaultSlugToFontString(frame.text)
+		end
+		scroll:SetScrollChild(child)
+		frame.scroll, frame.child = scroll, child
+		frame:SetScript("OnHide", function()
+			frame.text:SetText("")
+			frame.title:SetText("")
+			local list = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame
+			if list and list.selectedEntry then
+				list.selectedEntry:UnlockHighlight()
+				list.selectedEntry = nil
+			end
+		end)
+		self.activityFrame = frame
+	end
+	local lines = { BFL.L.RECENT_ALLIES_ACTIVITY }
+	for _, interaction in ipairs(data.interactionData.interactions) do
+		local ok, stamp = false, ""
+		if interaction.timestamp then ok, stamp = pcall(date, "%x %H:%M", interaction.timestamp) end
+		if not ok then stamp = "" end
+		lines[#lines + 1] = stamp .. "\n" .. self:GetInteractionText(interaction) .. "\n"
+	end
+	frame.title:SetText(data.characterData.fullName or data.characterData.name)
+	frame.text:SetText(table.concat(lines, "\n"))
+	frame:Show()
+	frame.child:SetHeight(math.max(1, frame.text:GetStringHeight()))
+	frame.scroll:SetVerticalScroll(0)
+end
+
 local function IsModernSocialUIActive()
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	return FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() or false
@@ -287,6 +469,10 @@ end
 
 function RecentAllies:OnSystemStatusUpdated()
 	local FriendsUI = BFL:GetModule("FriendsUI")
+	if InCombatLockdown and InCombatLockdown() then
+		if FriendsUI then FriendsUI.pendingNavigationRefresh = true end
+		return
+	end
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
 		if FriendsUI then
 			FriendsUI.navigationDirty = true
@@ -358,12 +544,14 @@ function RecentAllies:OnLoad(frame)
 						if frame.selectedEntry == btn then
 							frame.selectedEntry = nil
 							btn:UnlockHighlight()
+							if RecentAllies.activityFrame then RecentAllies.activityFrame:Hide() end
 						else
 							if frame.selectedEntry then
 								frame.selectedEntry:UnlockHighlight()
 							end
 							frame.selectedEntry = btn
 							btn:LockHighlight()
+							RecentAllies:ShowActivityHistory(btn)
 						end
 					elseif mouseButtonName == "RightButton" then
 						RecentAllies:OpenMenu(btn)
@@ -421,6 +609,11 @@ end
 
 -- Hide Recent Allies Frame (RecentAlliesListMixin:OnHide)
 function RecentAllies:OnHide(frame)
+	if self.activityFrame then self.activityFrame:Hide() end
+	if frame.selectedEntry then
+		frame.selectedEntry:UnlockHighlight()
+		frame.selectedEntry = nil
+	end
 	if BFL.HasRecentAllies then
 		FrameUtil.UnregisterFrameForEvents(frame, RecentAlliesListEvents)
 	end
@@ -435,6 +628,12 @@ end
 
 -- Refresh the list (RecentAlliesListMixin:Refresh)
 function RecentAllies:Refresh(frame, retainScrollPosition)
+	-- A cache refresh can recycle selected rows; discard the visible snapshot.
+	if self.activityFrame then self.activityFrame:Hide() end
+	if frame.selectedEntry then
+		frame.selectedEntry:UnlockHighlight()
+		frame.selectedEntry = nil
+	end
 	local PreviewMode = BFL:GetModule("PreviewMode")
 	local previewActive = PreviewMode
 		and PreviewMode.IsComponentEnabled
@@ -656,17 +855,17 @@ function RecentAllies:GetFilteredRecentAllies()
 		and PreviewMode.mockData
 		and type(PreviewMode.mockData.recentAllies) == "table"
 	then
-		return PreviewMode.mockData.recentAllies, false
+		return self:NormalizeList(PreviewMode.mockData.recentAllies), false
 	end
 
 	if CanUseNativeRecentAlliesSearch() and (self:HasActiveFilters() or self.searchText ~= "") then
 		local ok, result = pcall(C_RecentAllies.SearchRecentAllies, self:BuildSearchInfo())
 		if ok and not BFL:IsSecret(result) and type(result) == "table" then
-			return result, true
+			return self:NormalizeList(result), true
 		end
 	end
 	if BFL.Compat and BFL.Compat.GetRecentAllies then
-		return BFL.Compat.GetRecentAllies(), false
+		return self:NormalizeList(BFL.Compat.GetRecentAllies()), false
 	end
 	return {}, false
 end
@@ -768,17 +967,17 @@ function RecentAllies:MatchesSearch(ally, searchNormalized)
 	end
 
 	-- Search across all relevant fields
-	return contains(characterData.name)
+	if contains(characterData.name)
 		or contains(characterData.fullName)
 		or contains(stateData.currentLocation)
 		or contains(interactionData and interactionData.note)
-		or (
-			interactionData
-			and interactionData.interactions
-			and #interactionData.interactions > 0
-			and interactionData.interactions[1]
-			and contains(interactionData.interactions[1].description)
-		)
+	then return true end
+	for _, interaction in ipairs(interactionData and interactionData.interactions or {}) do
+		if contains(interaction.description) or contains(interaction.contextData and interaction.contextData.locationName) then
+			return true
+		end
+	end
+	return false
 end
 
 -- Set search text and refresh the list
@@ -847,6 +1046,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 		and BFL.AreRegionalUniqueNamesEnabled()
 		and characterData.fullName
 		or characterData.name
+	displayName = displayName or characterData.fullName or UNKNOWN or ""
 	button.CharacterData.Name:SetText(nameColor:WrapTextInColorCode(displayName))
 	button.CharacterData.Name:SetWidth(math.min(button.CharacterData.Name:GetUnboundedStringWidth(), 150))
 
@@ -879,7 +1079,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 		and #interactionData.interactions > 0
 		and interactionData.interactions[1]
 	if mostRecentInteraction then
-		button.CharacterData.MostRecentInteraction:SetText(mostRecentInteraction.description or "")
+		button.CharacterData.MostRecentInteraction:SetText(self:GetInteractionText(mostRecentInteraction))
 	else
 		button.CharacterData.MostRecentInteraction:SetText("")
 	end
@@ -911,12 +1111,15 @@ function RecentAllies:InitializeEntry(button, elementData)
 	self:ApplyEntryLayout(button, stateData)
 
 	-- Enable/disable party button based on online status
-	button.PartyButton:SetEnabled(stateData.isOnline)
+	button.PartyButton:SetEnabled(not elementData._isMock and stateData.isOnline and characterData.fullName ~= nil
+		and characterData.fullName ~= "")
 
 	-- Setup party button click handler
 	button.PartyButton:SetScript("OnClick", function()
-		if characterData and characterData.fullName and BFL.InviteUnit then
-			BFL.InviteUnit(characterData.fullName)
+		-- Re-read the recycled row at click time; reject disappeared/secret identities.
+		local current = self:NormalizeAlly(button.elementData)
+		if current and not current._isMock and current.stateData.isOnline and current.characterData.fullName and BFL.InviteUnit then
+			BFL.InviteUnit(current.characterData.fullName)
 		end
 	end)
 
@@ -940,7 +1143,7 @@ function RecentAllies:InitializeEntry(button, elementData)
 			if stateData.pinExpirationDate then
 				BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 				local timeUntilExpiration = math.max(stateData.pinExpirationDate - GetServerTime(), 1)
-				local timeText = RecentAlliesUtil.GetFormattedTime(timeUntilExpiration)
+				local timeText = SecondsToTime(timeUntilExpiration)
 				GameTooltip_AddHighlightLine(BFL_Tooltip, BFL.L.RECENT_ALLIES_PIN_EXPIRES:format(timeText))
 				BFL_Tooltip:Show()
 			end
@@ -959,11 +1162,15 @@ function RecentAllies:OpenMenu(button)
 		return
 	end
 
-	local recentAllyData = elementData
+	local recentAllyData = self:NormalizeAlly(elementData)
+	if not recentAllyData or recentAllyData._isMock or not recentAllyData.characterData.guid
+		or not recentAllyData.characterData.fullName
+	then return end
 	local useFullName = BFL.AreRegionalUniqueNamesEnabled and BFL.AreRegionalUniqueNamesEnabled()
 	local contextData = {
 		recentAllyData = recentAllyData,
-		name = useFullName and recentAllyData.characterData.fullName or recentAllyData.characterData.name,
+		name = useFullName and recentAllyData.characterData.fullName
+			or recentAllyData.characterData.name or recentAllyData.characterData.fullName,
 		server = useFullName and nil or recentAllyData.characterData.realmName,
 		guid = recentAllyData.characterData.guid,
 		isOffline = not recentAllyData.stateData.isOnline,
@@ -973,7 +1180,7 @@ function RecentAllies:OpenMenu(button)
 	local bestMenu = recentAllyData.stateData.isOnline and "RECENT_ALLY" or "RECENT_ALLY_OFFLINE"
 
 	-- Fallback to FRIEND menu if RECENT_ALLY not available
-	if not UnitPopupMenus[bestMenu] then
+	if UnitPopupMenus and not UnitPopupMenus[bestMenu] then
 		bestMenu = recentAllyData.stateData.isOnline and "FRIEND" or "FRIEND_OFFLINE"
 	end
 
@@ -988,12 +1195,14 @@ function RecentAllies:BuildTooltip(button, tooltip)
 		return
 	end
 
-	local characterData = elementData.characterData
-	local stateData = elementData.stateData
-	local interactionData = elementData.interactionData
+	local safeData = self:NormalizeAlly(elementData)
+	if not safeData then return end
+	local characterData = safeData.characterData
+	local stateData = safeData.stateData
+	local interactionData = safeData.interactionData
 
 	-- Character name
-	GameTooltip_AddNormalLine(tooltip, characterData.fullName)
+	GameTooltip_AddNormalLine(tooltip, characterData.fullName or characterData.name)
 
 	-- Race and level
 	local raceInfo = C_CreatureInfo.GetRaceInfo(characterData.raceID)
@@ -1026,11 +1235,5 @@ function RecentAllies:BuildTooltip(button, tooltip)
 		GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_NOTE:format(interactionData.note))
 	end
 
-	-- Most recent interaction
-	if interactionData.interactions and #interactionData.interactions > 0 and interactionData.interactions[1] then
-		GameTooltip_AddBlankLineToTooltip(tooltip)
-		local mostRecent = interactionData.interactions[1]
-		GameTooltip_AddNormalLine(tooltip, BFL.L.RECENT_ALLIES_ACTIVITY)
-		GameTooltip_AddHighlightLine(tooltip, mostRecent.description or "")
-	end
+	self:AddActivityTooltipLines(tooltip, interactionData.interactions)
 end

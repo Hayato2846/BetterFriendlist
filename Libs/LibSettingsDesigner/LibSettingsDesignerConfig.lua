@@ -183,17 +183,22 @@ local function getCategoryKey(category)
 	return tostring(category)
 end
 
-local function addSearchBlob(parts, value)
+local function addSearchBlob(parts, value, cache)
 	if value == nil or value == false then
 		return
 	end
 	if type(value) == "table" then
 		for _, entry in ipairs(value) do
-			addSearchBlob(parts, entry)
+			addSearchBlob(parts, entry, cache)
 		end
 		return
 	end
-	parts[#parts + 1] = normalizeSearchText(value)
+	local normalized = cache and type(value) == "string" and cache[value]
+	if normalized == nil or normalized == false then
+		normalized = normalizeSearchText(value)
+		if cache and type(value) == "string" then cache[value] = normalized end
+	end
+	parts[#parts + 1] = normalized
 end
 
 local AppMixin = {}
@@ -315,6 +320,8 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"isSelectedFunc",
 	"isVisible",
 	"justifyH",
+	"indent",
+	"headerStyle",
 	"list",
 	"listFunc",
 	"max",
@@ -385,18 +392,52 @@ local function sortByOrderAndTitle(a, b)
 	return tostring(a.title or a.id) < tostring(b.title or b.id)
 end
 
+-- Registration batches preserve immediate ID lookup while postponing array ordering.
+local function sortRegistrationList(app, list)
+	if (app._registrationBatchDepth or 0) > 0 then
+		app._registrationSortLists = app._registrationSortLists or {}
+		app._registrationSortLists[list] = true
+	else
+		table.sort(list, sortByOrderAndTitle)
+	end
+end
+
+function AppMixin:BeginRegistrationBatch()
+	if (self._registrationBatchDepth or 0) == 0 then self._registrationSearchCache = {} end
+	self._registrationBatchDepth = (self._registrationBatchDepth or 0) + 1
+end
+
+function AppMixin:FlushRegistrationSorts()
+	local lists = self._registrationSortLists
+	if not lists then return end
+	for list in pairs(lists) do
+		table.sort(list, sortByOrderAndTitle)
+	end
+	self._registrationSortLists = nil
+end
+
+function AppMixin:EndRegistrationBatch()
+	local depth = self._registrationBatchDepth or 0
+	if depth == 0 then return end
+	self._registrationBatchDepth = depth - 1
+	if depth == 1 then
+		self:FlushRegistrationSorts()
+		self._registrationSearchCache = nil
+	end
+end
+
 local function rebuildSearchBlob(app, control)
 	local parts = {}
 	local page = app.pagesByID[control.pageID or ""]
 	local group = page and page.groupsByID and page.groupsByID[control.groupID or ""]
 	local category = page and app.categoriesByID[page.category or ""]
-	addSearchBlob(parts, control.label or control.title or control.text or control.id)
-	addSearchBlob(parts, control.description or control.desc)
-	addSearchBlob(parts, control.key or control.settingKey)
-	addSearchBlob(parts, control.keywords or control.searchtags)
-	addSearchBlob(parts, page and page.title)
-	addSearchBlob(parts, group and group.title)
-	addSearchBlob(parts, category and category.title)
+	addSearchBlob(parts, control.label or control.title or control.text or control.id, app._registrationSearchCache)
+	addSearchBlob(parts, control.description or control.desc, app._registrationSearchCache)
+	addSearchBlob(parts, control.key or control.settingKey, app._registrationSearchCache)
+	addSearchBlob(parts, control.keywords or control.searchtags, app._registrationSearchCache)
+	addSearchBlob(parts, page and page.title, app._registrationSearchCache)
+	addSearchBlob(parts, group and group.title, app._registrationSearchCache)
+	addSearchBlob(parts, category and category.title, app._registrationSearchCache)
 	local notes = control.notes
 	if type(notes) == "string" then
 		notes = { { text = notes } }
@@ -404,10 +445,10 @@ local function rebuildSearchBlob(app, control)
 		notes = {}
 	end
 	for _, note in ipairs(notes) do
-		addSearchBlob(parts, note.title)
-		addSearchBlob(parts, note.text)
+		addSearchBlob(parts, note.title, app._registrationSearchCache)
+		addSearchBlob(parts, note.text, app._registrationSearchCache)
 		for _, block in ipairs(note.blocks or {}) do
-			addSearchBlob(parts, type(block) == "table" and (block.title or block.text) or block)
+			addSearchBlob(parts, type(block) == "table" and (block.title or block.text) or block, app._registrationSearchCache)
 		end
 	end
 	control.searchBlob = table.concat(parts, " ")
@@ -416,12 +457,12 @@ end
 local function buildSearchEntryBlob(app, page, entry)
 	local parts = {}
 	local category = page and app.categoriesByID[page.category or ""]
-	addSearchBlob(parts, entry.label or entry.title or entry.text or entry.id)
-	addSearchBlob(parts, entry.description or entry.desc)
-	addSearchBlob(parts, entry.keywords or entry.searchtags)
-	addSearchBlob(parts, entry.focusID or entry.focusId)
-	addSearchBlob(parts, page and page.title)
-	addSearchBlob(parts, category and category.title)
+	addSearchBlob(parts, entry.label or entry.title or entry.text or entry.id, app._registrationSearchCache)
+	addSearchBlob(parts, entry.description or entry.desc, app._registrationSearchCache)
+	addSearchBlob(parts, entry.keywords or entry.searchtags, app._registrationSearchCache)
+	addSearchBlob(parts, entry.focusID or entry.focusId, app._registrationSearchCache)
+	addSearchBlob(parts, page and page.title, app._registrationSearchCache)
+	addSearchBlob(parts, category and category.title, app._registrationSearchCache)
 	return table.concat(parts, " ")
 end
 
@@ -476,7 +517,7 @@ function AppMixin:RegisterCategory(data)
 		self.categoriesByID[category.id] = category
 		self.categories[#self.categories + 1] = category
 	end
-	table.sort(self.categories, sortByOrderAndTitle)
+	sortRegistrationList(self, self.categories)
 	return category
 end
 
@@ -498,7 +539,7 @@ function AppMixin:RegisterPage(data)
 	if page.category and not self.categoriesByID[page.category] then
 		self:RegisterCategory({ id = page.category, title = page.category, order = 1000 })
 	end
-	table.sort(self.pages, sortByOrderAndTitle)
+	sortRegistrationList(self, self.pages)
 	rebuildPageSearchEntries(self, page)
 	return page
 end
@@ -517,7 +558,7 @@ function AppMixin:RegisterGroup(pageID, data)
 		page.groupsByID[id] = group
 		page.groups[#page.groups + 1] = group
 	end
-	table.sort(page.groups, sortByOrderAndTitle)
+	sortRegistrationList(self, page.groups)
 	return group
 end
 
@@ -542,7 +583,7 @@ function AppMixin:RegisterPageNote(pageID, data)
 		end
 	end
 	page.aboutNotes[#page.aboutNotes + 1] = note
-	table.sort(page.aboutNotes, sortByOrderAndTitle)
+	sortRegistrationList(self, page.aboutNotes)
 	return note
 end
 
@@ -567,7 +608,7 @@ function AppMixin:RegisterControlNote(controlID, data)
 		end
 	end
 	control.notes[#control.notes + 1] = note
-	table.sort(control.notes, sortByOrderAndTitle)
+	sortRegistrationList(self, control.notes)
 	rebuildSearchBlob(self, control)
 	return note
 end
@@ -590,12 +631,13 @@ function AppMixin:RegisterControl(pageID, data)
 		self.controls[#self.controls + 1] = control
 		page.controls[#page.controls + 1] = control
 	end
+	if control.type == "inlinehint" then control.trackCustomized = false end
 	control.pageID = pageID
 	if control.groupID then
 		self:RegisterGroup(pageID, { id = control.groupID, title = control.groupTitle or control.groupID })
 	end
 	rebuildSearchBlob(self, control)
-	table.sort(page.controls, sortByOrderAndTitle)
+	sortRegistrationList(self, page.controls)
 	return control
 end
 
@@ -720,11 +762,13 @@ function AppMixin:RegisterLegacyControl(data)
 end
 
 function AppMixin:GetCategories()
+	self:FlushRegistrationSorts()
 	table.sort(self.categories, sortByOrderAndTitle)
 	return self.categories
 end
 
 function AppMixin:GetPages(categoryID)
+	self:FlushRegistrationSorts()
 	local pages = wipeTable(self._tmpPages)
 	for _, page in ipairs(self.pages) do
 		if self:IsPageVisible(page) and (not categoryID or page.category == categoryID) then
@@ -736,6 +780,7 @@ function AppMixin:GetPages(categoryID)
 end
 
 function AppMixin:GetPageControls(pageOrID)
+	self:FlushRegistrationSorts()
 	local page = type(pageOrID) == "string" and self.pagesByID[pageOrID] or pageOrID
 	local controls = wipeTable(self._tmpControls)
 	self._tmpControls = controls
@@ -844,6 +889,7 @@ function AppMixin:GetPage(pageID)
 end
 
 function AppMixin:GetDefaultPageID()
+	self:FlushRegistrationSorts()
 	return self.defaultPageID or (self.pages[1] and self.pages[1].id)
 end
 

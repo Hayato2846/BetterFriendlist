@@ -23,6 +23,7 @@ env.WOW_PROJECT_MAINLINE, env.WOW_PROJECT_CLASSIC, env.WOW_PROJECT_CAMELOT = 1, 
 env.BNET_CLIENT_WOW, env.BNET_CLIENT_APP = "WoW", "App"
 env.Enum = { GameMode = { Standard = 0, Plunderstorm = 1, WoWHack = 2 } }
 env.UnitFactionGroup = function() return "Alliance" end
+env.GetRealmID = function() return 100 end
 env.GetNativeRealmID = function() return 100 end
 env.max = math.max
 local activeMode, crossFaction, questSession = 0, false, false

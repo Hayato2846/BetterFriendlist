@@ -575,6 +575,11 @@ local function ApplyModernControlTheme(control, palette, themed)
 	end
 	if themed and not palette.externalControls then
 		local SkinEngine = BFL:GetModule("SkinEngine")
+		if SkinEngine and control.BFL_DarkButtonSkinned and SkinEngine:IsActive() then
+			-- Stateful buttons own their backdrop and label colors, including when disabled.
+			SkinEngine:RefreshButtonRenderer(control)
+			return
+		end
 		if SkinEngine and SkinEngine.StyleBackdrop then
 			SkinEngine:StyleBackdrop(control, palette.control, palette.border)
 		end
@@ -664,6 +669,7 @@ local function ApplyModernSideTabTheme(tab, palette, themed, selected)
 		tab.BFL_DarkManagedSelection = selected == true
 		tab.BFL_DarkTabButton = true
 		tab.BFL_DarkPreserveTabBackgroundOnPress = true
+		tab.BFL_DarkPixelBorder = true
 		SkinEngine:SetFrameSize(tab, MODERN_THEMED_SIDE_TAB_WIDTH, tab:GetHeight())
 		local countShown = tab.Count and tab.Count.IsShown and tab.Count:IsShown()
 		if tab.Icon then
@@ -692,6 +698,7 @@ local function ApplyModernSideTabTheme(tab, palette, themed, selected)
 	else
 		tab.BFL_DarkManagedSelection = nil
 		tab.BFL_DarkPreserveTabBackgroundOnPress = nil
+		tab.BFL_DarkPixelBorder = nil
 		if tab.SetChecked then
 			tab:SetChecked(selected == true)
 		elseif tab.SelectedTexture then
@@ -1211,6 +1218,15 @@ function FriendsUI:GetSocialTabForSection(sectionID)
 	return mapping[sectionID]
 end
 
+function FriendsUI:GetFriendTabAvailabilityReason(sectionID)
+	if sectionID == "quick_join" and BFL.GetQuickJoinGroupFinderAccess then
+		local canUse, reason = BFL.GetQuickJoinGroupFinderAccess()
+		if not canUse and not BFL:IsSecret(reason) and type(reason) == "string" and reason ~= "" then
+			return reason
+		end
+	end
+end
+
 function FriendsUI:GetCapabilities()
 	local friendsDisabled = BFL:IsGameRuleActive("IngameFriendsListDisabled")
 	local bnetSupported = not BFL.IsBattleNetFriendsListSupported or BFL.IsBattleNetFriendsListSupported()
@@ -1246,7 +1262,8 @@ function FriendsUI:GetCapabilities()
 			and quickJoinEnabled == true,
 		friend_requests = not friendsDisabled and bnetSupported and bnetEnabled,
 		recruit_a_friend = not friendsDisabled and (rafPreviewEnabled == true or rafEnabled == true),
-		raid = BFL.IsMainline == true and not friendsDisabled and not self:AreRaidGroupsDisabled(),
+		raid = BFL.IsMainline == true and not friendsDisabled and not self:AreRaidGroupsDisabled()
+			and BFL.IsRaidListSupported() and BFL.IsRaidListEnabled(),
 		guild = not friendsDisabled and (BFL.IsGuildTabEnabled and BFL:IsGuildTabEnabled() or false),
 		who = not friendsDisabled and whoEnabled == true,
 	}
@@ -1258,6 +1275,12 @@ end
 
 function FriendsUI:OnGameRulesChanged()
 	self.navigationDirty = true
+	-- Selecting another section may hide a secure Raid descendant. Defer the
+	-- entire navigation transaction; event handlers must never touch it in combat.
+	if InCombatLockdown and InCombatLockdown() then
+		self.pendingNavigationRefresh = true
+		return
+	end
 	if BFL:IsGameRuleActive("IngameFriendsListDisabled")
 		and BetterFriendsFrame
 		and BetterFriendsFrame:IsShown()
@@ -1852,6 +1875,8 @@ function FriendsUI:RefreshNavigation()
 		visibleSections[sectionID] = true
 	end
 	local L = GetL()
+	local palette, themed = self:GetModernThemeColors()
+	local skinSideTabs = themed and not palette.preserveNativeSideTabs
 	local storyRaidRestricted = self:IsStoryRaidTabRestricted()
 	for _, definition in ipairs(SECTION_DEFINITIONS) do
 		local tab = definition.tab
@@ -1881,14 +1906,16 @@ function FriendsUI:RefreshNavigation()
 			tab.Count:SetShown(count > 0)
 			tab.Count:SetText(count > 0 and count or "")
 			if tab.Icon then
-				local iconOffsetX, iconOffsetY = self:GetSideTabIconAnchorOffsets(tab, definition, count > 0)
+				local iconOffsetX, iconOffsetY = 0, count > 0 and 5 or 0
+				if not skinSideTabs then
+					iconOffsetX, iconOffsetY = self:GetSideTabIconAnchorOffsets(tab, definition, count > 0)
+				end
 				tab.Icon:ClearAllPoints()
 				tab.Icon:SetPoint("CENTER", tab, "CENTER", iconOffsetX, iconOffsetY)
 			end
 		end
 	end
-	local palette, themed = self:GetModernThemeColors()
-	self:LayoutNavigationTabs(availableSections, themed and not palette.preserveNativeSideTabs)
+	self:LayoutNavigationTabs(availableSections, skinSideTabs)
 	if
 		modernActive
 		and self.selectedSection
@@ -2210,55 +2237,74 @@ local function GetInviteInfo(index)
 end
 
 function FriendsUI:NormalizeInvite(index)
-	local raw = GetInviteInfo(index)
+	local ok, raw, accountName, isBattleTag, creationTimestamp = pcall(GetInviteInfo, index)
+	if not ok or BFL:IsSecret(raw) then return nil end
+	local function Safe(value, expectedType, fallback)
+		if BFL:IsSecret(value) or type(value) ~= expectedType then return fallback end
+		if expectedType == "number" and (value ~= value or value == math.huge or value == -math.huge) then return fallback end
+		return value
+	end
 	if type(raw) == "table" then
+		local inviteID = Safe(raw.inviteID, "number") or Safe(raw.id, "number")
+		if not inviteID then return nil end
 		return {
 			inviteIndex = index,
-			inviteID = raw.inviteID or raw.id,
-			accountName = raw.accountName or raw.name or UNKNOWN,
-			friendLevel = raw.friendLevel,
-			creationTimestamp = raw.creationTimestamp or raw.createdAt,
+			inviteID = inviteID,
+			accountName = Safe(raw.accountName, "string") or Safe(raw.name, "string") or UNKNOWN,
+			friendLevel = Safe(raw.friendLevel, "number"),
+			creationTimestamp = Safe(raw.creationTimestamp, "number") or Safe(raw.createdAt, "number"),
 		}
 	end
-	local inviteID, accountName, isBattleTag, creationTimestamp = GetInviteInfo(index)
+	local inviteID = Safe(raw, "number")
 	if inviteID == nil then
 		return nil
+	end
+	local friendLevel = Safe(isBattleTag, "boolean")
+	local levels = Enum and Enum.BattleNetFriendLevel
+	if friendLevel ~= nil and levels then
+		friendLevel = friendLevel and levels.BattleTag or levels.RealID
 	end
 	return {
 		inviteIndex = index,
 		inviteID = inviteID,
-		accountName = accountName or UNKNOWN,
-		friendLevel = isBattleTag,
-		creationTimestamp = creationTimestamp,
+		accountName = Safe(accountName, "string", UNKNOWN),
+		friendLevel = friendLevel,
+		creationTimestamp = Safe(creationTimestamp, "number"),
 	}
 end
 
 function FriendsUI:GetFriendLevelLabel(friendLevel)
 	local L = GetL()
+	if BFL:IsSecret(friendLevel) then return UNKNOWN or "" end
 	local level = Enum and Enum.BattleNetFriendLevel
 	if level then
-		if friendLevel == level.RealID then
+		if level.RealID ~= nil and friendLevel == level.RealID then
 			return L.FRIENDS_UI_REQUEST_REAL_ID or "Real ID"
-		elseif friendLevel == level.BattleTag then
+		elseif level.BattleTag ~= nil and friendLevel == level.BattleTag then
 			return L.FRIENDS_UI_REQUEST_BATTLETAG or "BattleTag"
-		elseif friendLevel == level.Title then
+		elseif level.Title ~= nil and friendLevel == level.Title then
 			return L.FRIENDS_UI_REQUEST_TITLE or "World of Warcraft"
 		end
 	end
-	if friendLevel == false or friendLevel == 0 then
+	if not level and (friendLevel == false or friendLevel == 0) then
 		return L.FRIENDS_UI_REQUEST_REAL_ID or "Real ID"
+	elseif not level and friendLevel == true then
+		return L.FRIENDS_UI_REQUEST_BATTLETAG or "BattleTag"
 	end
-	return L.FRIENDS_UI_REQUEST_BATTLETAG or "BattleTag"
+	return UNKNOWN or ""
 end
 
 function FriendsUI:IsRealIDInvite(friendLevel)
+	if BFL:IsSecret(friendLevel) then return false end
 	local level = Enum and Enum.BattleNetFriendLevel
-	return level and friendLevel == level.RealID or false
+	if level then return level.RealID ~= nil and friendLevel == level.RealID end
+	return friendLevel == false or friendLevel == 0
 end
 
 function FriendsUI:IsTitleInvite(friendLevel)
+	if BFL:IsSecret(friendLevel) then return false end
 	local level = Enum and Enum.BattleNetFriendLevel
-	return level and friendLevel == level.Title or false
+	return level ~= nil and level.Title ~= nil and friendLevel == level.Title
 end
 
 function FriendsUI:InitializeRequestHeader(button, elementData)
@@ -2639,6 +2685,10 @@ function FriendsUI:ApplyContactChrome(sectionID, header)
 			local GuildFrame = BFL:GetModule("GuildFrame")
 			actionButton:SetEnabled(not GuildFrame or not GuildFrame.IsInGuild or GuildFrame:IsInGuild())
 		end
+	end
+	local GlobalSync = BFL:GetModule("GlobalSync")
+	if GlobalSync and GlobalSync.RefreshTitleFriendUI then
+		GlobalSync:RefreshTitleFriendUI()
 	end
 	return chrome, showFilterBar
 end
@@ -3567,9 +3617,9 @@ function FriendsUI:ApplyModernScrollBarGeometry()
 			-MODERN_SCROLL_BOX_RIGHT_INSET,
 			24
 		)
-		-- Include the column-header and totals bands so Who uses the same full
-		-- vertical scrollbar rail as the Friends list.
-		AnchorModernScrollBar(who.ScrollBar, who.ScrollBox, 26, -24, referenceWidth)
+		-- The header, totals and search builder change the Who viewport.
+		-- Use the shared content rail to keep both scrollbar ends stationary.
+		AnchorModernScrollBar(who.ScrollBar, frame.ScrollFrame, nil, nil, referenceWidth)
 	end
 
 	local guild = frame.GuildFrame
@@ -5164,7 +5214,7 @@ function FriendsUI:ApplyModernVisibleControlTheme(palette, themed)
 		end
 	end
 	if raid then
-		ApplyThemedFontColor(raid, raid.NotInRaid, palette.disabledText, themed)
+		ApplyThemedFontColor(raid, raid.NotInRaid, palette.text, themed)
 		local control = raid.ControlPanel
 		if control then
 			ApplyThemedFontColor(control, control.EveryoneAssistLabel, palette.text, themed)
@@ -5275,7 +5325,7 @@ function FriendsUI:ApplyTheme(theme)
 		ApplyThemedFontColor(
 			battleNetDisplay,
 			battleNetDisplay and battleNetDisplay.Tag,
-			palette.battleTagText or MODERN_WHITE,
+			palette.battleTagText or (streamerActive and palette.text) or MODERN_WHITE,
 			themed
 		)
 		ApplyThemedFontColor(
@@ -6345,7 +6395,7 @@ function FriendsUI:RegisterTests()
 				if BetterFriendsFrame.WhoFrame then
 					anchoredScrollBars[#anchoredScrollBars + 1] = {
 						BetterFriendsFrame.WhoFrame.ScrollBar,
-						BetterFriendsFrame.WhoFrame.ScrollBox,
+						BetterFriendsFrame.ScrollFrame,
 						"Who",
 					}
 				end
@@ -7789,6 +7839,13 @@ function FriendsUI:Initialize()
 			self:OnGameRulesChanged()
 		end, 10)
 	end)
+	if C_PartyInfo and type(C_PartyInfo.IsRaidListSupported) == "function" then
+		pcall(function()
+			BFL:RegisterEventCallback("SOCIAL_UI_RAID_LIST_SYSTEM_STATUS_UPDATED", function()
+				self:OnGameRulesChanged()
+			end, 10)
+		end)
+	end
 	for _, event in ipairs({ "ALERT_AGE_VERIFICATION_RESTRICTED", "CHAT_DISABLED_CHANGED" }) do
 		pcall(function()
 			BFL:RegisterEventCallback(event, function()
@@ -7801,6 +7858,10 @@ function FriendsUI:Initialize()
 		end)
 	end
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		if self.pendingNavigationRefresh then
+			self.pendingNavigationRefresh = nil
+			self:OnGameRulesChanged()
+		end
 		if self.pendingStyle then
 			if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 				self:ApplyEffectiveStyle("combat-ended")

@@ -34,7 +34,11 @@ local function widget(width)
 	function object:SetHeight(value) self.height = value end
 	function object:SetWidth(value) self.width = value end
 	function object:Show() self.shown = true end
-	function object:Hide() self.shown = false end
+	function object:Hide()
+		self.shown = false
+		if self.onHide then self.onHide(self) end
+	end
+	function object:HookScript(event, callback) if event == "OnHide" then self.onHide = callback end end
 	function object:IsShown() return self.shown end
 	function object:SetParent(value) self.parent = value end
 	function object:EnableMouse() end
@@ -46,8 +50,10 @@ local function widget(width)
 	function object:CreateFontString() return widget() end
 	return object
 end
-local BFL = { modules = {}, L = {}, IsClassic = false, HasSecretValues = true }
+local BFL = { modules = {}, L = { FRIEND_TYPE_WOW = "WoW friend", FRIEND_TYPE_BATTLETAG = "BattleTag friend",
+	FRIEND_TYPE_REAL_ID = "Real ID friend" }, IsClassic = false, HasSecretValues = true }
 function BFL:GetModule(name) return self.modules[name] end
+function BFL:RegisterModule(name, module) self.modules[name] = module; return module end
 local secret = setmetatable({}, { __index = function() error("Secret metadata must not be inspected") end })
 function BFL:IsSecret(value) return value == secret end
 function BFL:GetSafeAccountName(account, tag) return self:IsSecret(account) and tag or account or tag or "Unknown" end
@@ -100,6 +106,7 @@ execute(nativeSource:sub(start, finish), nativePath .. " (native line measuremen
 BFL.modules.FriendsList = {
 	ResolveBNetFriendIndex = function() return 1 end,
 	ResolveWoWFriendIndex = function() return 1 end,
+	GetDisplayName = function() return "Masked friend" end,
 }
 BFL.modules.ContactMemory = { GetTooltipSummaryForFriend = function(_, friend)
 	if friend.tags then return { title = "Notes & Tags", tagsText = friend.tags } end
@@ -134,6 +141,7 @@ local function nameOccurrences()
 	return occurrences
 end
 show()
+equal(env.FriendsTooltip.BFLFriendTypeLine.text, "WoW friend", "Title type appears in the addon-owned tooltip line")
 equal(nameOccurrences(), 1, "An online Title character appears only once")
 check(not header:IsShown(), "The redundant Title account header is hidden")
 check(name:IsShown() and name.text:find("|cfffff569Raizor Shadowstalke|r", 1, true), "The retained character uses class color")
@@ -218,7 +226,68 @@ check(not header:IsShown(), "Returning to a Title friend restores the compact la
 env.BetterFriendsList_Button_OnLeave(button)
 equal(name:GetPoint(1), "LEFT", "Leaving restores anchors for tooltips opened outside BFL")
 check(not env.FriendsTooltip:IsShown(), "Leaving still hides the friend tooltip")
+check(not env.FriendsTooltip.BFLFriendTypeLine:IsShown(), "Leaving clears the addon-owned friend type")
+check(not env.FriendsTooltip.ContactMemoryLines[1]:IsShown(), "Leaving clears addon-owned contact memory")
+env.FriendsTooltip:Show()
+check(not env.FriendsTooltip.BFLFriendTypeLine:IsShown(), "A foreign native hover cannot resurrect the previous friend type")
+show()
+env.FriendsTooltip:Hide()
+check(not env.FriendsTooltip.BFLFriendTypeLine:IsShown(), "Parent hide also clears additions without an OnLeave event")
 env.Enum.BattleNetFriendLevel = nil
 show()
 check(header:IsShown() and name:IsShown(), "Clients without Title friend capability retain ordinary BNet behavior")
+-- Exercise the actual KnownCharacters model through the complete production
+-- tooltip renderer and Blizzard's native line-measurement helper.
+env.GetCurrentRegion = function() return 3 end
+BFL.L.KC_TITLE, BFL.L.KC_MANUAL, BFL.L.KC_MORE = "Known characters", "%s (manual)", "%d more known characters"
+local known = execute(read(repo, "Modules/KnownCharacters.lua"), "KnownCharacters")
+known:SetSetting("enabled", true)
+known:SetSetting("maxTooltipCharacters", 2)
+friend.battleTag = "Ada#1234"
+for _, fullName in ipairs({ "One-Home", "Two-Home", "Three-Home", "Four-Home" }) do check(known:AddManual(friend, fullName), "Tooltip fixture links a manual character") end
+show()
+local knownLines = env.FriendsTooltip.KnownCharacterLines
+equal(#knownLines, 4, "Native tooltip has a title, two characters and a remainder count")
+equal(knownLines[1].text, BFL.L.KC_TITLE, "Known characters has its own localized section")
+check(knownLines[4].text:find("2", 1, true), "The remainder reports known characters, not a complete alt total")
+local knownHeight = env.FriendsTooltip.height
+for _ = 1, 3 do show(); equal(env.FriendsTooltip.height, knownHeight, "Repeated known-character refresh never accumulates height") end
+env.BetterFriendsList_Button_OnLeave(button)
+for _, line in ipairs(knownLines) do check(not line:IsShown() and line.text == "", "Tooltip leave scrubs every addon-owned known-character line") end
+show()
+BFL.StreamerMode = { IsActive = function() return true end }
+known:HideSurfaces()
+for _, line in ipairs(knownLines) do check(not line:IsShown(), "Streamer privacy cleanup immediately hides known-character lines") end
+show()
+for _, line in ipairs(knownLines) do check(not line:IsShown(), "Streamer refresh cannot repopulate known-character lines") end
+BFL.StreamerMode = nil
+known:ClearContact(friend)
+show()
+for _, line in ipairs(knownLines) do check(not line:IsShown(), "Deleted character links cannot reappear in recycled tooltips") end
+-- The Classic dispatch must append exactly once via its secure post-hook and
+-- remove additions again when Blizzard reuses the frame for a foreign button.
+BFL.IsClassic = true
+local classicHooks = 0
+env.FriendsFrameTooltip_Show = function(nativeButton)
+	env.FriendsTooltip.height, env.FriendsTooltip.maxWidth = 0, 0
+	env.FriendsFrameTooltip_SetLine(header, nil, nativeButton.friendData and "Own friend" or "Foreign friend")
+end
+env.hooksecurefunc = function(functionName, callback)
+	classicHooks = classicHooks + 1
+	local original = env[functionName]
+	env[functionName] = function(...)
+		original(...)
+		callback(...)
+	end
+end
+execute(read(repo, "BetterFriendlist_Tooltip.lua"), "Classic tooltip dispatch")
+known:AddManual(friend, "Classic-Home")
+show()
+check(knownLines[1]:IsShown() and knownLines[2].text:find("Classic-Home", 1, true), "Classic native tooltip post-hook includes actual known-character data")
+local classicHeight = env.FriendsTooltip.height
+show()
+equal(env.FriendsTooltip.height, classicHeight, "Classic refresh adds the section only once")
+equal(classicHooks, 1, "Classic retains one secure post-hook, without replacing native scripts")
+env.FriendsFrameTooltip_Show({})
+for _, line in ipairs(knownLines) do check(not line:IsShown(), "Foreign Classic tooltips cannot retain known-character text") end
 io.write("[OK] Title friend tooltip smoke: " .. count .. " assertions passed (" .. nativePath .. "; mocked widgets, no live QA)\n")
