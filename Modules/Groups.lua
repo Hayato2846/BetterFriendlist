@@ -379,6 +379,9 @@ function Groups:Initialize()
 
 	-- Migrate old bnetAccountID-based friend assignments to battleTag-based
 	-- Using pcall to prevent migration errors from blocking initialization
+	local NoteSync = BFL:GetModule("NoteSync")
+	local previousImport = NoteSync and NoteSync.isImporting
+	if NoteSync then NoteSync.isImporting = true end
 	local status, err = pcall(function()
 		self:MigrateFriendAssignments()
 	end)
@@ -401,6 +404,7 @@ function Groups:Initialize()
 	if not status then
 		BFL:DebugPrint("Error in RunColorSnapshotMigration: " .. tostring(err))
 	end
+	if NoteSync then NoteSync.isImporting = previousImport end
 
 	local customGroups = DB:GetCustomGroups()
 	if customGroups then
@@ -567,8 +571,10 @@ end
 
 -- Get group ID by name (for migration)
 function Groups:GetGroupIdByName(groupName)
+	if type(groupName) ~= "string" then return nil end
+	local lowerName = groupName:lower()
 	for groupId, groupData in pairs(self.groups) do
-		if groupData.name == groupName then
+		if groupData.name and groupData.name:lower() == lowerName then
 			return groupId
 		end
 	end
@@ -767,6 +773,8 @@ function Groups:Rename(groupId, newName)
 			groupInfo.name = newName
 			DB:SaveCustomGroup(groupId, groupInfo)
 		end
+		local NoteSync = BFL:GetModule("NoteSync")
+		if NoteSync then NoteSync:OnGroupRenamed(groupId) end
 	end
 
 	-- Refresh Settings UI if open
@@ -840,9 +848,13 @@ function Groups:Delete(groupId)
 	end
 
 	-- Remove all friend assignments to this group
-	for _, friendUID in ipairs(DB:GetAllFriendUIDs()) do
-		DB:RemoveFriendFromGroup(friendUID, groupId)
+	local NoteSync = BFL:GetModule("NoteSync")
+	local function RemoveAssignments()
+		for _, friendUID in ipairs(DB:GetAllFriendUIDs()) do
+			DB:RemoveFriendFromGroup(friendUID, groupId)
+		end
 	end
+	if NoteSync then NoteSync:WithGroupDefinitionChange(RemoveAssignments) else RemoveAssignments() end
 
 	-- Force refresh friends list so removed friends appear in "No Group" immediately
 	BFL:ForceRefreshFriendsList()
@@ -978,13 +990,7 @@ function Groups:GetFriendUID(friend)
 		return nil
 	end
 	if friend.type == "bnet" then
-		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
-		if friend.battleTag and friend.battleTag ~= "" then
-			return "bnet_" .. friend.battleTag
-		else
-			-- Fallback to bnetAccountID only if battleTag is unavailable (should never happen)
-			return "bnet_" .. tostring(friend.bnetAccountID or "unknown")
-		end
+		return BFL.FriendNotes and BFL.FriendNotes.GetBNetUID(friend.accountInfo or friend)
 	else
 		return "wow_" .. (friend.name or "")
 	end

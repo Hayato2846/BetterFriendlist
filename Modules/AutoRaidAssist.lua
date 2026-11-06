@@ -52,6 +52,93 @@ local function GetGuildRosterData()
 	return BFL and BFL.GetModule and BFL:GetModule("GuildRosterData")
 end
 
+local function IsSecret(value)
+	return BFL.IsSecret and BFL:IsSecret(value)
+end
+
+local function IsReadableTable(value)
+	return not IsSecret(value) and type(value) == "table" and not (issecrettable and issecrettable(value))
+end
+
+local function ReadBoolean(api, ...)
+	if type(api) ~= "function" then return nil end
+	local ok, value = pcall(api, ...)
+	if not ok or IsSecret(value) or type(value) ~= "boolean" then return nil end
+	return value
+end
+
+local function HasReadableUnit(unit)
+	return not UnitExists or ReadBoolean(UnitExists, unit) == true
+end
+
+local function UsesRegionalNames()
+	return BFL.AreRegionalUniqueNamesEnabled and BFL.AreRegionalUniqueNamesEnabled() == true
+end
+
+local function CurrentRealm()
+	if UsesRegionalNames() or not GetNormalizedRealmName then
+		return nil
+	end
+	local realm = GetNormalizedRealmName()
+	return not IsSecret(realm) and type(realm) == "string" and realm or nil
+end
+
+local function NameLocale(key, fallback, regionalFallback)
+	if UsesRegionalNames() then
+		return L(key .. "_FOREVER", regionalFallback)
+	end
+	return L(key, fallback)
+end
+
+local function CanonicalContactKey(identity, key)
+	local kind, value = identity:SplitContactKey(key)
+	if kind == "player" and UsesRegionalNames() then
+		return identity:GetContactKeyFromPlayerName(value)
+	end
+	return kind and key or nil
+end
+
+local function IsTitleFriendRow(friend)
+	return IsReadableTable(friend) and BFL.IsTitleFriend
+		and (BFL.IsTitleFriend(friend) or (IsReadableTable(friend.accountInfo) and BFL.IsTitleFriend(friend.accountInfo)))
+end
+
+local function GetTitleCharacterName(identity, friend)
+	if not IsTitleFriendRow(friend) then return nil end
+	local game = IsReadableTable(friend.gameAccountInfo) and friend.gameAccountInfo or nil
+	local project = game and game.wowProjectID
+	if IsSecret(project) or (project ~= nil and WOW_PROJECT_ID and project ~= WOW_PROJECT_ID) then return nil end
+	local name = identity:FirstCleanString(game and game.characterName, friend.characterName)
+	local realm
+	if not UsesRegionalNames() then
+		realm = identity:FirstCleanString(game and game.realmName, friend.realmName)
+		-- A Title row is not necessarily on the player's realm. Missing target
+		-- realm information cannot authorize a same-named character at home.
+		if not name or (not realm and not name:find("-", 1, true)) then return nil end
+	end
+	name = identity:NormalizePlayerName(name, realm)
+	if name and name:match("^[^%s%-]+[%s%-]+[^%s%-]+$") then return name end
+	return nil
+end
+
+local function ResolveFriendContactKey(identity, friend)
+	if not IsReadableTable(friend) then return nil end
+	if IsTitleFriendRow(friend) then
+		-- Persist the selected character, never a numeric Title account ID whose
+		-- cross-session identity is not established by the API contract.
+		return identity:GetContactKeyFromPlayerName(GetTitleCharacterName(identity, friend))
+	end
+	return identity:ResolveContactKeyFromFriend(friend)
+end
+
+local function GetFriendLocation(friend)
+	if not IsReadableTable(friend) or not BFL.GetWoWAccountLocation then return nil end
+	local game = IsReadableTable(friend.gameAccountInfo) and friend.gameAccountInfo or nil
+	local location, kind = BFL.GetWoWAccountLocation(game or friend, friend.realmName)
+	if IsSecret(location) or type(location) ~= "string" or location == "" then return nil end
+	return location, kind
+end
+
 local function SafeTime()
 	if GetTime then
 		return GetTime()
@@ -69,6 +156,9 @@ end
 local function DebugValue(value)
 	if not IsDebugLogEnabled() then
 		return nil
+	end
+	if IsSecret(value) then
+		return "<restricted>"
 	end
 	if value == nil then
 		return "<nil>"
@@ -110,10 +200,9 @@ local function GetBFLActionRestrictedState()
 		return nil
 	end
 	local ok, result = pcall(BFL.IsActionRestricted, BFL)
-	if ok then
-		return result == true
-	end
-	return "error:" .. tostring(result)
+	if not ok then return "error" end
+	if IsSecret(result) then return true end
+	return result == true
 end
 
 local function IsPromotionActionRestricted()
@@ -121,11 +210,15 @@ local function IsPromotionActionRestricted()
 end
 
 local function IsActiveRaidContext()
-	return IsInRaid and IsInRaid() == true
+	return ReadBoolean(IsInRaid) == true
 end
 
 local function IsWoWGameAccount(gameAccountInfo)
-	if type(gameAccountInfo) ~= "table" then
+	if not IsReadableTable(gameAccountInfo) then
+		return false
+	end
+	if IsSecret(gameAccountInfo.isOnline) or IsSecret(gameAccountInfo.clientProgram)
+		or IsSecret(gameAccountInfo.wowProjectID) then
 		return false
 	end
 	if gameAccountInfo.isOnline == false then
@@ -142,8 +235,13 @@ local function IsWoWGameAccount(gameAccountInfo)
 end
 
 local function AddSearchText(parts, value)
-	if value ~= nil and value ~= "" and not (BFL.IsSecret and BFL:IsSecret(value)) then
-		parts[#parts + 1] = tostring(value):lower()
+	if not IsSecret(value) and (type(value) == "string" or type(value) == "number") and value ~= "" then
+		local text = tostring(value):lower()
+		parts[#parts + 1] = text
+		if UsesRegionalNames() then
+			parts[#parts + 1] = text:gsub("-", " ")
+			parts[#parts + 1] = text:gsub("%s+", "-")
+		end
 	end
 end
 
@@ -161,7 +259,7 @@ local function FinalizeCandidateSearch(candidate, parts)
 end
 
 local function GetFriendCandidateSource(friend, kind)
-	if BFL.IsTitleFriend and BFL.IsTitleFriend(friend) then
+	if IsTitleFriendRow(friend) then
 		return "titleFriend"
 	end
 	if kind == "bnet" then
@@ -211,11 +309,13 @@ local function GetFriendCandidateColor(friend, source)
 end
 
 local function GetGuildCandidateClassColor(member)
-	return CopyClassColor(member and RAID_CLASS_COLORS and RAID_CLASS_COLORS[member.classFile])
+	local classFile = member and member.classFile
+	if IsSecret(classFile) then return nil end
+	return CopyClassColor(RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile])
 end
 
 local function GetCurrentGroupLabel()
-	if IsInRaid and IsInRaid() then
+	if IsActiveRaidContext() then
 		return RAID or GROUP or "Raid"
 	end
 	return PARTY or GROUP or "Group"
@@ -350,7 +450,7 @@ function AutoRaidAssist:NormalizeDB()
 		local normalizedTargets = {}
 		for _, target in ipairs(db.targets) do
 			if type(target) == "table" then
-				local key = target.key or target.id
+				local key = CanonicalContactKey(ContactIdentity, target.key or target.id)
 				local kind, value = ContactIdentity:SplitContactKey(key)
 				local lookupKey = ContactIdentity:NormalizeLookupKey(key)
 				if kind and value and lookupKey and not seen[lookupKey] then
@@ -628,6 +728,7 @@ function AutoRaidAssist:AddTarget(contactKey, source, displayName)
 		DebugLog("AddTarget failed key=%s source=%s reason=missingIdentity", DebugValue(contactKey), DebugValue(source))
 		return false, "missingIdentity"
 	end
+	contactKey = CanonicalContactKey(ContactIdentity, contactKey)
 	local kind, value = ContactIdentity:SplitContactKey(contactKey)
 	if not kind or not value then
 		DebugLog("AddTarget failed key=%s source=%s reason=invalid", DebugValue(contactKey), DebugValue(source))
@@ -678,14 +779,15 @@ function AutoRaidAssist:AddTargetFromFriend(friend)
 		DebugLog("AddTargetFromFriend failed reason=missingIdentity")
 		return false, "missingIdentity"
 	end
-	local key = ContactIdentity:ResolveContactKeyFromFriend(friend)
+	if not IsReadableTable(friend) then return false, "invalid" end
+	local key = ResolveFriendContactKey(ContactIdentity, friend)
 	if not key then
 		DebugLog("AddTargetFromFriend failed reason=invalid")
 		return false, "invalid"
 	end
 	local kind = ContactIdentity:SplitContactKey(key)
 	local displayName = self:GetFriendDisplayName(friend)
-	local source = kind == "bnet" and "bnetFriend" or "wowFriend"
+	local source = GetFriendCandidateSource(friend, kind)
 	DebugLog("AddTargetFromFriend resolved key=%s source=%s display=%s", DebugValue(key), DebugValue(source), DebugValue(displayName))
 	return self:AddTarget(key, source, displayName)
 end
@@ -718,6 +820,14 @@ function AutoRaidAssist:AddManualCharacterTarget(value)
 		return false, "missingIdentity"
 	end
 	local cleanValue = ContactIdentity:CleanString(value)
+	if UsesRegionalNames() then
+		local normalized = ContactIdentity:NormalizePlayerName(cleanValue)
+		-- A first name alone must never select every character sharing it.
+		if not normalized or not normalized:match("^[^%s%-]+[%s%-]+[^%s%-]+$") then
+			return false, "invalidCharacter"
+		end
+		return self:AddTarget(ContactIdentity:GetContactKeyFromPlayerName(normalized), "manual", normalized)
+	end
 	if not cleanValue or not cleanValue:find("-", 1, true) then
 		DebugLog("AddManualCharacterTarget failed value=%s clean=%s reason=invalidCharacter", DebugValue(value), DebugValue(cleanValue))
 		return false, "invalidCharacter"
@@ -743,7 +853,7 @@ function AutoRaidAssist:RemoveTarget(contactKey)
 		DebugLog("RemoveTarget failed key=%s reason=missingIdentityOrDB", DebugValue(contactKey))
 		return false
 	end
-	local lookupKey = ContactIdentity:NormalizeLookupKey(contactKey)
+	local lookupKey = ContactIdentity:NormalizeLookupKey(CanonicalContactKey(ContactIdentity, contactKey))
 	if not lookupKey then
 		DebugLog("RemoveTarget failed key=%s reason=invalidLookup", DebugValue(contactKey))
 		return false
@@ -768,17 +878,18 @@ function AutoRaidAssist:RemoveTarget(contactKey)
 end
 
 function AutoRaidAssist:GetFriendDisplayName(friend)
+	if not IsReadableTable(friend) then
+		return nil
+	end
 	local FriendsList = GetFriendsList()
 	if FriendsList and FriendsList.GetDisplayName and type(friend) == "table" then
 		local name = FriendsList:GetDisplayName(friend)
-		if name and name ~= "" then
+		if not IsSecret(name) and type(name) == "string" and name ~= "" then
 			return name
 		end
 	end
-	if type(friend) == "table" then
-		return friend.displayName or friend.accountName or friend.battleTag or friend.name or friend.characterName
-	end
-	return nil
+	local identity = GetContactIdentity()
+	return identity and identity:FirstCleanString(friend.displayName, friend.accountName, friend.battleTag, friend.name, friend.characterName)
 end
 
 function AutoRaidAssist:FindFriendByContactKey(contactKey)
@@ -787,9 +898,10 @@ function AutoRaidAssist:FindFriendByContactKey(contactKey)
 	if not (ContactIdentity and FriendsList and FriendsList.friendsList) then
 		return nil
 	end
-	local lookupKey = ContactIdentity:NormalizeLookupKey(contactKey)
+	local lookupKey = ContactIdentity:NormalizeLookupKey(CanonicalContactKey(ContactIdentity, contactKey))
+	if not lookupKey then return nil end
 	for _, friend in ipairs(FriendsList.friendsList) do
-		local friendKey = ContactIdentity:ResolveContactKeyFromFriend(friend)
+		local friendKey = ResolveFriendContactKey(ContactIdentity, friend)
 		if ContactIdentity:NormalizeLookupKey(friendKey) == lookupKey then
 			return friend
 		end
@@ -812,12 +924,12 @@ end
 
 function AutoRaidAssist:GetCurrentGroupCandidateUnits()
 	local units = {}
-	if IsInRaid and IsInRaid() then
+	if IsActiveRaidContext() then
 		local count = GetNumGroupMembers and GetNumGroupMembers() or 0
 		for index = 1, count do
 			units[#units + 1] = "raid" .. index
 		end
-	elseif IsInGroup and IsInGroup() then
+	elseif ReadBoolean(IsInGroup) then
 		local count = GetNumSubgroupMembers and GetNumSubgroupMembers() or 0
 		for index = 1, count do
 			units[#units + 1] = "party" .. index
@@ -833,9 +945,9 @@ end
 
 function AutoRaidAssist:GetCandidateCacheSignature(FriendsList, GuildRosterData)
 	local groupState = "solo"
-	if IsInRaid and IsInRaid() then
+	if IsActiveRaidContext() then
 		groupState = "raid"
-	elseif IsInGroup and IsInGroup() then
+	elseif ReadBoolean(IsInGroup) then
 		groupState = "party"
 	end
 	local groupCount = GetNumGroupMembers and GetNumGroupMembers() or 0
@@ -865,20 +977,11 @@ function AutoRaidAssist:AddCurrentGroupCandidates(candidates, seen, query, Conta
 	query = query or ""
 	local groupLabel = GetCurrentGroupLabel()
 	for _, unit in ipairs(self:GetCurrentGroupCandidateUnits()) do
-		if (not UnitExists or UnitExists(unit)) and not (UnitIsUnit and UnitIsUnit(unit, "player")) then
+		if HasReadableUnit(unit) and not ReadBoolean(UnitIsUnit, unit, "player") then
 			local key = self:GetUnitContactKey(unit)
 			local lookupKey = ContactIdentity:NormalizeLookupKey(key)
 			if key and lookupKey and not seen[lookupKey] then
-				local name, realm
-				if UnitFullName then
-					name, realm = UnitFullName(unit)
-				end
-				if not name and UnitName then
-					name, realm = UnitName(unit)
-				end
-				if (not realm or realm == "") and GetNormalizedRealmName then
-					realm = GetNormalizedRealmName()
-				end
+				local name, realm = self:GetUnitNameParts(unit)
 
 				local _, value = ContactIdentity:SplitContactKey(key)
 				local normalizedName = ContactIdentity:NormalizePlayerName(name, realm) or value
@@ -889,7 +992,7 @@ function AutoRaidAssist:AddCurrentGroupCandidates(candidates, seen, query, Conta
 				AddSearchText(parts, nickname)
 				AddSearchText(parts, normalizedName)
 				AddSearchText(parts, value)
-				AddSearchText(parts, realm)
+				if not UsesRegionalNames() then AddSearchText(parts, realm) end
 				AddSearchText(parts, groupLabel)
 
 				local candidate = FinalizeCandidateSearch({
@@ -930,29 +1033,30 @@ function AutoRaidAssist:BuildCandidateCache()
 
 	if FriendsList and FriendsList.friendsList then
 		for _, friend in ipairs(FriendsList.friendsList) do
-			local key = ContactIdentity:ResolveContactKeyFromFriend(friend)
+			local key = ResolveFriendContactKey(ContactIdentity, friend)
 			local lookupKey = ContactIdentity:NormalizeLookupKey(key)
 			if key and lookupKey and not seen[lookupKey] then
 				local kind, value = ContactIdentity:SplitContactKey(key)
 				local source = GetFriendCandidateSource(friend, kind)
 				local displayName = self:GetFriendDisplayName(friend) or value
-				local nicknameUID = friend.uid
+				local nicknameUID = ContactIdentity:CleanString(friend.uid)
 				if not nicknameUID and kind == "bnet" then
 					nicknameUID = "bnet_" .. tostring(value or "")
 				elseif not nicknameUID and kind == "player" then
 					nicknameUID = "wow_" .. tostring(value or "")
 				end
 				local nickname = DB and DB.GetNickname and DB:GetNickname(nicknameUID) or nil
-				local gameAccountInfo = type(friend.gameAccountInfo) == "table" and friend.gameAccountInfo or nil
+				local gameAccountInfo = IsReadableTable(friend.gameAccountInfo) and friend.gameAccountInfo or nil
 				AddSearchText(parts, displayName)
 				AddSearchText(parts, nickname)
 				AddSearchText(parts, friend.accountName)
 				AddSearchText(parts, friend.battleTag)
 				AddSearchText(parts, friend.name)
 				AddSearchText(parts, friend.characterName)
-				AddSearchText(parts, friend.realmName)
+				AddSearchText(parts, value)
+				if not UsesRegionalNames() then AddSearchText(parts, friend.realmName) end
 				AddSearchText(parts, gameAccountInfo and gameAccountInfo.characterName)
-				AddSearchText(parts, gameAccountInfo and gameAccountInfo.realmName)
+				if not UsesRegionalNames() then AddSearchText(parts, gameAccountInfo and gameAccountInfo.realmName) end
 
 				seen[lookupKey] = true
 				candidates[#candidates + 1] = FinalizeCandidateSearch({
@@ -980,36 +1084,37 @@ function AutoRaidAssist:BuildCandidateCache()
 		else
 			members = GuildRosterData:CollectRoster()
 		end
-		for _, member in ipairs(members or {}) do
-			local realm = member.realm
-			if (not realm or realm == "") and GetNormalizedRealmName then
-				realm = GetNormalizedRealmName()
-			end
-			local normalizedName = ContactIdentity:NormalizePlayerName(member.fullName or member.name, realm)
-			local key = ContactIdentity:GetContactKeyFromPlayerName(member.fullName or member.name, realm)
-			local lookupKey = ContactIdentity:NormalizeLookupKey(key)
-			if key and normalizedName and lookupKey and not seen[lookupKey] then
-				local nicknameUID = "wow_" .. normalizedName
-				local nickname = DB and DB.GetNickname and DB:GetNickname(nicknameUID) or nil
-				local displayName = member.name or normalizedName
-				AddSearchText(parts, displayName)
-				AddSearchText(parts, nickname)
-				AddSearchText(parts, normalizedName)
-				AddSearchText(parts, member.fullName)
-				AddSearchText(parts, member.realm)
-				AddSearchText(parts, member.rank)
+		for _, member in ipairs(IsReadableTable(members) and members or {}) do
+			if IsReadableTable(member) then
+				local realm = not UsesRegionalNames() and ContactIdentity:CleanString(member.realm) or nil
+				realm = realm or CurrentRealm()
+				local fullName = ContactIdentity:FirstCleanString(member.fullName, member.name)
+				local normalizedName = ContactIdentity:NormalizePlayerName(fullName, realm)
+				local key = ContactIdentity:GetContactKeyFromPlayerName(fullName, realm)
+				local lookupKey = ContactIdentity:NormalizeLookupKey(key)
+				if key and normalizedName and lookupKey and not seen[lookupKey] then
+					local nicknameUID = "wow_" .. normalizedName
+					local nickname = DB and DB.GetNickname and DB:GetNickname(nicknameUID) or nil
+					local displayName = UsesRegionalNames() and normalizedName or ContactIdentity:CleanString(member.name) or normalizedName
+					AddSearchText(parts, displayName)
+					AddSearchText(parts, nickname)
+					AddSearchText(parts, normalizedName)
+					AddSearchText(parts, member.fullName)
+					if not UsesRegionalNames() then AddSearchText(parts, member.realm) end
+					AddSearchText(parts, member.rank)
 
-				seen[lookupKey] = true
-				candidates[#candidates + 1] = FinalizeCandidateSearch({
-					key = key,
-					kind = "player",
-					value = normalizedName,
-					source = "guild",
-					classColor = GetGuildCandidateClassColor(member),
-					displayName = displayName,
-					nickname = nickname,
-					subtitle = (GUILD or "Guild") .. " - " .. normalizedName,
-				}, parts)
+					seen[lookupKey] = true
+					candidates[#candidates + 1] = FinalizeCandidateSearch({
+						key = key,
+						kind = "player",
+						value = normalizedName,
+						source = "guild",
+						classColor = GetGuildCandidateClassColor(member),
+						displayName = displayName,
+						nickname = nickname,
+						subtitle = (GUILD or "Guild") .. " - " .. normalizedName,
+					}, parts)
+				end
 			end
 		end
 	end
@@ -1059,18 +1164,28 @@ end
 
 function AutoRaidAssist:GetCandidateSubtitle(friend, kind, value)
 	if kind == "bnet" then
-		local gameAccountInfo = type(friend.gameAccountInfo) == "table" and friend.gameAccountInfo or nil
-		local character = gameAccountInfo and gameAccountInfo.characterName or friend.characterName
-		local realm = gameAccountInfo and gameAccountInfo.realmName or friend.realmName
+		local gameAccountInfo = IsReadableTable(friend.gameAccountInfo) and friend.gameAccountInfo or nil
+		local identity = GetContactIdentity()
+		local character = identity and identity:FirstCleanString(gameAccountInfo and gameAccountInfo.characterName, friend.characterName)
+		local realm = identity and identity:FirstCleanString(gameAccountInfo and gameAccountInfo.realmName, friend.realmName)
+		local locationKind
+		if BFL.GetWoWAccountLocation then
+			realm, locationKind = GetFriendLocation(friend)
+		elseif UsesRegionalNames() then
+			realm = nil
+		end
 		if character and character ~= "" then
 			if realm and realm ~= "" then
-				return L("AUTO_RAID_ASSIST_BNET", "BattleTag") .. " - " .. character .. "-" .. realm
+				return L("AUTO_RAID_ASSIST_BNET", "BattleTag") .. " - " .. character .. (locationKind == "ruleset" and " - " or "-") .. realm
 			end
 			return L("AUTO_RAID_ASSIST_BNET", "BattleTag") .. " - " .. character
 		end
 		return L("AUTO_RAID_ASSIST_BNET", "BattleTag")
 	end
-	return L("AUTO_RAID_ASSIST_WOW", "WoW Friend") .. " - " .. tostring(value or "")
+	local subtitle = L("AUTO_RAID_ASSIST_WOW", "WoW Friend") .. " - " .. tostring(value or "")
+	local location, locationKind = GetFriendLocation(friend)
+	if locationKind == "ruleset" then subtitle = subtitle .. " - " .. location end
+	return subtitle
 end
 
 function AutoRaidAssist:GetTargetNameColor(target, friend, kind)
@@ -1119,19 +1234,26 @@ function AutoRaidAssist:GetTargetDisplay(target)
 	else
 		source = L("AUTO_RAID_ASSIST_WOW", "WoW Friend")
 	end
-	return displayName, source .. " - " .. tostring(value or ""), self:GetTargetNameColor(target, friend, kind)
+	local subtitle = source .. " - " .. tostring(value or "")
+	local location, locationKind = GetFriendLocation(friend)
+	if locationKind == "ruleset" then subtitle = subtitle .. " - " .. location end
+	return displayName, subtitle, self:GetTargetNameColor(target, friend, kind)
 end
 
 local function GetRaidIndexFromUnit(unit)
-	if type(unit) ~= "string" then
+	if IsSecret(unit) or type(unit) ~= "string" then
 		return nil
 	end
 	return tonumber(unit:match("^raid(%d+)$"))
 end
 
 local function SplitRosterPlayerName(fullName)
-	if type(fullName) ~= "string" or fullName == "" then
+	if IsSecret(fullName) or type(fullName) ~= "string" or fullName == "" then
 		return nil, nil
+	end
+	if UsesRegionalNames() then
+		local identity = GetContactIdentity()
+		return identity and identity:NormalizePlayerName(fullName) or nil, nil
 	end
 	local name, realm = fullName:match("^([^-]+)%-(.+)$")
 	if name and name ~= "" then
@@ -1146,27 +1268,43 @@ function AutoRaidAssist:GetUnitRosterInfo(unit)
 		return nil, nil, nil
 	end
 	local rosterName, rank = GetRaidRosterInfo(raidIndex)
+	if IsSecret(rank) then rank = nil end
 	local name, realm = SplitRosterPlayerName(rosterName)
 	if not name then
 		return nil, nil, rank
 	end
-	if (not realm or realm == "") and GetNormalizedRealmName then
-		realm = GetNormalizedRealmName()
-	end
+	realm = realm or CurrentRealm()
 	return name, realm, rank
 end
 
 function AutoRaidAssist:GetUnitNameParts(unit)
-	if not unit then
+	if IsSecret(unit) or type(unit) ~= "string" then
 		return nil, nil, nil
+	end
+	if UsesRegionalNames() then
+		-- Camelot's unmodified unit name joins first name and surname. The
+		-- second name part must never be interpreted as a realm or stripped.
+		local name = BFL.GetUnmodifiedUnitFullName and BFL.GetUnmodifiedUnitFullName(unit)
+		if not name and UnitName then
+			local first, surname = UnitName(unit)
+			if not IsSecret(first) and not IsSecret(surname) then
+				local identity = GetContactIdentity()
+				name = identity and identity:NormalizePlayerName(first, surname)
+			end
+		end
+		local rosterName, _, rank = self:GetUnitRosterInfo(unit)
+		local identity = GetContactIdentity()
+		return identity and identity:NormalizePlayerName(name or rosterName) or nil, nil, rank
 	end
 	local name, realm
 	if UnitFullName then
 		name, realm = UnitFullName(unit)
 	end
+	if IsSecret(name) or IsSecret(realm) then return nil, nil, nil end
 	if not name and UnitName then
 		name, realm = UnitName(unit)
 	end
+	if IsSecret(name) or IsSecret(realm) then return nil, nil, nil end
 
 	local rosterName, rosterRealm, rosterRank = self:GetUnitRosterInfo(unit)
 	if not name then
@@ -1175,7 +1313,7 @@ function AutoRaidAssist:GetUnitNameParts(unit)
 		realm = rosterRealm
 	end
 	if not realm or realm == "" then
-		realm = GetNormalizedRealmName and GetNormalizedRealmName() or nil
+		realm = CurrentRealm()
 	end
 	return name, realm, rosterRank
 end
@@ -1185,6 +1323,7 @@ function AutoRaidAssist:GetUnitDebugName(unit)
 	if not name or name == "" then
 		return nil
 	end
+	if UsesRegionalNames() then return name end
 	if realm and realm ~= "" then
 		return name .. "-" .. realm
 	end
@@ -1196,13 +1335,16 @@ function AutoRaidAssist:GetUnitPromotionName(unit)
 	if not name or name == "" then
 		return nil
 	end
+	if UsesRegionalNames() then return name end
 
-	local hasUnit = not UnitExists or UnitExists(unit)
+	local hasUnit = HasReadableUnit(unit)
 	local isSameRealm = false
 	if hasUnit and UnitRealmRelationship and LE_REALM_RELATION_SAME then
-		isSameRealm = UnitRealmRelationship(unit) == LE_REALM_RELATION_SAME
+		local relation = UnitRealmRelationship(unit)
+		if IsSecret(relation) then return nil end
+		isSameRealm = relation == LE_REALM_RELATION_SAME
 	elseif realm and GetNormalizedRealmName then
-		isSameRealm = realm == GetNormalizedRealmName()
+		isSameRealm = realm == CurrentRealm()
 	end
 
 	if realm and realm ~= "" and not isSameRealm then
@@ -1230,7 +1372,7 @@ function AutoRaidAssist:GetLookupKeyFromNameOrUnit(nameOrUnit)
 	end
 
 	local contactKey
-	if (UnitExists and UnitExists(nameOrUnit)) or GetRaidIndexFromUnit(nameOrUnit) then
+	if ReadBoolean(UnitExists, nameOrUnit) or GetRaidIndexFromUnit(nameOrUnit) then
 		contactKey = self:GetUnitContactKey(nameOrUnit)
 	end
 	if not contactKey then
@@ -1273,7 +1415,7 @@ end
 function AutoRaidAssist:BuildCurrentRaidLookupKeySet(ContactIdentity)
 	local keySet = {}
 	ContactIdentity = ContactIdentity or GetContactIdentity()
-	if not (ContactIdentity and IsInRaid and IsInRaid() and GetNumGroupMembers) then
+	if not (ContactIdentity and IsActiveRaidContext() and GetNumGroupMembers) then
 		return keySet
 	end
 
@@ -1321,6 +1463,7 @@ function AutoRaidAssist:PruneDemotedTargetsForCurrentRaid(reason)
 end
 
 function AutoRaidAssist:AddGameAccountKey(gameAccountInfo, keySet)
+	if not IsReadableTable(gameAccountInfo) then return end
 	if not IsWoWGameAccount(gameAccountInfo) then
 		DebugLog(
 			"AddGameAccountKey skipped character=%s realm=%s client=%s online=%s reason=notWowGameAccount",
@@ -1336,7 +1479,9 @@ function AutoRaidAssist:AddGameAccountKey(gameAccountInfo, keySet)
 		DebugLog("AddGameAccountKey skipped reason=missingIdentity")
 		return
 	end
-	local key = ContactIdentity:GetContactKeyFromPlayerName(gameAccountInfo.characterName, gameAccountInfo.realmName)
+	local name = ContactIdentity:CleanString(gameAccountInfo.characterName)
+	local realm = not UsesRegionalNames() and ContactIdentity:CleanString(gameAccountInfo.realmName) or nil
+	local key = ContactIdentity:GetContactKeyFromPlayerName(name, realm)
 	if key then
 		local lookupKey = ContactIdentity:NormalizeLookupKey(key)
 		if lookupKey then
@@ -1366,20 +1511,36 @@ function AutoRaidAssist:AddGameAccountKey(gameAccountInfo, keySet)
 end
 
 function AutoRaidAssist:AddBNetTargetGameKeys(target, keySet)
-	local battleTag = target and target.value
-	if not battleTag or battleTag == "" then
-		DebugLog("AddBNetTargetGameKeys skipped target=%s reason=missingBattleTag", DebugValue(target and target.key))
+	local identity = GetContactIdentity()
+	local value = identity and identity:CleanString(target and target.value)
+	if not value then return end
+	local wanted = value:lower()
+	local numericTitle = value:match("^%d+$") ~= nil
+	local savedName = numericTitle and identity:CleanString(target.displayName) or nil
+	if numericTitle and not UsesRegionalNames() and (not savedName or not savedName:find("-", 1, true)) then
 		return
 	end
-	local wanted = battleTag:lower()
-	DebugLog("AddBNetTargetGameKeys target=%s battleTag=%s", DebugValue(target.key or target.id), DebugValue(battleTag))
+	local expectedCharacter = numericTitle and identity:NormalizePlayerName(savedName) or nil
+	if numericTitle and (not expectedCharacter or not expectedCharacter:match("^[^%s%-]+[%s%-]+[^%s%-]+$")) then
+		return
+	end
+	local function Matches(account)
+		if not IsReadableTable(account) then return false end
+		if numericTitle then
+			local id = account.bnetAccountID
+			if IsSecret(id) or type(id) ~= "number" or tostring(id) ~= value then return false end
+			local character = GetTitleCharacterName(identity, account)
+			return character ~= nil and character:lower() == expectedCharacter:lower()
+		end
+		local battleTag = identity:CleanString(account.battleTag)
+		return battleTag ~= nil and battleTag:lower() == wanted
+	end
 
 	local FriendsList = GetFriendsList()
 	if FriendsList and FriendsList.friendsList then
 		for _, friend in ipairs(FriendsList.friendsList) do
-			if friend.type == "bnet" and friend.battleTag and friend.battleTag:lower() == wanted then
-				DebugLog("AddBNetTargetGameKeys matched BFL friend display=%s battleTag=%s", DebugValue(friend.displayName or friend.accountName), DebugValue(friend.battleTag))
-				if type(friend.gameAccounts) == "table" then
+			if Matches(friend) then
+				if not numericTitle and IsReadableTable(friend.gameAccounts) then
 					for _, gameAccountInfo in ipairs(friend.gameAccounts) do
 						self:AddGameAccountKey(gameAccountInfo, keySet)
 					end
@@ -1393,15 +1554,16 @@ function AutoRaidAssist:AddBNetTargetGameKeys(target, keySet)
 		return
 	end
 	local numBNet = BNGetNumFriends() or 0
+	if IsSecret(numBNet) or type(numBNet) ~= "number" then return end
 	for friendIndex = 1, numBNet do
 		local accountInfo = BFL.GetBNetFriendInfo(friendIndex)
-		if accountInfo and accountInfo.battleTag and accountInfo.battleTag:lower() == wanted then
-			DebugLog("AddBNetTargetGameKeys matched BN friendIndex=%d battleTag=%s", friendIndex, DebugValue(accountInfo.battleTag))
+		if Matches(accountInfo) then
 			self:AddGameAccountKey(accountInfo.gameAccountInfo, keySet)
 			local numGameAccounts = 0
-			if C_BattleNet and C_BattleNet.GetFriendNumGameAccounts then
+			if not numericTitle and C_BattleNet and C_BattleNet.GetFriendNumGameAccounts then
 				numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(friendIndex) or 0
 			end
+			if IsSecret(numGameAccounts) or type(numGameAccounts) ~= "number" then numGameAccounts = 0 end
 			for gameIndex = 1, numGameAccounts do
 				local gameAccountInfo = BFL.GetBNetFriendGameAccountInfo
 					and BFL.GetBNetFriendGameAccountInfo(friendIndex, gameIndex)
@@ -1525,10 +1687,10 @@ function AutoRaidAssist:GetPromotionGateStatus(reason)
 		reason = reason,
 		enabled = self:IsEnabled(),
 		targetCount = self:GetTargetCount(),
-		inRaid = IsInRaid and IsInRaid(),
-		inGroup = IsInGroup and IsInGroup(),
-		leader = UnitIsGroupLeader and UnitIsGroupLeader("player"),
-		assistant = UnitIsGroupAssistant and UnitIsGroupAssistant("player"),
+		inRaid = ReadBoolean(IsInRaid),
+		inGroup = ReadBoolean(IsInGroup),
+		leader = ReadBoolean(UnitIsGroupLeader, "player"),
+		assistant = ReadBoolean(UnitIsGroupAssistant, "player"),
 		groupMembers = GetNumGroupMembers and GetNumGroupMembers() or 0,
 		inCombat = InCombatLockdown and InCombatLockdown() == true,
 		promotionRestricted = IsPromotionActionRestricted(),
@@ -1605,10 +1767,12 @@ end
 
 function AutoRaidAssist:GetNotPromotableReason(unit)
 	local rosterName, _, rosterRank = self:GetUnitNameParts(unit)
-	if UnitExists and not UnitExists(unit) and (not rosterName or rosterName == "") then
+	if not HasReadableUnit(unit) and (not rosterName or rosterName == "") then
 		return "missingUnit"
 	end
-	if UnitIsUnit and UnitIsUnit(unit, "player") then
+	local isPlayer = ReadBoolean(UnitIsUnit, unit, "player")
+	if UnitIsUnit and isPlayer == nil then return "restrictedUnit" end
+	if isPlayer then
 		return "player"
 	end
 	if rosterRank == 2 then
@@ -1617,10 +1781,15 @@ function AutoRaidAssist:GetNotPromotableReason(unit)
 	if rosterRank == 1 then
 		return "alreadyAssistant"
 	end
-	if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+	local isLeader = ReadBoolean(UnitIsGroupLeader, unit)
+	local isAssistant = ReadBoolean(UnitIsGroupAssistant, unit)
+	if (UnitIsGroupLeader and isLeader == nil) or (UnitIsGroupAssistant and isAssistant == nil) then
+		return "restrictedRank"
+	end
+	if isLeader then
 		return "leader"
 	end
-	if UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+	if isAssistant then
 		return "alreadyAssistant"
 	end
 	return nil
@@ -2035,8 +2204,13 @@ function AutoRaidAssist:ProcessPromotionQueue()
 								attemptCount
 							)
 						else
+							local promotionName = self:GetUnitPromotionName(unit)
+							local promotionKey = ContactIdentity:GetContactKeyFromPlayerName(promotionName)
+							if not promotionName or ContactIdentity:NormalizeLookupKey(promotionKey) ~= lookupKey then
+								self:ScheduleNextQueuedPromotion()
+								return false
+							end
 							attemptCount = self:RecordPromotionAttempt(lookupKey, now)
-							local promotionName = self:GetUnitPromotionName(unit) or unit
 							self.lastPromotionAttempt[lookupKey] = now
 							DebugLog(
 								"PromoteAttempt lookup=%s unit=%s name=%s apiName=%s attempt=%d/%d queueRemaining=%d",
@@ -2173,9 +2347,10 @@ function AutoRaidAssist:RegisterSettingsDesignerControls(app, options)
 			groupTitle = groupTitle,
 			type = "button",
 			label = L("AUTO_RAID_ASSIST_MANAGE", "Manage Auto Raid Assist"),
-			description = L(
+			description = NameLocale(
 				"AUTO_RAID_ASSIST_MANAGE_DESC",
-				"Choose BattleTag friends, nickname matches, or manual Character-Realm targets."
+				"Choose BattleTag friends, nickname matches, or manual Character-Realm targets.",
+				"Choose friends, nickname matches, or manual First name-Last name targets."
 			),
 			buttonText = L("AUTO_RAID_ASSIST_MANAGE_BUTTON", "Manage"),
 			order = controlOrder + 10,
@@ -2302,7 +2477,7 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 
 	local searchTitle = CreateLabel(
 		parent,
-		L("AUTO_RAID_ASSIST_SEARCH_LABEL", "Find Friend") .. " / " .. L("AUTO_RAID_ASSIST_MANUAL_LABEL", "Character-Realm"),
+		L("AUTO_RAID_ASSIST_SEARCH_LABEL", "Find Friend") .. " / " .. NameLocale("AUTO_RAID_ASSIST_MANUAL_LABEL", "Character-Realm", "First name-Last name"),
 		"BetterFriendlistFontNormal"
 	)
 	Add(searchTitle, 18)
@@ -2484,7 +2659,7 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 		if reason == "duplicate" then
 			self.status:SetText(L("AUTO_RAID_ASSIST_DUPLICATE", "Already selected."))
 		elseif reason == "invalidCharacter" or reason == "invalid" then
-			self.status:SetText(L("AUTO_RAID_ASSIST_INVALID_CHARACTER", "Use Name-Realm."))
+			self.status:SetText(NameLocale("AUTO_RAID_ASSIST_INVALID_CHARACTER", "Use Name-Realm.", "Use First name-Last name."))
 		elseif reason == "noResults" then
 			self.status:SetText(L("AUTO_RAID_ASSIST_NO_RESULTS", "No matching friends"))
 		else

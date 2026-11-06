@@ -30,6 +30,9 @@ local function GetUnitRosterName(unit)
 	end
 
 	local unitName, realm = UnitFullName(unit)
+	if BFL.AreRegionalUniqueNamesEnabled() then
+		return BFL.GetUnmodifiedUnitFullName(unit) or BFL.NormalizePlayerIdentityName(unitName, realm)
+	end
 	if unitName and realm and realm ~= "" then
 		return unitName .. "-" .. realm
 	end
@@ -2140,7 +2143,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 	end
 	if button.Name then
 		local displayName = memberData.name or ""
-		if displayName:find("-") then
+		if not BFL.AreRegionalUniqueNamesEnabled() and displayName:find("-") then
 			displayName = strsplit("-", displayName)
 		end
 		button.Name:SetText(displayName)

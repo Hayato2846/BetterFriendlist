@@ -22,22 +22,28 @@ local COLOR_TABLE = {
 	gold = "ffd700",
 }
 
+local function WrapClassColor(color, text)
+	local hex = color.colorStr or string.format("ff%02x%02x%02x",
+		math.floor(color.r * 255 + 0.5), math.floor(color.g * 255 + 0.5), math.floor(color.b * 255 + 0.5))
+	return "|c" .. hex .. text .. "|r"
+end
+
 function BU.C(color, text)
 	if not text then
 		return ""
 	end
 
 	-- Check if it's a class color (try direct match first, then convert from localized name)
-	local classColor = RAID_CLASS_COLORS[color]
+	local classColor = BFL.ClassUtils:GetClassColorByFile(color)
 	if not classColor then
 		local classFile = BFL.ClassUtils and BFL.ClassUtils:GetClassFileFromClassName(color)
 		if classFile then
-			classColor = RAID_CLASS_COLORS[classFile]
+			classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 		end
 	end
 
 	if classColor then
-		return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
+		return WrapClassColor(classColor, text)
 	end
 
 	-- Otherwise use predefined or custom hex
@@ -89,9 +95,9 @@ function BU.ClassColorTextByFile(classFile, text)
 	if not text then
 		return ""
 	end
-	local classColor = classFile and RAID_CLASS_COLORS[classFile]
+	local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 	if classColor then
-		return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
+		return WrapClassColor(classColor, text)
 	end
 	return text
 end
@@ -103,7 +109,7 @@ function BU.ClassColorText(friend, text)
 	end
 	local classColor = BFL.ClassUtils and BFL.ClassUtils:GetClassColorForFriend(friend)
 	if classColor then
-		return string.format("|cff%02x%02x%02x%s|r", classColor.r * 255, classColor.g * 255, classColor.b * 255, text)
+		return WrapClassColor(classColor, text)
 	end
 	return text
 end

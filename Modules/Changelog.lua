@@ -93,6 +93,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.1]        - 2026-11-06
+
+BetterFriendlist 3.0.1 improves group note sync and backups, adds ruleset checks for invites in WoW Forever, and makes smooth scrolling optional.
+
+### All WoW Versions
+
+#### Added
+- **Full Backups** - Exports now include private contact notes and saved note backups. Both backup windows explain that the exported data can contain private information and friend names.
+- **Global Sync Database** - Use Delete All to clear saved Global Sync entries and their notes for this client after confirmation, without removing anyone from your Blizzard friends list.
+
+#### Improved
+- **Group Note Sync** - Large syncs send queued updates without waiting for each note to appear or repeatedly sending changes already awaiting confirmation. Progress shows what is queued and what is waiting, with fewer repeated friend-list reads and window refreshes.
+- **Note Cleanup** - The wizard keeps its recovery copy across retries, waits for delayed note changes, and lets you stop cleanup while keeping the backup. Title friend backups can be restored during the same game session.
+- **Backup Text Fields** - Large pastes in the import and export windows are buffered to reduce pauses. Selections and text after the insertion point are preserved.
+
+#### Fixed
+- **Group Assignments** - Existing note tags are read before syncing starts, and assignments stay intact when groups are renamed or changed during a sync. Group names containing # are supported, though other FriendGroups addons may display their escaped form.
+- **Settings Imports** - Backups are checked before replacing your data, and the previous settings are restored if applying an import fails. Nested filters and older group colors are preserved.
+- **Global Sync Backups** - Saved friends and Global Sync options are restored only into the same WoW client type, keeping Retail, Forever, and Classic separate. Imports from another client or older backups without this information keep your existing Global Sync data.
+- **Game Icons** - Friends playing WoW Forever show Blizzard's matching game icon in the friends list, tooltips, account menus, and the Data Broker.
+- **Friend Tags** - Removed patch-number references from the Blizzard handoff heading and description.
+
+### Retail Midnight & WoW Forever
+
+#### Improved
+- **Scrolling** - Immediate scrolling is the default again, matching the behavior before 3.0.0. Enable Smooth Scrolling in General settings to animate scrolling in either the Modern or Legacy layout.
+
+### WoW Forever
+
+#### Added
+- **Ruleset Display** - Friend details show Normal, PvP, RP, or RP-PvP instead of internal realm names. The default info line includes the ruleset, and custom name and info formats can use %ruleset%.
+- **Ruleset Invites** - Invite and Request to Join now check rulesets as well as faction. The party button is disabled for a different ruleset and explains why on hover; friends with several online characters can still use a compatible character.
+
+#### Fixed
+- **Class Colors** - Retail friends keep their Monk, Death Knight, Demon Hunter, and Evoker colors when viewed in Forever, including in tooltips, account menus, and the Data Broker.
+- **Character Names** - Auto Raid Assist keeps complete first and last names when finding, saving, and promoting Title friends. Raid, guild, and Quick Join displays also preserve surnames.
+- **Who Searches** - Who searches open in BetterFriendlist instead of Blizzard's Who or Looking For Group window, including searches from /who and character links. Looking For Group remains available for its normal group activities.
+- **Global Sync** - Saved entries can be removed from the sync database without removing Blizzard friends. The invite list opens horizontally centered over the friends list.
+
+### WoW Classic
+
+#### Fixed
+- **Backups and Notes** - Fixed missing characters at the end of some backup strings. Non-English group names can use the full note length supported by the client.
+
+---
+
 ## [3.0.0]        - 2026-11-03
 
 BetterFriendlist 3.0.0 adds saved Who searches, an option to show friends' alts in tooltips, and smoother scrolling on Retail and Forever.
@@ -338,25 +384,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 - **ElvUI Simple Mode** - The avatar now stays hidden when switching between Legacy and Modern while Simple Mode is active.
 - **ElvUI Guild Tab** - The Legacy guild member list now uses a background that matches the ElvUI theme.
 - **Modern Raid Tab** - Raid member right-click menus, shortcuts, selections, and drag-and-drop now stay connected to the correct player.
-
----
-
-## [2.8.3]        - 2026-08-18
-
-### Added
-- **Friend Tag Layout** - Choose how many tags can appear in total and on each line. Tags can also use separate full-width lines. When friends are grouped by a tag, that tag can be hidden from their rows.
-- **Tag Appearance** - Pick the font, size, style, and icon size used by friend tags. Each tag can also have its own text color to match its background.
-
-### Improved
-- **Friend Tag Editor** - Typing a label now switches to Custom Label automatically. Pressing Enter or Escape finishes text entry, and icon or label changes show up right away.
-- **Cleaner Settings** - Options that only work with Modern or Legacy are now shown when that interface is active, while shared options remain available in both.
-
-### Fixed
-- **Tag Icons and Labels** - Icon Only now works on the first click. Custom icon paths stay selected, switching between icon types no longer brings back an older icon, and reordering tags keeps their chosen icon zoom.
-- **Tag Rows** - Tag lines wrap more reliably with the chosen limits and sizes. Full-width tag rows no longer overlap the game icon or Invite button.
-- **Legacy Settings** - Sliders update the friend list without rebuilding the page while dragging. Dropdown widths, menu-count alignment, scrollbars, and right-click color resets have also been tidied up.
-- **Friend Search** - Clearing the search box once again restores its hint text and hides the clear button on Retail and Classic.
-- **Favorite Icons** - BFL and Blizzard favorite icons now leave a more even gap between the character name and the following friend info.
 
 ---
 

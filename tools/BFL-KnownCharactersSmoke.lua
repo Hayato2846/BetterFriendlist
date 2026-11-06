@@ -366,22 +366,50 @@ known:ClearContact({ battleTag = "Unrecorded#9999" })
 local afterCount = 0; for _ in pairs(store.contacts) do afterCount = afterCount + 1 end
 check(afterCount <= 200, "Forgetting an unknown contact cannot create unbounded suppression tombstones")
 
--- Run actual export/import source: private data is excluded BEFORE deep-copy,
--- and a foreign profile cannot inject links or enable automatic collection.
-env.Settings, env.L = {}, BFL.L
-local copied, serialized
-local db = { InternalDeepCopy = function(_, value) check(value.knownCharacters == nil, "Private data is excluded before deep-copy"); copied = value; return value end }
-env.GetDB = function() return db end
-env.Settings.SerializeTable = function(_, value) serialized = value; return "payload" end
-env.Settings.EncodeString = function(_, value) return value end
-execute(between(read("Modules/Settings.lua"), "function Settings:ExportSettings()", "-- Import settings from string"), "Profile export")
-env.Settings:ExportSettings()
-check(copied and serialized and serialized.knownCharacters == nil, "Exported profiles contain no private associations or collection preferences")
+-- Run complete production codec/database/export/import paths. Private graphs
+-- must be excluded before copying or validation, even if a local graph cycles.
+BFL.VERSION, BFL.Version = "3.0.1", "3.0.1"
+BFL.UI = { CONSTANTS = { MAX_RECURSION_DEPTH = 10 } }
+BFL.ForceRefreshFriendsList = function() end
+BFL.GetNumWoWFriends = function() return 0 end
+env.GetNormalizedRealmName = function() return "SmokeRealm" end
+env.BNGetNumFriends = function() return 0 end
+env.wipe = function(value) for key in pairs(value) do value[key] = nil end; return value end
+env.CopyTable = function(value)
+	if type(value) ~= "table" then return value end
+	local result = {}; for key, child in pairs(value) do result[key] = env.CopyTable(child) end; return result
+end
+execute(read("Utils/Encoding.lua"), "Encoding")
+execute(read("Utils/ProfileCodec.lua"), "ProfileCodec")
+execute(read("Modules/Database.lua"), "Database")
+execute(read("Modules/Groups.lua"), "Groups")
+local settings = execute(read("Modules/Settings.lua"), "Settings")
+BFL.modules.DB:Initialize()
+env.BetterFriendlistDB.bnetUIDMigrationDone_v2 = true
+env.BetterFriendlistDB.wowUIDMigrationDone_v1 = true
+env.BetterFriendlistDB.wowUIDMigrationDone_v2 = true
+env.BetterFriendlistDB.colorSnapshotMigrationDone = true
+BFL.modules.Groups:Initialize()
 local privateStore = env.BetterFriendlistDB.knownCharacters
-env.importData = { exportVersion = 3, knownCharacters = { enabled = true, observeBattleNet = true, contacts = { stolen = true } }, harmless = 7 }
-env.wipe = function(value) for key in pairs(value) do value[key] = nil end end
-execute(between(read("Modules/Settings.lua"), "\t-- Handle V3 (Everything)", "\telse\n\t\t-- Legacy V1/V2 Import Logic") .. "\nend", "Profile import privacy boundary")
+privateStore.smokeCycle = privateStore
+local codec, validated = BFL.ProfileCodec, false
+local originalValidation = codec.ValidateData
+codec.ValidateData = function(self, value)
+	validated = true
+	check(value.knownCharacters == nil, "Private data is excluded before graph validation or copying")
+	return originalValidation(self, value)
+end
+local exported = assert(settings:ExportSettings())
+codec.ValidateData = originalValidation
+local serialized = assert(settings:DeserializeTable(assert(settings:DecodeString(exported))))
+check(validated and serialized.knownCharacters == nil, "Exported profiles contain no private associations or collection preferences")
+local foreign = { exportVersion = 3, customGroups = {}, friendGroups = {},
+	knownCharacters = { enabled = true, observeBattleNet = true, contacts = { stolen = true } }, harmless = 7 }
+local imported = settings:EncodeString(assert(settings:SerializeTable(foreign)))
+check(settings:ImportSettings(imported), "A valid profile imports through the production staging transaction")
 equal(env.BetterFriendlistDB.knownCharacters, privateStore, "Profile import preserves local private data instead of replacing it")
 check(privateStore.observeBattleNet == false, "A foreign profile cannot silently grant observation consent")
+check(privateStore.smokeCycle == privateStore, "Import preserves the original local graph without copying it")
+privateStore.smokeCycle = nil
 equal(env.BetterFriendlistDB.harmless, 7, "Normal profile imports remain functional")
 io.write("[OK] Known characters smoke: " .. assertions .. " assertions (production module/callbacks, mocked engine; live taint QA required)\n")

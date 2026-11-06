@@ -1301,7 +1301,7 @@ local BROKER_COLOR_ENTRIES = {
 	{ key = "brokerNicknameColor", label = T("BROKER_SETTINGS_NICKNAME_COLOR", "Nickname Color") },
 	{ key = "brokerCharacterColor", label = T("BROKER_SETTINGS_CHARACTER_COLOR", "Character Color") },
 	{ key = "brokerZoneColor", label = T("BROKER_SETTINGS_ZONE_COLOR", "Zone Color") },
-	{ key = "brokerRealmColor", label = T("BROKER_SETTINGS_REALM_COLOR", "Realm Color") },
+	{ key = "brokerRealmColor", label = BFL.IsForever and L.BROKER_SETTINGS_RULESET_COLOR or T("BROKER_SETTINGS_REALM_COLOR", "Realm Color") },
 	{ key = "brokerNotesColor", label = T("BROKER_SETTINGS_NOTES_COLOR", "Notes Color") },
 }
 
@@ -1699,6 +1699,10 @@ local function RefreshVisibleSettingsCenter()
 end
 
 function SettingsDesigner:RefreshFriendsUIAvailability()
+	RefreshVisibleSettingsCenter()
+end
+
+function SettingsDesigner:RefreshNoteSyncState()
 	RefreshVisibleSettingsCenter()
 end
 
@@ -3379,6 +3383,8 @@ local function RegisterFriendsPages()
 		refreshOnChange = true,
 	})
 
+	AddToggle("friends.general", { key = "enableSmoothScrolling", group = "interface", label = L.SETTINGS_SMOOTH_SCROLLING, desc = L.SETTINGS_SMOOTH_SCROLLING_DESC, default = false, order = 110, method = "OnSmoothScrollingChanged", visibleWhen = function() return BFL.IsMainline == true end })
+
 	RegisterPage({
 		id = "friends.tabs",
 		category = "friends",
@@ -3427,7 +3433,7 @@ local function RegisterFriendsPages()
 	AddToggle("friends.display", { key = "grayOtherFaction", group = "rows", label = T("SETTINGS_GRAY_OTHER_FACTION", "Gray Out Other Faction"), desc = T("SETTINGS_GRAY_OTHER_FACTION_DESC", "Dim characters from the other faction."), default = false, order = 130, method = "OnGrayOtherFactionChanged" })
 	AddToggle("friends.display", { key = "showMultiAccountBadge", group = "rows", label = T("SETTINGS_SHOW_MULTI_ACCOUNT_BADGE", "Show Multi-Account Badge"), desc = T("SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC", "Display a badge for friends with multiple online game accounts."), default = true, order = 140, after = RefreshFriends })
 	AddToggle("friends.display", { key = "showMultiAccountInfo", group = "rows", label = T("SETTINGS_SHOW_MULTI_ACCOUNT_INFO", "Show Multi-Account Info"), desc = T("SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC", "Append multi-account details to the info line."), default = true, order = 150, after = RefreshFriends })
-	AddToggle("friends.display", { key = "showRealmName", group = "rows", label = T("SETTINGS_SHOW_REALM_NAME", "Show Realm Name"), desc = T("SETTINGS_SHOW_REALM_NAME_DESC", "Display the realm name for friends on different servers."), default = false, order = 160, method = "OnShowRealmNameChanged" })
+	AddToggle("friends.display", { key = "showRealmName", group = "rows", label = BFL.IsForever and L.SETTINGS_SHOW_RULESET_NAME or T("SETTINGS_SHOW_REALM_NAME", "Show Realm Name"), desc = BFL.IsForever and L.SETTINGS_SHOW_RULESET_NAME_DESC or T("SETTINGS_SHOW_REALM_NAME_DESC", "Display the realm name for friends on different servers."), default = false, order = 160, method = "OnShowRealmNameChanged" })
 	AddToggle("friends.display", { key = "hideMaxLevel", group = "rows", label = T("SETTINGS_HIDE_MAX_LEVEL", "Hide Max Level"), desc = T("SETTINGS_HIDE_MAX_LEVEL_DESC", "Do not display level number for characters at max level."), default = false, order = 170, method = "OnHideMaxLevelChanged" })
 	AddToggle("friends.display", { key = "showMobileAsAFK", group = "rows", label = T("SETTINGS_SHOW_MOBILE_AS_AFK", "Show Mobile as AFK"), desc = T("SETTINGS_SHOW_MOBILE_AS_AFK_DESC", "Display AFK status icon for friends on mobile."), default = false, order = 180, method = "OnShowMobileAsAFKChanged" })
 	AddToggle("friends.display", { key = "treatMobileAsOffline", group = "rows", label = T("SETTINGS_TREAT_MOBILE_OFFLINE", "Treat Mobile users as Offline"), desc = T("SETTINGS_TREAT_MOBILE_OFFLINE_DESC", "Move mobile-only friends into the offline group."), default = false, order = 190, method = "OnTreatMobileAsOfflineChanged" })
@@ -3463,7 +3469,7 @@ local function RegisterFriendsPages()
 		key = "nameFormatPreset",
 		group = "names",
 		label = T("SETTINGS_NAME_FORMAT_LABEL", "Preset:"),
-		desc = T("SETTINGS_NAME_FORMAT_DESC", "Choose the primary name format used in the friends list."),
+		desc = T("SETTINGS_NAME_FORMAT_DESC", "Choose the primary name format used in the friends list.") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS,
 		list = {
 			default = T("NAME_PRESET_DEFAULT", "Name (Character)"),
 			battletag = T("NAME_PRESET_BATTLETAG", "BattleTag (Character)"),
@@ -3480,16 +3486,16 @@ local function RegisterFriendsPages()
 		after = RefreshFriends,
 		refreshOnChange = true,
 	})
-	AddInput("friends.formatting", { key = "nameFormatCustom", group = "names", label = T("SETTINGS_NAME_FORMAT_CUSTOM_LABEL", "Custom Format:"), desc = T("SETTINGS_NAME_FORMAT_TOOLTIP", "Custom Name Format"), default = "%name%", inputWidth = 280, maxChars = 80, order = 110, visibleWhen = function() return GetDB("nameFormatPreset", "default") == "custom" end, isEnabled = function() return _G.FriendListColorsAPI == nil end, after = RefreshFriends })
+	AddInput("friends.formatting", { key = "nameFormatCustom", group = "names", label = T("SETTINGS_NAME_FORMAT_CUSTOM_LABEL", "Custom Format:"), desc = T("SETTINGS_NAME_FORMAT_DESC", "") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS, default = "%name%", inputWidth = 280, maxChars = 80, order = 110, visibleWhen = function() return GetDB("nameFormatPreset", "default") == "custom" end, isEnabled = function() return _G.FriendListColorsAPI == nil end, after = RefreshFriends })
 
 	AddGroup("friends.formatting", "info", T("SETTINGS_INFO_FORMAT_HEADER", "Friend Info Formatting"), 200)
 	AddDropdown("friends.formatting", {
 		key = "infoFormatPreset",
 		group = "info",
 		label = T("SETTINGS_INFO_FORMAT_LABEL", "Preset:"),
-		desc = T("SETTINGS_INFO_FORMAT_DESC", "Choose the secondary info line format."),
+		desc = T("SETTINGS_INFO_FORMAT_DESC", "Choose the secondary info line format.") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS,
 		list = {
-			default = T("SETTINGS_INFO_FORMAT_DEFAULT", "Default"),
+			default = BFL.IsForever and L.INFO_PRESET_DEFAULT_FOREVER or T("SETTINGS_INFO_FORMAT_DEFAULT", "Default"),
 			zone = ZONE or "Zone",
 			level = LEVEL or "Level",
 			class_zone = T("SETTINGS_INFO_FORMAT_CLASS_ZONE", "Class, Zone"),
@@ -3504,7 +3510,7 @@ local function RegisterFriendsPages()
 		after = RefreshFriends,
 		refreshOnChange = true,
 	})
-	AddInput("friends.formatting", { key = "infoFormatCustom", group = "info", label = T("SETTINGS_INFO_FORMAT_CUSTOM_LABEL", "Custom Format:"), desc = T("SETTINGS_INFO_FORMAT_TOOLTIP", "Custom Info Format"), default = "%level%, %zone%", inputWidth = 280, maxChars = 80, order = 210, visibleWhen = function() return GetDB("infoFormatPreset", "default") == "custom" end, after = RefreshFriends })
+	AddInput("friends.formatting", { key = "infoFormatCustom", group = "info", label = T("SETTINGS_INFO_FORMAT_CUSTOM_LABEL", "Custom Format:"), desc = T("SETTINGS_INFO_FORMAT_DESC", "") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS, default = "%level%, %zone%", inputWidth = 280, maxChars = 80, order = 210, visibleWhen = function() return GetDB("infoFormatPreset", "default") == "custom" end, after = RefreshFriends })
 
 	RegisterPage({
 		id = "friends.behavior",
@@ -4008,7 +4014,7 @@ local function RegisterFriendTagsControls()
 		id = "friendTags.syncLocalBlizzard",
 		group = "editor",
 		label = T("FRIEND_TAGS_SYNC_LOCAL_TITLE", "Sync Local Blizzard-compatible Tags"),
-		desc = T("FRIEND_TAGS_SYNC_LOCAL_DESC", "Transfers locally stored 12.0.7 Blizzard-compatible tags for currently known Battle.net friends to Blizzard when the 12.1 API is available."),
+		desc = T("FRIEND_TAGS_SYNC_LOCAL_DESC", "Moves locally stored Blizzard-compatible tag selections to Blizzard's native tag storage."),
 		buttonText = T("FRIEND_TAGS_SYNC_LOCAL_BUTTON", "Sync Known Friends"),
 		order = 410,
 		visibleWhen = HasPendingLocalBlizzardTags,
@@ -4314,7 +4320,7 @@ local function RegisterBrokerPages()
 	AddToggle("broker.sync", { key = "enableGlobalSync", group = "global", label = T("SETTINGS_GLOBAL_SYNC_ENABLE", "Enable Global Friend Sync"), desc = T("SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP", "Automatically sync friends from other realms to this character."), default = false, order = 100, visibleWhen = ShowLegacySyncControls, after = function(value) local GlobalSync = BFL:GetModule("GlobalSync"); if value and GlobalSync and GlobalSync.OnFriendListUpdate then GlobalSync:OnFriendListUpdate() end end, refreshOnChange = true })
 	AddToggle("broker.sync", { key = "enableGlobalSyncDeletion", group = "global", label = T("SETTINGS_GLOBAL_SYNC_DELETION", "Enable Deletion"), desc = T("SETTINGS_GLOBAL_SYNC_DELETION_DESC", "Allow Global Sync to remove friends marked as deleted."), default = false, order = 110, visibleWhen = ShowLegacySyncControls, parentCheck = function() return GetDB("enableGlobalSync", false) end })
 	AddGroup("broker.sync", "notes", T("SETTINGS_SYNC_GROUPS_HEADER", "Group Note Sync"), 200)
-	AddToggle("broker.sync", { key = "syncGroupsToNote", group = "notes", label = T("SETTINGS_SYNC_GROUPS_NOTE", "Sync Groups to Friend Note"), desc = T("SETTINGS_SYNC_GROUPS_NOTE_DESC", "Write group assignments into friend notes using FriendGroups format."), default = false, order = 200, newTagID = "syncGroupsToNote", after = function(value) if value then local NoteSync = BFL:GetModule("NoteSync"); if NoteSync and NoteSync.SyncAllFriends then NoteSync:SyncAllFriends() end else ShowNoteCleanupFrame("Show", "BetterFriendlistNoteCleanupWizard") end end })
+	AddToggle("broker.sync", { key = "syncGroupsToNote", group = "notes", label = T("SETTINGS_SYNC_GROUPS_NOTE", "Sync Groups to Friend Note"), desc = T("SETTINGS_SYNC_GROUPS_NOTE_DESC", "Write group assignments into friend notes using FriendGroups format."), default = false, order = 200, newTagID = "syncGroupsToNote", method = "OnSyncGroupsToNoteChanged" })
 	RegisterPage({
 		id = "broker.sync.database",
 		category = "broker",
@@ -4358,6 +4364,8 @@ local function RegisterAdvancedPages()
 	AddGroup("advanced.tools", "migration", T("SETTINGS_MIGRATION_HEADER", "FriendGroups Migration"), 100)
 	AddButton("advanced.tools", { id = "migration.friendgroups", group = "migration", label = T("SETTINGS_MIGRATE_BTN", "Migrate FriendGroups"), desc = T("SETTINGS_MIGRATE_TOOLTIP", "Import groups from the FriendGroups addon."), buttonText = T("SETTINGS_MIGRATE_BTN", "Migrate"), order = 100, onClick = function() CallSettings("ShowMigrationDialog") end })
 	AddGroup("advanced.tools", "importexport", T("SETTINGS_EXPORT_HEADER", "Export / Import Settings"), 200)
+	AddInlineHint("advanced.tools", "importexport", "importexport.fullBackup", L.SETTINGS_EXPORT_WARNING, 190)
+	AddInlineHint("advanced.tools", "importexport", "importexport.globalSyncFlavor", L.SETTINGS_IMPORT_GLOBAL_SYNC_INFO, 195)
 	AddButton("advanced.tools", { id = "export.settings", group = "importexport", label = T("BUTTON_EXPORT", "Export"), desc = T("SETTINGS_EXPORT_TOOLTIP", "Export your groups and friend assignments."), buttonText = T("BUTTON_EXPORT", "Export"), order = 200, onClick = function() CallSettingsDialog("ShowExportDialog", "exportFrame", "BetterFriendlistExportFrame") end })
 	AddButton("advanced.tools", { id = "import.settings", group = "importexport", label = T("SETTINGS_IMPORT_BTN", "Import"), desc = T("SETTINGS_IMPORT_TOOLTIP", "Import groups and friend assignments."), buttonText = T("SETTINGS_IMPORT_BTN", "Import"), order = 210, onClick = function() CallSettingsDialog("ShowImportDialog", "importFrame", "BetterFriendlistImportFrame") end })
 	AddGroup("advanced.tools", "cleanup", T("WIZARD_HEADER", "Note Cleanup"), 300, 1)

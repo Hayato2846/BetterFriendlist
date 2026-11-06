@@ -3,6 +3,20 @@ local GlobalSync = BFL.GlobalSync
 local ROW_HEIGHT = 26
 local ICON = "Interface\\AddOns\\BetterFriendlist\\Icons\\globe.blp"
 
+local function AnchorMenu(panel, button)
+	local frame = BetterFriendsFrame
+	local bottom, top = frame:GetBottom(), button:GetTop()
+	panel:ClearAllPoints()
+	if bottom and top then
+		-- Keep the existing height above the footer, with the horizontal center
+		-- tied to the friend list. Modern footer controls may use another scale.
+		local offsetY = top * button:GetEffectiveScale() / frame:GetEffectiveScale() - bottom + 6
+		panel:SetPoint("BOTTOM", frame, "BOTTOM", 0, offsetY)
+	else
+		panel:SetPoint("BOTTOMRIGHT", button, "TOPRIGHT", 0, 6)
+	end
+end
+
 local function CreateMenu(self)
 	local panel = CreateFrame("Frame", nil, BetterFriendsFrame, "BackdropTemplate")
 	panel:SetFrameStrata("DIALOG")
@@ -107,8 +121,7 @@ local function GetButton(self, anchor, modern)
 			panel:Hide()
 			return
 		end
-		panel:ClearAllPoints()
-		panel:SetPoint("BOTTOMRIGHT", button, "TOPRIGHT", 0, 6)
+		AnchorMenu(panel, button)
 		panel.Scroll:SetVerticalScroll(0)
 		panel:Show()
 		self:RefreshTitleFriendUI()

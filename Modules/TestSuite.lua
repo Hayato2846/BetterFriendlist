@@ -14554,7 +14554,7 @@ function TestSuite:RegisterForeverCompatibilityTests()
 	})
 
 	self:RegisterTest("data", "WhoResultListenerIsolation", {
-		description = "BFL Who requests temporarily isolate Retail and Forever native auto-open listeners and restore them afterward",
+		description = "Temporary Who ownership isolates native auto-open listeners and restores them afterward",
 		condition = function()
 			local module = BFL:GetModule("WhoFrame")
 			return module
@@ -14566,6 +14566,7 @@ function TestSuite:RegisterForeverCompatibilityTests()
 		action = function(V)
 			local module = BFL:GetModule("WhoFrame")
 			local originalSocialUI = module._testSocialUIAPI
+			local originalPersistentIsolation = module.UsesPersistentNativeWhoIsolation
 			local originalPending = module.whoPending
 			local originalSuspendedFrames = module.suspendedNativeWhoListFrames
 			local originalSuspendedFrameSet = module.suspendedNativeWhoListFrameSet
@@ -14598,6 +14599,9 @@ function TestSuite:RegisterForeverCompatibilityTests()
 			local foreverFrame, forever = NewNativeListener("Forever LFGWhoListFrame")
 
 			local ok, err = pcall(function()
+				-- Exercise the temporary Retail/Classic policy regardless of the
+				-- client running this test; Forever keeps its listener isolated.
+				module.UsesPersistentNativeWhoIsolation = function() return false end
 				module.suspendedNativeWhoListFrames = nil
 				module.suspendedNativeWhoListFrameSet = nil
 				module._testSocialUIAPI = { IsSystemEnabled = function() return false end }
@@ -14641,6 +14645,7 @@ function TestSuite:RegisterForeverCompatibilityTests()
 				module:RestoreNativeWhoListUpdates()
 			end
 			module._testSocialUIAPI = originalSocialUI
+			module.UsesPersistentNativeWhoIsolation = originalPersistentIsolation
 			module.whoPending = originalPending
 			module.suspendedNativeWhoListFrames = originalSuspendedFrames
 			module.suspendedNativeWhoListFrameSet = originalSuspendedFrameSet

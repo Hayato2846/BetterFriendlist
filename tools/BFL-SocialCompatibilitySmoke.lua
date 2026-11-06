@@ -48,9 +48,9 @@ end
 -- Execute the account-picker display builder, not a duplicated formatter.
 env.FriendsList = {}
 env.GetAccountClassFile = function() return "MAGE" end
-env.RAID_CLASS_COLORS = { MAGE = { WrapTextInColorCode = function(_, name) return "|cff00ffff" .. name .. "|r" end } }
+env.RAID_CLASS_COLORS = { MAGE = { r = 0, g = 1, b = 1, colorStr = "ff00ffff", WrapTextInColorCode = function(_, name) return "|cff00ffff" .. name .. "|r" end } }
 env.INVITE_RESTRICTION_NONE = 0
-execute(between(read("Modules/FriendsList.lua"), "function FriendsList:BuildAccountDisplay(", "local function GetInviteRestrictionTextSafe("), "account display")
+execute(between(read("Modules/FriendsList.lua"), "function FriendsList:IsReadableInviteRecord(", "local function GetInviteRestrictionTextSafe("), "account display and readability guards")
 local account = { characterName = "Ada-Lovelace", realmName = "Realm", playerGuid = "Player-200-1",
 	gameAccountID = 99, wowProjectID = 18, bflIsInvitable = true }
 env.RegionalUniqueNamesEnabled = function() return true end
@@ -62,6 +62,7 @@ V:AssertEqual(display.gameAccountID, 99, "Display formatting never rewrites acco
 V:Assert(display.raw == account and display.isInvitable, "Raw account and invitation capability are retained")
 env.RegionalUniqueNamesEnabled = function() return false end
 account.characterName = "Ada"
+account.wowProjectID = 1
 V:AssertEqual(env.FriendsList:BuildAccountDisplay(account).text, "|cff00ffffAda|r - Realm", "Traditional picker keeps realm label")
 
 -- Load the complete QuickJoin module with mocked read-only APIs.

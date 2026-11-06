@@ -17,7 +17,9 @@ local function between(source, first, last)
 end
 
 local BFL = { L = {} }
+function BFL:IsSecret() return false end
 local env = setmetatable({ BFL = BFL }, { __index = _G })
+function BFL:GetModule(name) if name == "FriendsList" then return env.FriendsList end end
 env.SlashCmdList = {}
 env.WOW_PROJECT_MAINLINE, env.WOW_PROJECT_CLASSIC, env.WOW_PROJECT_CAMELOT = 1, 2, 18
 env.BNET_CLIENT_WOW, env.BNET_CLIENT_APP = "WoW", "App"
@@ -34,6 +36,9 @@ local accounts, calls = {}, {}
 env.C_BattleNet = {
 	GetFriendNumGameAccounts = function() return #accounts end,
 	GetFriendGameAccountInfo = function(_, index) return accounts[index] end,
+	GetGameAccountInfoByID = function(id)
+		for _, account in ipairs(accounts) do if account.gameAccountID == id then return account end end
+	end,
 }
 env.BNGetNumFriendGameAccounts = function() return #accounts end
 env.BNGetFriendGameAccountInfo = function(_, index)
@@ -73,11 +78,16 @@ tests.Forever_BNetInviteRealmGate.action(V)
 local friendsSource = read(repoRoot, "Modules/FriendsList.lua")
 local constants = between(friendsSource, "local INVITE_RESTRICTION_NONE =", "-- Helper Functions")
 local statusBlock = between(friendsSource, "-- PHASE 4 OPTIMIZATION: Pre-calculate Invite Status", "-- The setting is explicitly mobile-only")
-local updateStatus = execute(constants .. "\nreturn function(friend, accountInfo, i)\n" .. statusBlock .. "\nend", "FriendsList invite status")
+local FriendsList = {}
+env.FriendsList = FriendsList
+execute(constants .. between(friendsSource, "function FriendsList:IsReadableInviteRecord(", "function FriendsList:BuildAccountDisplay("), "production account eligibility")
+local updateStatusMethod = execute(constants .. "\nreturn function(self, friend, accountInfo, i)\n" .. statusBlock .. "\nend", "FriendsList invite status")
+local function updateStatus(friend, accountInfo, index) return updateStatusMethod(FriendsList, friend, accountInfo, index) end
 
 local mainSource = read(repoRoot, "BetterFriendlist.lua")
+local mainConstants = between(mainSource, "-- BFL-owned invite restriction values", "local function GetBFLInviteRestrictionText(")
 local modeCheck = between(mainSource, "local CLASS_ID_TO_GAME_MODE =", "-- Multi-Game-Account Invite Picker")
-execute(modeCheck .. between(mainSource, "function BetterFriendsList_TravelPassButton_OnClick(", "function BetterFriendsList_TravelPassButton_OnEnter("), "TravelPassButton_OnClick")
+execute(mainConstants .. modeCheck .. between(mainSource, "function BetterFriendsList_TravelPassButton_OnClick(", "function BetterFriendsList_TravelPassButton_OnEnter("), "TravelPassButton_OnClick")
 env.BNGetNumFriends = function() return 1 end
 BFL.IsBattleNetFriendsListEnabled = function() return true end
 BFL.GetBNetFriendInfo = function() return { bnetAccountID = 42 } end
@@ -85,13 +95,12 @@ env.FriendsFrame_InviteOrRequestToJoin = function(guid, id) calls[#calls + 1] = 
 env.FriendsFrame_SetupTravelPassDropdown = function() calls[#calls + 1] = { picker = true } end
 
 local friend, inviteType = nil, "INVITE"
-local FriendsList = {}
 env.GetFriendsList = function() return FriendsList end
 function FriendsList:BuildAccountDisplay(ga)
-	return { gameAccountID = ga.gameAccountID, playerGuid = ga.playerGuid, text = ga.characterName, isInvitable = ga.bflIsInvitable }
+	return { gameAccountID = ga.gameAccountID, playerGuid = ga.playerGuid, text = ga.characterName, isInvitable = ga.bflIsInvitable, raw = ga }
 end
 -- Load the existing picker with the click handler so both share its local.
-execute(modeCheck .. between(mainSource, "local function GetInviteRestrictionText(", "BFL.ShowMultiAccountInvitePicker =")
+execute(mainConstants .. modeCheck .. between(mainSource, "local function GetInviteRestrictionText(", "BFL.ShowMultiAccountInvitePicker =")
 	.. between(mainSource, "function BetterFriendsList_TravelPassButton_OnClick(", "local inviteTypeToButtonText ="), "TravelPass picker and click")
 BFL.OpenSimpleContextMenu = function(_, _, items) calls[#calls + 1] = { picker = true, items = items } end
 env.BFL_FindBNetFriendData = function() return friend, FriendsList end
@@ -108,6 +117,7 @@ local function menu()
 		self.buttons[#self.buttons + 1] = button
 		return button
 	end
+	function root:SetEnabled(enabled) self.enabled = enabled; self.disabled = not enabled end
 	return root
 end
 
@@ -128,7 +138,7 @@ if arg[3] then
 end
 
 local function account(overrides)
-	local ga = { clientProgram = "WoW", wowProjectID = 18, realmID = 200, isInCurrentRegion = true,
+	local ga = { clientProgram = "WoW", wowProjectID = 18, realmID = 200, isInCurrentRegion = true, isOnline = true,
 		factionName = "Alliance", playerGuid = "Player-200-1", gameAccountID = 99, characterName = "Friend", classID = 1 }
 	for key, value in pairs(overrides or {}) do ga[key] = value end
 	return ga
@@ -144,7 +154,7 @@ local function check(name, project, list, expected, count)
 	V:AssertEqual(friend.canInvite, expected, name .. " enabled state")
 	V:AssertEqual(friend.numInvitableAccounts, count, name .. " validated account count")
 	local native = BFL.IsClassic and nativeClassicRestriction or (not BFL.IsClassic and nativeRestriction)
-	if native then
+	if native and not (BFL.IsForever and crossFaction and accounts[1] and accounts[1].factionName == "Horde") then
 		V:AssertEqual(friend.canInvite, native(1), name .. " Blizzard parity")
 	end
 	local root = menu()
@@ -176,11 +186,11 @@ check("Missing realm", 18, { account({ realmID = 0 }) }, false, 0)
 check("No game accounts", 18, {}, false, 0)
 check("App only", 18, { account({ clientProgram = "App" }) }, false, 0)
 check("Two WoW logins", 18, { account(), account({ gameAccountID = 100 }) }, true, 2)
-check("WoW and App", 18, { account(), account({ clientProgram = "App" }) }, true, 1)
-check("One incompatible WoW login", 18, { account({ wowProjectID = 1 }), account() }, true, 1)
+check("WoW and App", 18, { account(), account({ clientProgram = "App", gameAccountID = 100 }) }, true, 1)
+check("One incompatible WoW login", 18, { account({ wowProjectID = 1, gameAccountID = 100 }), account() }, true, 1)
 check("No cross faction capability", 18, { account({ factionName = "Horde" }) }, false, 0)
 crossFaction = true
-check("Cross faction supported", 18, { account({ factionName = "Horde" }) }, true, 1)
+check("Forever requires same faction even with native cross faction enabled", 18, { account({ factionName = "Horde" }) }, false, 0)
 questSession = true
 check("Quest session blocks cross faction", 18, { account({ factionName = "Horde" }) }, false, 0)
 questSession = false

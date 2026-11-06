@@ -51,15 +51,20 @@ If the request is vague, ask the smallest useful clarification or state the work
 - Check UI tasks against `docs/UI_CONVENTIONS.md`; use screenshots or a narrow visual assumption when layout, density, color, clipping, or state is material.
 - Verify WoW API usage against local Retail and Classic UI sources before adding or changing calls.
 - Use capability flags and BFL compatibility wrappers before raw flavor checks.
-- Update `CHANGELOG.md` only for approved user-visible changes, under `[DRAFT]`.
+- Update `CHANGELOG.md` for approved user-visible changes under `[DRAFT]`, applying the Changelog Style below from the first edit. Maintaining that structure is part of the feature work and does not need a separate user request.
 
 ## Changelog Style
 
-- Read the latest two or three published entries in `CHANGELOG.md` before writing. Keep the existing English style. For a larger update, open with one short sentence about the biggest changes. Group entries by WoW version where that helps players find what's relevant, then use the existing Added, Improved, Fixed, or Compatibility headings as needed.
+- Read the latest two or three published entries in `CHANGELOG.md` before writing. Apply their English release-note style automatically to both the draft and the promoted release; do not accumulate a flat development log and leave its organization for the maintainer.
+- Use this heading hierarchy: `## [DRAFT]` or the dated release heading, then `###` WoW-version sections, then `#### Added`, `#### Improved`, `#### Fixed`, or `#### Compatibility`. For a larger update, place one short introductory sentence about the biggest changes before the WoW-version sections.
+- Put changes shared by all clients under `### All WoW Versions`. Use the existing client headings, such as `### Retail Midnight & WoW Forever`, `### WoW Forever`, and `### WoW Classic`, for changes limited to those clients. A single-client update uses its applicable client section. Omit empty sections and categories, and list each change once in the section that matches its actual scope.
+- Use Added for new capabilities, Improved for changes to existing behavior or defaults, Fixed for problems present in a published release, and Compatibility for client support updates. Do not put every entry under Fixed.
 - Start each bullet with the feature or UI label in bold, followed by a hyphen and one or two plain sentences. Write for someone who plays WoW and has never seen BFL's code. Say what they can do now, what went wrong before, or where to find the new option. Use the words players see in-game, such as Who, right-click menu, BattleTag, or Raid tab.
 - Keep it conversational and matter-of-fact. Skip marketing language, filler, and claims about speed or reliability without evidence. Leave out API names, interface numbers, internal rendering details, and fixes to regressions that only existed in the current draft. Mention defaults, level requirements, client differences, and privacy behavior when they affect what a player sees or does.
 - For example, write “**Recently Added** - Long-time friends no longer show up as newly added after a reconnect.” Explain a restricted API in terms of the visible effect, such as “You can still open the guild list when the game temporarily hides extra details like professions.”
-- Keep upcoming notes under `[DRAFT]` until release promotion. Preserve published entries and run `tools/BFL-PackageCheck.ps1` to sync the embedded changelog used in game.
+- Before handing off a changelog change, review the whole upcoming entry against the approved changes since the previous release. Consolidate overlapping notes, remove abandoned behavior and draft-only regressions, and verify the introduction, heading hierarchy, client scope, categories, and bullet style. Complete this editorial pass yourself instead of waiting for a separate release-formatting request.
+- Keep upcoming notes under `[DRAFT]` until the user requests release promotion. At promotion, use the existing `## [X.Y.Z]        - YYYY-MM-DD` format with the current local date and update both addon TOCs to the requested version. Preserve the text of retained published entries, keep the existing release-history limit, and run `tools/BFL-PackageCheck.ps1` to sync the embedded changelog used in game.
+- Changelog editing, version promotion, and local deployment do not authorize release publication. Follow the separately authorized tag and push steps under Release Tags.
 
 ## Secret Values, Secret Context, and Taint
 
@@ -79,6 +84,7 @@ Choose the smallest validation set that matches risk:
 - Package/tooling: run `tools\BFL-PackageCheck.ps1` when ignore rules, package metadata, release tooling, or deploy tooling changed.
 - Runtime: run `tools\BFL-PackageCheck.ps1` for Lua/XML/locales/settings/package changes.
 - Test-ready deployment: for every user-requested runtime implementation or bugfix, deploy a fresh `CleanCopy` before handoff. The maintainer expects a deployed state for testing without a separate deploy request. Select the affected client explicitly, for example `tools\BFL-Deploy.ps1 -Mode CleanCopy -Client retail -Source .` for Retail-only work.
+- Forever runtime: for Forever-related features or bugfixes, including Forever friends displayed in Retail, also deploy with `tools\BFL-Deploy.ps1 -Mode CleanCopy -Client forever -Source .`. This targets the actual WoW `_forever_\Interface\AddOns` folders for BetterFriendlist and the Menu Bridge, in addition to any other affected client.
 - Cross-flavor runtime: deploy the affected Classic client explicitly, or use `-Client all` when TOC/XML, compatibility, settings runtime, shared loading, or packaging behavior affects multiple flavors.
 - Deployment exceptions: skip the required deploy only when the user explicitly opts out or deployment is blocked; report the exact command and reason.
 - Warning delta: run `tools\BFL-PreCommitDelta.ps1` when code changes could introduce new pre-commit warning signatures. Use `tools\BFL-PreCommitDelta.ps1 -UpdateBaseline` only when intentionally accepting a changed warning baseline.

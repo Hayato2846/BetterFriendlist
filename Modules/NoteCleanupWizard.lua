@@ -8,6 +8,7 @@ BFL.NoteCleanupWizard = NoteCleanupWizard
 
 local L = BFL.L or BFL_L
 local DB
+local FriendNotes = BFL.FriendNotes
 
 -- ========================================
 -- Constants
@@ -37,9 +38,236 @@ local rowFrames = {} -- Reusable row frames
 local searchText = ""
 local backupRowFrames = {} -- Reusable row frames for backup viewer
 local backupFilteredData = {} -- Filtered backup data
+local restoreOperationRows
 local backupSearchText = ""
 local isApplying = false
 local isRestoring = false
+local scanTotal = 0
+local scanComplete = false
+local pendingWrites, protectedBackups = {}, {}
+local pendingTimer
+local reconciling = false
+local RefreshButtons
+local mainRefreshPending, backupRefreshPending = false, false
+local operationVersion = 0
+local WRITE_INTERVAL = 0.5
+
+local function IsText(value)
+	return FriendNotes.IsReadableString(value)
+end
+
+local function SafeLabel(value, fallback)
+	if IsText(value) and value ~= "" and not value:find("|K", 1, true) then return value end
+	return fallback or L.UNKNOWN
+end
+
+local function Report(message)
+	if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffffBetterFriendlist:|r " .. message)
+	end
+end
+
+local function IsSyncEnabled()
+	if not (BetterFriendlistDB and BetterFriendlistDB.syncGroupsToNote == true) then return false end
+	local NoteSync = BFL:GetModule("NoteSync")
+	-- Requested activation waits behind this operation. Its own retries must
+	-- remain possible while sync has deliberately yielded ownership to us.
+	return not (NoteSync and NoteSync.waitingForWizard and NoteCleanupWizard:IsBusy())
+end
+
+local function SnapshotNotes()
+	return FriendNotes.CaptureSnapshot()
+end
+
+local function ResolveEntry(entry, key, snapshot)
+	if not FriendNotes.IsReadableTable(entry) then return nil end
+	if BFL:IsSecret(entry.isBNet) then return nil end
+	if entry.isBNet == true then
+		local account, reason, uid
+		if FriendNotes.IsReadableTable(entry.identity) then
+			uid = entry.identity.uid
+			account, reason = FriendNotes.ResolveBNetIdentity(entry.identity, snapshot and snapshot.bnet)
+		elseif IsText(entry.battleTag) and entry.battleTag ~= "" then
+			-- Original backups used the BattleTag itself as the key.
+			uid = "bnet_" .. entry.battleTag
+			if snapshot then account = snapshot.bnet[uid] else account = FriendNotes.FindBNetFriend(uid) end
+		end
+		if account then return account, account.note or "", FriendNotes.GetBNetUID(account) end
+		if reason == "identity" then return nil, nil, nil, reason end
+		if snapshot and snapshot.bnetComplete and uid and snapshot.bnet[uid] == nil then return nil, nil, nil, "removed" end
+	elseif entry.isBNet == false then
+		local name = IsText(entry.characterName) and entry.characterName or key
+		local info
+		if snapshot then info = snapshot.wow[name] else info = FriendNotes.FindWoWFriend(name) end
+		if not info then return nil, nil, nil, snapshot and snapshot.wowComplete and "removed" or "unavailable" end
+		local guid = entry.guid
+		if BFL:IsSecret(guid) or (guid ~= nil and not IsText(guid)) then return nil, nil, nil, "identity" end
+		if guid ~= nil then
+			if BFL:IsSecret(info.guid) or not IsText(info.guid) or info.guid == "" then return nil, nil, nil, "unavailable" end
+			if info.guid ~= guid then return nil, nil, nil, "identity" end
+		end
+		return info, info.notes or "", name
+	end
+end
+
+local function ReadEntry(entry, key, snapshot)
+	local _, note, _, reason = ResolveEntry(entry, key, snapshot)
+	return note, reason
+end
+
+local function WriteKey(entry, key)
+	if entry.isBNet then
+		return entry.identity and entry.identity.uid or ("bnet_" .. entry.battleTag)
+	end
+	return FriendNotes.GetWoWUID(entry.characterName or key)
+end
+
+local function SubmitEntry(entry, key, note, expected, snapshot)
+	local info, _, identity = ResolveEntry(entry, key, snapshot)
+	if not info then return false, "unavailable" end
+	if entry.isBNet then
+		return FriendNotes.WriteBNetNote(identity, note, expected, snapshot, entry.identity, "wizard")
+	end
+	return FriendNotes.WriteWoWNote(identity, note, expected, snapshot, entry.guid, "wizard")
+end
+
+local function CompletePending(record, success)
+	if pendingWrites[record.uid] ~= record then return end
+	pendingWrites[record.uid] = nil
+	if not next(pendingWrites) and pendingTimer then pendingTimer:Cancel(); pendingTimer = nil end
+	for _, callback in ipairs(record.callbacks) do callback(success) end
+	if RefreshButtons and not reconciling then RefreshButtons() end
+end
+
+local function ReconcilePending(snapshot)
+	if reconciling or not next(pendingWrites) then return end
+	reconciling = true
+	snapshot = snapshot or SnapshotNotes()
+	for _, record in pairs(pendingWrites) do
+		local current, reason = ReadEntry(record.entry, record.key, snapshot)
+		local active = FriendNotes.ObserveAcceptedWrite(record.uid, current, snapshot)
+		if reason == "identity" or reason == "removed" then
+			CompletePending(record, false)
+		elseif active then
+			-- Stop/Disable cannot cancel an accepted request owned by another
+			-- operation. Its pre-write base is never an acknowledgement of ours.
+			if active.note ~= record.note then record.waitingOn = active end
+		elseif record.waitingOn then
+			local previous = record.waitingOn
+			if record.kind == "restore" and current == previous.note and not IsSyncEnabled() then
+				record.waitingOn, record.expected = nil, current
+				local success, result = SubmitEntry(record.entry, record.key, record.note, current, snapshot)
+				if success then CompletePending(record, true)
+				elseif result ~= "pending" and result ~= "blocked" then CompletePending(record, false) end
+			else
+				-- Cleanup needs a fresh recovery backup after another owner's write.
+				CompletePending(record, false)
+			end
+		elseif current == record.note then CompletePending(record, true)
+		elseif current ~= nil and current ~= record.expected then
+			CompletePending(record, false)
+		end
+	end
+	reconciling = false
+	-- A native cache update may acknowledge dozens of notes together. Paint
+	-- each window once per poll, not once per acknowledged friend.
+	if mainRefreshPending then mainRefreshPending = false; NoteCleanupWizard:RefreshRows(snapshot) end
+	if backupRefreshPending then backupRefreshPending = false; NoteCleanupWizard:RefreshBackupRows(snapshot) end
+end
+
+local function SchedulePendingCheck()
+	if pendingTimer or not next(pendingWrites) then return end
+	local timer = C_Timer.NewTimer(1, function()
+		pendingTimer = nil
+		ReconcilePending()
+		SchedulePendingCheck()
+	end)
+	pendingTimer = timer
+end
+
+local function PendingCount(kind)
+	local count = 0
+	for _, record in pairs(pendingWrites) do if not kind or record.kind == kind then count = count + 1 end end
+	return count
+end
+
+function NoteCleanupWizard:IsBusy()
+	return isApplying or isRestoring or next(pendingWrites) ~= nil, PendingCount()
+end
+
+function NoteCleanupWizard:GetOperationStatus(kind)
+	local status = { total = 0, confirmed = 0, queued = 0, waiting = 0, unconfirmed = 0 }
+	for _, data in pairs(kind == "restore" and (restoreOperationRows or backupFilteredData) or friendData) do
+		if data.status then
+			status.total = status.total + 1
+			if data.status == "success" then status.confirmed = status.confirmed + 1
+			elseif data.status == "queued" then status.queued = status.queued + 1
+			elseif data.status == "pending" then status.waiting = status.waiting + 1
+			else status.unconfirmed = status.unconfirmed + 1 end
+		end
+	end
+	return status
+end
+
+RefreshButtons = function()
+	local busy = isApplying or isRestoring
+	if wizardFrame then
+		if wizardFrame.backupButton then wizardFrame.backupButton:SetEnabled(not busy) end
+		if wizardFrame.applyButton then wizardFrame.applyButton:SetEnabled(not busy and PendingCount("restore") == 0) end
+		if wizardFrame.stopButton then wizardFrame.stopButton:SetShown(busy or PendingCount() > 0) end
+	end
+	if backupViewerFrame then
+		if backupViewerFrame.backupButton then backupViewerFrame.backupButton:SetEnabled(not busy) end
+		if backupViewerFrame.restoreButton then backupViewerFrame.restoreButton:SetEnabled(not busy and PendingCount("cleanup") == 0) end
+		if backupViewerFrame.stopButton then backupViewerFrame.stopButton:SetShown(busy or PendingCount() > 0) end
+	end
+end
+
+function NoteCleanupWizard:Stop()
+	operationVersion = operationVersion + 1
+	isApplying, isRestoring = false, false
+	if pendingTimer then pendingTimer:Cancel(); pendingTimer = nil end
+	pendingWrites = {}
+	for _, collection in ipairs({ friendData, backupFilteredData, restoreOperationRows or {} }) do
+		for _, data in pairs(collection) do
+			if data.status == "queued" or data.status == "pending" then data.status = "stopped" end
+		end
+	end
+	self:RefreshRows()
+	self:RefreshBackupRows()
+	Report(L.WIZARD_STOPPED)
+end
+
+local function ReportPending(count)
+	Report(string.format(L.WIZARD_NOTES_PENDING, count))
+end
+
+-- Submission is separate from acknowledgement. Slow cache updates stay pending;
+-- they are never turned into failures by an arbitrary two-second timeout.
+local function WriteEntry(entry, key, note, expected, kind, callback)
+	-- Recheck queued writes if the user enables sync after confirmation.
+	if IsSyncEnabled() then callback(false); return end
+	local snapshot = SnapshotNotes()
+	local info, _, identity = ResolveEntry(entry, key, snapshot)
+	if not info then callback(false); return end
+	local uid, now = WriteKey(entry, key), GetTime()
+	local record = pendingWrites[uid]
+	if record then
+		if record.note ~= note or record.kind ~= kind then callback(false); return end
+		record.callbacks[#record.callbacks + 1] = callback
+		-- Repeated clicks only subscribe to the existing delivery, never resend it.
+		return
+	end
+	local success, reason = SubmitEntry(entry, key, note, expected, snapshot)
+	if success or (reason ~= "pending" and reason ~= "blocked") then callback(success)
+	else
+		local active = FriendNotes.GetAcceptedWrite(uid)
+		pendingWrites[uid] = { uid = uid, entry = entry, key = key, note = note, expected = expected,
+			kind = kind, submittedAt = now, callbacks = { callback },
+			waitingOn = active and active.note ~= note and active or nil }
+	end
+	SchedulePendingCheck()
+end
 
 -- ========================================
 -- Helper: Get streamer-safe display name
@@ -76,7 +304,11 @@ end
 -- ========================================
 -- Helper: Parse FriendGroups note
 -- ========================================
-local function ParseFriendGroupsNote(noteText)
+local function ParseFriendGroupsNote(noteText, friendUID)
+	local NoteSync = BFL:GetModule("NoteSync")
+	if NoteSync and NoteSync.ParseNoteGroups then
+		return NoteSync:ParseNoteGroups(noteText, friendUID)
+	end
 	if not noteText or noteText == "" then
 		return "", {}
 	end
@@ -102,56 +334,64 @@ local function NoteHasGroups(noteText)
 	return noteText:find("#") ~= nil
 end
 
+local function RefreshCurrentRows(snapshot)
+	for _, data in ipairs(friendData) do
+		local current = ReadEntry(data, data.characterName, snapshot)
+		local active = FriendNotes.GetAcceptedWrite(WriteKey(data, data.characterName))
+		if current ~= nil and current ~= data.originalNote then
+			local automatic = data.cleanedNote == ParseFriendGroupsNote(data.originalNote, data.backupKey)
+			local cleaned, groups = ParseFriendGroupsNote(current, data.backupKey)
+			data.originalNote, data.groups, data.hasGroups, data.status = current, groups, #groups > 0, nil
+			if automatic then data.cleanedNote = cleaned end
+		end
+	end
+end
+
 -- ========================================
 -- Scan all BNet friends
 -- ========================================
 function NoteCleanupWizard:ScanFriends()
-	isApplying = false
+	-- Reopening either window must not release the lock on an in-flight write.
+	if isApplying or isRestoring or next(pendingWrites) then return false end
 	friendData = {}
-
-	local numBNetFriends = BNGetNumFriends()
-	for i = 1, numBNetFriends do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-		if accountInfo then
-			local noteText = accountInfo.note or ""
-			local actualNote, groups = ParseFriendGroupsNote(noteText)
-
-			table.insert(friendData, {
-				index = i,
-				accountName = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
-				battleTag = accountInfo.battleTag or "",
-				bnetAccountID = accountInfo.bnetAccountID,
-				originalNote = noteText,
-				cleanedNote = actualNote,
-				groups = groups,
-				hasGroups = #groups > 0,
-				isBNet = true,
-			})
-		end
+	local bnetFriends, bnetComplete, bnetTotal = FriendNotes.GetBNetFriends()
+	local wowFriends, wowComplete, wowTotal = FriendNotes.GetWoWFriends()
+	scanTotal = bnetTotal + wowTotal
+	scanComplete = bnetComplete and wowComplete
+	for _, account in ipairs(bnetFriends) do
+		local uid = FriendNotes.GetBNetUID(account)
+		local noteText = account.note or ""
+		local actualNote, groups = ParseFriendGroupsNote(noteText, uid)
+		local tag = IsText(account.battleTag) and account.battleTag or ""
+		local game = account.gameAccountInfo
+		local characterName = FriendNotes.IsReadableTable(game) and SafeLabel(game.characterName) or L.UNKNOWN
+		friendData[#friendData + 1] = {
+			accountName = SafeLabel(account.accountName, tag ~= "" and tag or characterName),
+			battleTag = tag,
+			identity = FriendNotes.CreateBNetIdentity(account),
+			backupKey = uid,
+			originalNote = noteText,
+			cleanedNote = actualNote,
+			groups = groups,
+			hasGroups = #groups > 0,
+			isBNet = true,
+		}
 	end
-
-	-- Also scan WoW-only friends
-	if BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList() then
-		local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-		for i = 1, numWoWFriends do
-			local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
-			if friendInfo then
-				local noteText = friendInfo.notes or ""
-				local actualNote, groups = ParseFriendGroupsNote(noteText)
-
-				table.insert(friendData, {
-					index = i,
-					accountName = friendInfo.name or "",
-					battleTag = "",
-					characterName = friendInfo.name,
-					originalNote = noteText,
-					cleanedNote = actualNote,
-					groups = groups,
-					hasGroups = #groups > 0,
-					isBNet = false,
-				})
-			end
-		end
+	for _, info in ipairs(wowFriends) do
+		local noteText = info.notes or ""
+		local actualNote, groups = ParseFriendGroupsNote(noteText, "wow_" .. info.name)
+		friendData[#friendData + 1] = {
+			accountName = info.name,
+			battleTag = "",
+			characterName = info.name,
+			guid = not BFL:IsSecret(info.guid) and IsText(info.guid) and info.guid ~= "" and info.guid or nil,
+			backupKey = "wow_" .. info.name,
+			originalNote = noteText,
+			cleanedNote = actualNote,
+			groups = groups,
+			hasGroups = #groups > 0,
+			isBNet = false,
+		}
 	end
 
 	self:ApplyFilter()
@@ -186,41 +426,112 @@ end
 -- Backup notes to DB
 -- ========================================
 function NoteCleanupWizard:BackupNotes()
-	if not BetterFriendlistDB then
-		return
-	end
+	if not BetterFriendlistDB or isApplying or isRestoring then return false, 0, scanTotal end
+	local snapshot = SnapshotNotes()
+	ReconcilePending(snapshot)
+	RefreshCurrentRows(snapshot)
+	scanTotal, scanComplete = snapshot.total, snapshot.complete
 
 	local backup = {}
+	local count = 0
+	local previous = BetterFriendlistDB.noteBackup
 	for _, data in ipairs(friendData) do
-		local key = data.isBNet and data.battleTag or data.characterName
-		if key and key ~= "" then
-			backup[key] = {
-				originalNote = data.originalNote,
-				accountName = data.accountName,
-				battleTag = data.battleTag,
-				isBNet = data.isBNet,
-				timestamp = time(),
-			}
+		local current = ReadEntry(data, data.characterName, snapshot)
+		local key = data.backupKey
+		if current ~= nil and current == data.originalNote and not backup[key] then
+			local protected = protectedBackups[key]
+			if protected and FriendNotes.IsReadableTable(previous) and previous[key] == protected.entry
+				and (current == protected.entry.originalNote
+					or (data.cleanedNote == current and (current == protected.lastApplied or current == protected.lastSubmitted)))
+			then
+				-- Retrying a partial cleanup must not replace its recovery copy with
+				-- notes already cleaned by this same operation.
+				backup[key] = protected.entry
+			else
+				protectedBackups[key] = nil
+				backup[key] = {
+					originalNote = data.originalNote,
+					accountName = data.accountName,
+					battleTag = data.battleTag,
+					isBNet = data.isBNet,
+					identity = data.identity,
+					characterName = data.characterName,
+					guid = data.guid,
+					timestamp = time(),
+				}
+			end
+			count = count + 1
 		end
 	end
 
+	local complete = scanComplete and count == scanTotal
+	-- An unreadable roster must not erase an earlier, recoverable snapshot.
+	if not complete and FriendNotes.IsReadableTable(previous) then
+		for key, entry in pairs(previous) do
+			if IsText(key) and not backup[key] and FriendNotes.IsReadableTable(entry)
+				and IsText(entry.originalNote) and not BFL:IsSecret(entry.isBNet) and type(entry.isBNet) == "boolean"
+			then
+				local canonicalKey
+				if entry.isBNet and IsText(entry.battleTag) and entry.battleTag ~= "" then
+					canonicalKey = "bnet_" .. entry.battleTag
+				elseif not entry.isBNet then
+					canonicalKey = "wow_" .. (IsText(entry.characterName) and entry.characterName or key)
+				end
+				if not canonicalKey or not backup[canonicalKey] then backup[key] = entry end
+			end
+		end
+	end
 	BetterFriendlistDB.noteBackup = backup
-	BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.WIZARD_BACKUP_SUCCESS, #friendData))
+	if PendingCount("restore") == 0 then restoreOperationRows = nil end
+	self:RefreshRows()
+	Report(complete and string.format(L.WIZARD_BACKUP_SUCCESS, count)
+		or string.format(L.WIZARD_BACKUP_PARTIAL, count, scanTotal))
+	return complete, count, scanTotal
 end
 
 -- ========================================
 -- Apply cleaned notes
 -- ========================================
 function NoteCleanupWizard:ApplyCleanedNotes()
-	if isApplying then
-		return
+	if isApplying or isRestoring then return false end
+	if IsSyncEnabled() then
+		Report(L.WIZARD_SYNC_ENABLED)
+		return false
 	end
+	if PendingCount("restore") > 0 then ReportPending(PendingCount("restore")); return false end
+	local snapshot = SnapshotNotes()
+	ReconcilePending(snapshot)
+	local backup = BetterFriendlistDB and BetterFriendlistDB.noteBackup
 
 	-- Collect entries that need updating and mark as pending
 	local toUpdate = {}
 	for _, data in ipairs(friendData) do
-		if data.originalNote ~= data.cleanedNote then
-			data.status = "pending"
+		local current = ReadEntry(data, data.characterName, snapshot)
+		-- A delayed acknowledgement may arrive between batches or while the
+		-- window is idle. Already-applied changes need no new backup or write.
+		if current == data.cleanedNote and not active then
+			data.originalNote = current
+			data.groups = select(2, ParseFriendGroupsNote(current, data.backupKey))
+			data.hasGroups = #data.groups > 0
+		end
+		if data.originalNote ~= data.cleanedNote or (active and active.note ~= data.cleanedNote) then
+			local saved = FriendNotes.IsReadableTable(backup) and backup[data.backupKey]
+			local protected = protectedBackups[data.backupKey]
+			local pending = pendingWrites[WriteKey(data, data.characterName)]
+			local NoteSync = BFL:GetModule("NoteSync")
+			if BetterFriendlistDB.syncGroupsToNote and NoteSync and NoteSync.waitingForWizard and not pending then
+				ReportPending(PendingCount()); return false
+			end
+			if pending and pending.note ~= data.cleanedNote then ReportPending(PendingCount()); return false end
+			if not FriendNotes.IsReadableTable(saved) or not IsText(saved.originalNote)
+				or (saved.originalNote ~= data.originalNote and not (protected and protected.entry == saved and protected.lastApplied == data.originalNote))
+				or current ~= data.originalNote or ReadEntry(saved, data.characterName, snapshot) ~= data.originalNote
+			then
+				Report(L.WIZARD_BACKUP_REQUIRED)
+				return false
+			end
+			protectedBackups[data.backupKey] = protected and protected.entry == saved and protected or { entry = saved }
+			data.status = "queued"
 			table.insert(toUpdate, data)
 		else
 			data.status = nil
@@ -233,55 +544,61 @@ function NoteCleanupWizard:ApplyCleanedNotes()
 	end
 
 	isApplying = true
+	operationVersion = operationVersion + 1
+	local version = operationVersion
 	self:RefreshRows()
 
 	local currentIndex = 0
 	local successCount = 0
 	local errorCount = 0
+	local remaining, dispatchFinished, reported = #toUpdate, false, false
+	local function ReportFinished()
+		if not dispatchFinished or remaining > 0 or reported then return end
+		reported = true
+		Report(errorCount > 0 and string.format(L.WIZARD_APPLY_FAILED, successCount, errorCount)
+			or string.format(L.WIZARD_APPLY_SUCCESS, successCount))
+	end
 
 	local function ProcessNext()
-		if not isApplying then
+		if not isApplying or version ~= operationVersion then
 			return
 		end
 
 		currentIndex = currentIndex + 1
 		if currentIndex > #toUpdate then
 			isApplying = false
+			dispatchFinished = true
 			NoteCleanupWizard:RefreshRows()
-			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.WIZARD_APPLY_SUCCESS, successCount))
-			-- Re-apply Streamer Mode header (Blizzard resets it on each BNSetFriendNote)
-			if BFL.StreamerMode then
-				BFL.StreamerMode:UpdateState()
-			end
+			if remaining > 0 then ReportPending(remaining) else ReportFinished() end
 			return
 		end
 
 		local data = toUpdate[currentIndex]
-		local success, err = pcall(function()
-			if data.isBNet and data.bnetAccountID then
-				BNSetFriendNote(data.bnetAccountID, data.cleanedNote)
-			elseif not data.isBNet and data.characterName then
-				BFL.SetFriendNotes(data.characterName, data.cleanedNote)
+		data.status = "pending"
+		local target = data.cleanedNote
+		protectedBackups[data.backupKey].lastSubmitted = target
+		local completed = false
+		WriteEntry(data, data.characterName, target, data.originalNote, "cleanup", function(success)
+			if version ~= operationVersion then return end
+			completed = true
+			if success then
+				data.status = "success"
+				data.originalNote = target
+				data.groups = select(2, ParseFriendGroupsNote(target, data.backupKey))
+				data.hasGroups = #data.groups > 0
+				local protected = protectedBackups[data.backupKey]
+				if protected then protected.lastApplied = target end
+				successCount = successCount + 1
+			else
+				data.status = "error"
+				errorCount = errorCount + 1
 			end
+			remaining = remaining - 1
+			NoteCleanupWizard:RefreshRows()
+			ReportFinished()
 		end)
-
-		if success then
-			data.status = "success"
-			data.originalNote = data.cleanedNote
-			successCount = successCount + 1
-		else
-			data.status = "error"
-			errorCount = errorCount + 1
-			BFL:DebugPrint(
-				"|cffff0000BetterFriendlist:|r Error: "
-					.. BFL:SafeToString(data.accountName or "?")
-					.. " - "
-					.. tostring(err)
-			)
-		end
-
-		NoteCleanupWizard:RefreshRows()
-		C_Timer.After(0.05, ProcessNext)
+		if not completed then NoteCleanupWizard:RefreshRows() end
+		C_Timer.After(WRITE_INTERVAL, ProcessNext)
 	end
 
 	-- Start processing after brief delay to show pending state
@@ -373,7 +690,9 @@ end
 -- ========================================
 -- Refresh visible rows
 -- ========================================
-function NoteCleanupWizard:RefreshRows()
+function NoteCleanupWizard:RefreshRows(snapshot)
+	if reconciling then mainRefreshPending = true; return end
+	RefreshButtons()
 	if not wizardFrame then
 		return
 	end
@@ -422,7 +741,7 @@ function NoteCleanupWizard:RefreshRows()
 			else
 				row.bg:SetColorTexture(0.25, 0.04, 0.04, 0.4)
 			end
-		elseif data.status == "pending" then
+		elseif data.status == "pending" or data.status == "queued" then
 			if i % 2 == 0 then
 				row.bg:SetColorTexture(0.30, 0.25, 0.05, 0.6)
 			else
@@ -443,7 +762,7 @@ function NoteCleanupWizard:RefreshRows()
 		end
 
 		-- Status icon
-		if data.status == "pending" then
+		if data.status == "pending" or data.status == "queued" then
 			row.statusIcon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Waiting")
 			row.statusIcon:Show()
 		elseif data.status == "success" then
@@ -464,7 +783,7 @@ function NoteCleanupWizard:RefreshRows()
 
 		-- Color original note: highlight the #groups part in orange
 		if data.hasGroups then
-			local actualNote, _ = ParseFriendGroupsNote(data.originalNote)
+			local actualNote, _ = ParseFriendGroupsNote(data.originalNote, data.backupKey)
 			local groupPart = data.originalNote:sub(#actualNote + 1)
 			row.noteText:SetText(actualNote .. "|cffff8800" .. groupPart .. "|r")
 		else
@@ -472,6 +791,8 @@ function NoteCleanupWizard:RefreshRows()
 		end
 
 		-- Set cleaned note input
+		row.cleanedInput:SetMaxLetters(data.isBNet and 127 or 48)
+		row.cleanedInput:SetCountInvisibleLetters(true)
 		row.cleanedInput:SetText(data.cleanedNote)
 
 		-- Store reference to data for the EditBox callback
@@ -492,31 +813,12 @@ function NoteCleanupWizard:RefreshRows()
 	-- Update count label
 	if wizardFrame.countLabel then
 		-- Check if apply progress should be shown
-		local pendingCount = 0
-		local successCount = 0
-		local errorCount = 0
-		for _, data in ipairs(friendData) do
-			if data.status == "pending" then
-				pendingCount = pendingCount + 1
-			end
-			if data.status == "success" then
-				successCount = successCount + 1
-			end
-			if data.status == "error" then
-				errorCount = errorCount + 1
-			end
-		end
-
-		local totalStatusCount = pendingCount + successCount + errorCount
-
-		if totalStatusCount > 0 then
+		local status = self:GetOperationStatus("cleanup")
+		if status.total > 0 then
 			wizardFrame.countLabel:SetText(
 				string.format(
-					L.WIZARD_APPLY_PROGRESS_FMT,
-					successCount + errorCount,
-					totalStatusCount,
-					successCount,
-					errorCount
+					L.WIZARD_OPERATION_STATUS,
+					status.confirmed, status.total, status.queued, status.waiting, status.unconfirmed
 				)
 			)
 		else
@@ -540,6 +842,17 @@ end
 -- ========================================
 -- Create the Wizard Frame
 -- ========================================
+local function AddStopButton(frame, bottomBar, countLabel)
+	local button = CreateFrame("Button", nil, bottomBar, "UIPanelButtonTemplate")
+	button:SetSize(80, 22)
+	button:SetPoint("RIGHT", bottomBar, "RIGHT", -2, 0)
+	button:SetText(L.WIZARD_STOP_BTN)
+	button:SetScript("OnClick", function() NoteCleanupWizard:Stop() end)
+	button:Hide()
+	frame.stopButton = button
+	countLabel:SetPoint("RIGHT", button, "LEFT", -8, 0)
+end
+
 function NoteCleanupWizard:CreateWizardFrame()
 	if wizardFrame then
 		return wizardFrame
@@ -631,9 +944,9 @@ function NoteCleanupWizard:CreateWizardFrame()
 	end
 
 	backupBtn:SetScript("OnClick", function()
-		NoteCleanupWizard:BackupNotes()
+		local complete = NoteCleanupWizard:BackupNotes()
 		-- Visual feedback
-		backupBtn:SetText("|cff00ff00" .. L.WIZARD_BACKUP_DONE .. "|r")
+		if complete then backupBtn:SetText("|cff00ff00" .. L.WIZARD_BACKUP_DONE .. "|r") end
 		C_Timer.After(2, function()
 			if backupBtn and backupBtn:IsShown() then
 				backupBtn:SetText(L.WIZARD_BACKUP_BTN)
@@ -787,6 +1100,7 @@ function NoteCleanupWizard:CreateWizardFrame()
 	countLabel:SetPoint("LEFT", bottomBar, "LEFT", 4, 0)
 	countLabel:SetJustifyH("LEFT")
 	frame.countLabel = countLabel
+	AddStopButton(frame, bottomBar, countLabel)
 
 	wizardFrame = frame
 	frame:Hide()
@@ -797,56 +1111,37 @@ end
 -- ========================================
 -- Get backup data as sorted array
 -- ========================================
-function NoteCleanupWizard:GetBackupData()
+function NoteCleanupWizard:GetBackupData(snapshot)
 	local data = {}
-	if not BetterFriendlistDB or not BetterFriendlistDB.noteBackup then
-		return data
-	end
+	local backup = BetterFriendlistDB and BetterFriendlistDB.noteBackup
+	if not FriendNotes.IsReadableTable(backup) then return data end
+	if not snapshot then snapshot = SnapshotNotes(); ReconcilePending(snapshot) end
 
-	for key, entry in pairs(BetterFriendlistDB.noteBackup) do
-		-- Try to find current note for this friend
-		local currentNote = ""
-		if entry.isBNet and entry.battleTag and entry.battleTag ~= "" then
-			local numBNetFriends = BNGetNumFriends()
-			for i = 1, numBNetFriends do
-				local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-				if accountInfo and accountInfo.battleTag == entry.battleTag then
-					currentNote = accountInfo.note or ""
-					break
-				end
-			end
-		elseif not entry.isBNet then
-			if BFL.CanUseWoWFriendList and BFL.CanUseWoWFriendList() then
-				local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-				for i = 1, numWoWFriends do
-					local friendInfo = BFL.GetWoWFriendInfoByIndex(i)
-					if friendInfo and friendInfo.name == key then
-						currentNote = friendInfo.notes or ""
-						break
-					end
-				end
-			end
+	for key, entry in pairs(backup) do
+		if IsText(key) and FriendNotes.IsReadableTable(entry) and not BFL:IsSecret(entry.isBNet)
+			and type(entry.isBNet) == "boolean" and IsText(entry.originalNote)
+		then
+			local current = ReadEntry(entry, key, snapshot)
+			local tag = IsText(entry.battleTag) and entry.battleTag or ""
+			local timestamp = not BFL:IsSecret(entry.timestamp) and type(entry.timestamp) == "number" and entry.timestamp or 0
+			local operation = restoreOperationRows and restoreOperationRows[key]
+			data[#data + 1] = {
+				key = key,
+				backupEntry = entry,
+				accountName = SafeLabel(entry.accountName, tag ~= "" and tag or SafeLabel(entry.characterName)),
+				battleTag = tag,
+				characterName = IsText(entry.characterName) and entry.characterName or nil,
+				backedUpNote = entry.originalNote,
+				currentNote = current or L.WIZARD_NOTE_UNAVAILABLE,
+				available = current ~= nil,
+				isBNet = entry.isBNet,
+				timestamp = timestamp,
+				noteChanged = current == nil or current ~= entry.originalNote or FriendNotes.GetAcceptedWrite(WriteKey(entry, key)) ~= nil,
+				status = pendingWrites[WriteKey(entry, key)] and "pending" or (operation and operation.status),
+			}
 		end
-
-		table.insert(data, {
-			key = key,
-			accountName = BFL:GetSafeAccountName(entry.accountName, entry.battleTag),
-			battleTag = entry.battleTag or "",
-			backedUpNote = entry.originalNote or "",
-			currentNote = currentNote,
-			isBNet = entry.isBNet,
-			timestamp = entry.timestamp or 0,
-			noteChanged = currentNote ~= (entry.originalNote or ""),
-		})
 	end
-
-	-- Sort alphabetically by account name
-	table.sort(data, function(a, b)
-		local nameA = BFL:GetSafeAccountName(a.accountName, a.battleTag)
-		local nameB = BFL:GetSafeAccountName(b.accountName, b.battleTag)
-		return nameA:lower() < nameB:lower()
-	end)
-
+	table.sort(data, function(a, b) return a.accountName:lower() < b.accountName:lower() end)
 	return data
 end
 
@@ -880,19 +1175,29 @@ end
 -- Restore notes from backup (sequential with status icons)
 -- ========================================
 function NoteCleanupWizard:RestoreBackup()
-	if isRestoring then
-		return
+	if isRestoring or isApplying then return false end
+	if IsSyncEnabled() then
+		Report(L.WIZARD_SYNC_ENABLED)
+		return false
 	end
+	ReconcilePending()
+	if PendingCount("cleanup") > 0 then ReportPending(PendingCount("cleanup")); return false end
 
 	if not BetterFriendlistDB or not BetterFriendlistDB.noteBackup then
 		return
 	end
+	self:ApplyBackupFilter()
 
 	-- Collect entries that need restoring and mark as pending
 	local toRestore = {}
+	if PendingCount("restore") == 0 then restoreOperationRows = {} end
 	for _, data in ipairs(backupFilteredData) do
 		if data.noteChanged then
-			data.status = "pending"
+			data.status = "queued"
+			local existing = restoreOperationRows[data.key]
+			if not existing or (existing.status ~= "pending" and existing.status ~= "queued") then
+				restoreOperationRows[data.key] = data
+			end
 			table.insert(toRestore, data)
 		else
 			data.status = nil
@@ -905,26 +1210,32 @@ function NoteCleanupWizard:RestoreBackup()
 	end
 
 	isRestoring = true
+	operationVersion = operationVersion + 1
+	local version = operationVersion
 	self:RefreshBackupRows()
 
 	local currentIndex = 0
 	local successCount = 0
 	local errorCount = 0
+	local remaining, dispatchFinished, reported = #toRestore, false, false
+	local function ReportFinished()
+		if not dispatchFinished or remaining > 0 or reported then return end
+		reported = true
+		Report(errorCount > 0 and string.format(L.WIZARD_RESTORE_FAILED, successCount, errorCount)
+			or string.format(L.WIZARD_RESTORE_SUCCESS, successCount))
+	end
 
 	local function ProcessNext()
-		if not isRestoring then
+		if not isRestoring or version ~= operationVersion then
 			return
 		end
 
 		currentIndex = currentIndex + 1
 		if currentIndex > #toRestore then
 			isRestoring = false
+			dispatchFinished = true
 			NoteCleanupWizard:RefreshBackupRows()
-			BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. string.format(L.WIZARD_RESTORE_SUCCESS, successCount))
-			-- Re-apply Streamer Mode header (Blizzard resets it on each BNSetFriendNote)
-			if BFL.StreamerMode then
-				BFL.StreamerMode:UpdateState()
-			end
+			if remaining > 0 then ReportPending(remaining) else ReportFinished() end
 			-- Refresh main wizard if open
 			C_Timer.After(0.3, function()
 				if wizardFrame and wizardFrame:IsShown() then
@@ -935,40 +1246,44 @@ function NoteCleanupWizard:RestoreBackup()
 		end
 
 		local data = toRestore[currentIndex]
-		local backupEntry = BetterFriendlistDB.noteBackup[data.key]
-		local success, err = pcall(function()
-			if data.isBNet and data.battleTag and data.battleTag ~= "" then
-				local numBNetFriends = BNGetNumFriends()
-				for i = 1, numBNetFriends do
-					local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-					if accountInfo and accountInfo.battleTag == data.battleTag then
-						BNSetFriendNote(accountInfo.bnetAccountID, data.backedUpNote or "")
-						break
-					end
-				end
-			elseif not data.isBNet then
-				BFL.SetFriendNotes(data.key, data.backedUpNote or "")
+		data.status = "pending"
+		local completed = false
+		local function Complete(success)
+			if version ~= operationVersion then return end
+			completed = true
+			if success then
+				data.status = "success"
+				data.currentNote = data.backedUpNote
+				data.noteChanged = false
+				successCount = successCount + 1
+			else
+				data.status = "error"
+				errorCount = errorCount + 1
 			end
-		end)
-
-		if success then
-			data.status = "success"
-			data.currentNote = data.backedUpNote
-			data.noteChanged = false
-			successCount = successCount + 1
-		else
-			data.status = "error"
-			errorCount = errorCount + 1
-			BFL:DebugPrint(
-				"|cffff0000BetterFriendlist:|r Error: "
-					.. BFL:SafeToString(data.accountName or "?")
-					.. " - "
-					.. tostring(err)
-			)
+			remaining = remaining - 1
+			-- Filtering/reopening may replace the visible row objects while an
+			-- acknowledgement is in flight; update the matching current row too.
+			local operation = restoreOperationRows and restoreOperationRows[data.key]
+			if operation then
+				operation.status = data.status
+				if success then operation.currentNote, operation.noteChanged = data.backedUpNote, false end
+			end
+			for _, visible in ipairs(backupFilteredData) do
+				if visible.key == data.key then
+					visible.status = data.status
+					if success then visible.currentNote, visible.noteChanged = data.backedUpNote, false end
+				end
+			end
+			NoteCleanupWizard:RefreshBackupRows()
+			ReportFinished()
 		end
-
-		NoteCleanupWizard:RefreshBackupRows()
-		C_Timer.After(0.05, ProcessNext)
+		if not data.available then
+			Complete(false)
+		else
+			WriteEntry(data.backupEntry, data.key, data.backedUpNote, data.currentNote, "restore", Complete)
+		end
+		if not completed then NoteCleanupWizard:RefreshBackupRows() end
+		C_Timer.After(WRITE_INTERVAL, ProcessNext)
 	end
 
 	-- Start processing after brief delay to show pending state
@@ -1054,7 +1369,9 @@ end
 -- ========================================
 -- Refresh backup viewer rows
 -- ========================================
-function NoteCleanupWizard:RefreshBackupRows()
+function NoteCleanupWizard:RefreshBackupRows(snapshot)
+	if reconciling then backupRefreshPending = true; return end
+	RefreshButtons()
 	if not backupViewerFrame then
 		return
 	end
@@ -1103,7 +1420,7 @@ function NoteCleanupWizard:RefreshBackupRows()
 			else
 				row.bg:SetColorTexture(0.25, 0.04, 0.04, 0.4)
 			end
-		elseif data.status == "pending" then
+		elseif data.status == "pending" or data.status == "queued" then
 			if i % 2 == 0 then
 				row.bg:SetColorTexture(0.30, 0.25, 0.05, 0.6)
 			else
@@ -1124,7 +1441,7 @@ function NoteCleanupWizard:RefreshBackupRows()
 		end
 
 		-- Status icon
-		if data.status == "pending" then
+		if data.status == "pending" or data.status == "queued" then
 			row.statusIcon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Waiting")
 			row.statusIcon:Show()
 		elseif data.status == "success" then
@@ -1161,7 +1478,7 @@ function NoteCleanupWizard:RefreshBackupRows()
 	-- Update count label
 	if backupViewerFrame.countLabel then
 		local totalChanged = 0
-		local allData = self:GetBackupData()
+		local allData = self:GetBackupData(snapshot)
 		for _, entry in ipairs(allData) do
 			if entry.noteChanged then
 				totalChanged = totalChanged + 1
@@ -1170,12 +1487,8 @@ function NoteCleanupWizard:RefreshBackupRows()
 
 		-- Format the timestamp from most recent backup entry
 		local latestTimestamp = 0
-		if BetterFriendlistDB and BetterFriendlistDB.noteBackup then
-			for _, entry in pairs(BetterFriendlistDB.noteBackup) do
-				if entry.timestamp and entry.timestamp > latestTimestamp then
-					latestTimestamp = entry.timestamp
-				end
-			end
+		for _, entry in ipairs(allData) do
+			if entry.timestamp > latestTimestamp then latestTimestamp = entry.timestamp end
 		end
 
 		local timeStr = ""
@@ -1184,24 +1497,10 @@ function NoteCleanupWizard:RefreshBackupRows()
 		end
 
 		-- Check if restore progress should be shown
-		local pendingCount = 0
-		local sCount = 0
-		local eCount = 0
-		for _, entry in ipairs(backupFilteredData) do
-			if entry.status == "pending" then
-				pendingCount = pendingCount + 1
-			elseif entry.status == "success" then
-				sCount = sCount + 1
-			elseif entry.status == "error" then
-				eCount = eCount + 1
-			end
-		end
-
-		local totalStatusCount = pendingCount + sCount + eCount
-
-		if totalStatusCount > 0 then
+		local status = self:GetOperationStatus("restore")
+		if status.total > 0 then
 			backupViewerFrame.countLabel:SetText(
-				string.format(L.WIZARD_APPLY_PROGRESS_FMT, sCount + eCount, totalStatusCount, sCount, eCount)
+				string.format(L.WIZARD_OPERATION_STATUS, status.confirmed, status.total, status.queued, status.waiting, status.unconfirmed)
 			)
 		else
 			backupViewerFrame.countLabel:SetText(
@@ -1306,9 +1605,9 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	backupBtn:SetScript("OnClick", function()
 		-- Need to scan friends first to have data for backup
 		NoteCleanupWizard:ScanFriends()
-		NoteCleanupWizard:BackupNotes()
+		local complete = NoteCleanupWizard:BackupNotes()
 		-- Visual feedback
-		backupBtn:SetText("|cff00ff00" .. L.WIZARD_BACKUP_DONE .. "|r")
+		if complete then backupBtn:SetText("|cff00ff00" .. L.WIZARD_BACKUP_DONE .. "|r") end
 		C_Timer.After(2, function()
 			if backupBtn and backupBtn:IsShown() then
 				backupBtn:SetText(L.WIZARD_BACKUP_BTN)
@@ -1442,6 +1741,7 @@ function NoteCleanupWizard:CreateBackupViewerFrame()
 	countLabel:SetPoint("LEFT", bottomBar, "LEFT", 4, 0)
 	countLabel:SetJustifyH("LEFT")
 	frame.countLabel = countLabel
+	AddStopButton(frame, bottomBar, countLabel)
 
 	backupViewerFrame = frame
 	frame:Hide()
@@ -1453,7 +1753,9 @@ end
 -- Show the Backup Viewer
 -- ========================================
 function NoteCleanupWizard:ShowBackupViewer()
-	if not BetterFriendlistDB or not BetterFriendlistDB.noteBackup or not next(BetterFriendlistDB.noteBackup) then
+	if not BetterFriendlistDB or not FriendNotes.IsReadableTable(BetterFriendlistDB.noteBackup)
+		or not next(BetterFriendlistDB.noteBackup)
+	then
 		-- No backup available - show message
 		StaticPopupDialogs["BETTERFRIENDLIST_NO_BACKUP"] = {
 			text = L.WIZARD_NO_BACKUP,

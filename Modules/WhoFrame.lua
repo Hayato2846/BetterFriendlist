@@ -449,13 +449,55 @@ function WhoFrame:IsAvailable()
 		and type(C_FriendList.SendWho) == "function"
 end
 
--- Blizzard's legacy FriendsFrame and Forever's LFG Who surface open their
--- complete parent panels when they receive WHO_LIST_UPDATE while the new
--- Social UI is disabled. BFL owns its own result surface, so isolate only
--- those native listeners for BFL-owned requests. Event registration is C-side
--- state; no Blizzard scripts, fields, mixins, or protected functions are
--- replaced.
+-- EventRegistrations is a forbidden aspect on current clients. Never try to
+-- clear that aspect or change native scripts/visibility if access is denied.
+local function CanAccessNativeWhoEvents(frame)
+	if BFL.IsSecret and BFL:IsSecret(frame) then return false end
+	local ok, allowed = pcall(function()
+		if type(issecrettable) == "function" then
+			local secret = issecrettable(frame)
+			if (BFL.IsSecret and BFL:IsSecret(secret)) or secret ~= false then return false end
+		end
+		if type(frame.IsForbidden) == "function" then
+			local forbidden = frame:IsForbidden()
+			if (BFL.IsSecret and BFL:IsSecret(forbidden)) or forbidden ~= false then return false end
+		end
+		local aspect = Enum and Enum.ForbiddenAspect and Enum.ForbiddenAspect.EventRegistrations
+		if aspect and type(frame.HasAnyForbiddenAspects) == "function" then
+			local forbidden = frame:HasAnyForbiddenAspects(aspect)
+			if (BFL.IsSecret and BFL:IsSecret(forbidden)) or forbidden ~= false then return false end
+		end
+		return true
+	end)
+	return ok and allowed == true
+end
+
+function WhoFrame:ShouldOwnNativeWhoRequests()
+	if BFL.AllowBlizzardFriendsFrame or not self:IsAvailable() then return false end
+	if Kiosk and type(Kiosk.IsEnabled) == "function" and Kiosk.IsEnabled() then return false end
+	return not BFL.ShouldInterceptNativeWhoPanel or BFL:ShouldInterceptNativeWhoPanel()
+end
+
+function WhoFrame:UsesPersistentNativeWhoIsolation()
+	-- Forever's native Who view opens LFGParentFrame on every result, including
+	-- late results after a timeout. Its listener must stay isolated while BFL
+	-- replaces Who. Listing/Browse and native OnShow/OnHide scripts stay intact.
+	return BFL.IsForever == true and self:ShouldOwnNativeWhoRequests()
+end
+
+function WhoFrame:ShowWhoResults()
+	if not self:ShouldOwnNativeWhoRequests() then return false end
+	-- This path only opens addon UI; HandleFriendsFrameRedirect would also hide
+	-- a native FriendsFrame that happened to be visible in the secure caller.
+	if BFL.ApplyBetterFriendsFrameTarget then
+		BFL:ApplyBetterFriendsFrameTarget(2)
+		return true
+	end
+	return false
+end
+
 function WhoFrame:IsNativeWhoAutoOpenActive()
+	if self:UsesPersistentNativeWhoIsolation() then return true end
 	local socialUI = self._testSocialUIAPI or C_SocialUI
 	if type(socialUI) ~= "table" or type(socialUI.IsSystemEnabled) ~= "function" then
 		return false
@@ -488,11 +530,12 @@ function WhoFrame:SuspendNativeWhoListUpdates(nativeWhoFrame)
 	for _, frame in ipairs(frames) do
 		if frame
 			and not self.suspendedNativeWhoListFrameSet[frame]
+			and CanAccessNativeWhoEvents(frame)
 			and type(frame.IsEventRegistered) == "function"
 			and type(frame.UnregisterEvent) == "function"
 		then
 			local ok, isRegistered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
-			if ok and isRegistered == true then
+			if ok and not (BFL.IsSecret and BFL:IsSecret(isRegistered)) and isRegistered == true then
 				ok = pcall(frame.UnregisterEvent, frame, WHO_LIST_UPDATE_EVENT)
 				if ok then
 					self.suspendedNativeWhoListFrames[#self.suspendedNativeWhoListFrames + 1] = frame
@@ -516,16 +559,32 @@ function WhoFrame:RestoreNativeWhoListUpdates()
 
 	local restoredAny = false
 	for _, frame in ipairs(frames) do
-		if frame and type(frame.RegisterEvent) == "function" then
+		local restored = false
+		if frame and CanAccessNativeWhoEvents(frame) and type(frame.RegisterEvent) == "function" then
 			local isRegistered = false
 			if type(frame.IsEventRegistered) == "function" then
 				local ok, registered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
-				isRegistered = ok and registered == true
+				isRegistered = ok and not (BFL.IsSecret and BFL:IsSecret(registered)) and registered == true
 			end
 
-			if isRegistered or pcall(frame.RegisterEvent, frame, WHO_LIST_UPDATE_EVENT) then
-				restoredAny = true
+			if not isRegistered then
+				local ok = pcall(frame.RegisterEvent, frame, WHO_LIST_UPDATE_EVENT)
+				if ok and type(frame.IsEventRegistered) == "function" then
+					local readOK, registered = pcall(frame.IsEventRegistered, frame, WHO_LIST_UPDATE_EVENT)
+					isRegistered = readOK and not (BFL.IsSecret and BFL:IsSecret(registered)) and registered == true
+				end
 			end
+			if isRegistered then
+				restoredAny = true
+				restored = true
+			end
+		end
+		if not restored then
+			-- Keep the original registration for a later permitted restore.
+			self.suspendedNativeWhoListFrames = self.suspendedNativeWhoListFrames or {}
+			self.suspendedNativeWhoListFrameSet = self.suspendedNativeWhoListFrameSet or {}
+			self.suspendedNativeWhoListFrames[#self.suspendedNativeWhoListFrames + 1] = frame
+			self.suspendedNativeWhoListFrameSet[frame] = true
 		end
 	end
 
@@ -533,17 +592,80 @@ function WhoFrame:RestoreNativeWhoListUpdates()
 end
 
 function WhoFrame:OnNativeWhoListAddonLoaded(addonName, nativeWhoFrame)
-	if addonName ~= FOREVER_GROUP_FINDER_ADDON or not self.whoPending then
+	if (addonName ~= FOREVER_GROUP_FINDER_ADDON and addonName ~= "Blizzard_FriendsFrame")
+		or (not self.whoPending and not self:UsesPersistentNativeWhoIsolation())
+	then
 		return false
 	end
 
 	return self:SuspendNativeWhoListUpdates(nativeWhoFrame)
 end
 
+function WhoFrame:ReleaseNativeWhoRequest(requestGuard)
+	if not requestGuard or self.nativeWhoRequestGuard ~= requestGuard then
+		return false
+	end
+	self.nativeWhoRequestGuard = nil
+	self.whoPending = false
+	if self.whoTimeoutTimer then
+		self.whoTimeoutTimer:Cancel()
+		self.whoTimeoutTimer = nil
+	end
+	if not self:UsesPersistentNativeWhoIsolation() then self:RestoreNativeWhoListUpdates() end
+	self:SetLoadingSpinnerShown(nil, false)
+	return true
+end
+
+function WhoFrame:OnNativeWhoRequestSent()
+	if self.nativeWhoSendInProgress then
+		return false
+	end
+	if not self:ShouldOwnNativeWhoRequests() then
+		self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
+		self:RestoreNativeWhoListUpdates()
+		return false
+	end
+	if not BFL.IsForever then
+		return self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
+	end
+	-- Native /who, player-link/context actions and LFG-Who widgets share this
+	-- API. Observe their completed send without reading secret arguments,
+	-- resending or replacing the restricted native function. Opening BFL Who
+	-- keeps its existing XML OnShow routing; the observer adds no routing call.
+	-- The post-hook cannot tell whether WHO_LIST_UPDATE already fired inside
+	-- the native call. Do not invent an outstanding request/timeout here. Show
+	-- the shared results now and let subsequent WHO_LIST_UPDATE refresh them.
+	self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
+	self.lastWhoSendTime = GetTime()
+	self:StartRefreshButtonCooldown()
+	self:StartBuilderSearchButtonCooldown()
+	self:SuspendNativeWhoListUpdates()
+	return self:ShowWhoResults()
+end
+
+function WhoFrame:InstallNativeWhoRequestObserver()
+	if self.nativeWhoSendObserverInstalled then
+		return true
+	end
+	if type(hooksecurefunc) ~= "function"
+		or type(C_FriendList) ~= "table"
+		or type(C_FriendList.SendWho) ~= "function"
+	then
+		return false
+	end
+	hooksecurefunc(C_FriendList, "SendWho", function()
+		self:OnNativeWhoRequestSent()
+	end)
+	self.nativeWhoSendObserverInstalled = true
+	return true
+end
+
 function WhoFrame:Initialize()
 	if not self:IsAvailable() then
 		return
 	end
+	self:InstallNativeWhoRequestObserver()
+	if self:UsesPersistentNativeWhoIsolation() then self:SuspendNativeWhoListUpdates() end
 	-- Register event callback for WHO list updates
 	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
 		self:OnWhoListUpdate(...)
@@ -1172,9 +1294,9 @@ function WhoFrame:OnWhoListUpdate(...)
 	-- Restore after this event dispatch has completely unwound. Re-registering
 	-- immediately would let the native frame receive the same BFL-owned result.
 	local suspendedFrames = self.suspendedNativeWhoListFrames
-	if suspendedFrames then
+	if suspendedFrames and not self:UsesPersistentNativeWhoIsolation() then
 		C_Timer.After(0, function()
-			if self.suspendedNativeWhoListFrames == suspendedFrames then
+			if self.suspendedNativeWhoListFrames == suspendedFrames and not self:UsesPersistentNativeWhoIsolation() then
 				self:RestoreNativeWhoListUpdates()
 			end
 		end)
@@ -1896,6 +2018,24 @@ function WhoFrame:IsOnCooldown()
 	return self.lastWhoSendTime and (GetTime() - self.lastWhoSendTime < WHO_COOLDOWN)
 end
 
+function WhoFrame:BeginWhoRequest()
+	self.lastWhoSendTime = GetTime()
+	self.whoPending = true
+	local requestGuard = {}
+	self.nativeWhoRequestGuard = requestGuard
+	self:StartRefreshButtonCooldown()
+	self:StartBuilderSearchButtonCooldown()
+	if self.whoTimeoutTimer then self.whoTimeoutTimer:Cancel() end
+	self.whoTimeoutTimer = C_Timer.NewTimer(WHO_TIMEOUT, function()
+		if self:ReleaseNativeWhoRequest(requestGuard) then self:ShowThrottleHint() end
+	end)
+	self:ShowPendingState()
+	self:SetSelectedButton(nil)
+	if not self:UsesPersistentNativeWhoIsolation() then self:RestoreNativeWhoListUpdates() end
+	self:SuspendNativeWhoListUpdates()
+	return requestGuard
+end
+
 -- Send a Who request through BFL's own UI. Forever deliberately uses the
 -- legacy two-argument text query because its structured payload is restricted.
 function WhoFrame:SendWhoRequest(text, origin, filters)
@@ -1935,44 +2075,23 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 		text = 'z-"' .. zone .. '" ' .. minLevel .. "-" .. maxLevel
 	end
 
-	-- Record send time and set pending state
-	self.lastWhoSendTime = now
-	self.whoPending = true
+	local requestGuard = self:BeginWhoRequest()
 
-	-- Start button cooldown feedback
-	self:StartRefreshButtonCooldown()
-	self:StartBuilderSearchButtonCooldown()
-
-	-- Start timeout timer (server may silently drop the request)
-	if self.whoTimeoutTimer then
-		self.whoTimeoutTimer:Cancel()
-	end
-	self.whoTimeoutTimer = C_Timer.NewTimer(WHO_TIMEOUT, function()
-		self.whoTimeoutTimer = nil
-		if self.whoPending then
-			self.whoPending = false
-			self.nativeWhoRequestGuard = nil
-			self:RestoreNativeWhoListUpdates()
-			self:ShowThrottleHint()
-		end
+	-- The observer runs after the native call, within this same hardware event.
+	-- Always reset the addon-owned marker, including rejected/error dispatches.
+	local wasSending = self.nativeWhoSendInProgress
+	self.nativeWhoSendInProgress = true
+	local ok, sent = pcall(function()
+		-- Keep routing and the send together, before the hardware event unwinds.
+		C_FriendList.SetWhoToUi(true)
+		return self:DispatchWhoRequest(text, origin, filters)
 	end)
-
-	-- Show pending state in totals area
-	self:ShowPendingState()
-
-	-- Clear selection from previous search results
-	self:SetSelectedButton(nil)
-
-	-- Prevent native listeners from opening FriendsFrame or LFGParentFrame for
-	-- a request whose result is owned and rendered by BFL.
-	self:RestoreNativeWhoListUpdates()
-	self.nativeWhoRequestGuard = {}
-	self:SuspendNativeWhoListUpdates()
-
-	-- CRITICAL: Set Who routing IMMEDIATELY before each SendWho call
-	C_FriendList.SetWhoToUi(true)
-
-	local sent = self:DispatchWhoRequest(text, origin, filters)
+	self.nativeWhoSendInProgress = wasSending
+	if not ok or not sent then
+		self:ReleaseNativeWhoRequest(requestGuard)
+		if not ok then error(sent, 0) end
+		return false
+	end
 	local searches = BFL:GetModule("WhoSearches")
 	if sent and searches then searches:Record(text) end
 	return sent

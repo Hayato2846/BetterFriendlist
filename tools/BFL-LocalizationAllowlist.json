@@ -67,6 +67,78 @@
       "key": "SETTINGS_CENTER_SUPPORT_DISCORD",
       "checks": ["source-identical", "english-language"],
       "reason": "Discord is a product name."
+    },
+    {
+      "locale": "deDE",
+      "key": "RULESET_TYPE_NORMAL",
+      "value": "Normal",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "Normal is the established German label for a Normal/PvE realm."
+    },
+    {
+      "locale": "deDE",
+      "key": "RULESET_TYPE_RP",
+      "value": "RP",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "RP is the established German abbreviation for role-playing realms."
+    },
+    {
+      "locale": "deDE",
+      "key": "RULESET_TYPE_RPPVP",
+      "value": "RP-PvP",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "RP-PvP is the established German abbreviation for role-playing PvP realms."
+    },
+    {
+      "locale": "esES",
+      "key": "RULESET_TYPE_NORMAL",
+      "value": "Normal",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "Normal is the established Spanish label for a Normal/PvE realm."
+    },
+    {
+      "locale": "esMX",
+      "key": "RULESET_TYPE_NORMAL",
+      "value": "Normal",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "Normal is the established Latin American Spanish label for a Normal/PvE realm."
+    },
+    {
+      "locale": "frFR",
+      "key": "RULESET_TYPE_NORMAL",
+      "value": "Normal",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "Normal is the established French label for a Normal/PvE realm."
+    },
+    {
+      "locale": "ptBR",
+      "key": "RULESET_TYPE_NORMAL",
+      "value": "Normal",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "Normal is the established Brazilian Portuguese label for a Normal/PvE realm."
+    },
+    {
+      "locale": "ptBR",
+      "key": "RULESET_TYPE_RP",
+      "value": "RP",
+      "checks": [
+        "source-identical"
+      ],
+      "reason": "RP is the established Brazilian Portuguese abbreviation for role-playing realms."
     }
   ],
   "values": [],

@@ -372,35 +372,11 @@ local function ShouldUseClassColorNames()
 end
 
 local function GetClassColorForGameAccount(gameAccountInfo)
-	if not ShouldUseClassColorNames() or not RAID_CLASS_COLORS then
+	if not ShouldUseClassColorNames() or not BFL.ClassUtils then
 		return nil
 	end
-
-	local classID = SafeNumber(GetGameAccountField(gameAccountInfo, "classID", nil), nil)
-	if classID and classID > 0 then
-		local classFile
-		if C_CreatureInfo and C_CreatureInfo.GetClassInfo then
-			local classInfo = C_CreatureInfo.GetClassInfo(classID)
-			classFile = classInfo and classInfo.classFile
-		end
-		if not classFile and GetClassInfo then
-			local _
-			_, classFile = GetClassInfo(classID)
-		end
-		if classFile and RAID_CLASS_COLORS[classFile] then
-			return RAID_CLASS_COLORS[classFile]
-		end
-	end
-
-	local className = SafeString(GetGameAccountField(gameAccountInfo, "className", nil), nil)
-	if className and BFL.ClassUtils and BFL.ClassUtils.GetClassFileFromClassName then
-		local classFile = BFL.ClassUtils:GetClassFileFromClassName(className)
-		if classFile and RAID_CLASS_COLORS[classFile] then
-			return RAID_CLASS_COLORS[classFile]
-		end
-	end
-
-	return nil
+	local classFile = BFL.ClassUtils:GetClassFileForFriend(gameAccountInfo)
+	return BFL.ClassUtils:GetClassColorByFile(classFile)
 end
 
 local function ClassColorTextForGameAccount(gameAccountInfo, text)
@@ -417,6 +393,7 @@ local function ClassColorTextForGameAccount(gameAccountInfo, text)
 		if classColor.colorStr then
 			return "|c" .. classColor.colorStr .. text .. "|r"
 		end
+		return "|c" .. BFL.ClassUtils:GetClassColorHex(gameAccountInfo) .. text .. "|r"
 	end
 
 	return text
@@ -443,6 +420,40 @@ local function ShouldSafeGameAccountShowRichPresence(gameAccountInfo)
 	return not areaName
 end
 
+local function GetSafeGameAccountPresence(gameAccountInfo)
+	local presence = SafeString(GetGameAccountField(gameAccountInfo, "richPresence", nil), "")
+	if not BFL.IsWoWAccountRulesetLocation(gameAccountInfo) then return presence end
+	local location, _, realmEvidence = BFL.GetWoWAccountLocation(gameAccountInfo)
+	local replaced = 0
+	for _, realm in ipairs({
+		SafeString(GetGameAccountField(gameAccountInfo, "realmDisplayName", nil), ""),
+		SafeString(GetGameAccountField(gameAccountInfo, "realmName", nil), ""),
+		SafeString(realmEvidence, ""),
+	}) do
+		if realm ~= "" then
+			local pattern = realm:gsub(".", function(character)
+				if character:match("%a") then return "[" .. character:lower() .. character:upper() .. "]" end
+				return character:match("%w") and character or ("%" .. character)
+			end)
+			local count
+			presence, count = presence:gsub(pattern, function() return location end)
+			replaced = replaced + count
+		end
+	end
+	presence = presence:gsub("%s+%-%s*$", ""):gsub("^%s*%-%s*", "")
+	if location ~= "" and replaced == 0 then
+		presence = presence ~= "" and (presence .. " - " .. location) or location
+	end
+	return presence
+end
+
+local function GetSafeGameAccountAreaAndRuleset(gameAccountInfo)
+	local text = SafeString(GetGameAccountField(gameAccountInfo, "areaName", nil), UNKNOWN or "")
+	local location = BFL.GetWoWAccountLocation(gameAccountInfo)
+	if location ~= "" then text = text .. "\n" .. BFL.L.RULESET_LABEL .. " " .. location end
+	return text
+end
+
 local function GetSafeGameAccountCharacterLine(gameAccountInfo, battleTag)
 	local characterName = SafeString(GetGameAccountField(gameAccountInfo, "characterName", nil), UNKNOWN or "")
 	local characterLevel = SafeNumber(GetGameAccountField(gameAccountInfo, "characterLevel", nil), 0)
@@ -467,10 +478,10 @@ local function GetSafeGameAccountCharacterLine(gameAccountInfo, battleTag)
 	return text
 end
 
-local function BuildGameAccountIconPrefix(clientProgram)
+local function BuildGameAccountIconPrefix(clientProgram, subIcon)
 	clientProgram = SafeString(clientProgram, nil)
 	if BFL.GetClientProgramIconPrefix then
-		return BFL.GetClientProgramIconPrefix(clientProgram, 32)
+		return BFL.GetClientProgramIconPrefix(clientProgram, 32, subIcon)
 	end
 	return ""
 end
@@ -579,17 +590,16 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 			anchor = SetTooltipLine(
 				FriendsTooltipGameAccount1Info,
 				nil,
-				SafeString(GetGameAccountField(gameAccountInfo, "richPresence", nil), ""),
+				GetSafeGameAccountPresence(gameAccountInfo),
 				-4
 			)
 		else
 			SetTooltipLine(FriendsTooltipGameAccount1Name, nil, GetSafeGameAccountCharacterLine(gameAccountInfo, battleTag))
 			local areaName = SafeString(GetGameAccountField(gameAccountInfo, "areaName", nil), UNKNOWN or "")
-			if SafeBool(GetGameAccountField(gameAccountInfo, "isInCurrentRegion", nil), false) then
-				local realmName = SafeString(
-					GetGameAccountField(gameAccountInfo, "realmDisplayName", nil),
-					SafeString(GetGameAccountField(gameAccountInfo, "realmName", nil), UNKNOWN or "")
-				)
+			if BFL.IsWoWAccountRulesetLocation(gameAccountInfo) then
+				anchor = SetTooltipLine(FriendsTooltipGameAccount1Info, nil, GetSafeGameAccountAreaAndRuleset(gameAccountInfo), -4)
+			elseif SafeBool(GetGameAccountField(gameAccountInfo, "isInCurrentRegion", nil), false) then
+				local realmName = BFL.GetWoWAccountLocation(gameAccountInfo)
 				anchor = SetTooltipLine(FriendsTooltipGameAccount1Info, nil, BNET_FRIEND_TOOLTIP_ZONE_AND_REALM:format(areaName, realmName), -4)
 			else
 				local regionID = SafeNumber(GetGameAccountField(gameAccountInfo, "regionID", nil), nil)
@@ -647,7 +657,7 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 			local clientProgram = SafeString(GetGameAccountField(otherGameAccountInfo, "clientProgram", nil), nil)
 			if otherGameAccountInfo ~= gameAccountInfo and not hasFocus and clientProgram ~= BNET_CLIENT_APP and clientProgram ~= BNET_CLIENT_CLNT then
 				local areaName = SafeString(GetGameAccountField(otherGameAccountInfo, "areaName", nil), UNKNOWN or "")
-				local gameText = SafeString(GetGameAccountField(otherGameAccountInfo, "richPresence", nil), "")
+				local gameText = GetSafeGameAccountPresence(otherGameAccountInfo)
 
 				if not headerSet then
 					SetTooltipLine(FriendsTooltipOtherGameAccounts, anchor, nil, -8)
@@ -660,7 +670,7 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 
 				local characterNameString = _G["FriendsTooltipGameAccount" .. gameAccountIndex .. "Name"]
 				local gameAccountInfoString = _G["FriendsTooltipGameAccount" .. gameAccountIndex .. "Info"]
-				text = BuildGameAccountIconPrefix(clientProgram)
+				text = BuildGameAccountIconPrefix(clientProgram, GetGameAccountField(otherGameAccountInfo, "subIcon", nil))
 				if clientProgram == BNET_CLIENT_WOW and SafeNumber(GetGameAccountField(otherGameAccountInfo, "wowProjectID", nil), nil) == WOW_PROJECT_ID then
 					local characterName = SafeString(GetGameAccountField(otherGameAccountInfo, "characterName", nil), UNKNOWN or "")
 					local characterLevel = SafeNumber(GetGameAccountField(otherGameAccountInfo, "characterLevel", nil), 0)
@@ -680,7 +690,8 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 							className
 						)
 					end
-					gameText = areaName
+					gameText = BFL.IsWoWAccountRulesetLocation(otherGameAccountInfo)
+						and GetSafeGameAccountAreaAndRuleset(otherGameAccountInfo) or areaName
 				else
 					local characterName = ""
 					if SafeBool(GetGameAccountField(otherGameAccountInfo, "isOnline", nil), false) then
@@ -923,7 +934,7 @@ function BetterFriendsList_Button_OnEnter(self)
 		-- accountInfo fields through BNet_GetBNetAccountName/FriendsFrame helpers,
 		-- which taints SecretValue reads when entered from addon-owned buttons.
 		local usedSafeRetailBNetTooltip = false
-		if BFL.HasSecretValues and friendData.type == "bnet" then
+		if (BFL.HasSecretValues or BFL.IsForever) and friendData.type == "bnet" then
 			usedSafeRetailBNetTooltip = true
 			ShowSafeRetailBNetTooltip(proxyButton, self, friendData)
 		else

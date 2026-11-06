@@ -149,6 +149,19 @@ function GlobalSync:GetPendingTitleFriends()
 	return entries
 end
 
+local function HasStoredTitleFriend(name)
+	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
+	if not IsReadableTable(database) then return false end
+	for _, friends in pairs(database) do
+		if IsReadableTable(friends) then
+			for key, entry in pairs(friends) do
+				if MatchesName(key, name) and IsReadableTable(entry) and not entry.deleted then return true end
+			end
+		end
+	end
+	return false
+end
+
 function GlobalSync:AdvanceTitleInvites()
 	local batch = self.titleInviteBatch
 	if not batch or self.activeTitlePrompt then
@@ -160,8 +173,10 @@ function GlobalSync:AdvanceTitleInvites()
 		return
 	end
 	batch.index = batch.index + 1
-	if self:IsKnownTitleFriend(name) then
-		C_Timer.After(0, function() self:AdvanceTitleInvites() end)
+	if not HasStoredTitleFriend(name) or self:IsKnownTitleFriend(name) then
+		C_Timer.After(0, function()
+			if self.titleInviteBatch == batch then self:AdvanceTitleInvites() end
+		end)
 		return
 	end
 
@@ -274,6 +289,58 @@ function GlobalSync:DeleteStoredFriend(faction, key)
 			TryFriendAction(BFL.RemoveFriend, name)
 		end
 	end
+end
+
+-- Removing a saved record is independent of deleting a Blizzard friendship.
+-- In particular, imported legacy records must remain removable with Title Friends.
+function GlobalSync:RemoveStoredEntry(faction, key)
+	if not IsName(faction) or not IsName(key) then return false end
+	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
+	local friends = IsReadableTable(database) and database[faction]
+	local entry = IsReadableTable(friends) and friends[key]
+	if not IsReadableTable(entry) then return false end
+	friends[key] = nil
+	if self.pendingRestores then self.pendingRestores[entry] = nil end
+	if self.attemptedAdds then self.attemptedAdds[key] = nil end
+	return true
+end
+
+function GlobalSync:GetStoredEntryCount()
+	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
+	if not IsReadableTable(database) then return 0 end
+	local count = 0
+	for _, friends in pairs(database) do
+		if IsReadableTable(friends) then
+			for _ in pairs(friends) do count = count + 1 end
+		end
+	end
+	return count
+end
+
+local function ClearLocalTable(value)
+	if not IsReadableTable(value) then return end
+	for key in pairs(value) do value[key] = nil end
+end
+
+-- Remove saved records, including hidden/deleted ones, without touching native
+-- friendships. Keep the graph and faction tables shared by the open editors.
+function GlobalSync:ClearStoredEntries()
+	self.storageGeneration = (self.storageGeneration or 0) + 1
+	if self.addQueueTicker then self.addQueueTicker:Cancel(); self.addQueueTicker = nil end
+	if self.updateTimer then self.updateTimer:Cancel(); self.updateTimer = nil end
+	self.processingQueue, self.syncDeferred = false, false
+	self.titleInviteBatch = nil
+	self.deletionSnapshot, self.pendingIndexRemoval, self.refreshDatabase = nil, nil, nil
+	ClearLocalTable(self.pendingRestores)
+	ClearLocalTable(self.attemptedAdds)
+	ClearLocalTable(self.requestedTitleFriends)
+	-- An already open Blizzard confirmation remains owned by Blizzard and the
+	-- user. Retain its tracking record; clearing the batch prevents a successor.
+	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
+	if not IsReadableTable(database) then return 0 end
+	local count = self:GetStoredEntryCount()
+	for _, friends in pairs(database) do ClearLocalTable(friends) end
+	return count
 end
 
 function GlobalSync:SetStoredFriendNote(faction, key, note)
@@ -598,7 +665,9 @@ function GlobalSync:OnFriendListUpdate()
 	if self.updateTimer then
 		return
 	end
+	local generation = self.storageGeneration or 0
 	self.updateTimer = C_Timer.NewTimer(2, function()
+		if generation ~= (self.storageGeneration or 0) then return end
 		self:PerformSync()
 		self.updateTimer = nil
 	end)
@@ -907,7 +976,9 @@ function GlobalSync:ProcessAddQueue(queue)
 		self.addQueueTicker = nil
 	end
 
+	local generation = self.storageGeneration or 0
 	self.addQueueTicker = C_Timer.NewTicker(0.5, function(timer)
+		if generation ~= (self.storageGeneration or 0) then timer:Cancel(); return end
 		local legacyMode = self:UsesTitleFriends() == false
 		if not BetterFriendlistDB.enableGlobalSync or not legacyMode or not CanChangeFriends() then
 			self.syncDeferred = BetterFriendlistDB.enableGlobalSync and legacyMode

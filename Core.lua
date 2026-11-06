@@ -1493,16 +1493,20 @@ function BFL:InstallWhoSlashRedirect()
 		if not (whoModule and whoModule.IsAvailable and whoModule:IsAvailable()) then
 			return originalHandler(message, ...)
 		end
-
-		BFL:HandleFriendsFrameRedirect("show", 2, nil, true)
+		if (BFL.IsSecret and BFL:IsSecret(message)) or (message ~= nil and type(message) ~= "string") then
+			return false
+		end
 
 		local query = message or ""
 		if query == "" and type(_G.WhoFrame_GetDefaultWhoCommand) == "function" then
 			local ok, defaultQuery = pcall(_G.WhoFrame_GetDefaultWhoCommand)
-			if ok and type(defaultQuery) == "string" then
+			if ok and not (BFL.IsSecret and BFL:IsSecret(defaultQuery)) and type(defaultQuery) == "string" then
 				query = defaultQuery
+			else
+				return false
 			end
 		end
+		whoModule:ShowWhoResults()
 
 		local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
 		if editBox and type(editBox.SetText) == "function" then
@@ -1568,11 +1572,12 @@ function BFL:InstallFriendsFrameRedirects()
 	installRedirect("ShowFriends", function()
 		return directShow(1)
 	end)
-	-- BFL owns the Who entry point while it replaces the Friends frame,
-	-- including Forever where Blizzard otherwise routes it into Group Finder.
+	-- Who is an addon-owned destination on every client, including Forever.
+	-- This is separate from the native Group Finder's Listing/Browse entrypoints.
 	if self:ShouldInterceptNativeWhoPanel() then
 		installRedirect("ShowWhoPanel", function()
-			return BFL:HandleFriendsFrameRedirect("show", 2, nil, true)
+			local whoModule = BFL:GetModule("WhoFrame")
+			if whoModule then return whoModule:ShowWhoResults() end
 		end)
 	end
 	self:InstallWhoSlashRedirect()

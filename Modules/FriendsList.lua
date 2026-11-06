@@ -15,6 +15,9 @@ end
 local function GetDB()
 	return BFL:GetModule("DB")
 end
+function FriendsList:GetDisplayLocation(friend)
+	return BFL.GetWoWAccountLocation(friend.gameAccountInfo or friend, friend.realmName)
+end
 local function GetGroups()
 	return BFL:GetModule("Groups")
 end
@@ -798,6 +801,7 @@ end
 local GAME_ACCOUNT_COMPARE_FIELDS = {
 	"gameAccountID",
 	"clientProgram",
+	"subIcon",
 	"isOnline",
 	"isGameBusy",
 	"isGameAFK",
@@ -2642,6 +2646,43 @@ end
 -- ScrollBox Initialization (NEW - Phase 1)
 -- ========================================
 
+-- Apply the saved Mainline preference before binding, or immediately after a live settings change.
+function FriendsList:ApplyScrollInterpolation(scrollBox, scrollBar)
+	if not BFL.IsMainline or not BFL.HasModernScrollBox then return false end
+	local frame = BetterFriendsFrame
+	scrollBox = scrollBox or (frame and frame.ScrollFrame and frame.ScrollFrame.ScrollBox) or self.scrollBox
+	scrollBar = scrollBar or (frame and frame.MinimalScrollBar) or self.scrollBar
+	if not (scrollBox and scrollBar and scrollBox.SetInterpolateScroll and scrollBar.SetInterpolateScroll) then return false end
+	local DB = BFL:GetModule("DB")
+	local enabled = DB and DB:Get("enableSmoothScrolling", false) == true or false
+	scrollBox:SetInterpolateScroll(enabled)
+	scrollBar:SetInterpolateScroll(enabled)
+	if not enabled then
+		local wasAnimating = false
+		for _, control in ipairs({ scrollBox, scrollBar }) do
+			-- GetScrollInterpolator creates one lazily. Inspect only an existing
+			-- interpolator so the default immediate mode allocates no animation.
+			local interpolator = control.interpolator
+			if interpolator and interpolator.Cancel then
+				wasAnimating = wasAnimating or (interpolator.GetInterpolateTo and interpolator:GetInterpolateTo() ~= nil)
+				interpolator:Cancel()
+			end
+		end
+		if wasAnimating and scrollBox.GetScrollPercentage and scrollBox.SetScrollPercentage and scrollBar.SetScrollPercentage then
+			-- Native SetInterpolateScroll only changes a flag; it does not stop a
+			-- running ticker. Freeze the visible content and align the thumb.
+			local percentage = scrollBox:GetScrollPercentage()
+			local immediate = true
+			if ScrollBoxConstants and ScrollBoxConstants.NoScrollInterpolation ~= nil then
+				immediate = ScrollBoxConstants.NoScrollInterpolation
+			end
+			scrollBox:SetScrollPercentage(percentage, immediate)
+			scrollBar:SetScrollPercentage(percentage, immediate)
+		end
+	end
+	return enabled
+end
+
 -- Initialize scroll system (called once in Initialize())
 -- Retail: Modern ScrollBox/DataProvider system
 -- Classic: FauxScrollFrame with button pool
@@ -2681,16 +2722,13 @@ function FriendsList:InitializeScrollBox()
 	view:SetElementFactory(CreateElementFactory(self))
 	view:SetElementExtentCalculator(CreateExtentCalculator(self))
 
+	local scrollBox = scrollFrame.ScrollBox
+	-- Blizzard requires both controls to opt in before their initial binding.
+	self:ApplyScrollInterpolation(scrollBox, scrollBar)
 	-- Initialize once, then replace only the view on live Modern/Legacy switches.
-	if self.scrollBox and self.scrollBox.SetView then
-		self.scrollBox:SetView(view)
+	if self.scrollBox == scrollBox and scrollBox.SetView then
+		scrollBox:SetView(view)
 	else
-		local scrollBox = scrollFrame.ScrollBox
-		-- Blizzard disables interpolation for the pair unless both opt in before binding.
-		if scrollBox.SetInterpolateScroll and scrollBar.SetInterpolateScroll then
-			scrollBox:SetInterpolateScroll(true)
-			scrollBar:SetInterpolateScroll(true)
-		end
 		BFL.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 	end
 
@@ -3118,8 +3156,81 @@ local function GetAccountClassFile(account)
 end
 
 -- Build display data for a single game account (shared by menus/tooltips)
+function FriendsList:IsReadableInviteRecord(value)
+	if (BFL.IsSecret and BFL:IsSecret(value)) or type(value) ~= "table" then return false end
+	if type(issecrettable) == "function" then
+		local ok, restricted = pcall(issecrettable, value)
+		if not ok or (BFL.IsSecret and BFL:IsSecret(restricted)) or restricted then return false end
+	end
+	return true
+end
+
+function FriendsList:GetReadableInviteField(record, key)
+	if not self:IsReadableInviteRecord(record) then return nil end
+	local value = record[key]
+	if BFL.IsSecret and BFL:IsSecret(value) then return nil end
+	return value
+end
+
+function FriendsList:GetGameAccountInviteRestriction(gameAccountInfo, playerFactionGroup, playerRealmID)
+	if not self:IsReadableInviteRecord(gameAccountInfo) then return INVITE_RESTRICTION_INFO end
+	for _, key in ipairs({ "clientProgram", "wowProjectID", "realmID", "isInCurrentRegion", "factionName", "classID", "isOnline", "gameAccountID", "playerGuid" }) do
+		if BFL.IsSecret and BFL:IsSecret(gameAccountInfo[key]) then return INVITE_RESTRICTION_INFO end
+	end
+	if gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then return INVITE_RESTRICTION_CLIENT end
+	if gameAccountInfo.wowProjectID and WOW_PROJECT_ID and gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
+		if gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC then return INVITE_RESTRICTION_WOW_PROJECT_CLASSIC end
+		if gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE then return INVITE_RESTRICTION_WOW_PROJECT_MAINLINE end
+		return INVITE_RESTRICTION_WOW_PROJECT_ID
+	end
+	if gameAccountInfo.realmID == 0 or (BFL.IsForever and
+		(type(gameAccountInfo.realmID) ~= "number" or gameAccountInfo.realmID <= 0
+		or gameAccountInfo.realmID >= math.huge or gameAccountInfo.realmID % 1 ~= 0 or gameAccountInfo.isOnline ~= true
+		or type(gameAccountInfo.gameAccountID) ~= "number" or gameAccountInfo.gameAccountID <= 0
+		or gameAccountInfo.gameAccountID >= math.huge or gameAccountInfo.gameAccountID % 1 ~= 0
+		or type(gameAccountInfo.playerGuid) ~= "string" or gameAccountInfo.playerGuid == "")) then
+		return INVITE_RESTRICTION_INFO
+	end
+	if playerRealmID == nil then
+		playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
+	end
+	if (BFL.IsSecret and BFL:IsSecret(playerRealmID)) then return INVITE_RESTRICTION_INFO end
+	if BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then return INVITE_RESTRICTION_REALM end
+	if not gameAccountInfo.isInCurrentRegion then return INVITE_RESTRICTION_REGION end
+	if playerFactionGroup == nil and UnitFactionGroup then playerFactionGroup = UnitFactionGroup("player") end
+	if BFL.IsSecret and BFL:IsSecret(playerFactionGroup) then return INVITE_RESTRICTION_INFO end
+	if (BFL.IsForever or (gameAccountInfo.wowProjectID and WOW_PROJECT_ID))
+		and gameAccountInfo.factionName ~= playerFactionGroup then
+		if BFL.IsForever and type(gameAccountInfo.factionName) == "string" and gameAccountInfo.factionName ~= ""
+			and type(playerFactionGroup) == "string" and playerFactionGroup ~= "" then return INVITE_RESTRICTION_FACTION end
+		if self:IsReadableInviteRecord(C_QuestSession) and C_QuestSession.Exists then
+			local ok, active = pcall(C_QuestSession.Exists)
+			if not ok or (BFL.IsSecret and BFL:IsSecret(active)) then return INVITE_RESTRICTION_INFO end
+			if active then return INVITE_RESTRICTION_QUEST_SESSION end
+		end
+		if self:IsReadableInviteRecord(C_PartyInfo) and C_PartyInfo.CanFormCrossFactionParties then
+			local ok, allowed = pcall(C_PartyInfo.CanFormCrossFactionParties)
+			if not ok or (BFL.IsSecret and BFL:IsSecret(allowed)) then return INVITE_RESTRICTION_INFO end
+			if not allowed then return INVITE_RESTRICTION_FACTION end
+		end
+	end
+	if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
+		local ok, allowed = pcall(CanInviteGameAccountByGameMode, gameAccountInfo)
+		if not ok or (BFL.IsSecret and BFL:IsSecret(allowed)) then return INVITE_RESTRICTION_INFO end
+		if not allowed then return INVITE_RESTRICTION_GAME_MODE end
+	end
+	-- This is additive to native eligibility. A readable but unknown Ruleset
+	-- contributes no new restriction, including in the missing-project branch.
+	if BFL.GetForeverRulesetInviteRestriction then
+		local reason = BFL.GetForeverRulesetInviteRestriction(gameAccountInfo)
+		if reason then return BFL.INVITE_RESTRICTION_RULESET, reason end
+	end
+	if not gameAccountInfo.wowProjectID and not gameAccountInfo.realmID then return INVITE_RESTRICTION_NO_GAME_ACCOUNTS end
+	return INVITE_RESTRICTION_NONE
+end
+
 function FriendsList:BuildAccountDisplay(gameAccountInfo)
-	if not gameAccountInfo then
+	if not self:IsReadableInviteRecord(gameAccountInfo) then
 		return {
 			text = "Unknown",
 			isInvitable = false,
@@ -3127,43 +3238,95 @@ function FriendsList:BuildAccountDisplay(gameAccountInfo)
 	end
 
 	local charName = BFL.FormatPlayerDisplayName(gameAccountInfo.characterName) or UNKNOWN or "Unknown"
-	local realmName = gameAccountInfo.realmName or ""
+	local locationText = BFL.GetWoWAccountLocation(gameAccountInfo)
 
 	local classFile = GetAccountClassFile(gameAccountInfo)
 
 	local coloredName = charName
-	if classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] then
-		coloredName = RAID_CLASS_COLORS[classFile]:WrapTextInColorCode(charName)
+	local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
+	if classColor then
+		coloredName = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(gameAccountInfo)) .. charName .. "|r"
 	end
 
-	local text = BFL.FormatPlayerDisplayName(coloredName, realmName, " - ")
+	local text = coloredName
+	if locationText ~= "" then text = text .. " - " .. locationText end
 
-	local restriction = gameAccountInfo.bflRestriction or gameAccountInfo.inviteRestriction
+	local restriction = self:GetReadableInviteField(gameAccountInfo, "bflRestriction")
+		or self:GetReadableInviteField(gameAccountInfo, "inviteRestriction")
 	local restrictionNone = INVITE_RESTRICTION_NONE
 	local isInvitable
 
-	if gameAccountInfo.bflIsInvitable ~= nil then
-		isInvitable = gameAccountInfo.bflIsInvitable
+	local cachedInvitable = self:GetReadableInviteField(gameAccountInfo, "bflIsInvitable")
+	if cachedInvitable ~= nil then
+		isInvitable = cachedInvitable
 	elseif restrictionNone then
 		isInvitable = restriction == restrictionNone
 	else
 		isInvitable = restriction == nil
 	end
+	for _, key in ipairs({ "bflIsInvitable", "bflRestriction", "inviteRestriction", "gameAccountID", "playerGuid", "wowProjectID", "clientProgram" }) do
+		if BFL.IsSecret and BFL:IsSecret(gameAccountInfo[key]) then
+			isInvitable = false
+			restriction = INVITE_RESTRICTION_INFO
+		end
+	end
+	local restrictionText
+	if BFL.GetForeverRulesetInviteRestriction then
+		restrictionText = BFL.GetForeverRulesetInviteRestriction(gameAccountInfo)
+		if restrictionText then
+			restriction = BFL.INVITE_RESTRICTION_RULESET
+			isInvitable = false
+		elseif BFL.IsForever and restriction == BFL.INVITE_RESTRICTION_RULESET then
+			-- A prior Ruleset-only snapshot must recover when readable current
+			-- data no longer proves that mismatch. Keep all native restrictions.
+			restriction = self:GetGameAccountInviteRestriction(gameAccountInfo)
+			isInvitable = restriction == INVITE_RESTRICTION_NONE
+		end
+	end
 
 	return {
 		text = text,
 		coloredName = coloredName,
-		realmName = realmName,
+		realmName = self:GetReadableInviteField(gameAccountInfo, "realmName"),
+		locationText = locationText,
 		classFile = classFile,
 		isInvitable = isInvitable and true or false,
 		restriction = restriction,
-		gameAccountID = gameAccountInfo.gameAccountID,
-		playerGuid = gameAccountInfo.playerGuid,
-		factionName = gameAccountInfo.factionName,
-		projectID = gameAccountInfo.wowProjectID,
-		gameMode = gameAccountInfo.classID,
+		restrictionText = restrictionText,
+		gameAccountID = self:GetReadableInviteField(gameAccountInfo, "gameAccountID"),
+		playerGuid = self:GetReadableInviteField(gameAccountInfo, "playerGuid"),
+		factionName = self:GetReadableInviteField(gameAccountInfo, "factionName"),
+		projectID = self:GetReadableInviteField(gameAccountInfo, "wowProjectID"),
+		gameMode = self:GetReadableInviteField(gameAccountInfo, "classID"),
 		raw = gameAccountInfo,
 	}
+end
+
+-- Menu collection is shared by right-click and account-picker callers. Only
+-- the new Ruleset restriction adds previously hidden accounts to the menu.
+function FriendsList:GetInviteAccountEntries(friend)
+	if not self:IsReadableInviteRecord(friend) then return {} end
+	local entries, seen = {}, {}
+	local function Add(account, rulesetOnly)
+		if not self:IsReadableInviteRecord(account) then return end
+		local id = account.gameAccountID
+		if (BFL.IsSecret and BFL:IsSecret(id)) or type(id) ~= "number" or id <= 0 or id % 1 ~= 0 or seen[id] then return end
+		local entry = self:BuildAccountDisplay(account)
+		if rulesetOnly and (entry.restriction ~= BFL.INVITE_RESTRICTION_RULESET
+			or self:GetGameAccountInviteRestriction(account) ~= BFL.INVITE_RESTRICTION_RULESET) then return end
+		seen[id] = true
+		entries[#entries + 1] = entry
+	end
+	if self:IsReadableInviteRecord(friend.invitableAccounts) then
+		for _, account in ipairs(friend.invitableAccounts) do Add(account, false) end
+	end
+	if BFL.IsForever then
+		if self:IsReadableInviteRecord(friend.gameAccounts) then
+			for _, account in ipairs(friend.gameAccounts) do Add(account, true) end
+		end
+		Add(friend.gameAccountInfo, true)
+	end
+	return entries
 end
 
 local function GetInviteRestrictionTextSafe(restriction)
@@ -3620,6 +3783,7 @@ local function BuildMultiAccountRowData(self, friend)
 			entries[#entries + 1] = {
 				name = nameText,
 				clientProgram = ga.clientProgram,
+				subIcon = BFL.Compat.GetClientSubIcon(ga.subIcon),
 				previewTitleIcon = ga._previewTitleIcon,
 				classFile = display and display.classFile,
 				level = ga.characterLevel,
@@ -3630,6 +3794,7 @@ local function BuildMultiAccountRowData(self, friend)
 				wowProjectID = ga.wowProjectID,
 				realmName = ga.realmName or "",
 				gameAccountID = ga.gameAccountID,
+				restrictionText = display and display.restrictionText,
 			}
 		end
 		if #entries >= MAX_MULTI_ACCOUNT_ROW_ENTRIES then
@@ -3683,7 +3848,8 @@ function FriendsList:FormatInfoLine(friend)
 	local zone = isBNet and friend.areaName or friend.area or ""
 	local className = friend.className or ""
 	local gameName = friend.gameName or ""
-	local realmName = friend.realmName or ""
+	local realmName, locationKind = self:GetDisplayLocation(friend)
+	local ruleset = locationKind == "ruleset" and realmName or ""
 	local note = friend.note or friend.notes or ""
 	local statusText = ""
 
@@ -3722,50 +3888,30 @@ function FriendsList:FormatInfoLine(friend)
 		end
 	end
 
-	-- "default" preset: Use the original hardcoded logic
+	-- Keep the original default layout, with the target ruleset on Forever.
 	if infoPreset == "default" then
 		if friend.connected then
-			if isBNet then
-				-- BNet friend
-				if hasValidLevel and zone and zone ~= "" then
-					if hideMaxLevel and level == maxLevel then
-						return AppendMultiAccountInfo(zone)
-					else
-						return AppendMultiAccountInfo(FormatLevelLine(level, levelText) .. ", " .. zone)
-					end
-				elseif hasValidLevel then
-					if hideMaxLevel and level == maxLevel then
-						return AppendMultiAccountInfo(L.FRIEND_MAX_LEVEL or "")
-					else
-						return AppendMultiAccountInfo(FormatLevelLine(level, levelText))
-					end
-				elseif zone and zone ~= "" then
-					return AppendMultiAccountInfo(zone)
-				elseif gameName and gameName ~= "" then
-					return AppendMultiAccountInfo(gameName)
+			local text
+			if hasValidLevel and zone and zone ~= "" then
+				if hideMaxLevel and level == maxLevel then
+					text = zone
 				else
-					return AppendMultiAccountInfo(L.ONLINE_STATUS or "Online")
+					text = FormatLevelLine(level, levelText) .. ", " .. zone
 				end
+			elseif hasValidLevel then
+				text = hideMaxLevel and level == maxLevel and (L.FRIEND_MAX_LEVEL or "")
+					or FormatLevelLine(level, levelText)
+			elseif zone and zone ~= "" then
+				text = zone
+			elseif isBNet and gameName ~= "" then
+				text = gameName
 			else
-				-- WoW friend
-				if hasValidLevel and zone and zone ~= "" then
-					if hideMaxLevel and level == maxLevel then
-						return zone
-					else
-						return FormatLevelLine(level, levelText) .. ", " .. zone
-					end
-				elseif hasValidLevel then
-					if hideMaxLevel and level == maxLevel then
-						return L.FRIEND_MAX_LEVEL or ""
-					else
-						return FormatLevelLine(level, levelText)
-					end
-				elseif zone and zone ~= "" then
-					return zone
-				else
-					return L.ONLINE_STATUS or "Online"
-				end
+				text = L.ONLINE_STATUS or "Online"
 			end
+			if BFL.IsForever and ruleset ~= "" then
+				text = text ~= "" and (text .. ", " .. ruleset) or ruleset
+			end
+			return isBNet and AppendMultiAccountInfo(text) or text
 		else
 			-- Offline
 			if isBNet then
@@ -3799,6 +3945,7 @@ function FriendsList:FormatInfoLine(friend)
 			result = ReplaceTokenCaseInsensitive(result, "class", "")
 			result = ReplaceTokenCaseInsensitive(result, "game", "")
 			result = ReplaceTokenCaseInsensitive(result, "realm", "")
+			result = ReplaceTokenCaseInsensitive(result, "ruleset", "")
 			result = ReplaceTokenCaseInsensitive(result, "note", note)
 			result = ReplaceTokenCaseInsensitive(result, "status", statusText)
 			-- Phase 22b: Unified tokens - name tokens in info format
@@ -3842,6 +3989,7 @@ function FriendsList:FormatInfoLine(friend)
 	result = ReplaceTokenCaseInsensitive(result, "class", className)
 	result = ReplaceTokenCaseInsensitive(result, "game", gameName)
 	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
+	result = ReplaceTokenCaseInsensitive(result, "ruleset", ruleset)
 	result = ReplaceTokenCaseInsensitive(result, "note", note)
 	result = ReplaceTokenCaseInsensitive(result, "status", statusText)
 	result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
@@ -3927,6 +4075,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	end
 	local showFactionIcons = self.settingsCache.showFactionIcons or false
 	local factionIcon = showFactionIcons and self:GetFriendFactionIcon(friend) or ""
+	local locationText, locationKind = self:GetDisplayLocation(friend)
 	local nicknameVersion = BFL.NicknameCacheVersion or 0 -- Phase 6: Version Check
 
 	-- Inputs for validation
@@ -3963,6 +4112,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.colorClassNames == colorClassNames
 		and cacheEntry.showFactionIcons == showFactionIcons
 		and cacheEntry.factionIcon == factionIcon
+		and cacheEntry.locationText == locationText
+		and cacheEntry.locationKind == locationKind
 		and cacheEntry.isStreamerMode == isStreamerMode
 		and cacheEntry.streamerNameFormat == streamerNameFormat
 		and cacheEntry.note == note
@@ -4061,7 +4212,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		-- WoW: Name is Character Name
 		local fullName = rawName or "Unknown"
 
-		if showRealmName then
+		if BFL.AreRegionalUniqueNamesEnabled() then
+			name = fullName
+		elseif showRealmName then
 			name = fullName
 		else
 			local n, r = strsplit("-", fullName)
@@ -4118,9 +4271,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and result:match("^%s*%%[Nn][Aa][Mm][Ee]%%%s*$")
 	then
 		local classFile = GetClassFileForFriend(friend)
-		local classColor = classFile and RAID_CLASS_COLORS[classFile]
+		local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 		if classColor then
-			name = "|c" .. (classColor.colorStr or "ffffffff") .. name .. "|r"
+			name = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(friend)) .. name .. "|r"
 		end
 	end
 
@@ -4132,7 +4285,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 	-- Phase 22b: Unified token system - all tokens available in name format
 	local character = characterName
-	local realm = friend.realmName or ""
+	local realm = locationText
 
 	-- Apply class coloring, faction icon, timerunning, and realm to %character% token
 	if character ~= "" and HasTokenCaseInsensitive(result, "character") and not forSorting then
@@ -4147,10 +4300,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		decoratedChar = factionIcon .. decoratedChar
 
 		-- Realm name
-		if showRealmName and friend.realmName and friend.realmName ~= "" then
+		if showRealmName and realm ~= "" then
 			local playerRealm = GetRealmName()
-			if friend.realmName ~= playerRealm then
-				decoratedChar = decoratedChar .. " - " .. friend.realmName
+			if realm ~= playerRealm then
+				decoratedChar = decoratedChar .. " - " .. realm
 			end
 		end
 
@@ -4160,11 +4313,11 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 			useClassColor = true
 		end
 		local colorStr = nil
-		if useClassColor and friend.className then
+		if useClassColor and hasPublicClassData then
 			local classFile = GetClassFileForFriend(friend)
-			local classColor = classFile and RAID_CLASS_COLORS[classFile]
+			local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 			if classColor then
-				colorStr = classColor.colorStr or "ffffffff"
+				colorStr = classColor.colorStr or BFL.ClassUtils:GetClassColorHex(friend)
 			end
 		end
 
@@ -4200,6 +4353,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		result = ReplaceTokenCaseInsensitive(result, "character", character)
 	end
 	result = ReplaceTokenCaseInsensitive(result, "realm", realm)
+	result = ReplaceTokenCaseInsensitive(result, "ruleset", locationKind == "ruleset" and realm or "")
 
 	-- Info tokens available in name format (Phase 22b: Unified tokens)
 	if not forSorting then
@@ -4261,6 +4415,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		colorClassNames = colorClassNames,
 		showFactionIcons = showFactionIcons,
 		factionIcon = factionIcon,
+		locationText = locationText,
+		locationKind = locationKind,
 		isStreamerMode = isStreamerMode,
 		streamerNameFormat = streamerNameFormat,
 		note = note,
@@ -5530,171 +5686,52 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 				end
 
 				-- PHASE 4 OPTIMIZATION: Pre-calculate Invite Status
-				-- Moves O(N^2) complexity from Render Loop to Data Update
-				-- Multi-Game-Account Support: Also stores all game accounts for richer display
+				-- Data, menus and dispatch share the same per-account eligibility.
 				friend.canInvite = false
 				friend.inviteAtlas = nil
-
+				friend.inviteRestriction = nil
 				if friend.connected then
-					local restriction = nil
 					local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(i)
-
-					-- Multi-Game-Account: Store count and collect all game account data
+					if (BFL.IsSecret and BFL:IsSecret(numGameAccounts)) or type(numGameAccounts) ~= "number"
+						or numGameAccounts < 0 or numGameAccounts >= math.huge or numGameAccounts % 1 ~= 0 then numGameAccounts = 0 end
 					friend.numGameAccounts = numGameAccounts
 					friend.totalGameAccounts = numGameAccounts
-
-					local gameAccounts
-					local invitableAccounts
-					if numGameAccounts > 1 then
-						gameAccounts = {}
-						invitableAccounts = {}
-					end
-
+					local gameAccounts = numGameAccounts > 1 and {} or nil
+					local invitableAccounts = {}
+					local restriction
 					local playerFactionGroup = UnitFactionGroup("player")
 					local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
-
 					for k = 1, numGameAccounts do
 						local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(i, k)
-						if gameAccountInfo then
-							-- Multi-Game-Account: Store account info (filter out App/CLNT/BSAp)
-							if
-								gameAccounts
-								and gameAccountInfo.clientProgram ~= BNET_CLIENT_APP
-								and gameAccountInfo.clientProgram ~= "CLNT"
-								and gameAccountInfo.clientProgram ~= "BSAp"
-							then
+						if self:IsReadableInviteRecord(gameAccountInfo) then
+							local client = self:GetReadableInviteField(gameAccountInfo, "clientProgram")
+							if gameAccounts and client and client ~= BNET_CLIENT_APP and client ~= "CLNT" and client ~= "BSAp" then
 								gameAccounts[#gameAccounts + 1] = gameAccountInfo
 							end
-
-							-- Invite restriction check (original logic)
-							if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
-								local accountRestriction = nil
-								if gameAccountInfo.wowProjectID and WOW_PROJECT_ID then
-									if
-										gameAccountInfo.wowProjectID == WOW_PROJECT_CLASSIC
-										and WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC
-									then
-										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_CLASSIC
-									elseif
-										gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE
-										and WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
-									then
-										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_MAINLINE
-									elseif gameAccountInfo.wowProjectID ~= WOW_PROJECT_ID then
-										accountRestriction = INVITE_RESTRICTION_WOW_PROJECT_ID
-									elseif gameAccountInfo.realmID == 0 then
-										accountRestriction = INVITE_RESTRICTION_INFO
-									elseif BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then
-										accountRestriction = INVITE_RESTRICTION_REALM
-									elseif not gameAccountInfo.isInCurrentRegion then
-										accountRestriction = INVITE_RESTRICTION_REGION
-									else
-										-- Check faction restriction
-										if gameAccountInfo.factionName ~= playerFactionGroup then
-											if C_QuestSession and C_QuestSession.Exists() then
-												accountRestriction = INVITE_RESTRICTION_QUEST_SESSION
-											elseif
-												C_PartyInfo
-												and C_PartyInfo.CanFormCrossFactionParties
-												and not C_PartyInfo.CanFormCrossFactionParties()
-											then
-												accountRestriction = INVITE_RESTRICTION_FACTION
-											end
-										end
-										-- Check game mode restriction (Retail only)
-										if not accountRestriction and not BFL.IsClassic then
-											if not CanInviteGameAccountByGameMode(gameAccountInfo) then
-												accountRestriction = INVITE_RESTRICTION_GAME_MODE
-											end
-										end
-										-- If no sub-restriction found, this account is invitable
-										if not accountRestriction then
-											accountRestriction = INVITE_RESTRICTION_NONE
-											invitableAccounts = invitableAccounts or {}
-											invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
-										end
-									end
-								elseif gameAccountInfo.realmID == 0 then
-									accountRestriction = INVITE_RESTRICTION_INFO
-								elseif BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID) then
-									accountRestriction = INVITE_RESTRICTION_REALM
-								elseif not gameAccountInfo.isInCurrentRegion then
-									accountRestriction = INVITE_RESTRICTION_REGION
-								elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
-									accountRestriction = INVITE_RESTRICTION_NONE
-									invitableAccounts = invitableAccounts or {}
-									invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
-								end
-
-								-- Track best restriction across all accounts
-								-- Store per-account restriction metadata for downstream display logic
-								local restrictionValue = accountRestriction
-								if not restrictionValue and INVITE_RESTRICTION_NO_GAME_ACCOUNTS then
-									restrictionValue = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
-								end
-
-								gameAccountInfo.bflRestriction = restrictionValue
-								local restrictionNone = INVITE_RESTRICTION_NONE
-								if restrictionNone then
-									gameAccountInfo.bflIsInvitable = accountRestriction == restrictionNone
-								else
-									gameAccountInfo.bflIsInvitable = accountRestriction == nil
-								end
-
-								if accountRestriction then
-									if not restriction or accountRestriction > (restriction or 0) then
-										restriction = accountRestriction
-									end
-								end
-							else
-								if not restriction then
-									restriction = INVITE_RESTRICTION_CLIENT
-								end
+							local accountRestriction = self:GetGameAccountInviteRestriction(gameAccountInfo, playerFactionGroup, playerRealmID)
+							gameAccountInfo.bflRestriction = accountRestriction
+							gameAccountInfo.bflIsInvitable = accountRestriction == INVITE_RESTRICTION_NONE
+							if accountRestriction == INVITE_RESTRICTION_NONE then
+								invitableAccounts[#invitableAccounts + 1] = gameAccountInfo
 							end
+							if not restriction or accountRestriction > restriction then restriction = accountRestriction end
 						end
 					end
-
-					-- Keep invitable accounts even for a single login: the custom context
-					-- menu and fallback invite button consume this same validated list.
 					friend.gameAccounts = gameAccounts
-					friend.invitableAccounts = invitableAccounts
-					friend.numInvitableAccounts = invitableAccounts and #invitableAccounts or 0
-
-					-- Update numGameAccounts to filtered count (excludes App/CLNT/BSAp)
-					if gameAccounts then
-						friend.numGameAccounts = #gameAccounts
-					end
-
-					if not restriction then
-						restriction = INVITE_RESTRICTION_NO_GAME_ACCOUNTS
-					end
-
-					-- Fix: If at least one account is invitable, the friend-level restriction
-					-- must be NONE regardless of worse restrictions from other accounts
-					-- (e.g. non-WoW App accounts or cross-faction accounts during quest sessions).
-					-- The max-tracking can incorrectly override NONE (0) with a higher value.
-					if restriction ~= INVITE_RESTRICTION_NONE and invitableAccounts and #invitableAccounts > 0 then
-						restriction = INVITE_RESTRICTION_NONE
-					end
-
-					if restriction == INVITE_RESTRICTION_NONE then
-						friend.canInvite = true
-
-						-- Calculate Cross-Faction Atlas
-						if not BFL.IsClassic then
-							local isCrossFaction = accountInfo.gameAccountInfo
-								and accountInfo.gameAccountInfo.factionName
-								and accountInfo.gameAccountInfo.factionName ~= playerFactionGroup
-
-							if isCrossFaction then
-								if accountInfo.gameAccountInfo.factionName == "Horde" then
-									friend.inviteAtlas = "horde"
-								elseif accountInfo.gameAccountInfo.factionName == "Alliance" then
-									friend.inviteAtlas = "alliance"
-								end
-							else
-								friend.inviteAtlas = "default"
-							end
+					friend.invitableAccounts = #invitableAccounts > 0 and invitableAccounts or nil
+					friend.numInvitableAccounts = #invitableAccounts
+					if gameAccounts then friend.numGameAccounts = #gameAccounts end
+					if #invitableAccounts > 0 then restriction = INVITE_RESTRICTION_NONE end
+					friend.inviteRestriction = restriction or INVITE_RESTRICTION_NO_GAME_ACCOUNTS
+					friend.canInvite = friend.inviteRestriction == INVITE_RESTRICTION_NONE
+					if friend.canInvite then
+						if BFL.IsForever then
+							friend.inviteAtlas = "default"
+						elseif not BFL.IsClassic then
+							local focused = accountInfo.gameAccountInfo
+							local faction = self:GetReadableInviteField(focused, "factionName")
+							friend.inviteAtlas = faction and faction ~= playerFactionGroup and
+								(faction == "Horde" and "horde" or faction == "Alliance" and "alliance" or nil) or "default"
 						end
 					end
 				else
@@ -5735,6 +5772,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 								friend.characterName = prefAccount.characterName
 								friend.className = prefAccount.className
 								friend.classID = prefAccount.classID
+								friend.classFilename = prefAccount.classFilename
 								friend.areaName = prefAccount.areaName
 								friend.level = prefAccount.characterLevel
 								friend.realmName = prefAccount.realmName
@@ -5759,6 +5797,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 								friend.characterName = nil
 								friend.className = nil
 								friend.classID = nil
+								friend.classFilename = nil
 								friend.areaName = nil
 								friend.level = nil
 								friend.realmName = nil
@@ -5767,6 +5806,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 								friend.characterName = nil
 								friend.className = nil
 								friend.classID = nil
+								friend.classFilename = nil
 								friend.areaName = nil
 								friend.level = nil
 								friend.realmName = nil
@@ -6651,12 +6691,13 @@ function FriendsList:ShowGameAccountPicker(anchorFrame, friend)
 				if ga.areaName and ga.areaName ~= "" then
 					label = label .. " - " .. ga.areaName
 				end
+				if display and display.restrictionText then label = label .. " (" .. display.restrictionText .. ")" end
 			else
 				-- Non-WoW: just richPresence, no character name
 				label = ga.richPresence or ga.clientProgram or "Unknown"
 			end
 
-			label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
+			label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16, ga.subIcon) .. label
 			table.insert(items, {
 				type = "radio",
 				text = label,
@@ -7219,6 +7260,56 @@ function FriendsList:DeleteGroup(groupId)
 	return success, err
 end
 
+function FriendsList:IsRegionalInviteTargetInGroup(characterName)
+	if (BFL.IsSecret and BFL:IsSecret(characterName)) or type(characterName) ~= "string" then return false end
+	local target = BFL.NormalizePlayerIdentityName(characterName)
+	if not target then return false end
+	target = target:lower()
+	local function Matches(unit)
+		local fullName = BFL.GetUnmodifiedUnitFullName and BFL.GetUnmodifiedUnitFullName(unit)
+		if not fullName and UnitName then
+			local first, surname = UnitName(unit)
+			if not (BFL.IsSecret and (BFL:IsSecret(first) or BFL:IsSecret(surname))) then
+				fullName = BFL.NormalizePlayerIdentityName(first, surname)
+			end
+		end
+		fullName = BFL.NormalizePlayerIdentityName(fullName)
+		return fullName ~= nil and fullName:lower() == target
+	end
+	if Matches("player") then return true end
+	local count = GetNumGroupMembers and GetNumGroupMembers() or 0
+	if (BFL.IsSecret and BFL:IsSecret(count)) or type(count) ~= "number"
+		or count < 0 or count >= math.huge or count % 1 ~= 0 then return false end
+	local raid = IsInRaid and IsInRaid()
+	if BFL.IsSecret and BFL:IsSecret(raid) then return false end
+	for index = 1, count do
+		if Matches((raid and "raid" or "party") .. index) then return true end
+	end
+	return false
+end
+
+function FriendsList:GetForeverGroupInviteTarget(friend)
+	if not self:IsReadableInviteRecord(friend) or not self:IsReadableInviteRecord(friend.invitableAccounts) then return nil end
+	local primaryID = self:GetReadableInviteField(friend.gameAccountInfo, "gameAccountID")
+	-- Keep the focused character when eligible, then use another known eligible
+	-- account instead of silently dispatching an incompatible primary login.
+	for pass = 1, 2 do
+		for _, account in ipairs(friend.invitableAccounts) do
+			if self:IsReadableInviteRecord(account) then
+				local id = self:GetReadableInviteField(account, "gameAccountID")
+				if (pass == 1 and id == primaryID) or (pass == 2 and id ~= primaryID) then
+					if self:GetGameAccountInviteRestriction(account) == INVITE_RESTRICTION_NONE then
+						local name = self:GetReadableInviteField(account, "characterName")
+						if type(id) == "number" and id > 0 and type(name) == "string" and name ~= ""
+							and not self:IsRegionalInviteTargetInGroup(name) then return account, name end
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
 -- Fix #33: Helper to count invitable friends in a group (same WoW version, not in party)
 function FriendsList:GetInvitableCount(groupId)
 	local DB = GetDB()
@@ -7228,6 +7319,7 @@ function FriendsList:GetInvitableCount(groupId)
 
 	-- Helper to check if already in party/raid
 	local function IsAlreadyInGroup(characterName)
+		if BFL.IsForever then return self:IsRegionalInviteTargetInGroup(characterName) end
 		if not characterName then
 			return false
 		end
@@ -7298,7 +7390,11 @@ function FriendsList:GetInvitableCount(groupId)
 				local characterName = nil
 
 				if friend.type == "bnet" then
-					if
+					if BFL.IsForever then
+						local account
+						account, characterName = self:GetForeverGroupInviteTarget(friend)
+						isValid = account ~= nil
+					elseif
 						friend.gameAccountInfo
 						and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
 						and friend.gameAccountInfo.gameAccountID
@@ -7333,6 +7429,7 @@ function FriendsList:InviteGroupToParty(groupId)
 
 	-- Fix #33: Helper to check if a character name is already in our party/raid
 	local function IsAlreadyInGroup(characterName)
+		if BFL.IsForever then return self:IsRegionalInviteTargetInGroup(characterName) end
 		if not characterName then
 			return false
 		end
@@ -7406,9 +7503,13 @@ function FriendsList:InviteGroupToParty(groupId)
 				-- Validate invitable status (BNet WoW or WoW friend)
 				local isValid = false
 				local characterName = nil
+				local selectedAccount
 
 				if friend.type == "bnet" then
-					if
+					if BFL.IsForever then
+						selectedAccount, characterName = self:GetForeverGroupInviteTarget(friend)
+						isValid = selectedAccount ~= nil
+					elseif
 						friend.gameAccountInfo
 						and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
 						and friend.gameAccountInfo.gameAccountID
@@ -7432,7 +7533,7 @@ function FriendsList:InviteGroupToParty(groupId)
 				end
 
 				if isValid then
-					table.insert(inviteCandidates, friend)
+					table.insert(inviteCandidates, { friend = friend, gameAccountInfo = selectedAccount or friend.gameAccountInfo })
 				end
 			end
 		end
@@ -7478,10 +7579,19 @@ function FriendsList:InviteGroupToParty(groupId)
 	-- 4. Execute Invites
 	local inviteCount = 0
 	for i = 1, inviteLimit do
-		local friend = inviteCandidates[i]
+		local friend = inviteCandidates[i].friend
 		if friend.type == "bnet" then
-			BFL.BNInviteFriend(friend.gameAccountInfo.gameAccountID)
-			inviteCount = inviteCount + 1
+			local account = inviteCandidates[i].gameAccountInfo
+			if BFL.IsForever then
+				local allowed, _, current = BFL.ValidateForeverInviteTarget(account)
+				if allowed and self:GetGameAccountInviteRestriction(current) == INVITE_RESTRICTION_NONE then
+					BFL.BNInviteFriend(current.gameAccountID)
+					inviteCount = inviteCount + 1
+				end
+			else
+				BFL.BNInviteFriend(account.gameAccountID)
+				inviteCount = inviteCount + 1
+			end
 		elseif friend.type == "wow" then
 			BFL.InviteUnit(friend.name)
 			inviteCount = inviteCount + 1
@@ -8522,12 +8632,12 @@ Button_OnDragStart = function(self)
 			-- Reset base text color to Gold to prevent tinting issues from previous drags
 			ghost.text:SetTextColor(colorR, colorG, colorB)
 
-			if self.friendData.className then
+			do
 				local classFile = GetClassFileForFriend(self.friendData)
 
-				local classColor = classFile and RAID_CLASS_COLORS[classFile]
+				local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 				if classColor then
-					text = "|c" .. (classColor.colorStr or "ffffffff") .. text .. "|r"
+					text = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(self.friendData)) .. text .. "|r"
 					colorR, colorG, colorB = classColor.r, classColor.g, classColor.b
 				end
 			end
@@ -8761,6 +8871,7 @@ function FriendsList:GetFormattedButtonText(friend)
 	local DB = GetDB()
 	local factionIcon, factionName = self:GetFriendFactionIcon(friend)
 	if not self.settingsCache.showFactionIcons then factionIcon = "" end
+	local locationText, locationKind = self:GetDisplayLocation(friend)
 
 	-- [STREAMER MODE LOGIC INTEGRATED]
 	-- We removed the early return here to allow formatted names (e.g. Nicknames)
@@ -8776,6 +8887,8 @@ function FriendsList:GetFormattedButtonText(friend)
 		friend._cache_text_version == currentSettingsVersion
 		and friend._cache_text_compact == isCompactMode
 		and friend._cache_text_factionIcon == factionIcon
+		and friend._cache_text_location == locationText
+		and friend._cache_text_locationKind == locationKind
 		and friend._cache_text_line1
 	then
 		return friend._cache_text_line1, friend._cache_text_line2
@@ -8921,9 +9034,9 @@ function FriendsList:GetFormattedButtonText(friend)
 
 				if useClassColor and not shouldGray then
 					local classFile = GetClassFileForFriend(friend)
-					local classColor = classFile and RAID_CLASS_COLORS[classFile]
+					local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 					if classColor then
-						line1Text = "|c" .. (classColor.colorStr or "ffffffff") .. characterName .. "|r"
+						line1Text = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(friend)) .. characterName .. "|r"
 					else
 						line1Text = characterName
 					end
@@ -8977,6 +9090,8 @@ function FriendsList:GetFormattedButtonText(friend)
 	friend._cache_text_version = currentSettingsVersion
 	friend._cache_text_compact = isCompactMode
 	friend._cache_text_factionIcon = factionIcon
+	friend._cache_text_location = locationText
+	friend._cache_text_locationKind = locationKind
 	friend._cache_text_line1 = line1Text
 	friend._cache_text_line1_base = line1BaseText
 	friend._cache_text_line1_suffix = line1SuffixText
@@ -9022,7 +9137,7 @@ local function HasAssignedTexture(texture)
 	return value ~= nil
 end
 
-local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersion, useModernTitleIcon, previewTexture)
+local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersion, useModernTitleIcon, previewTexture, subIcon)
 	if not texture then
 		return false
 	end
@@ -9041,7 +9156,8 @@ local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersio
 	end
 
 	local version = titleIconVersion or (Enum and Enum.TitleIconVersion and Enum.TitleIconVersion.Small)
-	local requestKey = clientProgram and version and (tostring(clientProgram) .. ":" .. tostring(version)) or nil
+	subIcon = BFL.Compat.GetClientSubIcon(subIcon)
+	local requestKey = clientProgram and version and (tostring(clientProgram) .. ":" .. tostring(version) .. ":" .. (subIcon or "")) or nil
 
 	if useModernTitleIcon then
 		if requestKey and texture.BFLTitleIconAppliedKey == requestKey and HasAssignedTexture(texture) then
@@ -9056,7 +9172,7 @@ local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersio
 		-- the deterministic local-texture branch above.
 		texture.BFLTitleIconRequestKey = nil
 		texture:SetTexture(nil)
-		local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+		local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version, subIcon)
 		if ok then
 			texture.BFLTitleIconAppliedKey = requestKey
 		else
@@ -9083,12 +9199,12 @@ local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersio
 	if requestKey and C_Texture and version then
 		local ready = false
 		if C_Texture.IsTitleIconTextureReady then
-			local ok, isReady = pcall(C_Texture.IsTitleIconTextureReady, clientProgram, version)
+			local ok, isReady = pcall(C_Texture.IsTitleIconTextureReady, clientProgram, version, subIcon)
 			ready = ok and isReady == true
 		end
 
 		if ready and C_Texture.SetTitleIconTexture then
-			local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+			local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version, subIcon)
 			if ok then
 				texture.BFLTitleIconRequestKey = nil
 				texture.BFLTitleIconAppliedKey = requestKey
@@ -9113,17 +9229,17 @@ local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersio
 				if iconSize then
 					texture:SetSize(iconSize, iconSize)
 				end
-			end)
+			end, subIcon)
 			if ok then
 				-- Match Blizzard's card path as well. SetTitleIconTexture can
 				-- populate the region before the explicit resolver completes.
 				if texture.BFLTitleIconRequestKey == requestKey and C_Texture.SetTitleIconTexture then
-					pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+					pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version, subIcon)
 				end
 				return true
 			end
 		elseif C_Texture.SetTitleIconTexture then
-			local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version)
+			local ok = pcall(C_Texture.SetTitleIconTexture, texture, clientProgram, version, subIcon)
 			if ok then
 				texture.BFLTitleIconRequestKey = nil
 				texture.BFLTitleIconAppliedKey = requestKey
@@ -9139,24 +9255,25 @@ local function ApplyClientIcon(texture, clientProgram, iconSize, titleIconVersio
 end
 
 -- Returns an embedded texture string (|T...|t) for a game client icon, for use in text/menu labels
-function BFL:GetClientEmbeddedIcon(clientProgram, size)
+function BFL:GetClientEmbeddedIcon(clientProgram, size, subIcon)
 	if not clientProgram then
 		return ""
 	end
 	size = size or 16
+	subIcon = BFL.Compat.GetClientSubIcon(subIcon)
 	-- Retail: Use C_Texture API for proper high-res icon
 	if C_Texture and C_Texture.GetTitleIconTexture and C_Texture.IsTitleIconTextureReady then
 		if
 			Enum
 			and Enum.TitleIconVersion
-			and C_Texture.IsTitleIconTextureReady(clientProgram, Enum.TitleIconVersion.Small)
+			and C_Texture.IsTitleIconTextureReady(clientProgram, Enum.TitleIconVersion.Small, subIcon)
 		then
 			local iconStr = ""
 			C_Texture.GetTitleIconTexture(clientProgram, Enum.TitleIconVersion.Small, function(success, texture)
 				if success and BNet_GetClientEmbeddedTexture then
 					iconStr = BNet_GetClientEmbeddedTexture(texture, size, size, 0) .. " "
 				end
-			end)
+			end, subIcon)
 			if iconStr ~= "" then
 				return iconStr
 			end
@@ -9253,7 +9370,8 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 			iconSize,
 			Enum and Enum.TitleIconVersion and Enum.TitleIconVersion.Small,
 			modern,
-			entryData.previewTitleIcon
+			entryData.previewTitleIcon,
+			entryData.subIcon
 		)
 		entryFrame.icon:SetSize(iconSize, iconSize)
 		entryFrame.icon:Show()
@@ -9293,6 +9411,7 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 			-- Non-WoW game: name IS the richPresence already (set in BuildMultiAccountRowData)
 			-- No additional info to append
 		end
+		if entryData.restrictionText then displayText = displayText .. " (" .. entryData.restrictionText .. ")" end
 
 		entryFrame.text:SetText(displayText)
 
@@ -9756,12 +9875,14 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		-- Set game icon using Blizzard's modern API
 		if showGameIcon and friend.gameAccountInfo and friend.gameAccountInfo.clientProgram and friend.connected then
 			local clientProgram = friend.gameAccountInfo.clientProgram
+			local subIcon = BFL.Compat.GetClientSubIcon(friend.gameAccountInfo.subIcon)
 			local previewTitleIcon = friend._isMock
 				and (friend._previewTitleIcon or friend.gameAccountInfo._previewTitleIcon)
 				or nil
 
 			local iconCacheKey = (modern and "modern-title:" or "legacy-title:")
 				.. clientProgram
+				.. ":" .. (subIcon or "")
 				.. ":"
 				.. tostring(previewTitleIcon or "")
 			local hasResolvedIcon = HasAssignedTexture(button.gameIcon)
@@ -9772,7 +9893,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 					nil,
 					Enum and Enum.TitleIconVersion and Enum.TitleIconVersion.Medium,
 					modern,
-					previewTitleIcon
+					previewTitleIcon,
+					subIcon
 				)
 				button.lastClientProgram = iconCacheKey
 			end

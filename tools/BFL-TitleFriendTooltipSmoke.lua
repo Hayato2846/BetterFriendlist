@@ -68,7 +68,7 @@ local env = setmetatable({ BFL = BFL, UIParent = widget(), CreateFrame = functio
 	BNET_FRIEND_TOOLTIP_ZONE_AND_REALM = "Zone: %s\nRealm: %s", BNET_FRIEND_TOOLTIP_ZONE_AND_REGION = "Zone: %s\nRegion: %s",
 	FRIENDS_LIST_OFFLINE = "Offline", CANNOT_COOPERATE_LABEL = "*", FRIENDS_TOOLTIP_TOO_MANY_CHARACTERS = "+%d characters",
 	FRIENDS_BNET_NAME_COLOR = { r = 0.51, g = 0.77, b = 1 }, FRIENDS_GRAY_COLOR = { r = 0.5, g = 0.5, b = 0.5 },
-	RAID_CLASS_COLORS = { ROGUE = { colorStr = "fffff569" } }, BetterFriendlistDB = { colorClassNames = true },
+	RAID_CLASS_COLORS = { ROGUE = { r = 1, g = 245/255, b = 105/255, colorStr = "fffff569" } }, BetterFriendlistDB = { colorClassNames = true },
 	BFL_Tooltip = widget(),
 }, { __index = _G })
 env._G = env
@@ -91,6 +91,7 @@ local function execute(text, label)
 	return assert(load(text, "@" .. label, "t", env))("BetterFriendlist", BFL)
 end
 execute(read(repo, "Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
+execute(read(repo, "Data/ClassColors.lua"), "Data/ClassColors.lua")
 execute(read(repo, "Utils/ClassUtils.lua"), "Utils/ClassUtils.lua")
 local nativePath, nativeSource
 for _, path in ipairs({ "Interface/AddOns/Blizzard_FriendsFrame/Camelot/FriendsFrame.lua",
@@ -146,7 +147,7 @@ equal(nameOccurrences(), 1, "An online Title character appears only once")
 check(not header:IsShown(), "The redundant Title account header is hidden")
 check(name:IsShown() and name.text:find("|cfffff569Raizor Shadowstalke|r", 1, true), "The retained character uses class color")
 check(name.text:find("7 Human Rogue", 1, true), "Level, race and class remain available")
-equal(info.text, "Zone: Elwynn Forest\nRealm: Classic Beta PvE 2", "Zone and realm remain available")
+equal(info.text, "Elwynn Forest", "Forever hides the realm when its ruleset is unknown")
 equal(env.FriendsTooltipNoteText.text, "ABC", "The friend note remains available")
 equal(env.FriendsTooltip.ContactMemoryLines[2].text, "DPS, Healer, Tank", "Friend tags remain available")
 local point, relative, relativePoint, x, y = name:GetPoint(1)

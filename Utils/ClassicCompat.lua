@@ -1464,6 +1464,7 @@ end
 
 -- Older FriendsFrame helpers depend on faction/realm locals initialized by
 -- its OnShow. BFL keeps that frame hidden, so prefer the stateless native API.
+local IsReadableGameAccountInfo
 function Compat.GetBNetInviteTooltipInfo(friendIndex)
 	local util = FriendsListUtil
 	local restrictionTypes = BattleNetFriendPartyInviteRestrictionType
@@ -1477,24 +1478,62 @@ function Compat.GetBNetInviteTooltipInfo(friendIndex)
 		return nil
 	end
 	local ok, info = pcall(util.GetBattleNetFriendInviteInfo, friendIndex)
-	local restrictionOK, restrictionText = pcall(function()
+	local restrictionOK, restrictionText, selectedAccount = pcall(function()
 		-- A valid account wins; otherwise show the highest-priority native reason.
 		-- Do not seed with None: Retail's aggregate helper can mask real blocks.
 		local restriction = restrictionTypes.NoGameAccounts
+		local selectedText
+		local priority = restrictionPriority[restriction] or 0
 		for accountIndex = 1, C_BattleNet.GetFriendNumGameAccounts(friendIndex) do
 			local accountInfo = C_BattleNet.GetFriendGameAccountInfo(friendIndex, accountIndex)
 			local accountRestriction = util.GetGameAccountPartyInviteRestriction(accountInfo)
-			if accountRestriction == restrictionTypes.None then
-				return ""
+			local customReason
+			if BFL.IsForever and IsReadableGameAccountInfo(accountInfo) then
+				local faction = accountInfo.factionName
+				local playerOK, playerFaction = false, nil
+				if type(UnitFactionGroup) == "function" then playerOK, playerFaction = pcall(UnitFactionGroup, "player") end
+				local readableFactions = playerOK and not (BFL.IsSecret and (BFL:IsSecret(faction) or BFL:IsSecret(playerFaction)))
+					and type(faction) == "string" and type(playerFaction) == "string"
+					and faction ~= "" and playerFaction ~= ""
+				if accountRestriction == restrictionTypes.None and readableFactions and faction ~= playerFaction then
+					accountRestriction = restrictionTypes.Faction
+				end
+				if accountRestriction == restrictionTypes.None then
+					customReason = Compat.GetForeverRulesetInviteRestriction(accountInfo)
+					if customReason then accountRestriction = BFL.INVITE_RESTRICTION_RULESET end
+				end
 			end
-			if (restrictionPriority[accountRestriction] or 0) > (restrictionPriority[restriction] or 0) then
+			if accountRestriction == restrictionTypes.None then
+				return "", accountInfo
+			end
+			local accountPriority = customReason and (restrictionPriority[restrictionTypes.IncompatibleGameMode] or 12)
+				or (restrictionPriority[accountRestriction] or 0)
+			if accountPriority > priority then
 				restriction = accountRestriction
+				priority, selectedText = accountPriority, customReason
 			end
 		end
-		return util.GetBattleNetFriendPartyInviteRestrictionText(restriction)
+		return selectedText or util.GetBattleNetFriendPartyInviteRestrictionText(restriction)
 	end)
-	if not ok or type(info) ~= "table" or not restrictionOK then
+	if not ok or not IsReadableGameAccountInfo(info) or not restrictionOK then
 		return nil
+	end
+	if BFL.IsForever and IsReadableGameAccountInfo(selectedAccount) then
+		-- The native selector only prefers faction. Choose the account that also
+		-- passed the ruleset check, without modifying its native snapshot or info.
+		local guid, faction = selectedAccount.playerGuid, selectedAccount.factionName
+		if BFL.IsSecret and (BFL:IsSecret(guid) or BFL:IsSecret(faction)) then return nil end
+		local inviteType
+		if type(GetDisplayedInviteType) == "function" then
+			local typeOK, value = pcall(GetDisplayedInviteType, guid)
+			if typeOK and not (BFL.IsSecret and BFL:IsSecret(value)) and type(value) == "string" then inviteType = value end
+		end
+		local nativeGUID, nativeType = info.playerGUID, info.inviteType
+		if not inviteType and not (BFL.IsSecret and (BFL:IsSecret(nativeGUID) or BFL:IsSecret(nativeType)))
+			and nativeGUID == guid and type(nativeType) == "string"
+		then inviteType = nativeType end
+		info = { inviteType = inviteType, playerGUID = guid, factionName = faction,
+			isCrossFaction = false, gameAccountID = selectedAccount.gameAccountID }
 	end
 	return info, restrictionText
 end
@@ -1578,6 +1617,252 @@ local function IsSafeNameValue(value)
 		and value ~= ""
 end
 
+IsReadableGameAccountInfo = function(info)
+	if (BFL.IsSecret and BFL:IsSecret(info)) or type(info) ~= "table" then
+		return false
+	end
+	if type(issecrettable) == "function" then
+		local ok, secret = pcall(issecrettable, info)
+		if not ok or (BFL.IsSecret and BFL:IsSecret(secret)) or secret then
+			return false
+		end
+	end
+	return true
+end
+
+-- Camelot's ProjectConstants.lua defines 18. Retail does not necessarily load
+-- WOW_PROJECT_CAMELOT, but can still receive a Forever friend's game account.
+local FOREVER_PROJECT_ID = WOW_PROJECT_CAMELOT or 18
+local FOREVER_RULESET_TOKENS = { "PVP", "PVE", "RP" }
+local FOREVER_RULESET_LABEL_KEYS = {
+	PVE = "RULESET_TYPE_NORMAL", PVP = "RULESET_TYPE_PVP",
+	RP = "RULESET_TYPE_RP", RPPVP = "RULESET_TYPE_RPPVP",
+}
+-- BFL's own restriction values 0..13 are used by its invite UI. Do not extend
+-- Blizzard's BattleNetFriendPartyInviteRestrictionType or priority tables.
+BFL.INVITE_RESTRICTION_RULESET = 14
+
+local function HasForeverRulesetToken(text, token)
+	return text:find("%f[%w_]" .. token .. "%f[^%w_]") ~= nil
+end
+
+function Compat.IsWoWAccountRulesetLocation(gameAccountInfo)
+	if not IsReadableGameAccountInfo(gameAccountInfo) then
+		return BFL.IsForever == true
+	end
+	local projectID = gameAccountInfo.wowProjectID
+	if (BFL.IsSecret and BFL:IsSecret(projectID)) or projectID == nil then
+		return BFL.IsForever == true
+	end
+	return projectID == FOREVER_PROJECT_ID
+end
+
+local function GetForeverRealmRuleset(realmName)
+	if not IsSafeNameValue(realmName) then
+		return nil
+	end
+	local text = realmName:upper()
+	-- GetNormalizedRealmName removes spaces, including those around the type.
+	-- Accept only the observed CAMWOW + region/shard + Realm + number shape.
+	local normalizedType = text:match("^CAMWOW[A-Z]+%d+REALM%d+([A-Z]+)$")
+	if normalizedType == "RPPVP" or normalizedType == "PVP"
+		or normalizedType == "PVE" or normalizedType == "RP"
+	then
+		return normalizedType
+	end
+	-- Match the complete combined token before the shorter RP/PVP tokens.
+	if HasForeverRulesetToken(text, "RPPVP") or HasForeverRulesetToken(text, "RP%-PVP")
+		or HasForeverRulesetToken(text, "RP%s+PVP")
+	then
+		return "RPPVP"
+	end
+	local result
+	for _, token in ipairs(FOREVER_RULESET_TOKENS) do
+		if HasForeverRulesetToken(text, token) then
+			if result then return nil end -- Conflicting types are not evidence.
+			result = token
+		end
+	end
+	return result
+end
+
+local function GetForeverPresenceRuleset(richPresence)
+	if not IsSafeNameValue(richPresence) then return nil end
+	-- FriendsList already reads "Zone - Realm" from this target's own native
+	-- rich presence. Accept only a CAMWOW realm suffix, never arbitrary PvP text
+	-- in an area/status or a caller's fallback realm (which may be unrelated).
+	local start, _, normalizedRealm = richPresence:upper():find(" %- (CAMWOW.+)$")
+	if normalizedRealm and (normalizedRealm:match("^CAMWOW%s+[A-Z]+%d+%s+REALM%s+%d+%s+")
+		or normalizedRealm:match("^CAMWOW[A-Z]+%d+REALM%d+"))
+	then
+		local token = GetForeverRealmRuleset(normalizedRealm)
+		if token then return token, richPresence:sub(start + 3) end
+	end
+	return nil
+end
+
+local function GetForeverAccountRuleset(gameAccountInfo)
+	local realm = gameAccountInfo.realmName
+	local token = GetForeverRealmRuleset(realm)
+	if not token then
+		realm = gameAccountInfo.realmDisplayName
+		token = GetForeverRealmRuleset(realm)
+	end
+	if not token then
+		token, realm = GetForeverPresenceRuleset(gameAccountInfo.richPresence)
+	end
+	return token, realm
+end
+
+local function GetForeverRulesetLabel(gameAccountInfo)
+	local token, realm = GetForeverAccountRuleset(gameAccountInfo)
+	-- RealmList's native labels belong to GlueXML and are not guaranteed in
+	-- the in-game addon environment. Use BFL's always-loaded locale catalog.
+	local key = token and FOREVER_RULESET_LABEL_KEYS[token]
+	local label = key and BFL.L and BFL.L[key]
+	if IsSafeNameValue(label) then return label, realm end
+	return "", nil
+end
+
+local function IsReadableAccountID(value)
+	return not (BFL.IsSecret and BFL:IsSecret(value)) and type(value) == "number"
+		and value > 0 and value < math.huge and value % 1 == 0
+end
+
+local function ReadPlayerForeverRuleset(getter)
+	if type(getter) ~= "function" then return nil end
+	local ok, realm = pcall(getter)
+	return ok and GetForeverRealmRuleset(realm) or nil
+end
+
+local function GetPlayerForeverRuleset()
+	return ReadPlayerForeverRuleset(GetRealmName) or ReadPlayerForeverRuleset(GetNormalizedRealmName)
+end
+
+-- Default calls only inspect the supplied target snapshot. Dispatch callers
+-- request a fresh account record and must use its fourth return for identity
+-- and native restrictions; a missing record is not proof of availability.
+function Compat.GetForeverRulesetInviteRestriction(gameAccountInfo, refresh)
+	if BFL.IsForever ~= true then return nil, nil, nil, gameAccountInfo end
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return nil end
+	local current = gameAccountInfo
+	if refresh then
+		local id = current.gameAccountID
+		local getter = C_BattleNet and C_BattleNet.GetGameAccountInfoByID
+		if not IsReadableAccountID(id) or type(getter) ~= "function" then return nil end
+		local ok, record = pcall(getter, id)
+		if not ok or not IsReadableGameAccountInfo(record) then return nil end
+		local currentID = record.gameAccountID
+		if not IsReadableAccountID(currentID) or currentID ~= id then return nil end
+		current = record
+	end
+	local project, client = current.wowProjectID, current.clientProgram
+	if (BFL.IsSecret and (BFL:IsSecret(project) or BFL:IsSecret(client)))
+		or client ~= (BNET_CLIENT_WOW or "WoW")
+		or (project ~= nil and project ~= FOREVER_PROJECT_ID)
+	then return nil, nil, nil, current end
+	local targetToken = GetForeverAccountRuleset(current)
+	if not targetToken then return nil, nil, nil, current end
+	local playerToken = GetPlayerForeverRuleset()
+	if not playerToken or targetToken == playerToken then return nil, targetToken, playerToken, current end
+	local L = BFL.L or {}
+	return L.INVITE_RESTRICTION_RULESET, targetToken, playerToken, current
+end
+
+-- Additional BFL guard, not server authorization. Never switch a captured
+-- character to another character that has since occupied its game account.
+function Compat.ValidateForeverInviteTarget(gameAccountInfo)
+	if BFL.IsForever ~= true then return true, nil, gameAccountInfo end
+	local noInfo = IsSafeNameValue(ERR_TRAVEL_PASS_NO_INFO) and ERR_TRAVEL_PASS_NO_INFO or nil
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return false, noInfo end
+	local reason, _, _, current = Compat.GetForeverRulesetInviteRestriction(gameAccountInfo, true)
+	if not current then return false, noInfo end
+	local capturedGUID, currentGUID = gameAccountInfo.playerGuid, current.playerGuid
+	if BFL.IsSecret and (BFL:IsSecret(capturedGUID) or BFL:IsSecret(currentGUID)) then return false, noInfo end
+	if not IsSafeNameValue(capturedGUID) or currentGUID ~= capturedGUID then return false, noInfo end
+	local client, project, online = current.clientProgram, current.wowProjectID, current.isOnline
+	if (BFL.IsSecret and (BFL:IsSecret(client) or BFL:IsSecret(project) or BFL:IsSecret(online)))
+		or client ~= (BNET_CLIENT_WOW or "WoW")
+		or online ~= true
+		or (project ~= nil and project ~= FOREVER_PROJECT_ID)
+	then return false, noInfo end
+	local capturedProject = gameAccountInfo.wowProjectID
+	if not (BFL.IsSecret and BFL:IsSecret(capturedProject)) and capturedProject ~= nil
+		and project ~= nil and project ~= capturedProject
+	then return false, noInfo end
+	local faction = current.factionName
+	local ok, playerFaction
+	if type(UnitFactionGroup) == "function" then ok, playerFaction = pcall(UnitFactionGroup, "player") end
+	if ok and not (BFL.IsSecret and (BFL:IsSecret(faction) or BFL:IsSecret(playerFaction)))
+		and IsSafeNameValue(faction) and IsSafeNameValue(playerFaction) and faction ~= playerFaction
+	then
+		return false, IsSafeNameValue(ERR_TRAVEL_PASS_NOT_ALLIED) and ERR_TRAVEL_PASS_NOT_ALLIED or nil, current
+	end
+	if reason then return false, reason, current end
+	if type(BFL.GetModule) == "function" then
+		local modelOK, model = pcall(BFL.GetModule, BFL, "FriendsList")
+		if not modelOK or (BFL.IsSecret and BFL:IsSecret(model)) then return false, noInfo, current end
+		if model ~= nil then
+			if not IsReadableGameAccountInfo(model) then return false, noInfo, current end
+			local checker = model.GetGameAccountInviteRestriction
+			if type(checker) == "function" then
+				-- This production checker uses the pure ruleset helper, not this
+				-- validator. Reapply native eligibility to the refreshed account.
+				local checked, restriction, detail = pcall(checker, model, current)
+				if not checked or (BFL.IsSecret and BFL:IsSecret(restriction)) or type(restriction) ~= "number" then
+					return false, noInfo, current
+				end
+				if restriction ~= 0 then
+					local text = IsSafeNameValue(detail) and detail or nil
+					if not text and type(BFL.GetInviteRestrictionText) == "function" then
+						local textOK, value = pcall(BFL.GetInviteRestrictionText, restriction)
+						if textOK and IsSafeNameValue(value) then text = value end
+					end
+					return false, text or noInfo, current
+				end
+			end
+		end
+	end
+	return true, nil, current
+end
+
+-- Display only: never substitute this result for a realm in character names,
+-- contact keys, invites or account identity. Forever publishes no target
+-- ruleset field; recognize the user-verified type tokens in that account's
+-- own realm text instead. Unknown text stays empty, without player-rule data.
+function Compat.GetWoWAccountLocation(gameAccountInfo, fallbackRealm)
+	local kind = Compat.IsWoWAccountRulesetLocation(gameAccountInfo) and "ruleset" or "realm"
+	if BFL.IsSecret and BFL:IsSecret(gameAccountInfo) then
+		return "", kind
+	end
+	if gameAccountInfo ~= nil then
+		if not IsReadableGameAccountInfo(gameAccountInfo) then
+			return "", kind
+		end
+		local projectID, client = gameAccountInfo.wowProjectID, gameAccountInfo.clientProgram
+		if (BFL.IsSecret and (BFL:IsSecret(projectID) or BFL:IsSecret(client)))
+			or (projectID ~= nil and type(projectID) ~= "number")
+			or (client ~= nil and client ~= (BNET_CLIENT_WOW or "WoW"))
+		then
+			return "", kind
+		end
+	end
+	if kind == "ruleset" then
+		local label, realm
+		if gameAccountInfo then label, realm = GetForeverRulesetLabel(gameAccountInfo) end
+		return label or "", kind, realm
+	end
+	if gameAccountInfo then
+		if IsSafeNameValue(gameAccountInfo.realmDisplayName) then
+			return gameAccountInfo.realmDisplayName, kind
+		end
+		if IsSafeNameValue(gameAccountInfo.realmName) then
+			return gameAccountInfo.realmName, kind
+		end
+	end
+	return IsSafeNameValue(fallbackRealm) and fallbackRealm or "", kind
+end
+
 -- Display only; do not use this to rewrite GUIDs, contact keys or whisper IDs.
 function Compat.FormatPlayerDisplayName(name, realmName, separator)
 	if not IsSafeNameValue(name) then
@@ -1650,6 +1935,36 @@ local function TrimNameValue(value)
 	return value ~= "" and value or nil
 end
 
+local function GetSurnameSeparator()
+	local separators = Constants and Constants.CharacterNameSeparatorConsts
+	local separator = separators and separators.CHARACTERNAME_SURNAME_SEPARATOR
+	return IsSafeNameValue(separator) and separator or "-"
+end
+
+-- Use the client's surname separator, including when callers pass a display
+-- name with whitespace or an older manually stored First-Last spelling.
+local function NormalizeRegionalName(name, surname)
+	local firstName, lastName = name:match("^([^%s%-]+)%s+([^%s%-]+)$")
+	if not firstName then
+		firstName, lastName = name:match("^([^%s%-]+)%-([^%s%-]+)$")
+	end
+	if firstName then
+		name, surname = firstName, lastName
+	elseif name:find("%s") or name:find("-", 1, true) then
+		return name
+	end
+	if surname then
+		if NameUtil and type(NameUtil.GetFullNameWithoutRealm) == "function" then
+			local ok, fullName = pcall(NameUtil.GetFullNameWithoutRealm, name, surname)
+			if ok and IsSafeNameValue(fullName) and fullName ~= name then
+				return fullName
+			end
+		end
+		return name .. GetSurnameSeparator() .. surname
+	end
+	return name
+end
+
 function Compat.GetUnmodifiedUnitFullName(unit)
 	if NameUtil and type(NameUtil.GetUnmodifiedUnitFullName) == "function" then
 		local ok, fullName = pcall(NameUtil.GetUnmodifiedUnitFullName, unit)
@@ -1678,7 +1993,7 @@ function Compat.SplitPlayerName(fullName)
 		return nil, nil
 	end
 	if Compat.AreRegionalUniqueNamesEnabled() then
-		return fullName, nil
+		return NormalizeRegionalName(fullName), nil
 	end
 	if NameUtil and type(NameUtil.SplitPlayerNameIntoParts) == "function" then
 		local ok, name, realm = pcall(NameUtil.SplitPlayerNameIntoParts, fullName)
@@ -1718,15 +2033,7 @@ function Compat.NormalizePlayerName(name, realmOrSurname, fallbackRealm)
 	end
 
 	if Compat.AreRegionalUniqueNamesEnabled() then
-		if realmOrSurname and not name:find("-", 1, true)
-			and NameUtil and type(NameUtil.GetFullNameWithoutRealm) == "function"
-		then
-			local ok, fullName = pcall(NameUtil.GetFullNameWithoutRealm, name, realmOrSurname)
-			if ok and IsSafeNameValue(fullName) then
-				return fullName
-			end
-		end
-		return name
+		return NormalizeRegionalName(name, realmOrSurname)
 	end
 
 	if name:find("-", 1, true) then
@@ -2237,12 +2544,20 @@ function Compat.GetAtlasMarkup(atlasName, width, height, offsetX, offsetY, rVert
 	return string.format("|A:%s:%d:%d:%d:%d|a", atlasName, height, width, offsetX, offsetY)
 end
 
-function Compat.GetClientProgramIconPrefix(clientProgram, iconSize)
+function Compat.GetClientSubIcon(subIcon)
+	if (BFL.IsSecret and BFL:IsSecret(subIcon)) or type(subIcon) ~= "string" or subIcon == "" then
+		return nil
+	end
+	return subIcon
+end
+
+function Compat.GetClientProgramIconPrefix(clientProgram, iconSize, subIcon)
 	if type(clientProgram) ~= "string" or clientProgram == "" then
 		return ""
 	end
 
 	iconSize = tonumber(iconSize) or 32
+	subIcon = Compat.GetClientSubIcon(subIcon)
 	local textureAPI = C_Texture
 	local titleIconVersions = Enum and Enum["TitleIconVersion"]
 	local titleIconVersion = titleIconVersions and titleIconVersions.Small
@@ -2256,7 +2571,7 @@ function Compat.GetClientProgramIconPrefix(clientProgram, iconSize)
 		return ""
 	end
 
-	local readyOK, ready = pcall(textureAPI.IsTitleIconTextureReady, clientProgram, titleIconVersion)
+	local readyOK, ready = pcall(textureAPI.IsTitleIconTextureReady, clientProgram, titleIconVersion, subIcon)
 	if not (readyOK and ready) then
 		return ""
 	end
@@ -2266,7 +2581,7 @@ function Compat.GetClientProgramIconPrefix(clientProgram, iconSize)
 		if success and texture then
 			text = BNet_GetClientEmbeddedTexture(texture, iconSize, iconSize, 0) .. " "
 		end
-	end)
+	end, subIcon)
 	if not fetchOK then
 		return ""
 	end
@@ -3157,7 +3472,11 @@ local function GetExactPlayerNameForPartyAction(nameOrUnit)
 		exists = value
 	end
 	if not exists then
-		return nameOrUnit, false
+		return Compat.AreRegionalUniqueNamesEnabled() and Compat.NormalizePlayerName(nameOrUnit) or nameOrUnit, false
+	end
+	if Compat.AreRegionalUniqueNamesEnabled() then
+		local fullName = Compat.GetUnmodifiedUnitFullName(nameOrUnit)
+		return fullName and Compat.NormalizePlayerName(fullName) or nil, true
 	end
 
 	local name, realm
@@ -3642,7 +3961,7 @@ BFL.OpenContextMenu = function(button, menuType, contextData, name)
 		contextData.bflOrigin = ADDON_NAME
 		contextData.ownerFrame = contextData.ownerFrame or button
 	end
-	if BFL.HasSecretValues and BFL.OpenBetterFriendlistContextMenu then
+	if (BFL.HasSecretValues or BFL.IsForever) and BFL.OpenBetterFriendlistContextMenu then
 		PrepareUnitPopupContext(menuType, contextData)
 		if BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name) then
 			return
@@ -3691,6 +4010,12 @@ BFL.CanSetAppearOffline = Compat.CanSetAppearOffline
 BFL.SetMyBNetStatus = Compat.SetMyBNetStatus
 BFL.GetBNetFriendInfo = Compat.GetBNetFriendInfo
 BFL.GetBNetFriendGameAccountInfo = Compat.GetBNetFriendGameAccountInfo
+BFL.IsWoWAccountRulesetLocation = Compat.IsWoWAccountRulesetLocation
+BFL.GetWoWAccountLocation = Compat.GetWoWAccountLocation
+BFL.GetForeverRulesetInviteRestriction = Compat.GetForeverRulesetInviteRestriction
+BFL.ValidateForeverInviteTarget = Compat.ValidateForeverInviteTarget
+Compat.IsReadableGameAccountInfo = IsReadableGameAccountInfo
+BFL.IsReadableGameAccountInfo = IsReadableGameAccountInfo
 BFL.GetSafeFrameStrata = Compat.GetSafeFrameStrata
 BFL.IsBNetInviteRealmRestricted = Compat.IsBNetInviteRealmRestricted
 BFL.GetBNetInviteTooltipInfo = Compat.GetBNetInviteTooltipInfo

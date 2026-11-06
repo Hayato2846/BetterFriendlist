@@ -51,7 +51,8 @@ local function setup(accounts, options)
 	function BFL:RegisterEventCallback(event, callback) eventCallbacks[event] = callback end
 	BFL.FontManager = { ResolveFontPath = function() return "TestFont" end, GetFontFlags = function() return "" end }
 	local settings = { quickFilter = "all", primarySort = "status", secondarySort = "name", colorClassNames = options.colorClassNames == true,
-		showFactionIcons = options.showFactionIcons == true, compactMode = options.compact == true }
+		showFactionIcons = options.showFactionIcons == true, compactMode = options.compact == true,
+		enableSmoothScrolling = options.smoothScrolling }
 	BFL.modules.DB = {
 		Get = function(_, key, fallback) if not key then return settings end; if settings[key] ~= nil then return settings[key] end; return fallback end,
 		Set = function(_, key, value) settings[key] = value end,
@@ -75,7 +76,7 @@ local function setup(accounts, options)
 		C_QuestSession = { Exists = function() return false end },
 		C_GameRules = { GetActiveGameMode = function() return 0 end },
 		RegionalUniqueNamesEnabled = function() return not options.classic end,
-		RAID_CLASS_COLORS = { WARRIOR = { colorStr = "ffc79c6e" }, MAGE = { colorStr = "ff69ccf0" } },
+		RAID_CLASS_COLORS = { WARRIOR = { r = 199/255, g = 156/255, b = 110/255, colorStr = "ffc79c6e" }, MAGE = { r = 105/255, g = 204/255, b = 240/255, colorStr = "ff69ccf0" } },
 		wipe = function(value) for key in pairs(value) do value[key] = nil end; return value end,
 		strtrim = function(value) return value:match("^%s*(.-)%s*$") end,
 		strsplit = function(delimiter, value)
@@ -103,6 +104,7 @@ local function setup(accounts, options)
 	env.C_FriendList = { GetNumFriends = function() return 0 end }
 	local function execute(content, label) return assert(load(content, "@" .. label, "t", env))("BetterFriendlist", BFL) end
 	execute(read("Locales/enUS.lua"), "Locales/enUS.lua")
+	execute(read("Data/ClassColors.lua"), "Data/ClassColors.lua")
 	execute(read("Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
 	execute(read("Modules/KnownCharacters.lua"), "Modules/KnownCharacters.lua")
 	execute(read("Utils/ClassUtils.lua"), "Utils/ClassUtils.lua")
@@ -127,8 +129,8 @@ local function setup(accounts, options)
 	}
 end
 -- A layout switch replaces the view without rebinding the animated scroll pair.
-do
-	local context = setup({})
+for _, preference in ipairs({ {}, { value = false }, { value = true } }) do
+	local context = setup({}, { smoothScrolling = preference.value })
 	local bindings = 0
 	local function ScrollControl()
 		return {
@@ -144,20 +146,29 @@ do
 	end
 	context.env.ScrollUtil = {
 		InitScrollBoxListWithScrollBar = function(box, bar, view)
-			check(box.interpolate and bar.interpolate, "Interpolation is enabled before Blizzard binds the pair")
+			equal(box.interpolate, preference.value == true, "Saved interpolation preference applies before Blizzard binds the ScrollBox")
+			equal(bar.interpolate, preference.value == true, "Saved interpolation preference applies before Blizzard binds the scroll bar")
 			bindings = bindings + 1
 			box:SetView(view)
 		end,
 	}
 	context.BFL.HasModernScrollBox = true
 	context.list:InitializeScrollBox()
-	check(scrollBox.interpolate and scrollBar.interpolate, "Both native scroll controls opt into interpolation")
+	equal(scrollBox.interpolate, preference.value == true, "Smooth scrolling requires explicit opt-in")
+	equal(scrollBar.interpolate, preference.value == true, "Both native scroll controls share the preference")
 	equal(bindings, 1, "The scroll pair is bound on first initialization")
 	local firstView = scrollBox.view
 	context.list:InitializeScrollBox()
 	check(scrollBox.view ~= firstView, "A layout switch replaces the scroll view")
 	equal(bindings, 1, "A layout switch keeps the existing scroll binding")
-	check(scrollBox.interpolate and scrollBar.interpolate, "Interpolation survives the layout switch")
+	equal(scrollBox.interpolate, preference.value == true, "The interpolation preference survives the layout switch")
+	equal(scrollBar.interpolate, preference.value == true, "The bar preference survives the layout switch")
+	context.BFL.modules.DB:Set("enableSmoothScrolling", true)
+	equal(context.list:ApplyScrollInterpolation(), true, "Preference can be enabled live")
+	context.BFL.modules.DB:Set("enableSmoothScrolling", false)
+	equal(context.list:ApplyScrollInterpolation(), false, "Preference can be disabled live")
+	check(not scrollBox.interpolate and not scrollBar.interpolate, "Live disable immediately restores stepped scrolling")
+	equal(bindings, 1, "Live preference changes do not rebind native callbacks")
 end
 
 local function visibleCount(context)

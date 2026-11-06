@@ -160,6 +160,8 @@ local function GetBFLInviteRestrictionText(restriction, locale)
 		return L.TRAVEL_PASS_QUEST_SESSION or "Quest Session"
 	elseif restriction == BFL_INVITE_RESTRICTION_GAME_MODE then
 		return ERR_TRAVEL_PASS_GAME_MODE or L.TRAVEL_PASS_GAME_MODE or "Different game mode"
+	elseif restriction == BFL.INVITE_RESTRICTION_RULESET then
+		return L.INVITE_RESTRICTION_RULESET
 	end
 	return nil
 end
@@ -2482,6 +2484,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if not entry or entry.isInvitable == false or not entry.gameAccountID then
 					return false
 				end
+				if BFL.IsForever and not BFL.ValidateForeverInviteTarget(entry.raw or entry) then
+					return false
+				end
 
 				local inviteType = entry.inviteType or BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
 				if FriendsFrame_InviteOrRequestToJoin and entry.playerGuid then
@@ -3023,7 +3028,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 									label = ga.richPresence or ga.clientProgram or "Unknown"
 								end
 
-								label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16) .. label
+								label = BFL:GetClientEmbeddedIcon(ga.clientProgram, 16, ga.subIcon) .. label
 								switchButton:CreateRadio(label, IsSelected, SetSelected, ga.gameAccountID)
 							end
 						end
@@ -3174,6 +3179,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if not contextData or BFL:IsSecret(contextData.name) or not contextData.name then
 					return nil
 				end
+				if BFL.AreRegionalUniqueNamesEnabled() then
+					return BFL.NormalizePlayerIdentityName(contextData.name)
+				end
 				if
 					not BFL:IsSecret(contextData.server)
 					and contextData.server
@@ -3214,15 +3222,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				if isBNet then
 					local friendData, FriendsList = BFL_FindBNetFriendData(contextData)
-					if friendData and friendData.invitableAccounts and #friendData.invitableAccounts > 0 then
+					local accountEntries = friendData and FriendsList.GetInviteAccountEntries
+						and FriendsList:GetInviteAccountEntries(friendData)
+					if friendData and ((accountEntries and #accountEntries > 0)
+						or (friendData.invitableAccounts and #friendData.invitableAccounts > 0)) then
 						local friendUID = FriendsList and FriendsList.GetFriendUID and FriendsList:GetFriendUID(friendData)
 						local lastInvited = friendUID and FriendsList.GetLastInvitedAccountID
 							and FriendsList:GetLastInvitedAccountID(friendUID)
 							or nil
 						local entries = {}
 
-						for _, ga in ipairs(friendData.invitableAccounts) do
-							local entry = FriendsList.BuildAccountDisplay and FriendsList:BuildAccountDisplay(ga)
+						for _, ga in ipairs(accountEntries or friendData.invitableAccounts) do
+							local entry = accountEntries and ga or (FriendsList.BuildAccountDisplay and FriendsList:BuildAccountDisplay(ga))
 							if entry then
 								entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
 								entry.inviteType = BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
@@ -3257,14 +3268,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								if mixedInviteTypes and entry.inviteText then
 									label = entry.inviteText .. ": " .. label
 								end
-								inviteMenu:CreateButton(label, function()
+								BFL.CreateMenuButton(inviteMenu, label, function()
 									InviteEntry(entry)
-								end)
+								end, { enabled = entry.isInvitable ~= false, tooltip = entry.restrictionText })
 							end
 						elseif entries[1] then
-							rootDescription:CreateButton(entries[1].inviteText or BFL_GetInviteButtonText(nil), function()
+							BFL.CreateMenuButton(rootDescription, entries[1].inviteText or BFL_GetInviteButtonText(nil), function()
 								InviteEntry(entries[1])
-							end)
+							end, { enabled = entries[1].isInvitable ~= false, tooltip = entries[1].restrictionText })
 						end
 					end
 					return
@@ -4749,7 +4760,7 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 			label = "* " .. label
 		end
 		if not entry.isInvitable then
-			local reason = GetInviteRestrictionText(entry.restriction)
+			local reason = entry.restrictionText or GetInviteRestrictionText(entry.restriction)
 			if reason and reason ~= "" then
 				label = label .. " (" .. reason .. ")"
 			else
@@ -4782,6 +4793,9 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 				if capturedEntry.isInvitable == false then
 					return
 				end
+				if BFL.IsForever and not BFL.ValidateForeverInviteTarget(capturedEntry.raw or capturedEntry) then
+					return
+				end
 				if gameAccountID then
 					-- Use Blizzard's wrapper for proper Invite vs Request-To-Join handling.
 					if FriendsFrame_InviteOrRequestToJoin and capturedEntry.playerGuid then
@@ -4812,6 +4826,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 		return
 	end
 	if friendData.type == "wow" then
+		if BFL.IsForever and BFL.GetForeverRulesetInviteRestriction(friendData.gameAccountInfo or friendData) then return end
 		if friendData.connected and friendData.name and BFL.InviteUnit then
 			BFL.InviteUnit(friendData.name)
 		end
@@ -4832,7 +4847,8 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 	for i = 1, numBNet do
 		local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
-		if accountInfo and accountInfo.bnetAccountID == friendData.bnetAccountID then
+		if BFL.IsReadableGameAccountInfo(accountInfo) and not BFL:IsSecret(accountInfo.bnetAccountID)
+			and not BFL:IsSecret(friendData.bnetAccountID) and accountInfo.bnetAccountID == friendData.bnetAccountID then
 			actualIndex = i
 			break
 		end
@@ -4856,6 +4872,16 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 		for i = 1, numGameAccounts do
 			local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
+			if BFL.IsForever then
+				local allowed, reason, current = BFL.ValidateForeverInviteTarget(gameAccountInfo)
+				local list = GetFriendsList()
+				if allowed and current and list and list.GetGameAccountInviteRestriction
+					and list:GetGameAccountInviteRestriction(current, playerFactionGroup, playerRealmID) == BFL_INVITE_RESTRICTION_NONE then
+					gameAccountInfo = current
+				else
+					gameAccountInfo = nil
+				end
+			end
 			-- Account indices can disappear between the row update and this click.
 			local isValid = gameAccountInfo
 				and gameAccountInfo.isOnline ~= false
@@ -4872,10 +4898,10 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			then
 				if C_QuestSession and C_QuestSession.Exists() then
 					isValid = false
-				elseif
+				elseif BFL.IsForever or (
 					C_PartyInfo
 					and C_PartyInfo.CanFormCrossFactionParties
-					and not C_PartyInfo.CanFormCrossFactionParties()
+					and not C_PartyInfo.CanFormCrossFactionParties())
 				then
 					isValid = false
 				end
@@ -4887,8 +4913,10 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			end
 
 			if isValid then
-				gameAccountInfo.bflIsInvitable = true
-				validGameAccounts[#validGameAccounts + 1] = gameAccountInfo
+				local candidate = {}
+				for key, value in pairs(gameAccountInfo) do candidate[key] = value end
+				candidate.bflIsInvitable = true
+				validGameAccounts[#validGameAccounts + 1] = candidate
 				numValidGameAccounts = numValidGameAccounts + 1
 				lastGameAccountID = gameAccountInfo.gameAccountID
 				lastGameAccountGUID = gameAccountInfo.playerGuid
@@ -4912,6 +4940,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 		if #friendData.invitableAccounts == 1 then
 			-- Single invitable account: use Request-To-Join when appropriate
 			local singleAccount = friendData.invitableAccounts[1]
+			if BFL.IsForever and not BFL.ValidateForeverInviteTarget(singleAccount) then return end
 			local singleGuid = singleAccount.playerGuid
 			if singleGuid and GetDisplayedInviteType then
 				local inviteType = GetDisplayedInviteType(singleGuid)
@@ -4940,6 +4969,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			and gameAccountInfo.isOnline
 			and gameAccountInfo.realmID
 			and gameAccountInfo.realmID ~= 0
+			and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo))
 		then
 			BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
 			return
@@ -4948,7 +4978,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 	-- Single game account fallback
 	local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, 1)
-	if gameAccountInfo and gameAccountInfo.gameAccountID then
+	if gameAccountInfo and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo)) and gameAccountInfo.gameAccountID then
 		BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
 	end
 end
@@ -5077,7 +5107,8 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 
 	for i = 1, numBNet do
 		local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
-		if accountInfo and accountInfo.bnetAccountID == friendData.bnetAccountID then
+		if BFL.IsReadableGameAccountInfo(accountInfo) and not BFL:IsSecret(accountInfo.bnetAccountID)
+			and not BFL:IsSecret(friendData.bnetAccountID) and accountInfo.bnetAccountID == friendData.bnetAccountID then
 			actualIndex = i
 			break
 		end
@@ -5143,7 +5174,12 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 	-- CLASSIC FALLBACK (Legacy Logic)
 	-- Check for invite restrictions (matching Blizzard's Check code)
 	local restriction = nil -- Will be set to NO_GAME_ACCOUNTS if no valid accounts found
+	restrictionText = nil
 	local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
+	if BFL.IsForever and (BFL:IsSecret(numGameAccounts) or type(numGameAccounts) ~= "number"
+		or numGameAccounts < 0 or numGameAccounts >= math.huge or numGameAccounts % 1 ~= 0) then
+		numGameAccounts, restriction = 0, BFL_INVITE_RESTRICTION_INFO
+	end
 	local playerFactionGroup = UnitFactionGroup("player")
 	local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
 	local isCrossFaction = false
@@ -5158,7 +5194,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 		if not BFL.IsClassic and C_QuestSession and C_QuestSession.Exists() then
 			return BFL_INVITE_RESTRICTION_QUEST_SESSION
 		end
-		if BFL.IsClassic or not C_PartyInfo or not C_PartyInfo.CanFormCrossFactionParties
+		if BFL.IsForever or BFL.IsClassic or not C_PartyInfo or not C_PartyInfo.CanFormCrossFactionParties
 			or not C_PartyInfo.CanFormCrossFactionParties()
 		then
 			return BFL_INVITE_RESTRICTION_FACTION
@@ -5167,7 +5203,22 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 
 	for i = 1, numGameAccounts do
 		local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
-		if gameAccountInfo then
+		if BFL.IsForever then
+			local list = GetFriendsList()
+			local accountRestriction, accountReason = BFL_INVITE_RESTRICTION_INFO, nil
+			if list and list.GetGameAccountInviteRestriction and list:IsReadableInviteRecord(gameAccountInfo) then
+				accountRestriction, accountReason = list:GetGameAccountInviteRestriction(gameAccountInfo, playerFactionGroup, playerRealmID)
+				if accountRestriction == BFL_INVITE_RESTRICTION_NONE then
+					displayedGuid = list:GetReadableInviteField(gameAccountInfo, "playerGuid")
+					factionName = list:GetReadableInviteField(gameAccountInfo, "factionName")
+					restriction, restrictionText = BFL_INVITE_RESTRICTION_NONE, nil
+					break
+				end
+			end
+			if not restriction or accountRestriction > restriction then
+				restriction, restrictionText = accountRestriction, accountReason
+			end
+		elseif gameAccountInfo then
 			if gameAccountInfo.clientProgram == BNET_CLIENT_WOW then
 				local factionRestriction = GetFactionRestriction(gameAccountInfo)
 				if gameAccountInfo.playerGuid and not displayedGuid then
@@ -5215,6 +5266,8 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 						restriction = BFL_INVITE_RESTRICTION_REGION
 					elseif not BFL.IsClassic and not CanInviteByGameMode(gameAccountInfo) then
 						restriction = BFL_INVITE_RESTRICTION_GAME_MODE
+					elseif BFL.GetForeverRulesetInviteRestriction(gameAccountInfo) then
+						restriction = BFL.INVITE_RESTRICTION_RULESET
 					else
 						-- At least one valid WoW account that can be invited
 						restriction = BFL_INVITE_RESTRICTION_NONE
@@ -5235,6 +5288,8 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 					restriction = BFL_INVITE_RESTRICTION_REGION
 				elseif not BFL.IsClassic and not CanInviteByGameMode(gameAccountInfo) then
 					restriction = BFL_INVITE_RESTRICTION_GAME_MODE
+				elseif BFL.GetForeverRulesetInviteRestriction(gameAccountInfo) then
+					restriction = BFL.INVITE_RESTRICTION_RULESET
 				elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
 					-- Valid WoW account (no project ID check needed)
 					restriction = BFL_INVITE_RESTRICTION_NONE
@@ -5288,7 +5343,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 
 	-- Add restriction text in red if there's a restriction
 	if restriction ~= BFL_INVITE_RESTRICTION_NONE then
-		local restrictionText = GetBFLInviteRestrictionText(restriction) or ""
+		local restrictionText = restrictionText or GetBFLInviteRestrictionText(restriction) or ""
 
 		if restrictionText ~= "" then
 			BFL_Tooltip:AddLine(restrictionText, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b, true)

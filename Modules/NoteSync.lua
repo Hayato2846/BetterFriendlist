@@ -1,902 +1,808 @@
 -- Modules/NoteSync.lua
--- Syncs group assignments to friend notes in FriendGroups format
-
+-- Sync custom groups using FriendGroups notes. Local edits stay authoritative until acknowledged.
 local ADDON_NAME, BFL = ...
 local NoteSync = BFL:RegisterModule("NoteSync", {})
+local BNET_NOTE_LIMIT, WOW_NOTE_LIMIT = 127, 48
+local SYNC_BATCH_SIZE, SYNC_TICK_INTERVAL, VERIFY_DEBOUNCE = 5, 0.1, 5
+-- BFL fairness/pacing policy, not a documented Blizzard request-rate limit.
+local MAX_RETRY_DELAY = 60
+local TOKEN_PREFIX, JOURNAL_KEY = "~BFL1~", "noteSyncPendingWrites"
+NoteSync.isSyncing, NoteSync.isImporting, NoteSync.isWriting = false, false, false
+NoteSync.pendingWrites, NoteSync.inFlight, NoteSync.titleIdentities = {}, {}, {}
+NoteSync.retryCounts, NoteSync.retryNotes = {}, {}
+NoteSync.retryAt = {}
+NoteSync.passiveQueued = {}
+NoteSync.submitted = {}
 
--- Constants
-local BNET_NOTE_LIMIT = 127
-local WOW_NOTE_LIMIT = 48
-local SYNC_BATCH_SIZE = 5 -- Friends per tick during full sync
-local SYNC_TICK_INTERVAL = 0.1 -- Seconds between batches
-local VERIFY_DEBOUNCE = 5 -- Seconds to wait after last event before verifying notes
+local SnapshotFriends
 
--- State
-NoteSync.isSyncing = false
-NoteSync.isImporting = false
-NoteSync.syncTimer = nil
-NoteSync.verifyTimer = nil
-NoteSync.isWriting = false -- Guard to prevent verification re-triggering itself
+local function IsEnabled()
+	local DB = BFL:GetModule("DB")
+	return DB and DB:Get("syncGroupsToNote") == true
+end
 
--- ============================================================
--- UTILITY: Parse FriendGroups note format
--- Format: "ActualNote#Group1#Group2#Group3"
--- ============================================================
-local function ParseNoteGroups(noteText)
-	if not noteText or noteText == "" then
-		return "", {}
+local function WizardIsBusy()
+	local wizard = BFL.NoteCleanupWizard
+	return wizard and wizard.IsBusy and wizard:IsBusy()
+end
+
+local function EncodeGroupName(name)
+	if name:find("#", 1, true) or strtrim(name) ~= name or name:sub(1, #TOKEN_PREFIX) == TOKEN_PREFIX then
+		return TOKEN_PREFIX .. name:gsub("[%%#%s~]", function(char)
+			return string.format("%%%02X", string.byte(char))
+		end)
 	end
+	return name
+end
 
-	local parts = { strsplit("#", noteText) }
-	local actualNote = parts[1] or ""
-	local groups = {}
+local function DecodeGroupName(token)
+	if token:sub(1, #TOKEN_PREFIX) == TOKEN_PREFIX then
+		local decoded = token:sub(#TOKEN_PREFIX + 1):gsub("%%(%x%x)", function(hex)
+			return string.char(tonumber(hex, 16))
+		end)
+		if EncodeGroupName(decoded) == token then return decoded end
+	end
+	return strtrim(token)
+end
 
-	for i = 2, #parts do
-		local groupName = strtrim(parts[i])
-		if groupName ~= "" then
-			table.insert(groups, groupName)
+local function LetterCount(text)
+	-- Native note dialogs use SetMaxLetters, not SetMaxBytes. Never slice UTF-8 sequences.
+	local _, count = text:gsub("[^\128-\191]", "")
+	return count
+end
+
+function NoteSync:GetGroupNamesForFriend(friendUID)
+	local DB = BFL:GetModule("DB")
+	if not DB then return {} end
+	local orderMap, entries, names = {}, {}, {}
+	for i, id in ipairs(DB:Get("groupOrder") or {}) do orderMap[id] = i end
+	local customGroups = DB:GetCustomGroups()
+	for _, id in ipairs(DB:GetFriendGroups(friendUID)) do
+		local group = customGroups[id]
+		if group and type(group.name) == "string" then
+			entries[#entries + 1] = { name = group.name, order = orderMap[id] or group.order or 9999, id = id }
 		end
 	end
-
-	return actualNote, groups
+	table.sort(entries, function(a, b)
+		if a.order ~= b.order then return a.order < b.order end
+		return a.id < b.id
+	end)
+	for _, entry in ipairs(entries) do names[#names + 1] = entry.name end
+	return names
 end
 
--- ============================================================
--- INITIALIZE: Register event callbacks for periodic verification
--- ============================================================
-function NoteSync:Initialize()
-	-- Listen for friend list changes to detect external note modifications
-	-- (e.g., Note Cleanup Wizard stripping group tags)
-	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
-		self:ScheduleVerification()
-	end, 90) -- Low priority: runs after all other handlers
-
-	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
-		self:ScheduleVerification()
-	end, 90)
-end
-
--- ============================================================
--- SCHEDULE: Debounced verification after friend list events
--- Coalesces rapid events into a single verification pass
--- ============================================================
-function NoteSync:ScheduleVerification()
-	-- Guard: Skip if we caused the note change ourselves
-	if self.isWriting then
-		return
+function NoteSync:ParseNoteGroups(noteText, friendUID)
+	if not (BFL.FriendNotes and BFL.FriendNotes.IsReadableString(noteText)) or noteText == "" then return "", {} end
+	local parts, groups, i = { strsplit("#", noteText) }, {}, 2
+	-- Current assignments disambiguate raw names written before delimiter escaping existed.
+	local knownNames = friendUID and self:GetGroupNamesForFriend(friendUID) or {}
+	table.sort(knownNames, function(a, b) return #a > #b end)
+	while i <= #parts do
+		local name, consumed
+		local decoded, knownLiteral, knownDecoded = DecodeGroupName(parts[i]), false, false
+		for _, known in ipairs(knownNames) do
+			knownLiteral = knownLiteral or known == parts[i]
+			knownDecoded = knownDecoded or known == decoded
+		end
+		if decoded ~= strtrim(parts[i]) and (not knownLiteral or knownDecoded) then name, consumed = decoded, 1 end
+		for _, known in ipairs(name and {} or knownNames) do
+			if EncodeGroupName(known) ~= known then
+				local candidate, j = parts[i], i
+				while #candidate < #known and j < #parts do
+					j = j + 1
+					candidate = candidate .. "#" .. parts[j]
+				end
+				if candidate == known then name, consumed = known, j - i + 1; break end
+			end
+		end
+		name = name or DecodeGroupName(parts[i])
+		if name ~= "" then groups[#groups + 1] = name end
+		i = i + (consumed or 1)
 	end
+	return parts[1] or "", groups
+end
 
-	-- Guard: Skip if sync is disabled or already running a full sync
+function NoteSync:BuildNoteWithGroups(actualNote, groupNames, charLimit)
+	local result, limitReached = actualNote or "", false
+	for _, name in ipairs(groupNames or {}) do
+		local candidate = result .. "#" .. EncodeGroupName(name)
+		if LetterCount(candidate) > charLimit then limitReached = true; break end
+		result = candidate
+	end
+	return result, limitReached
+end
+
+function NoteSync:LoadPendingWrites()
 	local DB = BFL:GetModule("DB")
-	if not DB or not DB:Get("syncGroupsToNote") then
-		return
+	local saved = DB and DB:Get(JOURNAL_KEY)
+	if type(saved) == "table" then
+		local ordered = {}
+		for uid in pairs(saved) do if type(uid) == "string" then ordered[#ordered + 1] = uid end end
+		table.sort(ordered)
+		for _, uid in ipairs(ordered) do
+			local pending = saved[uid]
+			-- Do not replay numeric Title write intent without a verified current-session identity.
+			local accepted = type(pending) == "table" and BFL.FriendNotes.IsReadableString(pending.note)
+				and BFL.FriendNotes.IsReadableString(pending.before)
+			if (pending == true or accepted) and not uid:match("^bnet_%d+$") then
+				if not accepted or not pending.deliveryOnly then self.pendingWrites[uid] = true end
+				if accepted and not self.inFlight[uid] then
+					self.inFlight[uid] = BFL.FriendNotes.GetAcceptedWrite(uid)
+					if pending.deliveryOnly and not self.pendingWrites[uid] then self.passiveQueued[uid] = true end
+				end
+				self:TrackSyncWork(uid)
+				if not self.inFlight[uid] then self:QueueFriend(uid) end
+			end
+		end
 	end
+end
 
-	if self.isSyncing or self.isImporting then
-		return
+function NoteSync:TrackSyncWork(uid)
+	self.syncReport = self.syncReport or { uids = {}, confirmed = {}, limits = {}, unavailable = {}, callbacks = {} }
+	self.syncReport.uids[uid], self.syncReport.confirmed[uid] = true, nil
+end
+
+function NoteSync:MarkPending(friendUID, pending)
+	self.pendingWrites[friendUID] = pending and true or nil
+	if pending then
+		self.passiveQueued[friendUID] = nil
+		if self.syncReport then self.syncReport.confirmed[friendUID] = nil end
 	end
-
-	-- Debounce: Cancel pending verification and schedule a new one
-	if self.verifyTimer then
-		self.verifyTimer:Cancel()
+	if not pending then self.inFlight[friendUID], self.submitted[friendUID] = nil, nil; self:ResetRetry(friendUID) end
+	if friendUID:match("^bnet_%d+$") then return end
+	-- Internal delivery bookkeeping is not a visual setting. DB:Set would bump
+	-- SettingsVersion and invalidate every visible list even for a no-op readback.
+	if BetterFriendlistDB then
+		local saved = BetterFriendlistDB[JOURNAL_KEY]
+		if type(saved) ~= "table" then saved = {} end
+		local accepted = self.inFlight[friendUID] or BFL.FriendNotes.GetAcceptedWrite(friendUID)
+		if accepted and accepted.confirmed then self.inFlight[friendUID] = nil; accepted = BFL.FriendNotes.GetAcceptedWrite(friendUID) end
+		local delivery
+		if pending then
+			delivery = true
+			if accepted then
+				delivery = { note = accepted.note, before = accepted.before, name = accepted.name, guid = accepted.guid }
+			end
+		end
+		saved[friendUID] = delivery
+		BetterFriendlistDB[JOURNAL_KEY] = next(saved) and saved or nil
 	end
+end
 
-	self.verifyTimer = C_Timer.NewTimer(VERIFY_DEBOUNCE, function()
+function NoteSync:ResetRetry(friendUID)
+	-- A roster event or DB mutation cannot cancel a request already accepted by native code.
+	self.retryCounts[friendUID], self.retryNotes[friendUID] = nil, nil
+	self.retryAt[friendUID] = nil
+end
+
+function NoteSync:CancelWork()
+	self.workVersion = (self.workVersion or 0) + 1
+	if self.syncTimer then self.syncTimer:Cancel(); self.syncTimer = nil end
+	if self.verifyTimer then self.verifyTimer:Cancel(); self.verifyTimer = nil end
+	self.isSyncing, self.isWriting = false, false
+	self.syncQueue, self.syncQueued, self.syncCallbacks = nil, nil, nil
+	self.verificationPending, self.enablePending, self.enableCallbacks = false, false, nil
+	self.profileRestorePending = false
+	self.waitingForWizard = false
+	self.retryCounts, self.retryNotes = {}, {}
+	self.retryAt, self.nextWriteAt, self.verifyDue, self.verificationDelay, self.syncReport = {}, nil, nil, nil, nil
+	self.passiveQueued = {}
+	self.submitted = {}
+	self.rosterChanged, self.noteEventPending = false, false
+end
+
+function NoteSync:ResetPendingWrites()
+	self:CancelWork()
+	self.pendingWrites, self.unresolvedImports, self.titleIdentities = {}, {}, {}
+	self.profileRestorePending = false
+	if BetterFriendlistDB then BetterFriendlistDB[JOURNAL_KEY] = nil end
+	BFL.FriendNotes.PreserveAcceptedWrites()
+	-- Accepted local deliveries can still arrive after a profile change. Observe them
+	-- before sending the new stable-UID goal; never import these records from a profile.
+	for uid in pairs(self.inFlight) do self:MarkPending(uid, true) end
+end
+
+function NoteSync:OnDatabaseImported()
+	-- The importer calls this only after its transaction commits. Do not import stale notes.
+	local committed = false
+	local timer = C_Timer.NewTimer(0, function()
+		if not committed then return end
 		self.verifyTimer = nil
+		if IsEnabled() then self:SyncAllFriends() end
+	end)
+	local ok, err = pcall(self.ResetPendingWrites, self)
+	if not ok then timer:Cancel(); error(err) end
+	self.profileRestorePending = true
+	self.verifyTimer, committed = timer, true
+end
+
+function NoteSync:Disable()
+	local DB = BFL:GetModule("DB")
+	if DB then DB:Set("syncGroupsToNote", false) end
+	self:CancelWork()
+end
+
+function NoteSync:Enable(callback, progressCallback)
+	if self.isImporting then return false end
+	self:CancelWork()
+	self.profileRestorePending = false
+	self:LoadPendingWrites()
+	local DB = BFL:GetModule("DB")
+	if not DB then return false end
+	DB:Set("syncGroupsToNote", true)
+	if WizardIsBusy() then
+		self.waitingForWizard = true
+		self.enablePending, self.enableCallbacks = true, { callback, progressCallback }
+		self:ScheduleVerification(1)
+		return true, 0, 0
+	end
+	local groups, assignments, success, complete = self:ImportGroupsFromNotes()
+	if not success then self:Disable(); return false end
+	if complete then
+		self:SyncAllFriends(callback, progressCallback)
+	else
+		self.enablePending, self.enableCallbacks = true, { callback, progressCallback }
+		self:ScheduleVerification()
+	end
+	return true, groups, assignments
+end
+
+function NoteSync:SetEnabled(enabled, callback, progressCallback)
+	if enabled then return self:Enable(callback, progressCallback) end
+	self:Disable()
+	return true
+end
+
+function NoteSync:Initialize()
+	self:LoadPendingWrites()
+	if not self.eventsRegistered then
+		self.eventsRegistered = true
+		for _, event in ipairs({ "FRIENDLIST_UPDATE", "BN_FRIEND_INFO_CHANGED", "BN_FRIEND_LIST_SIZE_CHANGED", "BN_CONNECTED", "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED" }) do
+			local rosterChanged = event ~= "FRIENDLIST_UPDATE" and event ~= "BN_FRIEND_INFO_CHANGED"
+			BFL:RegisterEventCallback(event, function()
+				-- Events only flag work. Native note setters can synchronously emit
+				-- many events; do not read the entire roster from each callback.
+				self.rosterChanged = self.rosterChanged or rosterChanged
+				self.noteEventPending = true
+				self:ScheduleVerification()
+			end, 90)
+		end
+	end
+	-- Unsent journal work already has explicit local authority; do not hold its
+	-- first dispatch behind the normal five-second note-import debounce.
+	if next(self.pendingWrites) then self:StartDispatcher() end
+	self:ScheduleVerification()
+end
+
+function NoteSync:ScheduleVerification(delay)
+	if not IsEnabled() then return end
+	delay = math.max(0.25, delay or VERIFY_DEBOUNCE)
+	if self.isWriting or self.isSyncing or self.isImporting then
+		self.verificationPending = true
+		self.verificationDelay = math.min(self.verificationDelay or delay, delay)
+		return
+	end
+	local due = (GetTime and GetTime() or 0) + delay
+	-- Busy rosters must not postpone a scheduled verification forever.
+	if self.verifyTimer and self.verifyDue and self.verifyDue <= due then return end
+	if self.verifyTimer then self.verifyTimer:Cancel() end
+	self.verifyDue, self.verificationDelay = due, nil
+	self.verifyTimer = C_Timer.NewTimer(delay, function()
+		self.verifyTimer, self.verifyDue = nil, nil
 		self:VerifyAllNotes()
 	end)
 end
 
--- ============================================================
--- VERIFY: Bidirectional sync of friend notes <-> DB state
--- Phase 1 (read): Import new group tags from notes into DB
--- Phase 2 (write): Write DB groups to notes that are out of sync
--- ============================================================
-function NoteSync:VerifyAllNotes()
-	if self.isSyncing or self.isWriting then
-		return
+SnapshotFriends = function()
+	local friends, helper = {}, BFL.FriendNotes
+	if not helper then return friends, false end
+	local snapshot = helper.CaptureSnapshot()
+	for uid, account in pairs(snapshot.bnet) do
+		if account then friends[uid] = { note = account.note or "", account = account } end
 	end
-
-	local DB = BFL:GetModule("DB")
-	if not DB or not DB:Get("syncGroupsToNote") then
-		return
-	end
-
-	local Groups = BFL:GetModule("Groups")
-	if not Groups then
-		return
-	end
-
-	-- Build lookup tables for O(1) friend access
-	local bnetLookup = {} -- battleTag -> accountInfo
-	local numBNetFriends = BNGetNumFriends()
-	for i = 1, numBNetFriends do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-		if accountInfo and accountInfo.battleTag then
-			bnetLookup[accountInfo.battleTag] = accountInfo
+	for _, info in pairs(snapshot.wow) do
+		if info then
+		local name = BFL:NormalizeWoWFriendName(info.name)
+		if name then friends["wow_" .. name] = { note = info.notes or "", name = info.name } end
 		end
 	end
+	return friends, snapshot.complete, snapshot
+end
 
-	local wowLookup = {} -- normalizedName -> info
-	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-	for i = 1, numWoWFriends do
-		local info = BFL.GetWoWFriendInfoByIndex(i)
-		if info and info.name then
-			local normalized = BFL:NormalizeWoWFriendName(info.name)
-			if normalized then
-				wowLookup[normalized] = info
+function NoteSync:ApplyRosterChanges(friends)
+	if not self.noteEventPending then return end
+	for uid in pairs(self.pendingWrites) do
+		local note = friends[uid] and friends[uid].note
+		if self.rosterChanged or (self.retryCounts[uid] and note ~= self.retryNotes[uid]) then self:ResetRetry(uid) end
+	end
+	self.rosterChanged, self.noteEventPending = false, false
+end
+
+function NoteSync:BindTitleIdentity(uid, account, explicitAction, snapshot)
+	if uid:match("^bnet_%d+$") then
+		local helper = BFL.FriendNotes
+		if not helper then return end
+		local identity = self.titleIdentities[uid]
+		if identity and helper.ResolveBNetIdentity(identity, snapshot and snapshot.bnet) then return end
+		-- An invalidated identity is evidence of a boundary, not permission to select its replacement.
+		if identity and not explicitAction then return end
+		if not account then
+			if snapshot then account = snapshot.bnet[uid] else account = helper.FindBNetFriend(uid) end
+		end
+		if not account then return end
+		if not explicitAction then
+			-- Persisted numeric mappings alone cannot authorize sending names to another account.
+			local present = {}
+			local _, names = self:ParseNoteGroups(account.note or "", uid)
+			for _, name in ipairs(names) do present[name:lower()] = true end
+			for _, name in ipairs(self:GetGroupNamesForFriend(uid)) do
+				if not present[name:lower()] then return end
 			end
 		end
+		self.titleIdentities[uid] = helper.CreateBNetIdentity(account)
 	end
+end
 
-	-- ---- Phase 1: Read notes -> DB (import unknown groups + assignments) ----
-	local newGroupNames = {} -- set of group names that don't exist in DB yet
-	local noteAssignments = {} -- uid -> { groupName1, groupName2, ... }
-
-	-- Scan BNet notes
-	for battleTag, accountInfo in pairs(bnetLookup) do
-		local noteText = accountInfo.note or ""
-		if noteText:find("#") then
-			local _, groupNames = ParseNoteGroups(noteText)
-			if #groupNames > 0 then
-				local uid = "bnet_" .. battleTag
-				noteAssignments[uid] = groupNames
-				for _, gn in ipairs(groupNames) do
-					if not Groups:GetGroupIdByName(gn) then
-						newGroupNames[gn] = true
-					end
-				end
-			end
-		end
-	end
-
-	-- Scan WoW notes
-	for normalizedName, info in pairs(wowLookup) do
-		local noteText = info.notes or ""
-		if noteText:find("#") then
-			local _, groupNames = ParseNoteGroups(noteText)
-			if #groupNames > 0 then
-				local uid = "wow_" .. normalizedName
-				noteAssignments[uid] = groupNames
-				for _, gn in ipairs(groupNames) do
-					if not Groups:GetGroupIdByName(gn) then
-						newGroupNames[gn] = true
-					end
-				end
-			end
-		end
-	end
-
-	-- Create new groups and assign friends if we found unknown group names
-	local importedGroups = 0
-	local importedAssignments = 0
-
-	-- Collect group names to sort deterministically
-	local sortedNewNames = {}
-	for gn in pairs(newGroupNames) do
-		table.insert(sortedNewNames, gn)
-	end
-
-	if #sortedNewNames > 0 then
-		table.sort(sortedNewNames)
-
-		-- Determine insertion point and order value
-		local savedOrder = DB:Get("groupOrder")
-		local groupOrderArray = {}
-		local groupOrderSet = {}
-		if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
-			for _, gid in ipairs(savedOrder) do
-				if not groupOrderSet[gid] then
-					table.insert(groupOrderArray, gid)
-					groupOrderSet[gid] = true
-				end
-			end
-		else
-			groupOrderArray = { "favorites" }
-			groupOrderSet["favorites"] = true
-		end
-
-		local insertIdx = #groupOrderArray + 1
-		for i, gid in ipairs(groupOrderArray) do
-			if gid == "nogroup" then
-				insertIdx = i
-				break
-			end
-		end
-
-		local maxOrder = 1
-		local allGroups = Groups:GetAll()
-		for gid, gData in pairs(allGroups) do
-			if gid ~= "nogroup" then
-				maxOrder = math.max(maxOrder, gData.order or 1)
-			end
-		end
-		local currentOrder = maxOrder + 1
-
-		self.isImporting = true
-
-		for _, groupName in ipairs(sortedNewNames) do
-			local success, groupId = Groups:CreateWithOrder(groupName, currentOrder)
-			if success and groupId then
-				importedGroups = importedGroups + 1
-				if not groupOrderSet[groupId] then
-					table.insert(groupOrderArray, insertIdx, groupId)
-					groupOrderSet[groupId] = true
-					insertIdx = insertIdx + 1
-				end
-				currentOrder = currentOrder + 1
-			end
-		end
-
-		if not groupOrderSet["nogroup"] then
-			table.insert(groupOrderArray, "nogroup")
-		end
-
-		if importedGroups > 0 then
-			DB:Set("groupOrder", groupOrderArray)
-		end
-
-		self.isImporting = false
-	end
-
-	-- Assign friends from notes to groups they aren't in yet
+function NoteSync:ImportGroupsFromNotes(friends, excluded, snapshot)
+	local DB, Groups = BFL:GetModule("DB"), BFL:GetModule("Groups")
+	if not DB or not Groups or self.isImporting then return 0, 0, false end
+	local created, assigned = 0, 0
+	local complete = true
 	self.isImporting = true
-	for uid, groupNames in pairs(noteAssignments) do
-		for _, groupName in ipairs(groupNames) do
-			local groupId = Groups:GetGroupIdByName(groupName)
-			if groupId then
-				local success = DB:AddFriendToGroup(uid, groupId)
-				if success then
-					importedAssignments = importedAssignments + 1
-				end
+	local success, err = pcall(function()
+		if not friends then friends, complete, snapshot = SnapshotFriends() end
+		local allNames, assignments = {}, {}
+		for uid, friend in pairs(friends) do
+			local barrier = BFL.FriendNotes.ObserveAcceptedWrite(uid, friend.note, snapshot)
+			if not barrier and not self.pendingWrites[uid] and not (excluded and excluded[uid]) then
+				local _, names = self:ParseNoteGroups(friend.note, uid)
+				assignments[uid] = names
+				for _, name in ipairs(names) do allNames[name] = true end
+				if #names > 0 then self:BindTitleIdentity(uid, friend.account, false, snapshot) end
 			end
 		end
-	end
-	self.isImporting = false
-
-	if importedGroups > 0 or importedAssignments > 0 then
-		BFL:DebugPrint(
-			string.format(
-				"NoteSync: Verify imported %d group(s), %d assignment(s) from notes.",
-				importedGroups,
-				importedAssignments
-			)
-		)
-		-- Reload groups and refresh UI
-		if Groups.Initialize then
-			Groups:Initialize()
+		local sorted, nameMap, order, seen = {}, {}, {}, {}
+		for name in pairs(allNames) do sorted[#sorted + 1] = name end
+		table.sort(sorted)
+		for _, id in ipairs(DB:Get("groupOrder") or { "favorites" }) do
+			if not seen[id] then order[#order + 1] = id; seen[id] = true end
 		end
-		BFL:ForceRefreshFriendsList()
+		local insertAt, nextOrder = #order + 1, 2
+		for i, id in ipairs(order) do if id == "nogroup" then insertAt = i; break end end
+		for id, group in pairs(Groups:GetAll()) do
+			if id ~= "nogroup" then nextOrder = math.max(nextOrder, (group.order or 1) + 1) end
+		end
+		for _, name in ipairs(sorted) do
+			local id = Groups:GetGroupIdByName(name)
+			if not id then
+				local added
+				added, id = Groups:CreateWithOrder(name, nextOrder)
+				if added then
+					created, nextOrder = created + 1, nextOrder + 1
+					if not seen[id] then table.insert(order, insertAt, id); seen[id] = true; insertAt = insertAt + 1 end
+				else id = nil end
+			end
+			-- Built-ins derive membership. Do not delete an unrepresentable imported token.
+			if id and not Groups:Get(id).builtin then nameMap[name] = id end
+		end
+		if not seen.nogroup then order[#order + 1] = "nogroup" end
+		if created > 0 then DB:Set("groupOrder", order) end
+		self.unresolvedImports = self.unresolvedImports or {}
+		for uid, names in pairs(assignments) do
+			local unresolved = false
+			for _, name in ipairs(names) do
+				local id = nameMap[name]
+				if id then
+					if DB:AddFriendToGroup(uid, id) then assigned = assigned + 1 end
+				else unresolved = true end
+			end
+			self.unresolvedImports[uid] = unresolved and true or nil
+		end
+	end)
+	self.isImporting = false
+	if not success then BFL:DebugPrint("NoteSync: Import failed: " .. tostring(err)); return created, assigned, false end
+	if created > 0 or assigned > 0 then
+		local refreshed, refreshError = pcall(BFL.ForceRefreshFriendsList, BFL)
+		if not refreshed then BFL:DebugPrint("NoteSync: Refresh failed: " .. tostring(refreshError)) end
 	end
+	return created, assigned, true, complete
+end
 
-	-- ---- Phase 2: Write DB -> notes (fix out-of-sync notes) ----
-	local allFriendGroups = DB:GetFriendGroups() -- re-read after imports
-	local fixedCount = 0
-
+function NoteSync:WriteNote(friendUID, currentNote, groupNames, charLimit, writer, target, snapshot, identity)
+	local actualNote = self:ParseNoteGroups(currentNote, friendUID)
+	local expectedNote, limitReached = self:BuildNoteWithGroups(actualNote, groupNames, charLimit)
+	local shared = BFL.FriendNotes.ObserveAcceptedWrite(friendUID, currentNote, snapshot)
+	if shared then
+		self.inFlight[friendUID] = shared
+		if not self.pendingWrites[friendUID] then self.passiveQueued[friendUID] = true end
+	end
+	local accepted = self.inFlight[friendUID]
+	if accepted then
+		if shared or (not accepted.confirmed and currentNote ~= accepted.note) then
+			-- Even current == latest desired can be the pre-write base state. An old
+			-- accepted add may still arrive after a local remove, so do not clear intent.
+			self:TrackSyncWork(friendUID)
+			self:ScheduleVerification(VERIFY_DEBOUNCE)
+			return false, limitReached, "awaiting"
+		end
+		self.inFlight[friendUID] = nil
+		self:ResetRetry(friendUID)
+		if self.pendingWrites[friendUID] then self:MarkPending(friendUID, true) end
+	end
+	if expectedNote == currentNote then self:MarkPending(friendUID, false); return true, limitReached end
+	local now = GetTime and GetTime() or 0
+	if self.isPolling then
+		if not self.pendingWrites[friendUID] then self.passiveQueued[friendUID] = true end
+		self:QueueFriend(friendUID); return false, limitReached, "queued"
+	end
+	local due = math.max(self.nextWriteAt or 0, self.retryAt[friendUID] or 0)
+	if due > now then
+		self:TrackSyncWork(friendUID)
+		return false, limitReached, "paced"
+	end
+	local passive = not self.pendingWrites[friendUID] and self.passiveQueued[friendUID] == true
+	if not passive then self:MarkPending(friendUID, true) end
+	-- Apply the same pacing to bulk sync, verification and direct membership edits.
+	self.nextWriteAt = now + SYNC_TICK_INTERVAL
+	self.retryCounts[friendUID] = math.min((self.retryCounts[friendUID] or 0) + 1, 5)
+	self.retryNotes[friendUID] = currentNote
+	self.submitted[friendUID] = true
 	self.isWriting = true
-
-	for uid in pairs(allFriendGroups) do
-		local groupNames = self:GetGroupNamesForFriend(uid)
-		if #groupNames > 0 then
-			if uid:match("^bnet_") then
-				local battleTag = uid:gsub("^bnet_", "")
-				local accountInfo = bnetLookup[battleTag]
-				if accountInfo then
-					local actualNote = ParseNoteGroups(accountInfo.note or "")
-					local expectedNote = self:BuildNoteWithGroups(actualNote, groupNames, BNET_NOTE_LIMIT)
-					local currentNote = accountInfo.note or ""
-					if expectedNote ~= currentNote then
-						BNSetFriendNote(accountInfo.bnetAccountID, expectedNote)
-						fixedCount = fixedCount + 1
-						BFL:DebugPrint("NoteSync: Verification fixed BNet note for " .. battleTag)
-					end
-				end
-			elseif uid:match("^wow_") then
-				local charName = uid:gsub("^wow_", "")
-				local info = wowLookup[charName]
-				if info then
-					local actualNote = ParseNoteGroups(info.notes or "")
-					local expectedNote = self:BuildNoteWithGroups(actualNote, groupNames, WOW_NOTE_LIMIT)
-					local currentNote = info.notes or ""
-					if expectedNote ~= currentNote then
-						BFL.SetFriendNotes(info.name, expectedNote)
-						fixedCount = fixedCount + 1
-						BFL:DebugPrint("NoteSync: Verification fixed WoW note for " .. charName)
-					end
-				end
-			end
-		end
-	end
-
+	local ok, success, reason = pcall(writer, target, expectedNote, currentNote, snapshot, identity, "sync")
 	self.isWriting = false
-
-	if fixedCount > 0 then
-		BFL:DebugPrint("NoteSync: Verification complete, fixed " .. fixedCount .. " note(s).")
+	if ok and success then self:MarkPending(friendUID, false); return true, limitReached end
+	self:TrackSyncWork(friendUID)
+	if ok and reason == "changed" and passive then
+		self:ResetRetry(friendUID); self.submitted[friendUID] = nil
+		self.passiveQueued[friendUID] = true
+		self:QueueFriend(friendUID); self:StartDispatcher()
+		return false, limitReached, "changed"
 	end
+	if ok and reason == "blocked" then
+		self.inFlight[friendUID] = BFL.FriendNotes.GetAcceptedWrite(friendUID)
+		self:ScheduleVerification()
+		return false, limitReached, "awaiting"
+	end
+	if ok and reason == "pending" then
+		self.inFlight[friendUID] = BFL.FriendNotes.GetAcceptedWrite(friendUID) or { note = expectedNote, before = currentNote, time = now }
+		self:MarkPending(friendUID, true)
+		self.retryAt[friendUID] = nil
+		self:ScheduleVerification(VERIFY_DEBOUNCE)
+		return false, limitReached, "awaiting"
+	end
+	local delay = math.min(MAX_RETRY_DELAY, VERIFY_DEBOUNCE * 2 ^ (self.retryCounts[friendUID] - 1))
+	self.retryAt[friendUID] = now + delay
+	-- Only a real native rejection/error is eligible for automatic resubmission.
+	self:ScheduleVerification(math.min(delay, VERIFY_DEBOUNCE))
+	return false, limitReached, ok and reason or "failed"
 end
 
--- ============================================================
--- BUILD: Construct note string with groups appended
--- Returns: newNote, limitReached (boolean)
--- ============================================================
-function NoteSync:BuildNoteWithGroups(actualNote, groupNames, charLimit)
-	local result = actualNote or ""
-
-	if not groupNames or #groupNames == 0 then
-		return result, false
+function NoteSync:SyncBNetFriend(friendUID, groupNames, snapshot)
+	local helper = BFL.FriendNotes
+	local account = helper and helper.FindBNetFriend(friendUID, snapshot)
+	local identity
+	if friendUID:match("^bnet_%d+$") then
+		identity = self.titleIdentities[friendUID]
+		account = identity and helper.ResolveBNetIdentity(identity, snapshot and snapshot.bnet)
 	end
-
-	local limitReached = false
-
-	for _, groupName in ipairs(groupNames) do
-		local candidate = result .. "#" .. groupName
-		if #candidate > charLimit then
-			limitReached = true
-			break
-		end
-		result = candidate
-	end
-
-	return result, limitReached
+	if not account or not helper.IsReadableString(account.note or "") then return false, false, "unavailable" end
+	return self:WriteNote(friendUID, account.note or "", groupNames, BNET_NOTE_LIMIT, helper.WriteBNetNote, friendUID, snapshot, identity)
 end
 
--- ============================================================
--- RESOLVE: Get group names from group IDs, ordered by group order
--- ============================================================
-function NoteSync:GetGroupNamesForFriend(friendUID)
-	local DB = BFL:GetModule("DB")
-	if not DB then
-		return {}
-	end
+function NoteSync:SyncWoWFriend(friendUID, groupNames, snapshot, friends)
+	local helper = BFL.FriendNotes
+	if not helper then return false, false, "unavailable" end
+	local friend = (friends or SnapshotFriends())[friendUID]
+	if not friend then return false, false, "unavailable" end
+	local info = snapshot and snapshot.wow[friend.name]
+	local guid = info and helper.IsReadableString(info.guid) and info.guid or nil
+	return self:WriteNote(friendUID, friend.note, groupNames, WOW_NOTE_LIMIT, helper.WriteWoWNote, friend.name, snapshot, guid)
+end
 
-	local groupIds = DB:GetFriendGroups(friendUID)
-	if not groupIds or #groupIds == 0 then
-		return {}
-	end
-
-	local customGroups = DB:GetCustomGroups()
-
-	-- Build a lookup of groupId -> order position from saved group order
-	local savedOrder = DB:Get("groupOrder")
-	local orderMap = {}
-	if savedOrder and type(savedOrder) == "table" then
-		for i, gid in ipairs(savedOrder) do
-			orderMap[gid] = i
+function NoteSync:SyncSingleFriend(friendUID, snapshot, friends)
+	if not IsEnabled() or self.isImporting or self.isWriting then return false, false, "disabled" end
+	if WizardIsBusy() then self.waitingForWizard = true; self:ScheduleVerification(1); return false, false, "pending" end
+	if not snapshot then
+		local now = GetTime and GetTime() or 0
+		if self.nextWriteAt and self.nextWriteAt > now then
+			if self.pendingWrites[friendUID] then self:TrackSyncWork(friendUID) end
+			self:QueueFriend(friendUID)
+			self:StartDispatcher()
+			return false, false, "paced"
 		end
+		local complete
+		friends, complete, snapshot = SnapshotFriends()
+		self:ApplyRosterChanges(friends)
 	end
-
-	-- Collect custom groups with their order position
-	local groupEntries = {}
-	for _, groupId in ipairs(groupIds) do
-		-- Only sync custom groups (not built-in like favorites, nogroup, ingame)
-		local groupInfo = customGroups[groupId]
-		if groupInfo and groupInfo.name then
-			table.insert(groupEntries, {
-				name = groupInfo.name,
-				order = orderMap[groupId] or 9999,
-			})
+	if self.passiveQueued[friendUID] and not self.pendingWrites[friendUID] then
+		-- Queueing a normal full sync is not a local edit. Read/import again at
+		-- dispatch time, since a large paced queue can remain open for minutes.
+		local friend = friends[friendUID]
+		if not friend then
+			if self.syncReport then self.syncReport.unavailable[friendUID] = true end
+			return false, false, "unavailable"
 		end
+		local _, _, imported = self:ImportGroupsFromNotes({ [friendUID] = friend }, nil, snapshot)
+		if not imported then return false, false, "unavailable" end
 	end
-
-	-- Sort by group order position
-	table.sort(groupEntries, function(a, b)
-		return a.order < b.order
+	if self.unresolvedImports and self.unresolvedImports[friendUID] and not self.pendingWrites[friendUID] then return false, false, "unresolved" end
+	local ok, success, limitReached, reason = pcall(function()
+		local names = self:GetGroupNamesForFriend(friendUID)
+		if friendUID:match("^bnet_") then return self:SyncBNetFriend(friendUID, names, snapshot) end
+		if friendUID:match("^wow_") then return self:SyncWoWFriend(friendUID, names, snapshot, friends) end
+		return false, false, "unavailable"
 	end)
-
-	-- Extract names in order
-	local groupNames = {}
-	for _, entry in ipairs(groupEntries) do
-		table.insert(groupNames, entry.name)
+	self.isWriting = false
+	if not ok then
+		self:MarkPending(friendUID, true)
+		self:TrackSyncWork(friendUID)
+		self.retryAt[friendUID] = (GetTime and GetTime() or 0) + MAX_RETRY_DELAY
+		self:ScheduleVerification(VERIFY_DEBOUNCE)
+		BFL:DebugPrint("NoteSync: Write failed: " .. tostring(success))
+		return false, false, "failed"
 	end
-
-	return groupNames
+	if self.syncReport then
+		if success then self.syncReport.confirmed[friendUID] = true end
+		if limitReached then self.syncReport.limits[friendUID] = true end
+		self.syncReport.unavailable[friendUID] = not success and (reason == "unavailable" or reason == "unresolved") or nil
+	end
+	if reason == "unavailable" or reason == "unresolved" then self.retryAt[friendUID] = nil end
+	if success then self.passiveQueued[friendUID] = nil end
+	return success, limitReached, reason
 end
 
--- ============================================================
--- EVENT HOOK: Called when group order changes
--- Triggers a full re-sync of all friend notes
--- ============================================================
-function NoteSync:OnGroupOrderChanged()
-	local DB = BFL:GetModule("DB")
-	if not DB then
-		return
+function NoteSync:GetSyncStatus()
+	local report = self.syncReport
+	if not report then return nil end
+	local status = { total = 0, confirmed = 0, queued = 0, waiting = 0, retrying = 0, unavailable = 0, limits = 0 }
+	local now = GetTime and GetTime() or 0
+	for uid in pairs(report.uids) do
+		status.total = status.total + 1
+		if report.confirmed[uid] then status.confirmed = status.confirmed + 1
+		elseif report.unavailable[uid] then status.unavailable = status.unavailable + 1
+		elseif self.inFlight[uid] then status.waiting = status.waiting + 1
+		elseif not self.submitted[uid] then status.queued = status.queued + 1
+		else status.retrying = status.retrying + 1 end
+		if report.limits[uid] then status.limits = status.limits + 1 end
 	end
-
-	-- Guard: Only sync if setting is enabled
-	if not DB:Get("syncGroupsToNote") then
-		return
-	end
-
-	-- Guard: Skip during bulk import (the OnAccept caller handles SyncAllFriends after import)
-	if self.isImporting then
-		return
-	end
-
-	-- Re-sync all friends with the new group order
-	self:SyncAllFriends()
+	return status
 end
 
--- ============================================================
--- SYNC: Single friend note update
--- ============================================================
-function NoteSync:SyncSingleFriend(friendUID)
-	local DB = BFL:GetModule("DB")
-	if not DB then
-		return false
-	end
-
-	-- Guard: Only sync if setting is enabled
-	if not DB:Get("syncGroupsToNote") then
-		return false
-	end
-
-	local groupNames = self:GetGroupNamesForFriend(friendUID)
-
-	if friendUID:match("^bnet_") then
-		return self:SyncBNetFriend(friendUID, groupNames)
-	elseif friendUID:match("^wow_") then
-		return self:SyncWoWFriend(friendUID, groupNames)
-	end
-
-	return false
-end
-
--- ============================================================
--- SYNC: BNet friend note
--- ============================================================
-function NoteSync:SyncBNetFriend(friendUID, groupNames)
-	local battleTag = friendUID:gsub("^bnet_", "")
-
-	-- Find account by battleTag
-	local numBNetFriends = BNGetNumFriends()
-	for i = 1, numBNetFriends do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-		if accountInfo and accountInfo.battleTag == battleTag then
-			local actualNote = ParseNoteGroups(accountInfo.note or "")
-			local newNote, limitReached = self:BuildNoteWithGroups(actualNote, groupNames, BNET_NOTE_LIMIT)
-
-			-- Only write if note actually changed
-			local currentNote = accountInfo.note or ""
-			if newNote ~= currentNote then
-				self.isWriting = true
-				BNSetFriendNote(accountInfo.bnetAccountID, newNote)
-				self.isWriting = false
-				BFL:DebugPrint("NoteSync: Updated BNet note for " .. battleTag)
-			end
-
-			return true, limitReached
+function NoteSync:ReportSyncState()
+	local report = self.syncReport
+	if not report then return end
+	local status = self:GetSyncStatus()
+	local pending = status.total - status.confirmed
+	local now = GetTime and GetTime() or 0
+	local key = string.format("%d:%d:%d:%d:%d:%d", status.confirmed, status.total, status.queued, status.waiting, status.retrying, status.unavailable)
+	if pending > 0 and report.lastUpdate and now - report.lastUpdate < 5 then return end
+	if pending == 0 and self.isSyncing then return end
+	local L = BFL.L or BFL_LOCALE or {}
+	if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		if pending > 0 then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffff00BetterFriendlist:|r " .. string.format(L.MSG_SYNC_GROUPS_STATUS or "Note sync: %d/%d confirmed | %d queued | %d awaiting confirmation | %d retrying | %d unavailable.", status.confirmed, status.total, status.queued, status.waiting, status.retrying, status.unavailable))
+		elseif pending == 0 then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00BetterFriendlist:|r " .. string.format(L.MSG_SYNC_GROUPS_COMPLETE or "Group note sync complete. Updated: %d, Skipped (limit): %d", status.confirmed, status.limits))
 		end
 	end
-
-	BFL:DebugPrint("NoteSync: BNet friend not found: " .. battleTag)
-	return false, false
+	report.lastStatus, report.lastUpdate = key, now
+	if pending == 0 then
+		self.syncReport = nil
+		for _, callbacks in ipairs(report.callbacks) do if callbacks[1] then pcall(callbacks[1], status.confirmed, status.limits) end end
+	end
 end
 
--- ============================================================
--- SYNC: WoW friend note
--- ============================================================
-function NoteSync:SyncWoWFriend(friendUID, groupNames)
-	local charName = friendUID:gsub("^wow_", "")
-
-	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-	for i = 1, numWoWFriends do
-		local info = BFL.GetWoWFriendInfoByIndex(i)
-		if info then
-			local name = BFL:NormalizeWoWFriendName(info.name)
-			if name == charName then
-				local actualNote = ParseNoteGroups(info.notes or "")
-				local newNote, limitReached = self:BuildNoteWithGroups(actualNote, groupNames, WOW_NOTE_LIMIT)
-
-				-- Only write if note actually changed
-				local currentNote = info.notes or ""
-				if newNote ~= currentNote then
-					-- Use info.name (raw API name) instead of charName (normalized with realm)
-					-- C_FriendList.SetFriendNotes expects the name in the format the API returns it
-					self.isWriting = true
-					BFL.SetFriendNotes(info.name, newNote)
-					self.isWriting = false
-					BFL:DebugPrint("NoteSync: Updated WoW note for " .. charName)
-				end
-
-				return true, limitReached
-			end
-		end
-	end
-
-	BFL:DebugPrint("NoteSync: WoW friend not found: " .. charName)
-	return false, false
-end
-
--- ============================================================
--- FULL SYNC: Sync all friends with group assignments
--- Uses batched processing to avoid UI freezes
--- ============================================================
-function NoteSync:SyncAllFriends(callback, progressCallback)
-	local L = BFL_LOCALE
-
-	if self.isSyncing then
-		BFL:DebugPrint("NoteSync: Already syncing, skipping.")
-		return
-	end
-
-	local DB = BFL:GetModule("DB")
-	if not DB then
-		return
-	end
-
-	-- Collect all friends that have group assignments
-	local allFriendGroups = DB:GetFriendGroups() -- no arg = all
-	local friendUIDs = {}
-	for uid in pairs(allFriendGroups) do
-		table.insert(friendUIDs, uid)
-	end
-
-	-- Also collect friends with NO groups (to clean their notes)
-	-- We need to check all BNet and WoW friends
-	local allFriendSet = {}
-	for _, uid in ipairs(friendUIDs) do
-		allFriendSet[uid] = true
-	end
-
-	-- Scan BNet friends for any that have group tags in notes but no DB assignment
-	local numBNetFriends = BNGetNumFriends()
-	for i = 1, numBNetFriends do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-		if accountInfo and accountInfo.battleTag then
-			local uid = "bnet_" .. accountInfo.battleTag
-			if not allFriendSet[uid] then
-				-- Check if note has group tags
-				local noteText = accountInfo.note or ""
-				if noteText:find("#") then
-					table.insert(friendUIDs, uid)
-					allFriendSet[uid] = true
-				end
-			end
-		end
-	end
-
-	-- Scan WoW friends
-	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-	for i = 1, numWoWFriends do
-		local info = BFL.GetWoWFriendInfoByIndex(i)
-		if info then
-			local name = BFL:NormalizeWoWFriendName(info.name)
-			if name then
-				local uid = "wow_" .. name
-				if not allFriendSet[uid] then
-					local noteText = info.notes or ""
-					if noteText:find("#") then
-						table.insert(friendUIDs, uid)
-						allFriendSet[uid] = true
-					end
-				end
-			end
-		end
-	end
-
-	local totalFriends = #friendUIDs
-	if totalFriends == 0 then
-		BFL:DebugPrint("NoteSync: No friends to sync.")
-		local completeMsg = string.format(
-			L.MSG_SYNC_GROUPS_COMPLETE or "Group note sync complete. Updated: %d, Skipped (limit): %d",
-			0,
-			0
-		)
-		print("|cff00ff00BetterFriendlist:|r " .. completeMsg)
-		if callback then
-			callback(0, 0)
+function NoteSync:VerifyAllNotes()
+	if not IsEnabled() then return end
+	if WizardIsBusy() then self.waitingForWizard = true; self:ScheduleVerification(1); return end
+	self.waitingForWizard = false
+	if self.isSyncing or self.isImporting or self.isWriting then self.verificationPending = true; return end
+	self.verificationPending = false
+	if self.profileRestorePending then self:SyncAllFriends(); return end
+	if self.enablePending then
+		local friends, complete, snapshot = SnapshotFriends()
+		local _, _, success = self:ImportGroupsFromNotes(friends, nil, snapshot)
+		if success and complete then
+			local callbacks = self.enableCallbacks or {}
+			self.enablePending, self.enableCallbacks = false, nil
+			self:SyncAllFriends(callbacks[1], callbacks[2])
 		end
 		return
 	end
+	local excluded = {}
+	local friends, complete, snapshot = SnapshotFriends()
+	self:ApplyRosterChanges(friends)
+	for uid in pairs(self.pendingWrites) do excluded[uid] = true end
+	local _, _, imported = self:ImportGroupsFromNotes(friends, excluded, snapshot)
+	if not imported then return end
+	-- Confirmation is read-only. A changed DB goal is dispatched only after the
+	-- older accepted value is actually observed, and joins the same fair FIFO.
+	self.isPolling = true
+	for uid in pairs(friends) do self:SyncSingleFriend(uid, snapshot, friends) end
+	for uid in pairs(excluded) do if not friends[uid] then self:SyncSingleFriend(uid, snapshot, friends) end end
+	self.isPolling = false
+	self:StartDispatcher()
+	if self.isSyncing then self:ProcessDispatch(friends, snapshot) end
+	self:ReportSyncState()
+	-- Unavailable/removed friends keep their journal entry and retry on roster events, not a permanent polling loop.
+	if self.verificationPending then self:ScheduleVerification(self.verificationDelay) end
+end
 
-	BFL:DebugPrint(string.format(L.MSG_SYNC_GROUPS_STARTED or "Syncing groups to friend notes..."))
-	print("|cff00ff00BetterFriendlist:|r " .. (L.MSG_SYNC_GROUPS_STARTED or "Syncing groups to friend notes..."))
+function NoteSync:QueueFriend(friendUID)
+	if self.syncReport then self.syncReport.uids[friendUID] = true end
+	if self.inFlight[friendUID] and self.inFlight[friendUID].confirmed then self.inFlight[friendUID] = nil end
+	if self.inFlight[friendUID] then self:ScheduleVerification(); return end
+	self.syncQueue, self.syncQueued = self.syncQueue or {}, self.syncQueued or {}
+	if not self.syncQueued[friendUID] then
+		self.syncQueue[#self.syncQueue + 1] = friendUID
+		self.syncQueued[friendUID] = true
+		if self.syncReport then self.syncReport.uids[friendUID] = true end
+	end
+end
 
+function NoteSync:FinishDispatcher()
+	if self.syncTimer then self.syncTimer:Cancel(); self.syncTimer = nil end
+	self.isSyncing = false
+	local callbacks = self.syncCallbacks or {}
+	self.syncCallbacks = nil
+	if self.syncReport then
+		for _, entry in ipairs(callbacks) do self.syncReport.callbacks[#self.syncReport.callbacks + 1] = entry end
+	end
+	self:ReportSyncState()
+	local delay
+	local now = GetTime and GetTime() or 0
+	for uid in pairs(self.pendingWrites) do
+		if self.inFlight[uid] then delay = VERIFY_DEBOUNCE; break end
+		if self.retryAt[uid] then delay = math.min(delay or VERIFY_DEBOUNCE, math.max(.25, self.retryAt[uid] - now)) end
+	end
+	if delay or self.verificationPending then self:ScheduleVerification(delay or self.verificationDelay) end
+end
+
+function NoteSync:ProcessDispatch(friends, snapshot)
+	if not IsEnabled() or self.isImporting or WizardIsBusy() then return end
+	if not friends then
+		local complete
+		friends, complete, snapshot = SnapshotFriends()
+		self:ApplyRosterChanges(friends)
+	end
+	local version = self.workVersion
+	for _ = 1, SYNC_BATCH_SIZE do
+		local selected, retry
+		local now = GetTime and GetTime() or 0
+		-- Legacy booleans retain local intent but contain no persisted delivery
+		-- receipt. Their initial attempt precedes known rejections, across entrypoints.
+		for i, uid in ipairs(self.syncQueue) do
+			if not self.submitted[uid] and not self.inFlight[uid] then selected = i; break end
+			if not self.inFlight[uid] and (self.retryAt[uid] or 0) <= now and not retry then retry = i end
+		end
+		selected = selected or retry
+		if not selected then self:FinishDispatcher(); return end
+		local uid = table.remove(self.syncQueue, selected)
+		self.syncQueued[uid] = nil
+		local success, _, reason = self:SyncSingleFriend(uid, snapshot, friends)
+		if version ~= self.workVersion then return end
+		if reason == "paced" then
+			-- Keep its position rather than sending it through a verification timer
+			-- or rotating it behind newer requests on each pacing check.
+			table.insert(self.syncQueue, selected, uid); self.syncQueued[uid] = true
+			break
+		elseif not success and reason ~= "awaiting" and reason ~= "unavailable" and reason ~= "unresolved" then
+			self:QueueFriend(uid)
+		end
+	end
+	local status = self:GetSyncStatus()
+	for _, callbacks in ipairs(self.syncCallbacks or {}) do
+		if callbacks[2] then pcall(callbacks[2], status and (status.total - #self.syncQueue) or 0, status and status.total or 0) end
+		if version ~= self.workVersion then return end
+	end
+	self:ReportSyncState()
+	if #self.syncQueue == 0 then self:FinishDispatcher() end
+end
+
+function NoteSync:StartDispatcher()
+	if self.isSyncing or not IsEnabled() or self.isImporting then return end
+	if not self.syncQueue or #self.syncQueue == 0 then return end
 	self.isSyncing = true
-	local index = 1
-	local updatedCount = 0
-	local skippedCount = 0
-
-	-- Cancel any existing sync timer
-	if self.syncTimer then
-		self.syncTimer:Cancel()
-		self.syncTimer = nil
-	end
-
+	local version = self.workVersion
 	self.syncTimer = C_Timer.NewTicker(SYNC_TICK_INTERVAL, function(ticker)
-		local batchEnd = math.min(index + SYNC_BATCH_SIZE - 1, totalFriends)
+		if version ~= self.workVersion then ticker:Cancel(); return end
+		if not IsEnabled() then self:CancelWork(); ticker:Cancel(); return end
+		if self.isImporting then return end
+		if WizardIsBusy() then self.waitingForWizard = true; self:FinishDispatcher(); self:ScheduleVerification(1); return end
+		self:ProcessDispatch()
+	end)
+end
 
-		for i = index, batchEnd do
-			local uid = friendUIDs[i]
-			local success, limitReached = self:SyncSingleFriend(uid)
+function NoteSync:SyncAllFriends(callback, progressCallback)
+	if not IsEnabled() or self.isImporting then return false end
+	if WizardIsBusy() then self.waitingForWizard = true; self:ScheduleVerification(1); return false end
+	if self.enablePending then self:ScheduleVerification(); return true end
+	local DB = BFL:GetModule("DB")
+	if not DB then return false end
+	local friends, complete, snapshot = SnapshotFriends()
+	local restore = self.profileRestorePending
+	-- Every newly readable UID gets its read/import phase before a normal full sync can claim write authority.
+	if not restore then
+		local _, _, imported = self:ImportGroupsFromNotes(friends, nil, snapshot)
+		if not imported then return false end
+	end
+	self.syncQueue, self.syncQueued, self.syncCallbacks = self.syncQueue or {}, self.syncQueued or {}, self.syncCallbacks or {}
+	self.syncReport = self.syncReport or { uids = {}, confirmed = {}, limits = {}, unavailable = {}, callbacks = {} }
+	if callback or progressCallback then self.syncCallbacks[#self.syncCallbacks + 1] = { callback, progressCallback } end
+	local function QueueAuthoritative(uid)
+		-- A complete empty/partial roster does not establish intent for saved friends we have not seen.
+		if not friends[uid] and not self.pendingWrites[uid] and not restore then return end
+		if (self.unresolvedImports and self.unresolvedImports[uid]) and not self.pendingWrites[uid] then return end
+		if uid:match("^bnet_%d+$") and not self.titleIdentities[uid] then return end
+		if restore then self:ResetRetry(uid); self:MarkPending(uid, true)
+		elseif not self.pendingWrites[uid] then self.passiveQueued[uid] = true end
+		self:QueueFriend(uid)
+	end
+	for uid in pairs(DB:GetFriendGroups()) do QueueAuthoritative(uid) end
+	for uid in pairs(self.pendingWrites) do self:QueueFriend(uid) end
+	for uid, friend in pairs(friends) do if friend.note:find("#", 1, true) then QueueAuthoritative(uid) end end
+	self.profileRestorePending = false
+	if self.isSyncing then return true end
+	local L = BFL.L or BFL_LOCALE or {}
+	if #self.syncQueue > 0 and DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffffBetterFriendlist:|r " .. (L.MSG_SYNC_GROUPS_STARTED or "Syncing groups to friend notes..."))
+	end
+	self:StartDispatcher()
+	if not self.isSyncing then self:FinishDispatcher() end
+	return true
+end
 
-			if success then
-				updatedCount = updatedCount + 1
-				if limitReached then
-					skippedCount = skippedCount + 1
-					local displayName = uid:gsub("^bnet_", ""):gsub("^wow_", "")
-					BFL:DebugPrint(
-						string.format(L.MSG_SYNC_GROUPS_NOTE_LIMIT or "Note limit reached for %s", displayName)
-					)
-				end
-			end
-		end
+function NoteSync:OnGroupChanged(friendUID, preserveIdentity)
+	if self.isImporting then return end
+	local snapshot, friends = self.groupDefinitionSnapshot, self.groupDefinitionFriends
+	if friendUID:match("^bnet_%d+$") and (preserveIdentity or self.isChangingGroupDefinition) then
+		local identity = self.titleIdentities[friendUID]
+		if not identity or not BFL.FriendNotes.ResolveBNetIdentity(identity, snapshot and snapshot.bnet) then return end
+	else
+		-- Remember explicit current-friend identity evidence even while sync is disabled.
+		self:BindTitleIdentity(friendUID, snapshot and snapshot.bnet[friendUID], true, snapshot)
+	end
+	if not IsEnabled() then return end
+	self:ResetRetry(friendUID)
+	if not self.inFlight[friendUID] then self.submitted[friendUID] = nil end
+	self:MarkPending(friendUID, true)
+	if self.enablePending then return end
+	if self.isSyncing then self:QueueFriend(friendUID); return end
+	-- Preserve immediate feedback for an isolated edit, but never jump ahead of
+	-- older unsent work loaded from the journal.
+	self:QueueFriend(friendUID)
+	self:StartDispatcher()
+	if self.isSyncing then self:ProcessDispatch(friends, snapshot) end
+end
 
-		index = batchEnd + 1
+function NoteSync:WithGroupDefinitionChange(callback)
+	local previous = self.isChangingGroupDefinition
+	local previousSnapshot, previousFriends = self.groupDefinitionSnapshot, self.groupDefinitionFriends
+	local friends, complete, snapshot = SnapshotFriends()
+	self.isChangingGroupDefinition, self.groupDefinitionSnapshot, self.groupDefinitionFriends = true, snapshot, friends
+	local ok, err = pcall(callback)
+	self.isChangingGroupDefinition, self.groupDefinitionSnapshot, self.groupDefinitionFriends = previous, previousSnapshot, previousFriends
+	if not ok then error(err) end
+end
 
-		-- Progress update every batch
-		if index <= totalFriends then
-			BFL:DebugPrint(
-				string.format(L.MSG_SYNC_GROUPS_PROGRESS or "Syncing notes: %d / %d", index - 1, totalFriends)
-			)
-			if progressCallback then
-				progressCallback(index - 1, totalFriends)
-			end
-		end
-
-		-- Done
-		if index > totalFriends then
-			ticker:Cancel()
-			self.syncTimer = nil
-			self.isSyncing = false
-
-			if progressCallback then
-				progressCallback(totalFriends, totalFriends)
-			end
-
-			local completeMsg = string.format(
-				L.MSG_SYNC_GROUPS_COMPLETE or "Group note sync complete. Updated: %d, Skipped (limit): %d",
-				updatedCount,
-				skippedCount
-			)
-			BFL:DebugPrint(completeMsg)
-			print("|cff00ff00BetterFriendlist:|r " .. completeMsg)
-
-			if callback then
-				callback(updatedCount, skippedCount)
-			end
+function NoteSync:OnGroupRenamed(groupId)
+	if not IsEnabled() or self.isImporting then return end
+	local DB = BFL:GetModule("DB")
+	if not DB then return end
+	self:WithGroupDefinitionChange(function()
+		for uid, ids in pairs(DB:GetFriendGroups()) do
+			for _, id in ipairs(ids) do if id == groupId then self:OnGroupChanged(uid, true); break end end
 		end
 	end)
 end
 
--- ============================================================
--- EVENT HOOK: Called when a friend's group membership changes
--- This is called from Database.lua after AddFriendToGroup/RemoveFriendFromGroup
--- ============================================================
-function NoteSync:OnGroupChanged(friendUID)
-	local DB = BFL:GetModule("DB")
-	if not DB then
-		return
-	end
-
-	-- Guard: Only sync if setting is enabled
-	if not DB:Get("syncGroupsToNote") then
-		return
-	end
-
-	-- Avoid syncing during full sync or import
-	if self.isSyncing or self.isImporting then
-		return
-	end
-
-	-- Sync the specific friend
-	self:SyncSingleFriend(friendUID)
+function NoteSync:OnGroupOrderChanged()
+	if IsEnabled() and not self.isImporting then self:SyncAllFriends() end
 end
 
--- ============================================================
--- IMPORT: Read existing group tags from friend notes and create
--- groups + assignments in DB before the first write-sync.
--- Prevents data loss for users coming from FriendGroups who
--- haven't run the migration wizard.
--- Returns: importedGroups (number), importedAssignments (number)
--- ============================================================
-function NoteSync:ImportGroupsFromNotes()
-	local DB = BFL:GetModule("DB")
-	local Groups = BFL:GetModule("Groups")
-	if not DB or not Groups then
-		return 0, 0
-	end
-
-	-- Phase 1: Scan all friend notes for #-tags
-	local allGroupNames = {} -- set of unique group names found
-	local friendAssignments = {} -- friendUID -> { groups = {name1, name2, ...} }
-
-	-- Scan BNet friends
-	local numBNetFriends = BNGetNumFriends()
-	for i = 1, numBNetFriends do
-		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-		if accountInfo and accountInfo.battleTag then
-			local noteText = accountInfo.note or ""
-			if noteText:find("#") then
-				local _, groupNames = ParseNoteGroups(noteText)
-				if #groupNames > 0 then
-					local uid = "bnet_" .. accountInfo.battleTag
-					friendAssignments[uid] = groupNames
-					for _, gn in ipairs(groupNames) do
-						allGroupNames[gn] = true
-					end
-				end
-			end
-		end
-	end
-
-	-- Scan WoW friends
-	local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-	for i = 1, numWoWFriends do
-		local info = BFL.GetWoWFriendInfoByIndex(i)
-		if info and info.name then
-			local noteText = info.notes or ""
-			if noteText:find("#") then
-				local _, groupNames = ParseNoteGroups(noteText)
-				if #groupNames > 0 then
-					local name = BFL:NormalizeWoWFriendName(info.name)
-					if name then
-						local uid = "wow_" .. name
-						friendAssignments[uid] = groupNames
-						for _, gn in ipairs(groupNames) do
-							allGroupNames[gn] = true
-						end
-					end
-				end
-			end
-		end
-	end
-
-	-- Nothing to import?
-	local nameCount = 0
-	for _ in pairs(allGroupNames) do
-		nameCount = nameCount + 1
-	end
-	if nameCount == 0 then
-		BFL:DebugPrint("NoteSync: Import - no group tags found in notes.")
-		return 0, 0
-	end
-
-	-- Phase 2: Create missing groups, build name -> groupId map
-	local groupNameMap = {}
-	local createdGroups = 0
-
-	-- Get existing group order to append new groups
-	local savedOrder = DB:Get("groupOrder")
-	local groupOrderArray
-	local groupOrderSet = {} -- for dedup checks
-	if savedOrder and type(savedOrder) == "table" and #savedOrder > 0 then
-		-- Copy existing order
-		groupOrderArray = {}
-		for _, gid in ipairs(savedOrder) do
-			if not groupOrderSet[gid] then
-				table.insert(groupOrderArray, gid)
-				groupOrderSet[gid] = true
-			end
-		end
-	else
-		groupOrderArray = { "favorites" }
-		groupOrderSet["favorites"] = true
-	end
-
-	-- Find the insertion point: before "nogroup" (last element in most setups)
-	local insertIdx = #groupOrderArray + 1
-	for i, gid in ipairs(groupOrderArray) do
-		if gid == "nogroup" then
-			insertIdx = i
-			break
-		end
-	end
-
-	-- Determine next order value from existing groups
-	local maxOrder = 1
-	local allGroups = Groups:GetAll()
-	for gid, gData in pairs(allGroups) do
-		if gid ~= "nogroup" then
-			maxOrder = math.max(maxOrder, gData.order or 1)
-		end
-	end
-	local currentOrder = maxOrder + 1
-
-	-- Sort group names alphabetically for deterministic order
-	local sortedNames = {}
-	for gn in pairs(allGroupNames) do
-		table.insert(sortedNames, gn)
-	end
-	table.sort(sortedNames)
-
-	for _, groupName in ipairs(sortedNames) do
-		local existingId = Groups:GetGroupIdByName(groupName)
-		if existingId then
-			groupNameMap[groupName] = existingId
-		else
-			local success, groupId = Groups:CreateWithOrder(groupName, currentOrder)
-			if success and groupId then
-				groupNameMap[groupName] = groupId
-				createdGroups = createdGroups + 1
-				-- Insert into order array before "nogroup" (skip if already present as ghost)
-				if not groupOrderSet[groupId] then
-					table.insert(groupOrderArray, insertIdx, groupId)
-					groupOrderSet[groupId] = true
-					insertIdx = insertIdx + 1
-				end
-				currentOrder = currentOrder + 1
-			end
-		end
-	end
-
-	-- Ensure "nogroup" is in the order array
-	if not groupOrderSet["nogroup"] then
-		table.insert(groupOrderArray, "nogroup")
-	end
-
-	-- Save updated group order if we created new groups
-	if createdGroups > 0 then
-		DB:Set("groupOrder", groupOrderArray)
-	end
-
-	-- Phase 3: Assign friends to groups (skip duplicates)
-	-- Suppress OnGroupChanged during bulk assignment to prevent
-	-- intermediate note writes (SyncAllFriends handles it after)
-	self.isImporting = true
-	local assignmentCount = 0
-	for uid, groupNames in pairs(friendAssignments) do
-		for _, groupName in ipairs(groupNames) do
-			local groupId = groupNameMap[groupName]
-			if groupId then
-				local success = DB:AddFriendToGroup(uid, groupId)
-				if success then
-					assignmentCount = assignmentCount + 1
-				end
-			end
-		end
-	end
-	self.isImporting = false
-
-	BFL:DebugPrint(
-		string.format(
-			"NoteSync: Import complete - %d group(s) created, %d assignment(s) added.",
-			createdGroups,
-			assignmentCount
-		)
-	)
-
-	return createdGroups, assignmentCount
-end
-
--- ============================================================
--- CLEANUP: Remove group tags from a friend's note
--- Used when disabling sync or removing all groups
--- ============================================================
 function NoteSync:CleanFriendNote(friendUID)
-	if friendUID:match("^bnet_") then
-		local battleTag = friendUID:gsub("^bnet_", "")
-		local numBNetFriends = BNGetNumFriends()
-		for i = 1, numBNetFriends do
-			local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-			if accountInfo and accountInfo.battleTag == battleTag then
-				local actualNote = ParseNoteGroups(accountInfo.note or "")
-				if actualNote ~= (accountInfo.note or "") then
-					self.isWriting = true
-					BNSetFriendNote(accountInfo.bnetAccountID, actualNote)
-					self.isWriting = false
-				end
-				return
-			end
-		end
-	elseif friendUID:match("^wow_") then
-		local charName = friendUID:gsub("^wow_", "")
-		local numWoWFriends = (BFL.GetNumWoWFriends and BFL.GetNumWoWFriends() or 0)
-		for i = 1, numWoWFriends do
-			local info = BFL.GetWoWFriendInfoByIndex(i)
-			if info then
-				local name = BFL:NormalizeWoWFriendName(info.name)
-				if name == charName then
-					local actualNote = ParseNoteGroups(info.notes or "")
-					if actualNote ~= (info.notes or "") then
-						-- Use info.name (raw API name) for same reason as SyncWoWFriend
-						self.isWriting = true
-						BFL.SetFriendNotes(info.name, actualNote)
-						self.isWriting = false
-					end
-					return
-				end
-			end
-		end
-	end
+	if not IsEnabled() or self.isImporting then return false end
+	if friendUID:match("^bnet_") then return self:SyncBNetFriend(friendUID, {}) end
+	if friendUID:match("^wow_") then return self:SyncWoWFriend(friendUID, {}) end
+	return false
 end

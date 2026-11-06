@@ -2532,398 +2532,122 @@ end
 -- EXPORT / IMPORT SYSTEM
 --------------------------------------------------------------------------
 
--- Export all settings to a string
+-- Full backups include private notes and note backups. Global Sync carries a
+-- flavor scope; installation identity and delivery journals stay local.
 function Settings:ExportSettings()
-	if not BetterFriendlistDB then
-		return nil, L.ERROR_DB_NOT_AVAILABLE
-	end
-
-	-- Deep copy the DB to ensure we capture EVERYTHING
-	-- This fulfills the requirement to export future settings automatically
-	local DB = GetDB()
-	-- Private character associations are local-only, not profile data. Exclude
-	-- before deep-copy/serialization, rather than copying private payloads first.
-	local publicData = {}
+	local codec = BFL.ProfileCodec
+	if type(BetterFriendlistDB) ~= "table" then return nil, L.ERROR_DB_NOT_AVAILABLE end
+	if not codec then return nil, L.ERROR_MODULES_NOT_LOADED end
+	local exportData = {}
 	for key, value in pairs(BetterFriendlistDB) do
-		if key ~= "knownCharacters" then publicData[key] = value end
+		if not codec.LOCAL_KEYS[key] then exportData[key] = value end
 	end
-	local exportData = DB:InternalDeepCopy(publicData)
-	-- Onboarding acknowledgement and reload-resume state belong to this installation
-	-- and must not suppress, resume, or re-open onboarding on an imported profile.
-	exportData.appearanceOnboardingVersion = nil
-	exportData.appearanceOnboardingResume = nil
-
-	-- Tag with export version 3 (Base64 + Full DB)
 	exportData.exportVersion = 3
-
-	-- Serialize to string using manual encoding
+	-- Derived from this running client, never from imported SavedVariables.
+	exportData.exportFlavor = codec:GetCurrentFlavor()
+	-- Serialize validates the graph before traversing it; do not deep-copy an
+	-- untrusted/cyclic graph first or silently truncate supported filter trees.
 	local serialized = self:SerializeTable(exportData)
-
-	if not serialized then
-		return nil, L.ERROR_EXPORT_SERIALIZE
-	end
-
-	-- Encode to Base64 (using BFL3: prefix)
-	-- Used C_EncodingUtil.EncodeBase64 if available as requested
+	if not serialized then return nil, L.ERROR_EXPORT_SERIALIZE end
 	local encoded = self:EncodeString(serialized)
-
+	if not encoded then return nil, L.ERROR_EXPORT_SERIALIZE end
 	return encoded, nil
 end
 
--- Import settings from string
-function Settings:ImportSettings(importString)
-	if not importString or importString == "" then
-		return false, L.ERROR_IMPORT_EMPTY
-	end
-
-	-- Decode
-	local decoded, version = self:DecodeString(importString)
-	if not decoded then
-		return false, L.ERROR_IMPORT_DECODE
-	end
-
-	-- Deserialize
-	local importData = self:DeserializeTable(decoded)
-	if not importData then
-		return false, L.ERROR_IMPORT_DESERIALIZE
-	end
-
-	-- IMPORT DATA
-	local DB = GetDB()
-	local Groups = GetGroups()
-
-	if not DB or not Groups then
-		return false, L.ERROR_MODULES_NOT_LOADED
-	end
-
-	-- Handle V3 (Everything)
-	if importData.exportVersion and importData.exportVersion >= 3 then
-		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V3 (Full) backup...")
-		local appearanceOnboardingVersion = BetterFriendlistDB.appearanceOnboardingVersion
-		local appearanceOnboardingResume = BetterFriendlistDB.appearanceOnboardingResume
-		local knownCharacters = BetterFriendlistDB.knownCharacters
-
-		-- Wipe the entire DB first, then apply import data.
-		-- This ensures keys that existed in the live DB but NOT in the export
-		-- (e.g., newly created groups, settings added after the export) are removed.
-		wipe(BetterFriendlistDB)
-
-		-- Import ALL keys from the export
-		for key, value in pairs(importData) do
-			-- Skip metadata
-			if
-				key ~= "exportVersion"
-				and key ~= "version"
-				and key ~= "appearanceOnboardingVersion"
-				and key ~= "appearanceOnboardingResume"
-				and key ~= "knownCharacters"
-			then
-				BetterFriendlistDB[key] = value
-			end
-		end
-		BetterFriendlistDB.appearanceOnboardingVersion = appearanceOnboardingVersion
-		BetterFriendlistDB.appearanceOnboardingResume = appearanceOnboardingResume
-		BetterFriendlistDB.knownCharacters = knownCharacters
-
-		-- Explicitly handle version to prevent mismatches
-		-- We keep the current addon version in DB, not the one from export,
-		-- to trigger migration logic if needed on next reload
-		BetterFriendlistDB.version = BFL.VERSION
-	else
-		-- Legacy V1/V2 Import Logic
-		BFL:DebugPrint("|cff00ff00BetterFriendlist:|r Importing V1/V2 (Legacy) backup...")
-
-		-- Validate structure (Relaxed for V1/V2 as they might miss some keys but must have core ones)
-		if not importData.customGroups or not importData.friendGroups then
-			return false, L.ERROR_EXPORT_STRUCTURE
-		end
-
-		-- Clear existing data (Common to v1 and v2)
-		BetterFriendlistDB.customGroups = {}
-		BetterFriendlistDB.friendGroups = {}
-		BetterFriendlistDB.groupOrder = {}
-		BetterFriendlistDB.groupStates = {}
-
-		-- Import custom groups
-		if importData.customGroups then
-			for groupId, groupInfo in pairs(importData.customGroups) do
-				BetterFriendlistDB.customGroups[groupId] = {
-					name = groupInfo.name,
-					collapsed = groupInfo.collapsed or false,
-					order = groupInfo.order or 2,
-					color = groupInfo.color or { r = 1.0, g = 0.82, b = 0.0 },
-				}
-			end
-		end
-
-		-- Import friend assignments
-		if importData.friendGroups then
-			for friendUID, groups in pairs(importData.friendGroups) do
-				BetterFriendlistDB.friendGroups[friendUID] = {}
-				for _, groupId in ipairs(groups) do
-					table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
-				end
-			end
-		end
-
-		-- Import group order
-		if importData.groupOrder then
-			for _, groupId in ipairs(importData.groupOrder) do
-				table.insert(BetterFriendlistDB.groupOrder, groupId)
-			end
-		end
-
-		-- Import group states
-		if importData.groupStates then
-			for groupId, collapsed in pairs(importData.groupStates) do
-				BetterFriendlistDB.groupStates[groupId] = collapsed
-			end
-		end
-
-		-- Import group colors (user-customized colors)
-		if importData.groupColors then
-			BetterFriendlistDB.groupColors = {}
-			for groupId, color in pairs(importData.groupColors) do
-				if color and color.r and color.g and color.b then
-					BetterFriendlistDB.groupColors[groupId] = {
-						r = color.r,
-						g = color.g,
-						b = color.b,
-					}
-				end
-			end
-		end
-
-		-- Version 2: Import all other settings
-		if importData.version and importData.version >= 2 then
-			local keysToImport = {
-				-- General
-				"compactMode",
-				"theme",
-				"darkThemeSettings",
-				"customTheme",
-				"enableElvUISkin",
-				"fontSize",
-				"windowScale",
-				"hideMaxLevel",
-				"accordionGroups",
-				"showFavoritesGroup",
-				"colorClassNames",
-				"hideEmptyGroups",
-				"headerCountFormat",
-				"groupHeaderAlign",
-				"showGroupArrow",
-				"groupArrowAlign",
-				"showFactionIcons",
-				"showRealmName",
-				"grayOtherFaction",
-				"showMobileAsAFK",
-				"treatMobileAsOffline",
-				"nameDisplayFormat",
-				"enableInGameGroup",
-				"inGameGroupMode",
-				-- Fonts
-				"fontFriendName",
-				"fontSizeFriendName",
-				"fontOutlineFriendName",
-				"fontShadowFriendName",
-				"fontColorFriendName",
-				"fontFriendInfo",
-				"fontSizeFriendInfo",
-				"fontOutlineFriendInfo",
-				"fontShadowFriendInfo",
-				"fontColorFriendInfo",
-				"fontTabText",
-				"fontSizeTabText",
-				"fontOutlineTabText",
-				"fontShadowTabText",
-				"fontRaidName",
-				"fontSizeRaidName",
-				"fontOutlineRaidName",
-				"fontShadowRaidName",
-				"fontGroupHeader",
-				"fontSizeGroupHeader",
-				"fontOutlineGroupHeader",
-				"fontShadowGroupHeader",
-				"colorGroupCount",
-				"colorGroupArrow",
-				"brokerFont",
-				"brokerFontSize",
-				"brokerFontFlags",
-				"brokerUseCustomFontForNonLatin",
-				-- Sort & Filter
-				"quickFilter",
-				"primarySort",
-				"secondarySort",
-				"customQuickFilters",
-				"quickFilterVisibility",
-				"quickFilterOrder",
-				"nextCustomQuickFilterId",
-				"customSorters",
-				"sorterVisibility",
-				"sorterOrder",
-				"nextCustomSorterId",
-				-- Guild Tab
-				"enableGuildTab",
-				"guildTabFilterMode",
-				"guildTabSortMode",
-				"guildTabShowClassIcons",
-				"guildTabUseNicknames",
-				-- Broker
-				"brokerEnabled",
-				"brokerShowIcon",
-				"brokerShowLabel",
-				"brokerShowTotal",
-				"brokerShowGroups",
-				"brokerTooltipMode",
-				"brokerClickAction",
-				"brokerShowHints",
-				-- Sync
-				"enableGlobalSync",
-				"enableGlobalSyncDeletion",
-				-- Other
-				"nicknames",
-				"enableBetaFeatures",
-			}
-
-			for _, key in ipairs(keysToImport) do
-				if importData[key] ~= nil then
-					BetterFriendlistDB[key] = importData[key]
-				end
-			end
-		end
-	end
-
-	if importData.theme == nil and importData.enableElvUISkin ~= nil then
-		BetterFriendlistDB.theme = importData.enableElvUISkin == true and "elvui" or "blizzard"
-	end
-	if DB.NormalizeThemeSetting then
-		DB:NormalizeThemeSetting()
-	end
-	if DB.NormalizeThemeSettings then
-		DB:NormalizeThemeSettings()
-	end
+local function RefreshImportedProfile(reason)
+	local DB, Groups = GetDB(), GetGroups()
+	if DB.NormalizeThemeSetting then DB:NormalizeThemeSetting() end
+	if DB.NormalizeThemeSettings then DB:NormalizeThemeSettings() end
 	local Registry = BFL:GetModule("FilterSortRegistry")
 	if Registry and Registry.NormalizeDB then
 		Registry:NormalizeDB()
 		Registry:NormalizeCurrentSelections()
 	end
 	local FriendTags = BFL:GetModule("FriendTags")
-	if FriendTags and FriendTags.OnDatabaseImported then
-		FriendTags:OnDatabaseImported()
-	end
+	if FriendTags and FriendTags.OnDatabaseImported then FriendTags:OnDatabaseImported() end
 	local QuickFilters = BFL:GetModule("QuickFilters")
-	if QuickFilters and QuickFilters.InvalidateTagFilterCache then
-		QuickFilters:InvalidateTagFilterCache()
-	end
+	if QuickFilters and QuickFilters.InvalidateTagFilterCache then QuickFilters:InvalidateTagFilterCache() end
 	local ThemeManager = BFL:GetModule("ThemeManager")
-	if ThemeManager and ThemeManager.InvalidateEffectiveTheme then
-		ThemeManager:InvalidateEffectiveTheme()
-	end
-
-	-- Reload Groups module (this will apply imported colors)
+	if ThemeManager and ThemeManager.InvalidateEffectiveTheme then ThemeManager:InvalidateEffectiveTheme() end
 	Groups:Initialize()
-
-	-- Invalidate caches after direct DB writes
-	if BFL.SettingsVersion then
-		BFL.SettingsVersion = BFL.SettingsVersion + 1
-	end
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList then
-		if FriendsList.InvalidateSettingsCache then
-			FriendsList:InvalidateSettingsCache()
-		end
+		if FriendsList.InvalidateSettingsCache then FriendsList:InvalidateSettingsCache() end
+		if FriendsList.ApplyScrollInterpolation then FriendsList:ApplyScrollInterpolation() end
 		FriendsList.lastBuildInputs = nil
 	end
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-	if FriendsUI and FriendsUI.RefreshModernConfigurationLayout then
-		-- Import writes Simple Mode and its search option directly. Reassert the
-		-- Modern layout before rendering so controls from the previous profile do
-		-- not remain visible merely because the friend data itself was unchanged.
-		FriendsUI:RefreshModernConfigurationLayout("settings-import")
-	end
-
-	-- Sync Streamer Mode visual state (button icon, header text) with imported DB
+	if FriendsUI and FriendsUI.RefreshModernConfigurationLayout then FriendsUI:RefreshModernConfigurationLayout(reason) end
 	local StreamerMode = BFL:GetModule("StreamerMode")
-	if StreamerMode then
-		StreamerMode:UpdateState()
-	end
-
-	-- Force full display refresh - import affects groups and display structure
+	if StreamerMode then StreamerMode:UpdateState() end
 	BFL:ForceRefreshFriendsList()
 	local PreviewMode = BFL:GetModule("PreviewMode")
-	if PreviewMode and PreviewMode.OnSettingChanged then
-		PreviewMode:OnSettingChanged("settingsImport")
-	end
+	if PreviewMode and PreviewMode.OnSettingChanged then PreviewMode:OnSettingChanged("settingsImport") end
+end
 
+function Settings:ImportSettings(importString)
+	if type(importString) ~= "string" or importString == "" then return false, L.ERROR_IMPORT_EMPTY end
+	local codec, DB, Groups = BFL.ProfileCodec, GetDB(), GetGroups()
+	if not codec or not DB or not Groups or not DB.PrepareImportedProfile or type(BetterFriendlistDB) ~= "table" then
+		return false, L.ERROR_MODULES_NOT_LOADED
+	end
+	if #importString > codec.MAX_BYTES * 2 + 64 then return false, L.ERROR_IMPORT_DECODE end
+	local decoded = self:DecodeString(importString)
+	if not decoded then return false, L.ERROR_IMPORT_DECODE end
+	local importData = self:DeserializeTable(decoded)
+	if not importData then return false, L.ERROR_IMPORT_DESERIALIZE end
+	local prepared, staged, errorKey = pcall(DB.PrepareImportedProfile, DB, importData)
+	if not prepared or not staged then return false, L[errorKey or "ERROR_EXPORT_STRUCTURE"] end
+
+	-- Save original references, not another deep copy: modules retain references
+	-- to the DB and some nested settings tables. Failed imports restore both.
+	local live, previous, oldGroups = BetterFriendlistDB, {}, {}
+	for key, value in pairs(live) do previous[key] = value end
+	for key, value in pairs(Groups.groups or {}) do oldGroups[key] = value end
+	local NoteSync = BFL:GetModule("NoteSync")
+	local wasImporting = NoteSync and NoteSync.isImporting
+	if NoteSync then NoteSync.isImporting = true end
+	local previousVersion = BFL.SettingsVersion
+	local function replace(values)
+		wipe(live)
+		for key, value in pairs(values) do live[key] = value end
+	end
+	replace(staged)
+	BFL.SettingsVersion = (previousVersion or 0) + 1
+	local applied = pcall(RefreshImportedProfile, "settings-import")
+	if not applied then
+		replace(previous)
+		-- Keep the version monotonic so every consumer discards imported caches.
+		BFL.SettingsVersion = BFL.SettingsVersion + 1
+		pcall(RefreshImportedProfile, "settings-import-rollback")
+		if Groups.groups then
+			wipe(Groups.groups)
+			for key, value in pairs(oldGroups) do Groups.groups[key] = value end
+		end
+		if NoteSync then NoteSync.isImporting = wasImporting end
+		return false, L.ERROR_IMPORT_APPLY
+	end
+	if self.InvalidatePendingNoteSyncConfirmation then
+		pcall(self.InvalidatePendingNoteSyncConfirmation, self)
+	end
+	if NoteSync then
+		NoteSync.isImporting = wasImporting
+		-- This hook resets installation-local pending writes and schedules the
+		-- committed DB as the source of truth, without importing old note tags.
+		if NoteSync.OnDatabaseImported then
+			local ok = pcall(NoteSync.OnDatabaseImported, NoteSync)
+			if not ok then BFL:DebugPrint("Note synchronization could not resume after profile import.") end
+		end
+	end
 	return true, nil
 end
 
--- Simple table serialization (Lua table to string)
 function Settings:SerializeTable(tbl)
-	local function serialize(val, depth)
-		depth = depth or 0
-		if depth > UI.MAX_RECURSION_DEPTH then
-			return "nil"
-		end -- Prevent infinite recursion
-
-		local t = type(val)
-		if t == "number" then
-			return tostring(val)
-		elseif t == "boolean" then
-			return val and "true" or "false"
-		elseif t == "string" then
-			return string.format("%q", val)
-		elseif t == "table" then
-			local parts = {}
-			table.insert(parts, "{")
-			for k, v in pairs(val) do
-				local key = type(k) == "string" and string.format("[%q]", k) or string.format("[%s]", tostring(k))
-				table.insert(parts, key .. "=" .. serialize(v, depth + 1) .. ",")
-			end
-			table.insert(parts, "}")
-			return table.concat(parts)
-		else
-			return "nil"
-		end
-	end
-
-	return serialize(tbl)
+	return BFL.ProfileCodec and BFL.ProfileCodec:Serialize(tbl) or nil
 end
 
--- Deserialize string to table
 function Settings:DeserializeTable(str)
-	if not str or str == "" then
-		return nil
-	end
-
-	-- Security: Use setfenv to sandbox the loaded code instead of fragile character whitelisting.
-	-- setfenv(func, {}) removes access to ALL globals (os, print, loadstring, etc.),
-	-- making code injection harmless. Table literals only need Lua keywords (true/false/nil)
-	-- which work without any environment.
-	local func, err = loadstring("return " .. str)
-	if not func then
-		BFL:DebugPrint("DeserializeTable: loadstring failed:", err)
-		return nil
-	end
-
-	-- Sandbox: empty environment prevents access to any global functions or variables
-	setfenv(func, {})
-
-	-- Execute in protected call to catch runtime errors
-	local success, result = pcall(func)
-	if not success then
-		BFL:DebugPrint("DeserializeTable: pcall failed:", tostring(result))
-		return nil
-	end
-
-	-- Validate result is a table (not a string, number, or other type from crafted input)
-	if type(result) ~= "table" then
-		BFL:DebugPrint("DeserializeTable: Result is not a table:", type(result))
-		return nil
-	end
-
-	return result
+	return BFL.ProfileCodec and BFL.ProfileCodec:Deserialize(str) or nil
 end
 
 -- Encode string to base64 or hex format
@@ -2937,47 +2661,28 @@ function Settings:EncodeString(str)
 	end
 
 	-- Fallback to Hex (Legacy V1/V2 style) if Base64 fails
-	local hexParts = {}
-	for i = 1, #str do
-		table.insert(hexParts, string.format("%02x", string.byte(str, i)))
-	end
-	return "BFL1:" .. table.concat(hexParts)
+	return "BFL1:" .. str:gsub(".", function(char) return string.format("%02x", char:byte()) end)
 end
 
 -- Decode format back to string
 function Settings:DecodeString(encoded)
-	if not encoded then
-		return nil
+	local codec = BFL.ProfileCodec
+	if not codec or type(encoded) ~= "string" or #encoded > codec.MAX_BYTES * 2 + 64 then return nil end
+	encoded = encoded:match("^%s*(.-)%s*$")
+	if encoded:sub(1, 5) == "BFL1:" then
+		local hex = encoded:sub(6)
+		if #hex == 0 or #hex % 2 ~= 0 or #hex > codec.MAX_BYTES * 2 or hex:find("[^%x]") then return nil end
+		local decoded = hex:gsub("%x%x", function(pair) return string.char(tonumber(pair, 16)) end)
+		return decoded, 1
 	end
-
-	-- V3: Base64
-	if string.match(encoded, "^BFL3:") then
-		local b64 = string.sub(encoded, 6)
-		local decoded = BFL:Base64Decode(b64)
-		return decoded, 3
-	end
-
-	-- V1/V2: Hex
-	if string.match(encoded, "^BFL1:") then
-		local hex = string.sub(encoded, 6)
-		local chars = {}
-		for i = 1, #hex, 2 do
-			local byte = tonumber(string.sub(hex, i, i + 1), 16)
-			if not byte then
-				return nil
-			end
-			table.insert(chars, string.char(byte))
-		end
-		return table.concat(chars), 1
-	end
-
-	-- Try raw base64 (if user copied without prefix?)
-	local tryB64 = BFL:Base64Decode(encoded)
-	if tryB64 then
-		return tryB64, 3
-	end
-
-	return nil
+	if encoded:sub(1, 5) == "BFL3:" then encoded = encoded:sub(6)
+	elseif encoded:match("^BFL%d+:") then return nil end
+	local base64 = encoded:gsub("%s", "")
+	if #base64 == 0 or #base64 % 4 ~= 0 or #base64 > math.ceil(codec.MAX_BYTES / 3) * 4
+		or not base64:match("^[A-Za-z0-9+/]*=?=?$") then return nil end
+	local decoded = BFL:Base64Decode(base64)
+	if type(decoded) ~= "string" or #decoded > codec.MAX_BYTES then return nil end
+	return decoded, 3
 end
 
 -- Show export dialog with scrollable text
@@ -2996,7 +2701,7 @@ function Settings:ShowExportDialog()
 
 	-- Set text and show
 	self.exportFrame:Show()
-	self.exportFrame.scrollFrame.editBox:SetText(exportString)
+	self.exportFrame.pasteBuffer:SetText(exportString)
 	self.exportFrame.scrollFrame.editBox:HighlightText()
 	self.exportFrame.scrollFrame.editBox:SetFocus()
 
@@ -3012,7 +2717,7 @@ function Settings:ShowImportDialog()
 
 	-- Clear and show
 	self.importFrame:Show()
-	self.importFrame.scrollFrame.editBox:SetText("")
+	self.importFrame.pasteBuffer:SetText("")
 	self.importFrame.scrollFrame.editBox:SetFocus()
 end
 
@@ -3049,6 +2754,8 @@ function Settings:CreateExportFrame()
 
 	local editBox = CreateFrame("EditBox", nil, scrollFrame)
 	editBox:SetMultiLine(true)
+	editBox:SetMaxLetters(0)
+	editBox:SetMaxBytes(0)
 	editBox:SetFontObject(BetterFriendlistFontHighlight)
 	editBox:SetWidth(460)
 	editBox:SetAutoFocus(false)
@@ -3060,6 +2767,7 @@ function Settings:CreateExportFrame()
 			frame:Hide()
 		end
 	end)
+	frame.pasteBuffer = BFL.BufferedEditBox.Attach(editBox)
 	scrollFrame:SetScrollChild(editBox)
 	scrollFrame.editBox = editBox
 
@@ -3071,6 +2779,7 @@ function Settings:CreateExportFrame()
 	copyButton:SetNormalFontObject("BetterFriendlistFontNormal")
 	copyButton:SetHighlightFontObject("BetterFriendlistFontHighlight")
 	copyButton:SetScript("OnClick", function()
+		frame.pasteBuffer:Finish()
 		editBox:HighlightText()
 		editBox:SetFocus()
 	end)
@@ -3111,12 +2820,15 @@ function Settings:CreateImportFrame()
 
 	local editBox = CreateFrame("EditBox", nil, scrollFrame)
 	editBox:SetMultiLine(true)
+	editBox:SetMaxLetters(0)
+	editBox:SetMaxBytes(0)
 	editBox:SetFontObject(BetterFriendlistFontHighlight)
 	editBox:SetWidth(460)
 	editBox:SetAutoFocus(true)
 	editBox:SetScript("OnEscapePressed", function(self)
 		frame:Hide()
 	end)
+	frame.pasteBuffer = BFL.BufferedEditBox.Attach(editBox)
 	scrollFrame:SetScrollChild(editBox)
 	scrollFrame.editBox = editBox
 
@@ -3128,7 +2840,7 @@ function Settings:CreateImportFrame()
 	importButton:SetNormalFontObject("BetterFriendlistFontNormal")
 	importButton:SetHighlightFontObject("BetterFriendlistFontHighlight")
 	importButton:SetScript("OnClick", function()
-		local importString = editBox:GetText()
+		local importString = frame.pasteBuffer:GetText()
 		local success, err = Settings:ImportSettings(importString)
 
 		if success then
@@ -3178,6 +2890,14 @@ function Settings:OnCompactModeChanged(checked)
 
 	-- CRITICAL: Force full display refresh to recalculate button heights
 	BFL:ForceRefreshFriendsList()
+end
+
+function Settings:OnSmoothScrollingChanged(checked)
+	local DB = GetDB()
+	if not DB or not BFL.IsMainline then return end
+	DB:Set("enableSmoothScrolling", checked == true)
+	local FriendsList = BFL:GetModule("FriendsList")
+	if FriendsList and FriendsList.ApplyScrollInterpolation then FriendsList:ApplyScrollInterpolation() end
 end
 
 -- Callback for ShowBlizzardOption checkbox
@@ -4571,6 +4291,12 @@ function Settings:RefreshGeneralTab()
 			L.SETTINGS_FRIENDS_UI_STYLE_DESC or "Choose the Modern layout or the previous BetterFriendlist layout."
 		)
 		table.insert(allFrames, styleDropdown)
+		if BFL.IsMainline then
+			local smoothScroll = Components:CreateCheckbox(tab, L.SETTINGS_SMOOTH_SCROLLING,
+				DB:Get("enableSmoothScrolling", false), function(value) self:OnSmoothScrollingChanged(value) end)
+			smoothScroll:SetTooltip(L.SETTINGS_SMOOTH_SCROLLING, L.SETTINGS_SMOOTH_SCROLLING_DESC)
+			table.insert(allFrames, smoothScroll)
+		end
 		table.insert(allFrames, Components:CreateSpacer(tab))
 	end
 
@@ -4650,13 +4376,13 @@ function Settings:RefreshGeneralTab()
 
 	-- Row 3: Realm Name & Hide Max Level
 	local row3 = Components:CreateDoubleCheckbox(tab, { -- Left
-		label = L.SETTINGS_SHOW_REALM_NAME,
+		label = BFL.IsForever and L.SETTINGS_SHOW_RULESET_NAME or L.SETTINGS_SHOW_REALM_NAME,
 		initialValue = DB:Get("showRealmName", false),
 		callback = function(val)
 			self:OnShowRealmNameChanged(val)
 		end,
-		tooltipTitle = L.SETTINGS_SHOW_REALM_NAME,
-		tooltipDesc = L.SETTINGS_SHOW_REALM_NAME_DESC or "Display the realm name for friends on different servers",
+		tooltipTitle = BFL.IsForever and L.SETTINGS_SHOW_RULESET_NAME or L.SETTINGS_SHOW_REALM_NAME,
+		tooltipDesc = BFL.IsForever and L.SETTINGS_SHOW_RULESET_NAME_DESC or L.SETTINGS_SHOW_REALM_NAME_DESC,
 	}, { -- Right
 		label = L.SETTINGS_HIDE_MAX_LEVEL,
 		initialValue = DB:Get("hideMaxLevel", false),
@@ -4892,8 +4618,7 @@ function Settings:RefreshGeneralTab()
 	if nameCustomInput.SetTooltip then
 		nameCustomInput:SetTooltip(
 			L.SETTINGS_NAME_FORMAT_TOOLTIP or "Custom Name Format",
-			L.SETTINGS_NAME_FORMAT_DESC
-				or "Use tokens to customize the display:\n|cffFFD100%name%|r - Account Name\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Nickname\n|cffFFD100%note%|r - Note\n|cffFFD100%character%|r - Character Name\n|cffFFD100%realm%|r - Realm Name\n|cffFFD100%level%|r - Level\n|cffFFD100%zone%|r - Zone\n|cffFFD100%class%|r - Class\n|cffFFD100%game%|r - Game"
+			(L.SETTINGS_NAME_FORMAT_DESC or "") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS
 		)
 	end
 	-- Initially show/hide based on current preset
@@ -4923,7 +4648,7 @@ function Settings:RefreshGeneralTab()
 	-- Info Format Preset Dropdown
 	local infoPresetEntries = {
 		labels = {
-			L.INFO_PRESET_DEFAULT or "Default (Level, Zone)",
+			BFL.IsForever and L.INFO_PRESET_DEFAULT_FOREVER or (L.INFO_PRESET_DEFAULT or "Default (Level, Zone)"),
 			L.INFO_PRESET_ZONE or "Zone Only",
 			L.INFO_PRESET_LEVEL or "Level Only",
 			L.INFO_PRESET_CLASS_ZONE or "Class, Zone",
@@ -4975,8 +4700,7 @@ function Settings:RefreshGeneralTab()
 	if infoCustomInput.SetTooltip then
 		infoCustomInput:SetTooltip(
 			L.SETTINGS_INFO_FORMAT_TOOLTIP or "Custom Info Format",
-			L.SETTINGS_INFO_FORMAT_DESC
-				or "Use tokens to customize the info line:\n|cffFFD100%level%|r - Character Level\n|cffFFD100%zone%|r - Current Zone\n|cffFFD100%class%|r - Class Name\n|cffFFD100%game%|r - Game Name\n|cffFFD100%realm%|r - Realm Name\n|cffFFD100%status%|r - AFK/DND/Online\n|cffFFD100%lastonline%|r - Last Online\n|cffFFD100%name%|r - Account Name\n|cffFFD100%battletag%|r - BattleTag\n|cffFFD100%nickname%|r - Nickname\n|cffFFD100%note%|r - Note\n|cffFFD100%character%|r - Character Name"
+			(L.SETTINGS_INFO_FORMAT_DESC or "") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS
 		)
 	end
 	-- Initially show/hide based on current preset
@@ -5798,7 +5522,7 @@ function Settings:RefreshFriendTagsTab()
 			Components:CreateLabel(
 				tab,
 				L.FRIEND_TAGS_SYNC_LOCAL_DESC
-					or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native 12.1 tag storage.",
+					or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native tag storage.",
 				true,
 				{ r = 0.75, g = 0.75, b = 0.75, a = 1 }
 			)
@@ -5810,7 +5534,7 @@ function Settings:RefreshFriendTagsTab()
 				FriendTags:HandoffKnownLocalBlizzardTags(RefreshFriendTagsSettings)
 			end,
 			L.FRIEND_TAGS_SYNC_LOCAL_DESC
-				or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native 12.1 tag storage."
+				or "Moves locally stored Blizzard-compatible tag selections to Blizzard's native tag storage."
 		)
 		handoffButton:SetWidth(260)
 		table.insert(allFrames, handoffButton)
@@ -6795,7 +6519,63 @@ function Settings:RefreshGroupsTab()
 	tab.components = allFrames
 end
 
--- Refresh Advanced Tab
+-- Both settings surfaces use the same import-before-write activation flow.
+function Settings:InvalidatePendingNoteSyncConfirmation()
+	self.noteSyncSettingGeneration = (self.noteSyncSettingGeneration or 0) + 1
+	if type(StaticPopup_Hide) == "function" then
+		StaticPopup_Hide("BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM")
+		StaticPopup_Hide("BETTERFRIENDLIST_SYNC_GROUPS_DISABLE")
+	end
+end
+
+function Settings:OnSyncGroupsToNoteChanged(enabled)
+	local NoteSync = BFL:GetModule("NoteSync")
+	if not (NoteSync and NoteSync.SetEnabled) then return end
+	self:InvalidatePendingNoteSyncConfirmation()
+	local generation, workVersion = self.noteSyncSettingGeneration, NoteSync.workVersion
+	local function IsCurrentRequest()
+		return Settings.noteSyncSettingGeneration == generation and NoteSync.workVersion == workVersion
+	end
+	local function RefreshControls()
+		Settings:RefreshAdvancedTab()
+		local SettingsDesigner = BFL:GetModule("SettingsDesigner")
+		if SettingsDesigner and SettingsDesigner.RefreshNoteSyncState then
+			SettingsDesigner:RefreshNoteSyncState()
+		end
+	end
+	if enabled == true then
+		StaticPopupDialogs["BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM"] = {
+			text = L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT,
+			button1 = L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1,
+			button2 = L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2,
+			OnAccept = function()
+				if not IsCurrentRequest() then return end
+				NoteSync:SetEnabled(true)
+				RefreshControls()
+			end,
+			OnCancel = RefreshControls,
+			timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+		}
+		StaticPopup_Show("BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM")
+	else
+		NoteSync:SetEnabled(false)
+		workVersion = NoteSync.workVersion
+		RefreshControls()
+		StaticPopupDialogs["BETTERFRIENDLIST_SYNC_GROUPS_DISABLE"] = {
+			text = L.DIALOG_SYNC_GROUPS_DISABLE_TEXT,
+			button1 = L.DIALOG_SYNC_GROUPS_DISABLE_BTN1,
+			button2 = L.DIALOG_SYNC_GROUPS_DISABLE_BTN2,
+			OnAccept = function()
+				if not IsCurrentRequest() then return end
+				local Wizard = BFL.NoteCleanupWizard
+				if Wizard and Wizard.Show then Wizard:Show() end
+			end,
+			timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+		}
+		StaticPopup_Show("BETTERFRIENDLIST_SYNC_GROUPS_DISABLE")
+	end
+end
+
 -- Refresh Advanced Tab
 function Settings:RefreshAdvancedTab()
 	if not settingsFrame or not Components then
@@ -6898,6 +6678,7 @@ function Settings:RefreshAdvancedTab()
 		true
 	)
 	table.insert(allFrames, exportWarning)
+	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_IMPORT_GLOBAL_SYNC_INFO, true))
 
 	-- Export/Import Buttons Row
 	local btnRow = CreateFrame("Frame", nil, tab)
@@ -6946,86 +6727,7 @@ function Settings:RefreshAdvancedTab()
 		L.SETTINGS_SYNC_GROUPS_NOTE or "Sync Groups to Friend Note",
 		BetterFriendlistDB.syncGroupsToNote or false,
 		function(checked)
-			if checked then
-				-- Show confirmation dialog before enabling
-				StaticPopupDialogs["BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM"] = {
-					text = L.DIALOG_SYNC_GROUPS_CONFIRM_TEXT,
-					button1 = L.DIALOG_SYNC_GROUPS_CONFIRM_BTN1 or "Enable",
-					button2 = L.DIALOG_SYNC_GROUPS_CONFIRM_BTN2 or "Cancel",
-					OnAccept = function()
-						BetterFriendlistDB.syncGroupsToNote = true
-						-- Increment settings version to invalidate caches
-						if BFL.SettingsVersion then
-							BFL.SettingsVersion = BFL.SettingsVersion + 1
-						end
-						-- Import existing group tags from notes before writing
-						-- (prevents data loss for users coming from FriendGroups)
-						local NoteSync = BFL:GetModule("NoteSync")
-						if NoteSync then
-							local importedGroups, importedAssignments = NoteSync:ImportGroupsFromNotes()
-							if importedGroups > 0 then
-								local importMsg = string.format(
-									L.MSG_SYNC_GROUPS_IMPORTED
-										or "Imported %d group(s) and %d assignment(s) from existing notes.",
-									importedGroups,
-									importedAssignments
-								)
-								BFL:DebugPrint("|cff00ff00BetterFriendlist:|r " .. importMsg)
-								-- Reload groups from DB and force re-render
-								local Groups = BFL:GetModule("Groups")
-								if Groups and Groups.Initialize then
-									Groups:Initialize()
-								end
-								BFL:ForceRefreshFriendsList()
-								-- Refresh group list in Settings UI if open
-								if BetterFriendlistSettingsFrame and BetterFriendlistSettingsFrame:IsShown() then
-									Settings:RefreshGroupList()
-								end
-							end
-						end
-						-- Trigger full sync of all friend notes
-						local NoteSync = BFL:GetModule("NoteSync")
-						if NoteSync then
-							NoteSync:SyncAllFriends()
-						end
-					end,
-					OnCancel = function()
-						-- Revert checkbox state
-						BetterFriendlistDB.syncGroupsToNote = false
-						-- Refresh the Advanced tab to reset the checkbox visual
-						Settings:RefreshAdvancedTab()
-					end,
-					timeout = 0,
-					whileDead = true,
-					hideOnEscape = true,
-					preferredIndex = 3,
-				}
-				StaticPopup_Show("BETTERFRIENDLIST_SYNC_GROUPS_CONFIRM")
-			else
-				BetterFriendlistDB.syncGroupsToNote = false
-				-- Increment settings version to invalidate caches
-				if BFL.SettingsVersion then
-					BFL.SettingsVersion = BFL.SettingsVersion + 1
-				end
-				-- Ask user if they want to clean up notes
-				StaticPopupDialogs["BETTERFRIENDLIST_SYNC_GROUPS_DISABLE"] = {
-					text = L.DIALOG_SYNC_GROUPS_DISABLE_TEXT
-						or "Group Note Sync has been disabled.\n\nWould you like to open the Note Cleanup Wizard to remove the group suffixes from your friend notes?",
-					button1 = L.DIALOG_SYNC_GROUPS_DISABLE_BTN1 or "Open Cleanup Wizard",
-					button2 = L.DIALOG_SYNC_GROUPS_DISABLE_BTN2 or "Keep Notes",
-					OnAccept = function()
-						local NoteCleanupWizard = BFL.NoteCleanupWizard
-						if NoteCleanupWizard then
-							NoteCleanupWizard:Show()
-						end
-					end,
-					timeout = 0,
-					whileDead = true,
-					hideOnEscape = true,
-					preferredIndex = 3,
-				}
-				StaticPopup_Show("BETTERFRIENDLIST_SYNC_GROUPS_DISABLE")
-			end
+			Settings:OnSyncGroupsToNoteChanged(checked)
 		end
 	)
 	syncNoteToggle:SetTooltip(
@@ -9457,7 +9159,7 @@ function Settings:RefreshBrokerTab()
 		CreateBrokerColumnColor(L.BROKER_SETTINGS_NICKNAME_COLOR or "Nickname Color", "brokerNicknameColor")
 		CreateBrokerColumnColor(L.BROKER_SETTINGS_CHARACTER_COLOR or "Character Color", "brokerCharacterColor")
 		CreateBrokerColumnColor(L.BROKER_SETTINGS_ZONE_COLOR or "Zone Color", "brokerZoneColor")
-		CreateBrokerColumnColor(L.BROKER_SETTINGS_REALM_COLOR or "Realm Color", "brokerRealmColor")
+		CreateBrokerColumnColor(BFL.IsForever and L.BROKER_SETTINGS_RULESET_COLOR or L.BROKER_SETTINGS_REALM_COLOR, "brokerRealmColor")
 		CreateBrokerColumnColor(L.BROKER_SETTINGS_NOTES_COLOR or "Notes Color", "brokerNotesColor")
 
 		-- Spacer
@@ -9476,7 +9178,7 @@ function Settings:RefreshBrokerTab()
 			{ key = "Character", label = L.BROKER_COLUMN_CHARACTER, default = true },
 			{ key = "Game", label = L.BROKER_COLUMN_GAME, default = true },
 			{ key = "Zone", label = L.BROKER_COLUMN_ZONE, default = true },
-			{ key = "Realm", label = L.BROKER_COLUMN_REALM, default = true },
+			{ key = "Realm", label = BFL.IsForever and L.BROKER_COLUMN_RULESET or L.BROKER_COLUMN_REALM, default = true },
 			{ key = "Notes", label = L.BROKER_COLUMN_NOTES, default = true },
 		}
 
@@ -10174,6 +9876,29 @@ end
 -- ===========================================
 -- GLOBAL SYNC TAB (Tab ID 6)
 -- ===========================================
+function Settings:ShowGlobalSyncDeleteAllConfirmation()
+	local GlobalSync = BFL:GetModule("GlobalSync")
+	if not GlobalSync or GlobalSync:GetStoredEntryCount() == 0 then return end
+	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
+	StaticPopupDialogs["BFL_GLOBAL_SYNC_DELETE_ALL"] = {
+		text = L.GLOBAL_SYNC_DELETE_ALL_CONFIRM,
+		button1 = L.BUTTON_DELETE_ALL,
+		button2 = L.BUTTON_CANCEL,
+		OnAccept = function()
+			-- A profile imported while confirmation was open is a different database.
+			if not BetterFriendlistDB or BetterFriendlistDB.GlobalFriends ~= database then return end
+			GlobalSync:ClearStoredEntries()
+			self:RefreshGlobalSyncTab()
+			if GlobalSync.RefreshTitleFriendUI then GlobalSync:RefreshTitleFriendUI() end
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+	StaticPopup_Show("BFL_GLOBAL_SYNC_DELETE_ALL")
+end
+
 function Settings:RefreshGlobalSyncTab()
 	local DB = GetDB()
 	local GlobalSync = BFL:GetModule("GlobalSync")
@@ -10199,6 +9924,11 @@ function Settings:RefreshGlobalSyncTab()
 		true
 	)
 	table.insert(allFrames, desc)
+
+	local deleteAll = Components:CreateButton(tab, L.BUTTON_DELETE_ALL,
+		function() self:ShowGlobalSyncDeleteAllConfirmation() end, L.GLOBAL_SYNC_DELETE_ALL_DESC)
+	deleteAll:SetEnabled(GlobalSync and GlobalSync:GetStoredEntryCount() > 0)
+	table.insert(allFrames, deleteAll)
 
 	-- Enable Global Sync
 	local enableSync = Components:CreateCheckbox(
@@ -10346,7 +10076,7 @@ function Settings:RefreshGlobalSyncTab()
 							-- Action Button (Delete or Restore)
 							local actionBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
 							actionBtn:SetSize(20, 20)
-							actionBtn:SetPoint("RIGHT", -5, 0)
+							actionBtn:SetPoint("RIGHT", titleFriends and -30 or -5, 0)
 
 							local restore = titleFriends or value.deleted
 							actionBtn:SetText(titleFriends and "+" or (restore and "R" or "X"))
@@ -10367,6 +10097,25 @@ function Settings:RefreshGlobalSyncTab()
 							actionBtn:SetScript("OnLeave", function()
 								BFL_Tooltip:Hide()
 							end)
+
+							if titleFriends then
+								local removeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+								removeBtn:SetSize(20, 20)
+								removeBtn:SetPoint("LEFT", actionBtn, "RIGHT", 5, 0)
+								removeBtn:SetText("X")
+								removeBtn:SetScript("OnClick", function()
+									GlobalSync:RemoveStoredEntry(faction, friendUID)
+									self:RefreshGlobalSyncTab()
+									if GlobalSync.RefreshTitleFriendUI then GlobalSync:RefreshTitleFriendUI() end
+								end)
+								removeBtn:SetScript("OnEnter", function(owner)
+									BFL_Tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+									BFL_Tooltip:SetText(L.TOOLTIP_REMOVE_SYNC_ENTRY)
+									BFL_Tooltip:AddLine(L.TOOLTIP_REMOVE_SYNC_ENTRY_DESC, 1, 1, 1, true)
+									BFL_Tooltip:Show()
+								end)
+								removeBtn:SetScript("OnLeave", function() BFL_Tooltip:Hide() end)
+							end
 
 							-- Edit Button (Note)
 							local editBtn = CreateFrame("Button", nil, row)

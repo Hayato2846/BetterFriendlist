@@ -13,82 +13,53 @@ for i = 1, 64 do
 end
 
 local function fallback_encode(s)
-	local r = ""
-	local y = 0
-	local b = { 0, 0, 0 }
-	for i = 1, #s, 1 do
-		b[y + 1] = string.byte(s, i)
-		y = y + 1
-		if y == 3 then
-			r = r .. string.sub(b64chars, math.floor(b[1] / 4) + 1, math.floor(b[1] / 4) + 1)
-			r = r
-				.. string.sub(
-					b64chars,
-					math.floor(((b[1] % 4) * 16) + (b[2] / 16)) + 1,
-					math.floor(((b[1] % 4) * 16) + (b[2] / 16)) + 1
-				)
-			r = r
-				.. string.sub(
-					b64chars,
-					math.floor(((b[2] % 16) * 4) + (b[3] / 64)) + 1,
-					math.floor(((b[2] % 16) * 4) + (b[3] / 64)) + 1
-				)
-			r = r .. string.sub(b64chars, (b[3] % 64) + 1, (b[3] % 64) + 1)
-			y = 0
-		end
+	local chunks = {}
+	for i = 1, #s, 3 do
+		local a, b, c = string.byte(s, i, i + 2)
+		local first = math.floor(a / 4) + 1
+		local second = (a % 4) * 16 + math.floor((b or 0) / 16) + 1
+		local third = ((b or 0) % 16) * 4 + math.floor((c or 0) / 64) + 1
+		local fourth = (c or 0) % 64 + 1
+		chunks[#chunks + 1] = b64chars:sub(first, first) .. b64chars:sub(second, second)
+			.. (b and b64chars:sub(third, third) or "=") .. (c and b64chars:sub(fourth, fourth) or "=")
 	end
-	if y == 1 then
-		r = r .. string.sub(b64chars, math.floor(b[1] / 4) + 1, math.floor(b[1] / 4) + 1)
-		r = r .. string.sub(b64chars, math.floor(((b[1] % 4) * 16)) + 1, math.floor(((b[1] % 4) * 16)) + 1)
-		r = r .. "=="
-	elseif y == 2 then
-		r = r .. string.sub(b64chars, math.floor(b[1] / 4) + 1, math.floor(b[1] / 4) + 1)
-		r = r
-			.. string.sub(
-				b64chars,
-				math.floor(((b[1] % 4) * 16) + (b[2] / 16)) + 1,
-				math.floor(((b[1] % 4) * 16) + (b[2] / 16)) + 1
-			)
-		r = r .. string.sub(b64chars, math.floor(((b[2] % 16) * 4)) + 1, math.floor(((b[2] % 16) * 4)) + 1)
-		r = r .. "="
-	end
-	return r
+	return table.concat(chunks)
 end
 
 local function fallback_decode(s)
-	s = string.gsub(s, "[^" .. b64chars .. "=]", "")
-	local r = ""
-	local z = 0
-	local b = { 0, 0, 0, 0 }
-	for i = 1, #s, 1 do
-		local c = string.byte(s, i)
-		if c >= 65 and c <= 90 then
-			b[z + 1] = c - 65
-		elseif c >= 97 and c <= 122 then
-			b[z + 1] = c - 71
-		elseif c >= 48 and c <= 57 then
-			b[z + 1] = c + 4
-		elseif c == 43 then
-			b[z + 1] = 62
-		elseif c == 47 then
-			b[z + 1] = 63
-		elseif c == 61 then
-			break
-		end
-		z = z + 1
-		if z == 4 then
-			r = r .. string.char(((b[1] * 4) + math.floor(b[2] / 16)))
-			r = r .. string.char(((b[2] % 16) * 16) + math.floor(b[3] / 4))
-			r = r .. string.char(((b[3] % 4) * 64) + b[4])
-			z = 0
+	s = s:gsub("%s", "")
+	if #s % 4 == 1 then return nil end
+	local padding = s:find("=", 1, true)
+	if padding and (#s % 4 ~= 0 or #s - padding > 1 or s:sub(padding):find("[^=]")) then return nil end
+	local chunks = {}
+	for i = 1, #s, 4 do
+		local a, b, c, d = s:byte(i, i + 3)
+		local first, second = b64map[a], b64map[b]
+		if first == nil or second == nil then return nil end
+		local byte1 = first * 4 + math.floor(second / 16)
+		if c == nil or c == 61 then
+			if (d ~= nil and d ~= 61) or i + 3 < #s or second % 16 ~= 0 then return nil end
+			chunks[#chunks + 1] = string.char(byte1)
+		else
+			local third = b64map[c]
+			if third == nil then return nil end
+			local byte2 = (second % 16) * 16 + math.floor(third / 4)
+			if d == nil or d == 61 then
+				if i + 3 < #s or third % 4 ~= 0 then return nil end
+				chunks[#chunks + 1] = string.char(byte1, byte2)
+			else
+				local fourth = b64map[d]
+				if fourth == nil then return nil end
+				chunks[#chunks + 1] = string.char(byte1, byte2, (third % 4) * 64 + fourth)
+			end
 		end
 	end
-	return r
+	return table.concat(chunks)
 end
 
 -- Public API
 function BFL:Base64Encode(text)
-	if not text then
+	if (BFL.IsSecret and BFL:IsSecret(text)) or type(text) ~= "string" then
 		return nil
 	end
 	local success, result = pcall(function()
@@ -108,7 +79,7 @@ function BFL:Base64Encode(text)
 end
 
 function BFL:Base64Decode(text)
-	if not text then
+	if (BFL.IsSecret and BFL:IsSecret(text)) or type(text) ~= "string" then
 		return nil
 	end
 

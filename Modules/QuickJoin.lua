@@ -1516,7 +1516,9 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 				leaderName = self.groupInfo._mockLeaderName
 			elseif guidLeaderName then
 				-- Format: "Name-Server" or just "Name" if same server
-				if guidLeaderRealm and guidLeaderRealm ~= "" and guidLeaderRealm ~= GetNormalizedRealmName() then
+				if BFL.AreRegionalUniqueNamesEnabled() then
+					leaderName = BFL.GetCopyCharacterName(guidLeaderName) or guidLeaderName
+				elseif guidLeaderRealm and guidLeaderRealm ~= "" and guidLeaderRealm ~= GetNormalizedRealmName() then
 					leaderName = guidLeaderName .. "-" .. guidLeaderRealm
 				else
 					leaderName = guidLeaderName

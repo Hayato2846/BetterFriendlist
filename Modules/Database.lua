@@ -25,6 +25,7 @@ local defaults = {
 	friendGroups = {},
 	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
 	showWelcomeMessage = true, -- Show the welcome message on login
+	enableSmoothScrolling = false, -- Mainline friends list animation is opt-in
 	groupOrder = nil, -- nil = use default order (favorites, custom alphabetically, nogroup)
 	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
 	groupCountColors = {}, -- {groupId: {r, g, b}} - custom colors for group counts (overrides global)
@@ -341,6 +342,365 @@ function DB:InternalDeepCopy(orig)
 		copy = orig
 	end
 	return copy
+end
+
+-- Import is prepared without rebinding or mutating the live SavedVariables table.
+-- Module initialization is deliberately not used here: it can write to libraries,
+-- register callbacks, or synchronize friend notes before an import has committed.
+local LEGACY_V2_PROFILE_KEYS = {
+	"compactMode", "theme", "darkThemeSettings", "customTheme", "enableElvUISkin", "fontSize", "windowScale",
+	"hideMaxLevel", "accordionGroups", "showFavoritesGroup", "colorClassNames", "hideEmptyGroups", "headerCountFormat",
+	"groupHeaderAlign", "showGroupArrow", "groupArrowAlign", "showFactionIcons", "showRealmName", "grayOtherFaction",
+	"showMobileAsAFK", "treatMobileAsOffline", "nameDisplayFormat", "enableInGameGroup", "inGameGroupMode",
+	"fontFriendName", "fontSizeFriendName", "fontOutlineFriendName", "fontShadowFriendName", "fontColorFriendName",
+	"fontFriendInfo", "fontSizeFriendInfo", "fontOutlineFriendInfo", "fontShadowFriendInfo", "fontColorFriendInfo",
+	"fontTabText", "fontSizeTabText", "fontOutlineTabText", "fontShadowTabText", "fontRaidName", "fontSizeRaidName",
+	"fontOutlineRaidName", "fontShadowRaidName", "fontGroupHeader", "fontSizeGroupHeader", "fontOutlineGroupHeader",
+	"fontShadowGroupHeader", "colorGroupCount", "colorGroupArrow", "brokerFont", "brokerFontSize", "brokerFontFlags",
+	"brokerUseCustomFontForNonLatin", "quickFilter", "primarySort", "secondarySort", "customQuickFilters",
+	"quickFilterVisibility", "quickFilterOrder", "nextCustomQuickFilterId", "customSorters", "sorterVisibility",
+	"sorterOrder", "nextCustomSorterId", "enableGuildTab", "guildTabFilterMode", "guildTabSortMode",
+	"guildTabShowClassIcons", "guildTabUseNicknames", "brokerEnabled", "brokerShowIcon", "brokerShowLabel",
+	"brokerShowTotal", "brokerShowGroups", "brokerTooltipMode", "brokerClickAction", "brokerShowHints",
+	"enableGlobalSync", "enableGlobalSyncDeletion", "nicknames", "enableBetaFeatures",
+}
+
+local function IsProfileArray(value, itemType)
+	if type(value) ~= "table" then return false end
+	local count = 0
+	for key, item in pairs(value) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 or (itemType and type(item) ~= itemType) then return false end
+		count = count + 1
+	end
+	return count == #value
+end
+
+local function IsProfileColor(color, indexed)
+	if type(color) ~= "table" then return false end
+	for index, component in ipairs({ "r", "g", "b" }) do
+		local value = color[indexed and index or component]
+		if type(value) ~= "number" or value < 0 or value > 1 then return false end
+	end
+	local alpha = color[indexed and 4 or "a"]
+	return alpha == nil or (type(alpha) == "number" and alpha >= 0 and alpha <= 1)
+end
+
+local function FillProfileDefaults(profile, template, codec)
+	for key, value in pairs(template) do
+		local current = profile[key]
+		if current == nil then profile[key] = codec:Copy(value)
+		elseif type(current) ~= type(value) then return false
+		elseif type(value) == "table" and not FillProfileDefaults(current, value, codec) then return false end
+	end
+	return true
+end
+
+local function ValidateProfileGroups(profile)
+	for groupId, info in pairs(profile.customGroups) do
+		if type(groupId) ~= "string" or groupId == "" or NON_PERSISTED_FRIEND_GROUPS[groupId]
+			or type(info) ~= "table" or type(info.name) ~= "string" or not info.name:find("%S")
+			or (info.order ~= nil and type(info.order) ~= "number")
+			or (info.collapsed ~= nil and type(info.collapsed) ~= "boolean")
+			or (info.color ~= nil and not IsProfileColor(info.color)) then return false end
+	end
+	for uid, assignments in pairs(profile.friendGroups) do
+		if type(uid) ~= "string" or not uid:match("^bnet_.+") and not uid:match("^wow_.+")
+			or not IsProfileArray(assignments, "string") then return false end
+		local clean, seen = {}, {}
+		for _, id in ipairs(assignments) do
+			if profile.customGroups[id] and not seen[id] then clean[#clean + 1] = id; seen[id] = true end
+		end
+		profile.friendGroups[uid] = #clean > 0 and clean or nil
+	end
+	if profile.groupOrder ~= nil then
+		if not IsProfileArray(profile.groupOrder, "string") then return false end
+		local clean, seen = {}, {}
+		for _, id in ipairs(profile.groupOrder) do
+			if (profile.customGroups[id] or NON_PERSISTED_FRIEND_GROUPS[id]) and not seen[id] then
+				clean[#clean + 1] = id; seen[id] = true
+			end
+		end
+		profile.groupOrder = clean
+	end
+	for id, state in pairs(profile.groupStates) do
+		if type(id) ~= "string" or type(state) ~= "boolean" then return false end
+	end
+	for _, key in ipairs({ "groupColors", "groupCountColors", "groupArrowColors" }) do
+		for id, color in pairs(profile[key]) do
+			if type(id) ~= "string" or not IsProfileColor(color) then return false end
+		end
+	end
+	if profile.builtinGroupOverrides ~= nil then
+		if type(profile.builtinGroupOverrides) ~= "table" then return false end
+		for id, override in pairs(profile.builtinGroupOverrides) do
+			if not NON_PERSISTED_FRIEND_GROUPS[id] or type(override) ~= "table"
+				or (override.name ~= nil and type(override.name) ~= "string") then return false end
+		end
+	end
+	return true
+end
+
+local function ValidateProfileCollections(profile)
+	local function stringMap(value, itemType)
+		if type(value) ~= "table" then return false end
+		for key, item in pairs(value) do if type(key) ~= "string" or type(item) ~= itemType then return false end end
+		return true
+	end
+	for _, key in ipairs({ "nicknames", "guildNicknames" }) do if not stringMap(profile[key], "string") then return false end end
+	for _, key in ipairs({ "groupCountColors", "groupArrowColors" }) do
+		if not stringMap(profile[key], "table") then return false end
+	end
+	for _, key in ipairs({ "customQuickFilters", "customSorters", "customFriendTags", "friendCustomTags", "friendBlizzardTags", "friendTagProfiles" }) do
+		if not stringMap(profile[key], "table") then return false end
+	end
+	for _, key in ipairs({ "quickFilterVisibility", "sorterVisibility", "knownFriendUIDs", "quickFilterTags", "modernFriendTabVisibility" }) do
+		if not stringMap(profile[key], "boolean") then return false end
+	end
+	for _, key in ipairs({ "quickFilterOrder", "sorterOrder", "modernFriendTabOrder", "guildBrokerColumnOrder" }) do
+		if not IsProfileArray(profile[key], "string") then return false end
+	end
+	for uid, timestamp in pairs(profile.recentlyAddedTimestamps) do
+		if type(uid) ~= "string" or type(timestamp) ~= "number" then return false end
+	end
+	local function filterNode(node, depth)
+		if depth > 6 or type(node) ~= "table" or (node.negate ~= nil and type(node.negate) ~= "boolean") then return false end
+		if node.type == "condition" then
+			return type(node.field) == "string" and type(node.op) == "string"
+		elseif node.type ~= "group" or (node.op ~= "AND" and node.op ~= "OR") or not IsProfileArray(node.children, "table") then return false end
+		for _, child in ipairs(node.children) do if not filterNode(child, depth + 1) then return false end end
+		return true
+	end
+	for id, filter in pairs(profile.customQuickFilters) do
+		if type(filter.name) ~= "string" or not filterNode(filter.ast, 1) then return false end
+		filter.id = id
+	end
+	for id, sorter in pairs(profile.customSorters) do
+		if type(sorter.name) ~= "string" or not IsProfileArray(sorter.chain, "table") then return false end
+		for _, step in ipairs(sorter.chain) do
+			if type(step.field) ~= "string" or (step.direction ~= nil and type(step.direction) ~= "string")
+				or (step.empty ~= nil and type(step.empty) ~= "string") then return false end
+		end
+		sorter.id = id
+	end
+	for _, shortcut in pairs(profile.raidShortcuts) do
+		if type(shortcut) ~= "table" or type(shortcut.modifier) ~= "string" or type(shortcut.button) ~= "string" then return false end
+	end
+	for key, contact in pairs(profile.contactMemory.contacts) do
+		if type(key) ~= "string" or type(contact) ~= "table"
+			or (contact.privateNote ~= nil and type(contact.privateNote) ~= "string")
+			or (contact.tags ~= nil and type(contact.tags) ~= "table") then return false end
+	end
+	if profile.noteBackup ~= nil then
+		if type(profile.noteBackup) ~= "table" then return false end
+		for key, entry in pairs(profile.noteBackup) do
+			if type(key) ~= "string" or type(entry) ~= "table" then return false end
+			for _, field in ipairs({ "originalNote", "accountName", "battleTag" }) do
+				if entry[field] ~= nil and type(entry[field]) ~= "string" then return false end
+			end
+			if entry.isBNet ~= nil and type(entry.isBNet) ~= "boolean" then return false end
+			if entry.timestamp ~= nil and type(entry.timestamp) ~= "number" then return false end
+		end
+	end
+	if profile.GlobalFriends ~= nil then
+		if type(profile.GlobalFriends) ~= "table" then return false end
+		for faction, friends in pairs(profile.GlobalFriends) do
+			if type(faction) ~= "string" or type(friends) ~= "table" then return false end
+			for name, entry in pairs(friends) do
+				if type(name) ~= "string" or type(entry) ~= "table" then return false end
+				for _, field in ipairs({ "notes", "guid" }) do if entry[field] ~= nil and type(entry[field]) ~= "string" then return false end end
+				for _, field in ipairs({ "deleted", "restoring" }) do if entry[field] ~= nil and type(entry[field]) ~= "boolean" then return false end end
+				for _, field in ipairs({ "lastSeen", "deletedTime" }) do if entry[field] ~= nil and type(entry[field]) ~= "number" then return false end end
+			end
+		end
+	end
+	return true
+end
+
+local function ValidateProfileGeometry(profile)
+	local anchors = { TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true, RIGHT = true, BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true }
+	local function size(value)
+		return type(value) == "table" and type(value.width) == "number" and type(value.height) == "number"
+			and value.width > 0 and value.height > 0 and value.width <= 10000 and value.height <= 10000
+	end
+	for layout, dimensions in pairs(profile.mainFrameSize) do
+		if type(layout) ~= "string" or not size(dimensions) then return false end
+	end
+	for layout, position in pairs(profile.mainFramePosition) do
+		if type(layout) ~= "string" or type(position) ~= "table" then return false end
+		for _, key in ipairs({ "point", "relativePoint" }) do
+			if position[key] ~= nil and (type(position[key]) ~= "string" or not anchors[position[key]]) then return false end
+		end
+		for _, key in ipairs({ "x", "y" }) do
+			if position[key] ~= nil and type(position[key]) ~= "number" then return false end
+		end
+	end
+	if not size(profile.settingsCenterWindow) or not size(profile.changelogWindowSize) then return false end
+	for _, key in ipairs({ "x", "y" }) do
+		if profile.changelogWindowSize[key] ~= nil and type(profile.changelogWindowSize[key]) ~= "number" then return false end
+	end
+	-- FrameSettings migrates old per-layout positions at initialization. Imports
+	-- must perform the same migration now, before ApplyPosition reads Shared.
+	local positions = profile.mainFramePosition
+	local requestedLayout = profile.friendsFrameStyle == "modern" and "RetailModern" or "Default"
+	if not positions.Shared then positions.Shared = positions[requestedLayout] or positions.Default or positions.RetailModern end
+	positions.Default, positions.RetailModern = nil, nil
+	return true
+end
+
+function DB:PrepareImportedProfile(importData)
+	local codec = BFL.ProfileCodec
+	if not codec or type(importData) ~= "table" or not codec:ValidateData(importData) then return nil, "ERROR_EXPORT_STRUCTURE" end
+	local full = importData.exportVersion ~= nil
+	if full and importData.exportVersion ~= 3 then return nil, "ERROR_IMPORT_VERSION" end
+	if not full and importData.version ~= nil and importData.version ~= 1 and importData.version ~= 2 then return nil, "ERROR_IMPORT_VERSION" end
+	if full and importData.version ~= nil and type(importData.version) ~= "string" then return nil, "ERROR_EXPORT_STRUCTURE" end
+	if importData.exportFlavor ~= nil and type(importData.exportFlavor) ~= "string" then return nil, "ERROR_EXPORT_STRUCTURE" end
+	local currentFlavor = codec:GetCurrentFlavor()
+	local restoreFlavorState = full and currentFlavor ~= nil and importData.exportFlavor == currentFlavor
+	if restoreFlavorState and importData.globalFriendsMigrated ~= nil and type(importData.globalFriendsMigrated) ~= "boolean" then
+		return nil, "ERROR_EXPORT_STRUCTURE"
+	end
+	if type(importData.customGroups) ~= "table" or type(importData.friendGroups) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+	for key in pairs(importData) do if type(key) ~= "string" then return nil, "ERROR_EXPORT_STRUCTURE" end end
+	local source, staged = full and importData or BetterFriendlistDB, {}
+	if type(source) ~= "table" then return nil, "ERROR_DB_NOT_AVAILABLE" end
+	-- Exclude local private graphs before validation/copy, just as export does.
+	local publicSource = {}
+	for key, value in pairs(source) do
+		if not codec.LOCAL_KEYS[key] and (restoreFlavorState or not codec.FLAVOR_KEYS[key]) then publicSource[key] = value end
+	end
+	if not codec:ValidateData(publicSource) then return nil, "ERROR_EXPORT_STRUCTURE" end
+	staged = codec:Copy(publicSource)
+	staged.exportVersion = nil
+	staged.exportFlavor = nil
+	for key, expected in pairs(defaults) do
+		if staged[key] ~= nil and type(staged[key]) ~= type(expected) then return nil, "ERROR_EXPORT_STRUCTURE" end
+	end
+	if not full then
+		if type(staged.groupCountColors) ~= "table" or type(staged.groupArrowColors) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+		if importData.version == 2 then
+			for _, key in ipairs(LEGACY_V2_PROFILE_KEYS) do
+				if importData[key] ~= nil and not codec.FLAVOR_KEYS[key] then staged[key] = codec:Copy(importData[key]) end
+			end
+			-- Presets did not exist in V2; derive the imported legacy format again.
+			if importData.nameDisplayFormat ~= nil then staged.nameFormatPreset = nil; staged.nameFormatCustom = nil end
+			if importData.theme == nil and importData.enableElvUISkin ~= nil then
+				staged.theme = importData.enableElvUISkin == true and "elvui" or "blizzard"
+			end
+		end
+		for _, key in ipairs({ "customGroups", "friendGroups", "groupOrder", "groupStates", "groupColors" }) do
+			staged[key] = codec:Copy(importData[key] ~= nil and importData[key] or {})
+			if importData[key] ~= nil and type(importData[key]) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+		end
+		if type(staged.groupColors) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+		for id, info in pairs(staged.customGroups) do
+			if type(info) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+			if info.order == nil then info.order = 2 end
+			if info.collapsed == nil then info.collapsed = false end
+			if staged.groupColors[id] == nil and info.color ~= nil then staged.groupColors[id] = codec:Copy(info.color) end
+			-- Old backups had a single color per group, also used for count/arrows.
+			if staged.groupColors[id] then
+				staged.groupCountColors[id] = codec:Copy(staged.groupColors[id])
+				staged.groupArrowColors[id] = codec:Copy(staged.groupColors[id])
+			end
+		end
+	end
+	-- Run supported pre-default migrations on the detached profile only.
+	self:ApplyExternalMenuBridgeDefaultMigration(staged)
+	if staged.theme == nil and staged.enableElvUISkin ~= nil then staged.theme = staged.enableElvUISkin == true and "elvui" or "blizzard" end
+	if staged.showNotesAsName ~= nil or staged.showNicknameAsName ~= nil or staged.showNicknameInName ~= nil then
+		for _, key in ipairs({ "showNotesAsName", "showNicknameAsName", "showNicknameInName" }) do
+			if staged[key] ~= nil and type(staged[key]) ~= "boolean" then return nil, "ERROR_EXPORT_STRUCTURE" end
+		end
+		local format = staged.showNicknameAsName and "%nickname%" or (staged.showNotesAsName and "%note%" or "%name%")
+		if staged.showNicknameInName and format ~= "%nickname%" then format = format .. " (%nickname%)" end
+		staged.nameDisplayFormat, staged.nameFormatPreset = format, nil
+		staged.showNotesAsName, staged.showNicknameAsName, staged.showNicknameInName = nil, nil, nil
+	end
+	if staged.nameFormatPreset == nil and type(staged.nameDisplayFormat) == "string" then
+		local old = staged.nameDisplayFormat
+		local presets = { ["%name%"] = "default", ["%name% (%character%)"] = "default", ["%battletag%"] = "battletag", ["%nickname%"] = "nickname", ["%character%"] = "character" }
+		staged.nameFormatPreset = presets[old:lower()] or "custom"
+		staged.nameFormatCustom = presets[old:lower()] and old or (old .. " (%character%)")
+	end
+	local removedPresets = { name_nickname = "%name% (%nickname%)", name_note = "%name% (%note%)", name_battletag = "%name% (%battletag%)" }
+	if removedPresets[staged.nameFormatPreset] then staged.nameFormatCustom = removedPresets[staged.nameFormatPreset]; staged.nameFormatPreset = "custom" end
+	if staged.nameFormatPreset == "name_character" then staged.nameFormatPreset = "default" end
+	if not staged.fontFlagsMigratedToPerFont then
+		if staged.fontUseSlugRendering ~= nil and type(staged.fontUseSlugRendering) ~= "boolean" then return nil, "ERROR_EXPORT_STRUCTURE" end
+		for _, key in ipairs({ "fontOutlineFriendName", "fontOutlineFriendInfo", "fontOutlineTabText", "fontOutlineRaidName", "fontOutlineGroupHeader", "brokerFontFlags" }) do
+			local flags = staged[key] or ""
+			if type(flags) ~= "string" then return nil, "ERROR_EXPORT_STRUCTURE" end
+			if staged.fontUseSlugRendering ~= false then
+				if BFL.FontManager and BFL.FontManager.AddFontFlag then flags = BFL.FontManager:AddFontFlag(flags, "SLUG")
+				elseif not flags:find("SLUG", 1, true) then flags = flags ~= "" and (flags .. ",SLUG") or "SLUG" end
+			elseif BFL.FontManager and BFL.FontManager.RemoveFontFlag then flags = BFL.FontManager:RemoveFontFlag(flags, "SLUG")
+			else flags = flags:gsub("SLUG,?", ""):gsub(",$", "") end
+			staged[key] = flags
+		end
+		staged.fontUseSlugRendering, staged.fontFlagsMigratedToPerFont = nil, true
+	end
+	if staged.primarySort == "activity" then staged.primarySort = "status" end
+	if staged.secondarySort == "activity" then staged.secondarySort = "name" end
+	staged.friendActivity = nil
+	if staged.brokerClickAction == "appear_offline" then staged.brokerClickAction = "toggle" end
+	if staged.raidToolsSortMode == "meter" then staged.raidToolsSortMode = "tmrh"; staged.raidToolsBalanceDps = true end
+	if staged.raidToolsGroupOffset ~= nil then
+		local offset = staged.raidToolsGroupOffset
+		if type(offset) ~= "number" or offset < 0 or offset > 8 or offset % 1 ~= 0 then return nil, "ERROR_EXPORT_STRUCTURE" end
+		staged.raidToolsPreserveGroups = {}
+		for index = 1, offset do staged.raidToolsPreserveGroups[index] = true end
+		staged.raidToolsGroupOffset = nil
+	end
+	if restoreFlavorState and staged.GlobalFriends == nil then
+		staged.GlobalFriends = { Alliance = {}, Horde = {} }
+		staged.globalFriendsMigrated = true
+	elseif restoreFlavorState and type(staged.GlobalFriends) == "table" and not staged.globalFriendsMigrated then
+		-- Older full backups used [faction][realm - character][friend]. Flatten
+		-- those records before live sync can mistake a storage key for a friend.
+		local flattened = {}
+		for faction, records in pairs(staged.GlobalFriends) do
+			if type(faction) ~= "string" or type(records) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+			flattened[faction] = {}
+			for key, record in pairs(records) do
+				if type(key) ~= "string" or type(record) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+				local nested = false
+				for _, child in pairs(record) do if type(child) == "table" then nested = true; break end end
+				if nested then
+					local realm = key:match("^(.+) %- .+$") or key
+					for name, data in pairs(record) do
+						if type(name) ~= "string" or type(data) ~= "table" then return nil, "ERROR_EXPORT_STRUCTURE" end
+						local uid = name:find("-", 1, true) and name or (name .. "-" .. realm)
+						flattened[faction][uid] = codec:Copy(data)
+					end
+				else flattened[faction][key] = record end
+			end
+		end
+		staged.GlobalFriends, staged.globalFriendsMigrated = flattened, true
+	end
+	if not FillProfileDefaults(staged, defaults, codec) then return nil, "ERROR_EXPORT_STRUCTURE" end
+	if not ValidateProfileGroups(staged) or not ValidateProfileCollections(staged) or not ValidateProfileGeometry(staged) then
+		return nil, "ERROR_EXPORT_STRUCTURE"
+	end
+	for _, key in ipairs({ "colorGroupCount", "colorGroupArrow" }) do
+		if staged[key] ~= nil and not IsProfileColor(staged[key]) then return nil, "ERROR_EXPORT_STRUCTURE" end
+	end
+	-- Guild Broker and both settings UIs store RGB arrays, unlike named group colors.
+	for _, key in ipairs({ "guildBrokerNicknameColor", "guildBrokerRankColor", "guildBrokerZoneColor", "guildBrokerNoteColor", "guildBrokerOfficerNoteColor" }) do
+		if staged[key] ~= nil and not IsProfileColor(staged[key], true) then return nil, "ERROR_EXPORT_STRUCTURE" end
+	end
+	if staged.defaultFrameWidth < 380 then staged.defaultFrameWidth = 380 end
+	if staged.windowScale <= 0 or staged.windowScale > 5 or staged.defaultFrameWidth > 10000 or staged.defaultFrameHeight <= 0
+		or staged.defaultFrameHeight > 10000 then return nil, "ERROR_EXPORT_STRUCTURE" end
+	for key in pairs(codec.LOCAL_KEYS) do staged[key] = BetterFriendlistDB[key] end
+	if not restoreFlavorState then
+		-- Keep the current graph and its migration/options together. This also
+		-- protects imports from older backups whose source flavor is unknown.
+		for key in pairs(codec.FLAVOR_KEYS) do staged[key] = BetterFriendlistDB[key] end
+	end
+	-- Keep the imported addon version until a future version migration can see it.
+	staged.version = full and importData.version or BetterFriendlistDB.version
+	return staged
 end
 
 -- ========================================

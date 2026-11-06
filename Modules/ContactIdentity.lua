@@ -12,6 +12,19 @@ local function IsSecret(value)
 	return BFL and BFL.IsSecret and BFL:IsSecret(value)
 end
 
+local function IsReadableTable(value)
+	if IsSecret(value) or type(value) ~= "table" then
+		return false
+	end
+	if type(issecrettable) == "function" then
+		local ok, secret = pcall(issecrettable, value)
+		if not ok or IsSecret(secret) or secret then
+			return false
+		end
+	end
+	return true
+end
+
 local function Trim(value)
 	if type(value) ~= "string" then
 		return nil
@@ -129,7 +142,7 @@ function ContactIdentity:ResolveContactKeyFromFriend(friend)
 		return self:GetContactKeyFromPlayerName(friend)
 	end
 
-	if type(friend) ~= "table" then
+	if not IsReadableTable(friend) then
 		return nil
 	end
 
@@ -149,7 +162,7 @@ function ContactIdentity:ResolveContactKeyFromFriend(friend)
 	end
 
 	local gameAccountInfo = friend.gameAccountInfo
-	if IsSecret(gameAccountInfo) or type(gameAccountInfo) ~= "table" then
+	if not IsReadableTable(gameAccountInfo) then
 		gameAccountInfo = nil
 	end
 	local name = self:FirstCleanString(friend.name, friend.characterName, gameAccountInfo and gameAccountInfo.characterName)
@@ -159,7 +172,7 @@ function ContactIdentity:ResolveContactKeyFromFriend(friend)
 end
 
 function ContactIdentity:ResolveContactKeyFromContext(contextData)
-	if IsSecret(contextData) or type(contextData) ~= "table" then
+	if not IsReadableTable(contextData) then
 		return nil
 	end
 

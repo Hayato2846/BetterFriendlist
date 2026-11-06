@@ -13,6 +13,9 @@ local Broker = BFL:RegisterModule("Broker", {})
 local function GetDB()
 	return BFL:GetModule("DB")
 end
+local function GetDisplayLocation(friend)
+	return BFL.GetWoWAccountLocation(friend.gameAccountInfo or friend, friend.realmName)
+end
 local function GetFriendsList()
 	return BFL:GetModule("FriendsList")
 end
@@ -293,19 +296,29 @@ local function SmartInviteOrJoin(friendType, data)
 		if data.client ~= "WoW" or not data.gameAccountID then
 			return
 		end
+		local currentGameInfo
+		if BFL.IsForever then
+			if BFL:IsSecret(data.gameAccountID) then return end
+			local allowed, reason
+			allowed, reason, currentGameInfo = BFL.ValidateForeverInviteTarget(data.gameAccountInfo or data)
+			if not allowed or not currentGameInfo or currentGameInfo.gameAccountID ~= data.gameAccountID then return end
+		end
 
 		if isLeader then
 			BFL.BNInviteFriend(data.gameAccountID)
 		else
-			if data.characterName and data.characterName ~= "" then
-				local targetName = data.characterName
-				if data.realmName and data.realmName ~= "" and data.realmName ~= GetRealmName() then
-					targetName = targetName .. "-" .. data.realmName
+			local targetName = currentGameInfo and currentGameInfo.characterName or data.characterName
+			if not BFL:IsSecret(targetName) and type(targetName) == "string" and targetName ~= "" then
+				if BFL.AreRegionalUniqueNamesEnabled() then
+					targetName = BFL.NormalizePlayerIdentityName(targetName)
+				else
+					targetName = BFL.NormalizePlayerIdentityName(targetName, data.realmName) or targetName
 				end
 				BFL.RequestInviteFromUnit(targetName)
 			end
 		end
 	elseif friendType == "wow" then
+		if BFL.IsForever and BFL.GetForeverRulesetInviteRestriction(data.gameAccountInfo or data) then return end
 		local targetName = data.fullName or data.characterName
 		if not targetName then
 			return
@@ -439,7 +452,7 @@ local function L(key)
 	return key
 end
 
-local function GetClientEmbeddedIcon(clientProgram, size, previewTexture)
+local function GetClientEmbeddedIcon(clientProgram, size, previewTexture, subIcon)
 	if not clientProgram or clientProgram == "" then
 		return ""
 	end
@@ -450,7 +463,7 @@ local function GetClientEmbeddedIcon(clientProgram, size, previewTexture)
 	end
 
 	if BFL.GetClientEmbeddedIcon then
-		local icon = BFL:GetClientEmbeddedIcon(clientProgram, size or 14)
+		local icon = BFL:GetClientEmbeddedIcon(clientProgram, size or 14, subIcon)
 		if icon and icon ~= "" then
 			return icon
 		end
@@ -509,7 +522,7 @@ local function GetFriendGameDisplay(friend, iconSize)
 		and friend._isMock
 		and (friend._previewTitleIcon or (gameInfo and gameInfo._previewTitleIcon))
 		or nil
-	local icon = GetClientEmbeddedIcon(client, iconSize or 14, previewTexture)
+	local icon = GetClientEmbeddedIcon(client, iconSize or 14, previewTexture, gameInfo and gameInfo.subIcon)
 
 	if icon ~= "" and gameName ~= "" then
 		return icon .. gameName
@@ -808,7 +821,7 @@ local function GetFilteredFriendCounts()
 						level = friendInfo.level,
 						className = friendInfo.className,
 						area = friendInfo.area,
-						realmName = friendInfo.name and select(2, strsplit("-", friendInfo.name)),
+						realmName = friendInfo.name and select(2, BFL.SplitPlayerName(friendInfo.name)),
 						note = friendInfo.notes,
 						notes = friendInfo.notes,
 						afk = friendInfo.afk,
@@ -1434,7 +1447,7 @@ local function GetFriendDisplayName(friend)
 	local note = friend.note or ""
 	local nickname = DB and DB:GetNickname(friend.id) or ""
 	local characterName = ""
-	local realmName = ""
+	local realmName, locationKind = GetDisplayLocation(friend)
 
 	if friend.type == "bnet" then
 		if isStreamerMode then
@@ -1457,17 +1470,18 @@ local function GetFriendDisplayName(friend)
 		end
 		-- Character name from game info
 		characterName = friend.characterName or friend.toonName or ""
-		realmName = friend.realmName or ""
 	else
 		local fullName = friend.fullName or friend.name or "Unknown"
 		local showRealmName = DB and DB:Get("showRealmName", false)
 
 		-- Extract character and realm from fullName
-		local n, r = strsplit("-", fullName)
+		local n, r = BFL.SplitPlayerName(fullName)
 		characterName = n or fullName
-		realmName = r or ""
+		if locationKind ~= "ruleset" then realmName = r or "" end
 
-		if showRealmName then
+		if BFL.AreRegionalUniqueNamesEnabled() then
+			name = fullName
+		elseif showRealmName then
 			name = fullName
 		else
 			local playerRealm = GetNormalizedRealmName()
@@ -1520,7 +1534,7 @@ local function GetFriendDisplayName(friend)
 	if colorClassNames and characterName ~= "" then
 		local classColor = GetClassColorForFriend(friend)
 		if classColor then
-			classColorStr = string.format("ff%02x%02x%02x", classColor.r * 255, classColor.g * 255, classColor.b * 255)
+			classColorStr = BFL.ClassUtils:GetClassColorHex(friend)
 		end
 	end
 
@@ -1564,6 +1578,7 @@ local function GetFriendDisplayName(friend)
 	end
 
 	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
+	result = ReplaceTokenCaseInsensitive(result, "ruleset", locationKind == "ruleset" and realmName or "")
 	-- Phase 22b: Unified tokens - info tokens in name format
 	result = ReplaceTokenCaseInsensitive(result, "level", friend.level and tostring(friend.level) or "")
 	result = ReplaceTokenCaseInsensitive(result, "zone", friend.areaName or friend.area or "")
@@ -1852,7 +1867,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 		{ key = "Character", label = L("BROKER_COLUMN_CHARACTER"), align = "LEFT", default = true },
 		{ key = "Game", label = L("BROKER_COLUMN_GAME"), align = "LEFT", default = true },
 		{ key = "Zone", label = L("BROKER_COLUMN_ZONE"), align = "LEFT", default = true },
-		{ key = "Realm", label = L("BROKER_COLUMN_REALM"), align = "LEFT", default = true },
+		{ key = "Realm", label = L(BFL.IsForever and "BROKER_COLUMN_RULESET" or "BROKER_COLUMN_REALM"), align = "LEFT", default = true },
 		{ key = "Notes", label = L("BROKER_COLUMN_NOTES"), align = "LEFT", default = true },
 	}
 
@@ -2372,8 +2387,8 @@ local function CreateLibQTipTooltip(anchorFrame)
 						return classA < classB
 					end
 				elseif mode == "realm" then
-					local realmA = a.realmName or ""
-					local realmB = b.realmName or ""
+					local realmA = GetDisplayLocation(a)
+					local realmB = GetDisplayLocation(b)
 					if realmA ~= realmB then
 						return realmA < realmB
 					end
@@ -2509,7 +2524,7 @@ local function CreateLibQTipTooltip(anchorFrame)
 				elseif col.key == "Zone" then
 					val = ApplyBrokerColumnColor(friend.area or "", "brokerZoneColor")
 				elseif col.key == "Realm" then
-					val = ApplyBrokerColumnColor(friend.realmName or "", "brokerRealmColor")
+					val = ApplyBrokerColumnColor(GetDisplayLocation(friend), "brokerRealmColor")
 				elseif col.key == "Notes" then
 					val = ApplyBrokerColumnColor(friend.note or "", "brokerNotesColor")
 				end
@@ -2831,8 +2846,9 @@ function CreateDetailTooltip(cell, data)
 	-- WoW-specific details
 	if data.client == "WoW" then
 		-- Realm
-		if data.realmName and data.realmName ~= "" then
-			tt2:AddDoubleLine(C("ltblue", L("REALM_LABEL")), data.realmName)
+		local location, locationKind = GetDisplayLocation(data)
+		if location ~= "" then
+			tt2:AddDoubleLine(C("ltblue", L(locationKind == "ruleset" and "RULESET_LABEL" or "REALM_LABEL")), location)
 		end
 
 		-- Class (with color)

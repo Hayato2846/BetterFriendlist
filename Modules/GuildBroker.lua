@@ -313,7 +313,7 @@ function GuildBroker:CollectGuildRoster()
 				name = "Unknown"
 				realm = ""
 			else
-				name, realm = strsplit("-", safeFullName, 2)
+				name, realm = BFL.SplitPlayerName(safeFullName)
 			end
 			local isAFK = (status == 1)
 			local isDND = (status == 2)

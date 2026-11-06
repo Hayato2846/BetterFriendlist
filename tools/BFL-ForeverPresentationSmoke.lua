@@ -42,7 +42,7 @@ local env = setmetatable({ BFL = BFL, BFL_LOCALE_ENUS = BFL.L, L = BFL.L,
 	FACTION_ALLIANCE = "Alliance", FACTION_HORDE = "Horde", FACTION_NEUTRAL = "Neutral",
 	RED_FONT_COLOR = { r = 1, g = 0, b = 0 }, HIGHLIGHT_FONT_COLOR = { r = 1, g = 1, b = 1 },
 	GRAY_FONT_COLOR = { r = 0.5, g = 0.5, b = 0.5 }, FONT_COLOR_CODE_CLOSE = "|r",
-	RAID_CLASS_COLORS = { WARRIOR = { colorStr = "ffc79c6e" }, MAGE = { colorStr = "ff69ccf0" }, ROGUE = { colorStr = "fffff569" } },
+	RAID_CLASS_COLORS = { WARRIOR = { r = 199/255, g = 156/255, b = 110/255, colorStr = "ffc79c6e" }, MAGE = { r = 105/255, g = 204/255, b = 240/255, colorStr = "ff69ccf0" }, ROGUE = { r = 1, g = 245/255, b = 105/255, colorStr = "fffff569" } },
 }, { __index = _G })
 local function execute(content, label)
 	return assert(load(content, "@" .. label, "t", env))("BetterFriendlist", BFL)
@@ -56,8 +56,10 @@ local parseChangelog, enableChangelogResize =
 	execute(changelogSource .. "\nreturn ParseChangelog, EnableChangelogResize", "Modules/Changelog.lua")
 local changelog = BFL:GetModule("Changelog")
 local entries = changelog:GetEntries()
-local released, previous = entries[1], entries[2]
-equal(released.version, version, "The newest release matches both manifests")
+equal(entries[1].version, version, "The installed entry matches both manifests, including drafts")
+local published = {}
+for _, entry in ipairs(entries) do if not entry.isDraft then published[entry.version] = entry end end
+local released, previous = assert(published["3.0.0"]), assert(published["2.9.2"])
 equal(released.date, "2026-11-03", "The new release date is shown")
 check(not released.isDraft and #released.blocks > 0, "Released notes keep their content and release state")
 equal(previous.version, "2.9.2", "The previous release is preserved")
@@ -144,7 +146,8 @@ env.GetNormalizedRealmName = env.GetRealmName
 env.strsplit = function(_, value) return value:match("^([^%-]+)%-?(.*)$") end
 env.FriendsList = { settingsCache = { nameFormatString = "%name% (%character%)", colorClassNames = false } }
 local friendSource = read(repo, "Modules/FriendsList.lua")
-execute(between(friendSource, "local function ReplaceTokenCaseInsensitive(", "-- Info Line Formatting (Phase 22)")
+execute(between(friendSource, "function FriendsList:GetDisplayLocation(", "local function GetGroups()")
+	.. between(friendSource, "local function ReplaceTokenCaseInsensitive(", "-- Info Line Formatting (Phase 22)")
 	.. between(friendSource, "function FriendsList:GetDisplayName(", "-- Update \"Send Message\" button state"), "FriendsList display name")
 local list = env.FriendsList
 local friend = { uid = "title-42", type = "bnet", friendLevel = 3, accountName = "Ada Lovelace",
@@ -268,7 +271,7 @@ end }
 env.table = setmetatable({ count = function(value) local count = 0; for _ in pairs(value) do count = count + 1 end; return count end }, { __index = table })
 env.assertsafe = assert
 local function account(overrides)
-	local value = { clientProgram = "WoW", wowProjectID = 18, factionName = "Alliance", realmID = 200,
+	local value = { clientProgram = "WoW", wowProjectID = 18, factionName = "Alliance", realmID = 200, gameAccountID = 99,
 		isInCurrentRegion = true, classID = 1, playerGuid = "Player-42", isOnline = true }
 	for key, data in pairs(overrides or {}) do value[key] = data end
 	return value
@@ -366,12 +369,14 @@ check(not hasLine("Cross-faction content: Alliance"), "Forever does not promise 
 playerFaction = "Alliance"
 accounts[1].factionName = "Horde"
 crossFaction = true
+BFL.IsForever, env.WOW_PROJECT_ID, accounts[1].wowProjectID = false, 1, 1
 showTooltip()
 check(hasLine("Cross-faction content: Horde") and not hasLine("NOT_ALLIED"), "Retail cross-faction hints remain supported when allowed")
 questSession = true
 showTooltip()
 check(hasLine("QUEST_SESSION"), "Real Quest Session restrictions remain supported")
 questSession, crossFaction = false, false
+BFL.IsForever, env.WOW_PROJECT_ID = true, 18
 for _, fixture in ipairs({
 	{ { wowProjectID = 2 }, "WRONG_PROJECT_CLASSIC_OVERRIDE" },
 	{ { wowProjectID = 1 }, "WRONG_PROJECT_MAINLINE_OVERRIDE" },
@@ -436,9 +441,17 @@ env.GetDisplayedInviteType = function() return "INVITE" end
 env.C_SocialQueue = nil
 
 local emptyInfo = BFL.GetBNetInviteTooltipInfo
+-- The compatibility tooltip uses the same complete eligibility method as the
+-- real list when stateless native tooltip helpers are unavailable.
+env.GetFriendsList = function() return env.FriendsList end
+local listSource = read(repo, "Modules/FriendsList.lua")
+execute(between(listSource, "local INVITE_RESTRICTION_NONE =", "-- Helper Functions")
+	.. between(listSource, "function FriendsList:IsReadableInviteRecord(", "function FriendsList:BuildAccountDisplay("),
+	"production fallback invite eligibility")
 env.FriendsListUtil = nil
 equal(BFL.GetBNetInviteTooltipInfo(1), nil, "Clients without stateless helpers use the compatibility fallback")
-equal(#showTooltip(), 1, "Fallback reads current faction and accepts a valid second account")
+equal(env.FriendsList:GetGameAccountInviteRestriction(accounts[2]), 0, "The fallback fixture's second account remains eligible")
+equal(#showTooltip(), 1, "Fallback reads current faction and accepts a valid second account (" .. tostring(tooltip.lines[2] and tooltip.lines[2].text) .. ")")
 accounts = { account({ classID = 14 }) }
 showTooltip()
 check(hasLine("GAME_MODE"), "The compatibility tooltip also reports an incompatible game mode")
@@ -446,7 +459,7 @@ accounts = { account({ factionName = "Horde" }) }
 showTooltip()
 check(hasLine(BFL.L.TRAVEL_PASS_DIFFERENT_FACTION), "Fallback keeps a real Forever faction restriction")
 check(not hasLine("Cross-faction content: Horde"), "Fallback hides unsupported cross-faction content")
-BFL.IsClassic, env.WOW_PROJECT_ID = true, 2
+BFL.IsClassic, BFL.IsForever, env.WOW_PROJECT_ID = true, false, 2
 accounts = { account({ wowProjectID = 2, realmID = 100 }) }
 equal(#showTooltip(), 1, "Classic fallback accepts a same-faction same-realm friend")
 accounts[1].realmID = 200
