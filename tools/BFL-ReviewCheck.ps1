@@ -312,6 +312,9 @@ function Test-StaticLuaPatterns {
 
     foreach ($file in $luaFiles) {
         $path = Join-Path $RepoRoot ($file -replace '/', [System.IO.Path]::DirectorySeparatorChar)
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            continue
+        }
         $lines = @(Get-Content -LiteralPath $path -Encoding UTF8)
         $changedLineLookup = Get-ChangedLineLookup -File $file -BaseRef $BaseRef
         $warnedApi = @{}

@@ -152,6 +152,7 @@ end
 -- ========================================
 function Components:CreateHeader(parent, text)
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SettingsSectionHeader = true
 	holder:SetPoint("LEFT", 5, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	holder.text = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalLarge")

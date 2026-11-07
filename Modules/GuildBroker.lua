@@ -768,12 +768,9 @@ local function OnMemberLineClick(cell, data, mouseButton)
 	elseif actualButton == "RightButton" then
 		-- Context menu
 		GuildBroker:OpenMemberContextMenu(data)
-	else
-		-- Whisper
-		if hasUsableFullName then
-			local whisperName = data.fullName:gsub(" ", "")
-			BFL:SecureSendTell(whisperName)
-		end
+	elseif actualButton == "LeftButton" and hasUsableFullName then
+		local friendMenu = BFL:GetModule("NativeFriendMenu")
+		if friendMenu then friendMenu:ShowWhisperUnavailable() end
 	end
 end
 
@@ -788,6 +785,8 @@ function GuildBroker:OpenMemberContextMenu(data)
 
 	local GuildActions = BFL:GetModule("GuildActions")
 	if GuildActions and GuildActions.ShowMemberMenu and GuildActions:ShowMemberMenu(UIParent, data, "BFL_GuildBrokerMemberDropdown") then
+		-- The menu is owned by UIParent and stays open when the broker tooltip closes.
+		if tooltip then tooltip:Hide() end
 		return true
 	end
 
@@ -1493,6 +1492,18 @@ local function CreateLibQTipTooltip(anchorFrame)
 				end
 				OnMemberLineClick(nil, member, button)
 			end)
+
+			local friendMenu = not previewData and BFL:GetModule("NativeFriendMenu")
+			if friendMenu and member.online and not BFL:IsSecret(member.fullName)
+				and type(member.fullName) == "string" and member.fullName ~= "Unknown"
+			then
+				friendMenu:UpdateBrokerRow(row, {
+					type = "wow",
+					name = member.fullName:gsub(" ", ""),
+					connected = true,
+					_isMock = member._isMock,
+				}, true)
+			end
 
 			displayedCount = displayedCount + 1
 		end

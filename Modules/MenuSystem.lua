@@ -42,6 +42,8 @@ function MenuSystem:Initialize()
 			if DB then
 				DB:SetNickname(data.uid, text)
 				BFL:ForceRefreshFriendsList()
+				local hints = BFL:GetModule("NicknameHints")
+				if hints then hints:OnNicknameSaved(text, data.nickname, "friends", data.uid) end
 			end
 		end,
 		EditBoxOnEnterPressed = function(self, data)
@@ -50,6 +52,8 @@ function MenuSystem:Initialize()
 			if DB then
 				DB:SetNickname(data.uid, text)
 				BFL:ForceRefreshFriendsList()
+				local hints = BFL:GetModule("NicknameHints")
+				if hints then hints:OnNicknameSaved(text, data.nickname, "friends", data.uid) end
 			end
 			self:GetParent():Hide()
 		end,

@@ -796,18 +796,16 @@ function Settings:ShowLegacy(categoryID, focusSection)
 		end
 		settingsFrame:Show()
 		self:SelectCategory(categoryID or currentTab or 1) -- Restore or show first category
-		if focusSection == "betaFeatures" then
-			self:ScrollToLegacyBetaFeatures()
-		end
+		self:ScrollToLegacySection(focusSection)
 	else
 		-- BFL:DebugPrint("|cffff0000BetterFriendlist Settings:|r Frame not initialized!")
 	end
 end
 
-function Settings:ScrollToLegacyBetaFeatures()
+function Settings:ScrollToLegacySection(section)
 	local scrollFrame = settingsFrame and settingsFrame.ContentScrollFrame
 	local content = scrollFrame and scrollFrame.Content
-	local anchor = self.legacyBetaFeaturesAnchor
+	local anchor = self.legacySectionAnchors and self.legacySectionAnchors[section]
 	if not (scrollFrame and content and anchor and anchor.GetTop and scrollFrame.SetVerticalScroll) then
 		return
 	end
@@ -824,6 +822,11 @@ function Settings:ScrollToLegacyBetaFeatures()
 
 	local offset = math.max(0, contentTop - anchorTop - 8)
 	pcall(scrollFrame.SetVerticalScroll, scrollFrame, offset)
+end
+
+local function RegisterLegacySection(settings, section, anchor)
+	settings.legacySectionAnchors = settings.legacySectionAnchors or {}
+	settings.legacySectionAnchors[section] = anchor
 end
 
 -- ===========================================
@@ -2565,6 +2568,8 @@ local function RefreshImportedProfile(reason)
 	end
 	local FriendTags = BFL:GetModule("FriendTags")
 	if FriendTags and FriendTags.OnDatabaseImported then FriendTags:OnDatabaseImported() end
+	local FriendTagEditor = BFL:GetModule("FriendTagEditor")
+	if FriendTagEditor and FriendTagEditor.OnDatabaseImported then FriendTagEditor:OnDatabaseImported() end
 	local QuickFilters = BFL:GetModule("QuickFilters")
 	if QuickFilters and QuickFilters.InvalidateTagFilterCache then QuickFilters:InvalidateTagFilterCache() end
 	local ThemeManager = BFL:GetModule("ThemeManager")
@@ -3221,6 +3226,38 @@ end
 --]]
 
 -- Enable Guild Tab toggle (all versions)
+function Settings:OnGuildFilterModeChanged(mode)
+	local DB = GetDB()
+	if not DB then return end
+	DB:Set("guildTabFilterMode", mode)
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.SetFilter then GuildFrame:SetFilter(mode) end
+end
+
+function Settings:OnGuildSortModeChanged(mode)
+	local DB = GetDB()
+	if not DB then return end
+	DB:Set("guildTabSortMode", mode)
+	local GuildFrame = BFL:GetModule("GuildFrame")
+	if GuildFrame and GuildFrame.SetSort then GuildFrame:SetSort(mode, true) end
+end
+
+function Settings:OnShowStreamerModeButtonChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	DB:Set("showStreamerModeButton", checked == true)
+	local StreamerMode = BFL:GetModule("StreamerMode")
+	if StreamerMode then StreamerMode:UpdateState() end
+end
+
+function Settings:OnStreamerModeHeaderTextChanged(text)
+	local DB = GetDB()
+	if not DB then return end
+	DB:Set("streamerModeHeaderText", text)
+	local StreamerMode = BFL:GetModule("StreamerMode")
+	if StreamerMode then StreamerMode:UpdateState() end
+end
+
 function Settings:OnEnableGuildTabChanged(checked)
 	local DB = GetDB()
 	if not DB then
@@ -4458,6 +4495,7 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_HIDE_EMPTY_GROUPS_DESC or "Automatically hides groups that have no online members",
 	})
 	table.insert(allFrames, row6)
+	RegisterLegacySection(self, "hideEmptyGroups", row6)
 
 	-- Row 7: Favorite Icon + Favorite Icon Dropdown (conditional)
 	local favoriteIconEnabled = DB:Get("enableFavoriteIcon", true)
@@ -4501,6 +4539,7 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_ENABLE_FAVORITE_ICON_DESC or "Display a star icon on the friend button for favorites.",
 	}, favoriteDropdownData)
 	table.insert(allFrames, row7)
+	RegisterLegacySection(self, "enableFavoriteIcon", row7)
 
 	-- Row 8: Blizzard Option
 	local row8 = Components:CreateCheckbox(tab, {
@@ -4643,6 +4682,7 @@ function Settings:RefreshGeneralTab()
 	-- Header: Friend Info Formatting (Phase 22)
 	-- ========================================
 	local infoFormatHeader = Components:CreateHeader(tab, L.SETTINGS_INFO_FORMAT_HEADER or "Friend Info Formatting")
+	RegisterLegacySection(self, "friendInfoFormatting", infoFormatHeader)
 	table.insert(allFrames, infoFormatHeader)
 
 	-- Info Format Preset Dropdown
@@ -4852,6 +4892,7 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = string.format(showGroupDescFmt, inGameDisplayName),
 	})
 	table.insert(allFrames, groupRow)
+	RegisterLegacySection(self, "showFavoritesGroup", groupRow)
 
 	-- NEW: In-Game Group Mode (Sub-option) - Keep as dedicated row since it's a dropdown
 	if DB:Get("enableInGameGroup", false) then
@@ -5198,6 +5239,7 @@ function Settings:RefreshContactMemoryTab()
 			or "Show private notes in supported friend and ignore tooltips.",
 	})
 	table.insert(allFrames, contactMemoryTooltipToggle)
+	RegisterLegacySection(self, "privateNotesTooltips", contactMemoryTooltipToggle)
 
 	local contactMemoryStreamerToggle = Components:CreateCheckbox(tab, {
 		label = L.CONTACT_MEMORY_SETTINGS_HIDE_STREAMER or "Hide in Streamer Mode",
@@ -5303,7 +5345,9 @@ function Settings:RefreshFriendTagsTab()
 	table.insert(allFrames, editorButton)
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_VISIBILITY or "Visibility"))
+	local visibilityHeader = Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_VISIBILITY or "Visibility")
+	RegisterLegacySection(self, "friendTagsVisibility", visibilityHeader)
+	table.insert(allFrames, visibilityHeader)
 
 	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
 		label = L.FRIEND_TAGS_SHOW_ROW_CHIPS or "Show Row Chips",
@@ -5378,6 +5422,7 @@ function Settings:RefreshFriendTagsTab()
 		)
 	end
 	table.insert(allFrames, compactDropdown)
+	RegisterLegacySection(self, "friendTagsCompact", compactDropdown)
 
 	table.insert(allFrames, Components:CreateSlider(tab, L.FRIEND_TAGS_MAX_ROW_CHIPS or "Max Row Chips", 1, 20,
 		FriendTags:GetSetting("maxRowChips", 3), function(value)
@@ -5579,6 +5624,10 @@ function Settings:RefreshGuildTab()
 			if GuildFrame.EnsureEnabled then
 				GuildFrame:EnsureEnabled()
 			end
+			if GuildFrame.RefreshSettings then
+				GuildFrame:RefreshSettings()
+				return
+			end
 			if GuildFrame.RefreshHeaderControls then
 				GuildFrame:RefreshHeaderControls()
 			end
@@ -5632,13 +5681,7 @@ function Settings:RefreshGuildTab()
 			return DB:Get("guildTabFilterMode", "online") == val
 		end,
 		function(val)
-			DB:Set("guildTabFilterMode", val)
-			local GuildFrame = BFL:GetModule("GuildFrame")
-			if GuildFrame and GuildFrame.SetFilter then
-				GuildFrame:SetFilter(val)
-			else
-				RefreshGuildFrame()
-			end
+			self:OnGuildFilterModeChanged(val)
 		end
 	)
 	if filterDropdown.SetTooltip then
@@ -5669,13 +5712,7 @@ function Settings:RefreshGuildTab()
 			return DB:Get("guildTabSortMode", "rank") == val
 		end,
 		function(val)
-			DB:Set("guildTabSortMode", val)
-			local GuildFrame = BFL:GetModule("GuildFrame")
-			if GuildFrame and GuildFrame.SetSort then
-				GuildFrame:SetSort(val, true)
-			else
-				RefreshGuildFrame()
-			end
+			self:OnGuildSortModeChanged(val)
 		end
 	)
 	if sortDropdown.SetTooltip then
@@ -6792,52 +6829,6 @@ function Settings:RefreshAdvancedTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- ===========================================
-	-- Taint-Free Whisper Section
-	-- ===========================================
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper"))
-
-	-- Description
-	table.insert(
-		allFrames,
-		Components:CreateLabel(
-			tab,
-			L.SETTINGS_TAINT_FREE_WHISPER_DESC
-				or "Uses a BFL-owned whisper box in the chat input location instead of opening Blizzard's chat editor.",
-			true
-		)
-	)
-
-	-- Taint-Free Whisper Toggle
-	local taintFreeToggle = Components:CreateCheckbox(
-		tab,
-		L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper",
-		BetterFriendlistDB.taintFreeWhisper or false,
-		function(checked)
-			local DB = GetDB()
-			if DB then
-				DB:Set("taintFreeWhisper", checked)
-			else
-				BetterFriendlistDB.taintFreeWhisper = checked
-			end
-			if not checked and BFL.CloseTaintFreeWhisper then
-				BFL:CloseTaintFreeWhisper(true)
-			end
-			if not DB and BFL.SettingsVersion then
-				BFL.SettingsVersion = BFL.SettingsVersion + 1
-			end
-		end
-	)
-	taintFreeToggle:SetTooltip(
-		L.SETTINGS_TAINT_FREE_WHISPER or "Taint-Free Whisper",
-		L.SETTINGS_TAINT_FREE_WHISPER_TOOLTIP
-			or "Prevents chat taint by keeping whisper input separate from Blizzard's chat edit box."
-	)
-	table.insert(allFrames, taintFreeToggle)
-
-	-- Spacer
-	table.insert(allFrames, Components:CreateSpacer(tab))
-
-	-- ===========================================
 	-- External AddOn Menu Bridge Section
 	-- ===========================================
 	if BFL.HasSecretValues then
@@ -6900,7 +6891,7 @@ function Settings:RefreshAdvancedTab()
 	-- Beta Features Section
 	-- ===========================================
 	local betaFeaturesHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r")
-	self.legacyBetaFeaturesAnchor = betaFeaturesHeader
+	RegisterLegacySection(self, "betaFeatures", betaFeaturesHeader)
 	table.insert(allFrames, betaFeaturesHeader)
 
 	-- Beta features description
@@ -8939,7 +8930,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("brokerShowIcon", val)
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
-					Broker:UpdateBrokerText()
+					Broker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -8958,7 +8949,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("brokerShowLabel", val)
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
-					Broker:UpdateBrokerText()
+					Broker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -8977,7 +8968,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("brokerShowTotal", val)
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
-					Broker:UpdateBrokerText()
+					Broker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -9000,7 +8991,7 @@ function Settings:RefreshBrokerTab()
 				-- Update broker text immediately
 				local Broker = BFL:GetModule("Broker")
 				if Broker and Broker.UpdateBrokerText then
-					Broker:UpdateBrokerText()
+					Broker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -9021,7 +9012,7 @@ function Settings:RefreshBrokerTab()
 					DB:Set("brokerShowWoWIcon", val)
 					local Broker = BFL:GetModule("Broker")
 					if Broker and Broker.UpdateBrokerText then
-						Broker:UpdateBrokerText()
+						Broker:UpdateBrokerText(true)
 					end
 				end
 			)
@@ -9042,7 +9033,7 @@ function Settings:RefreshBrokerTab()
 					DB:Set("brokerShowBNetIcon", val)
 					local Broker = BFL:GetModule("Broker")
 					if Broker and Broker.UpdateBrokerText then
-						Broker:UpdateBrokerText()
+						Broker:UpdateBrokerText(true)
 					end
 				end
 			)
@@ -9364,7 +9355,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("guildBrokerShowIcon", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
-					GBroker:UpdateBrokerText()
+					GBroker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -9379,7 +9370,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("guildBrokerShowLabel", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
-					GBroker:UpdateBrokerText()
+					GBroker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -9394,7 +9385,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("guildBrokerShowTotal", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
-					GBroker:UpdateBrokerText()
+					GBroker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -9572,7 +9563,7 @@ function Settings:RefreshBrokerTab()
 				DB:Set("guildBrokerExcludeSelf", val)
 				local GBroker = BFL:GetModule("GuildBroker")
 				if GBroker and GBroker.UpdateBrokerText then
-					GBroker:UpdateBrokerText()
+					GBroker:UpdateBrokerText(true)
 				end
 			end
 		)
@@ -10203,11 +10194,7 @@ function Settings:RefreshStreamerTab()
 		L.SETTINGS_ENABLE_STREAMER_MODE or "Show Streamer Mode Button",
 		DB:Get("showStreamerModeButton", true),
 		function(checked)
-			DB:Set("showStreamerModeButton", checked)
-			local StreamerMode = BFL:GetModule("StreamerMode")
-			if StreamerMode then
-				StreamerMode:UpdateState()
-			end
+			self:OnShowStreamerModeButtonChanged(checked)
 		end
 	)
 	enableToggle:SetTooltip(L.STREAMER_MODE_TITLE, L.STREAMER_MODE_ENABLE_DESC)
@@ -10222,12 +10209,7 @@ function Settings:RefreshStreamerTab()
 		L.STREAMER_MODE_HEADER_TEXT or "Custom Header Text",
 		DB:Get("streamerModeHeaderText", "Streamer Mode"),
 		function(val)
-			DB:Set("streamerModeHeaderText", val)
-			-- Update live if active
-			local StreamerMode = BFL:GetModule("StreamerMode")
-			if StreamerMode then
-				StreamerMode:UpdateState()
-			end
+			self:OnStreamerModeHeaderTextChanged(val)
 		end
 	)
 	table.insert(allFrames, headerBox)

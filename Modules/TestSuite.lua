@@ -3050,14 +3050,13 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("data", "FriendTagEditor_LabelModeAndTargetedIconRefresh", {
-		description = "Manual label text selects the expected mode and committed icons refresh only their navigation row",
+	TS:RegisterTest("data", "FriendTagEditor_DraftInputAndTargetedIconRefresh", {
+		description = "Editor input releases focus without applying drafts and navigation icons refresh in place",
 			action = function(V)
 				local Editor = BFL:GetModule("FriendTagEditor")
 				local FriendTags = BFL:GetModule("FriendTags")
 				local handlers = {}
 				local focusClears = 0
-				local flushes = 0
 				local fakeInput = {
 					SetScript = function(_, event, callback)
 						handlers[event] = callback
@@ -3066,41 +3065,13 @@ local function RegisterBuiltInTests()
 						focusClears = focusClears + 1
 					end,
 				}
-				local oldFlushAutoSave = Editor.FlushAutoSave
-				local ok, err = pcall(function()
-					Editor.FlushAutoSave = function()
-						flushes = flushes + 1
-					end
-					V:Assert(Editor:BindEditorInputFocusHandlers(fakeInput), "Editor input handlers should bind")
-					V:AssertType(handlers.OnEnterPressed, "function", "Enter should have a focus-release handler")
-					V:AssertType(handlers.OnEscapePressed, "function", "Escape should have a focus-release handler")
-					V:AssertType(handlers.OnEditFocusLost, "function", "Focus loss should flush pending edits")
-					handlers.OnEnterPressed(fakeInput)
-					handlers.OnEscapePressed(fakeInput)
-					V:AssertEqual(focusClears, 2, "Enter and Escape should both release editor input focus")
-					V:AssertEqual(flushes, 2, "Enter and Escape should both commit pending editor input")
-				end)
-				Editor.FlushAutoSave = oldFlushAutoSave
-				if not ok then
-					error(err, 0)
-				end
-				V:AssertEqual(Editor:GetLabelModeForText("Manual"), "custom", "Non-empty input should select Custom Label")
-				V:AssertEqual(Editor:GetLabelModeForText(""), "default", "Empty manual input should restore Default Label")
-				V:AssertEqual(
-					Editor:GetLabelModeAfterTextChange("", "icon_only", false),
-					"icon_only",
-					"Programmatic Icon Only clearing must preserve Icon Only mode"
-				)
-				V:AssertEqual(
-					Editor:GetLabelModeAfterTextChange("", "custom", true),
-					"default",
-					"Manually clearing a custom label should restore Default Label"
-				)
-				V:AssertEqual(
-					Editor:GetLabelModeAfterTextChange("Manual", "default", true),
-					"custom",
-					"Manually typing a label should select Custom Label"
-				)
+				Editor:BindEditorInputFocusHandlers(fakeInput)
+				V:AssertType(handlers.OnEnterPressed, "function", "Enter should have a focus-release handler")
+				V:AssertType(handlers.OnEscapePressed, "function", "Escape should have a focus-release handler")
+				V:AssertEqual(handlers.OnEditFocusLost, nil, "Focus loss leaves changes in the draft")
+				handlers.OnEnterPressed(fakeInput)
+				handlers.OnEscapePressed(fakeInput)
+				V:AssertEqual(focusClears, 2, "Enter and Escape both release editor input focus")
 
 				WithTemporaryDatabase({}, function()
 				FriendTags:OnDatabaseImported()
@@ -3180,154 +3151,15 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("data", "FriendTagEditor_UsesSharedIconExplorer", {
-		description = "Friend Tag editor should use BFL's searchable icon explorer instead of an inline dropdown or fixed icon grid",
+		description = "The tag editor opens the shared searchable icon library directly",
 		action = function(V)
-			local FriendTagEditor = BFL:GetModule("FriendTagEditor")
-			local FriendTags = BFL:GetModule("FriendTags")
-			V:AssertNotNil(FriendTagEditor, "FriendTagEditor module should exist")
-			V:AssertNotNil(FriendTags, "FriendTags module should exist")
-			V:AssertType(FriendTagEditor.CreateIconControls, "function", "FriendTagEditor should create icon controls")
-			if BFL.ShowIconSelector then
-				V:AssertType(BFL.ShowIconSelector, "function", "FriendTagEditor should have access to BFL's shared icon explorer")
-				V:AssertType(BFL.BFLIconCatalog, "table", "Icon explorer should expose BFL's custom icon catalog")
-				V:Assert(#BFL.BFLIconCatalog > 0, "BFL custom icons should be available to the icon explorer")
-				return
-			end
-
-			local oldCreateDropdown = BFL.CreateDropdown
-			local oldInitializeDropdown = BFL.InitializeDropdown
-			local oldIsModernDropdown = BFL.IsModernDropdown
-			local oldGetIconOptions = FriendTags.GetIconOptions
-			local oldCreateFrame = CreateFrame
-			local oldSetWidth = UIDropDownMenu_SetWidth
-			local oldJustifyText = UIDropDownMenu_JustifyText
-			local oldSetText = UIDropDownMenu_SetText
-			local oldRefreshPreview = FriendTagEditor.RefreshPreview
-			local oldEditState = FriendTagEditor.editState
-			local capturedCreate
-			local capturedInit
-
-			local function MakeObject()
-				local object = {}
-				function object:SetPoint(...)
-					self.point = { ... }
-				end
-				function object:SetWidth(width)
-					self.width = width
-				end
-				function object:SetSize(width, height)
-					self.width = width
-					self.height = height
-				end
-				function object:SetText(text)
-					self.text = text
-				end
-				function object:GetText()
-					return self.text or ""
-				end
-				function object:SetShown(shown)
-					self.shown = shown
-				end
-				function object:SetScript(script, handler)
-					self.scripts = self.scripts or {}
-					self.scripts[script] = handler
-				end
-				function object:SetAutoFocus(value)
-					self.autoFocus = value
-				end
-				function object:SetMaxLetters(value)
-					self.maxLetters = value
-				end
-				function object:SetFontObject(value)
-					self.fontObject = value
-				end
-				return object
-			end
-
-			local ok, err = pcall(function()
-				FriendTagEditor.editState = {
-					iconMode = "option",
-					iconOptionID = "tag",
-					iconType = "texture",
-					iconValue = "Interface\\Icons\\INV_Misc_Note_01",
-					icon = "Interface\\Icons\\INV_Misc_Note_01",
-					texture = "Interface\\Icons\\INV_Misc_Note_01",
-				}
-				FriendTagEditor.RefreshPreview = function() end
-				FriendTags.GetIconOptions = function()
-					return {
-						{
-							id = "tag",
-							label = "Tag",
-							iconType = "texture",
-							iconValue = "Interface\\Icons\\INV_Misc_Note_01",
-							icon = "Interface\\Icons\\INV_Misc_Note_01",
-							texture = "Interface\\Icons\\INV_Misc_Note_01",
-						},
-					}
-				end
-				BFL.CreateDropdown = function(parent, name, width, preferModern)
-					capturedCreate = {
-						parent = parent,
-						name = name,
-						width = width,
-						preferModern = preferModern,
-					}
-					local dropdown = MakeObject()
-					dropdown.SetupMenu = function() end
-					return dropdown
-				end
-				BFL.IsModernDropdown = function(dropdown)
-					return dropdown and dropdown.SetupMenu ~= nil
-				end
-				BFL.InitializeDropdown = function(dropdown, options, getter, setter)
-					capturedInit = {
-						dropdown = dropdown,
-						options = options,
-						getter = getter,
-						setter = setter,
-					}
-				end
-				UIDropDownMenu_SetWidth = function()
-					error("Legacy width should not be used for modern FriendTagEditor dropdown")
-				end
-				UIDropDownMenu_JustifyText = function()
-					error("Legacy justify should not be used for modern FriendTagEditor dropdown")
-				end
-				UIDropDownMenu_SetText = function()
-					error("Legacy text should not be used for modern FriendTagEditor dropdown")
-				end
-				CreateFrame = function()
-					return MakeObject()
-				end
-
-				local parent = MakeObject()
-				function parent:CreateFontString()
-					return MakeObject()
-				end
-
-				FriendTagEditor:CreateIconControls(parent, -40)
-
-				V:AssertNotNil(capturedCreate, "Icon dropdown should be created through BFL.CreateDropdown")
-				V:AssertEqual(capturedCreate.preferModern, true, "Icon dropdown should allow modern dropdown creation")
-				V:AssertNotNil(capturedInit, "Icon dropdown should initialize through BFL.InitializeDropdown")
-				V:AssertEqual(capturedInit.options.getSelectionText("tag"), "Tag", "Icon dropdown should preserve selection text")
-				V:AssertEqual(FriendTagEditor.iconDropdown.text, "Tag", "Modern dropdown text should be set without UIDropDownMenu")
-			end)
-
-			BFL.CreateDropdown = oldCreateDropdown
-			BFL.InitializeDropdown = oldInitializeDropdown
-			BFL.IsModernDropdown = oldIsModernDropdown
-			FriendTags.GetIconOptions = oldGetIconOptions
-			CreateFrame = oldCreateFrame
-			UIDropDownMenu_SetWidth = oldSetWidth
-			UIDropDownMenu_JustifyText = oldJustifyText
-			UIDropDownMenu_SetText = oldSetText
-			FriendTagEditor.RefreshPreview = oldRefreshPreview
-			FriendTagEditor.editState = oldEditState
-			if not ok then
-				error(err, 0)
-			end
+			local Editor = BFL:GetModule("FriendTagEditor")
+			V:AssertNotNil(Editor, "FriendTagEditor module should exist")
+			V:AssertType(Editor.OpenIconSelector, "function", "FriendTagEditor should open the icon library directly")
+			V:AssertType(Editor.SetIconMode, "function", "The editor can change icon mode independently of the library")
+			V:AssertType(BFL.ShowIconSelector, "function", "The library uses BFL's shared icon explorer")
+			V:AssertType(BFL.BFLIconCatalog, "table", "Icon explorer should expose BFL's custom icon catalog")
+			V:Assert(#BFL.BFLIconCatalog > 0, "BFL custom icons should be available to the icon explorer")
 		end,
 	})
 
@@ -10074,7 +9906,7 @@ local function RegisterBuiltInTests()
 	})
 
 	TS:RegisterTest("integration", "OfflineTitleFriend_WhisperIsBlocked", {
-		description = "Only offline title friends are excluded from BFL menu and row-click whisper paths",
+		description = "The shared offline Title-friend guard preserves online Title and offline BattleTag eligibility",
 		condition = function()
 			return BFL.IsRetail
 				and Enum
@@ -10090,40 +9922,6 @@ local function RegisterBuiltInTests()
 				not BFL.IsOfflineTitleFriend({ friendLevel = battleTagLevel }, true),
 				"Offline BattleTag friend should keep the existing behavior"
 			)
-
-			local FriendsList = BFL:GetModule("FriendsList")
-			if not FriendsList then
-				V:Skip("FriendsList module unavailable")
-				return
-			end
-			local oldSend = BFL.SecureSendBNetTell
-			local sends = 0
-			local ok, err = pcall(function()
-				BFL.SecureSendBNetTell = function()
-					sends = sends + 1
-				end
-				local offlineResult = FriendsList:WhisperFriend({
-					type = "bnet",
-					friendLevel = titleLevel,
-					connected = false,
-					accountName = "Offline Title Friend",
-				})
-				V:Assert(offlineResult == false, "Row-click whisper should reject an offline title friend")
-				V:AssertEqual(sends, 0, "Rejected title friend must not open Battle.net chat")
-
-				local onlineResult = FriendsList:WhisperFriend({
-					type = "bnet",
-					friendLevel = titleLevel,
-					connected = true,
-					accountName = "Online Title Friend",
-				})
-				V:Assert(onlineResult == true, "Online title friend should remain whisperable")
-				V:AssertEqual(sends, 1, "Online title friend should open Battle.net chat exactly once")
-			end)
-			BFL.SecureSendBNetTell = oldSend
-			if not ok then
-				error(err, 0)
-			end
 		end,
 	})
 
@@ -17512,8 +17310,8 @@ function TestSuite:RegisterRaidInteractionTest()
 		end,
 	})
 
-	self:RegisterTest("integration", "RaidFrame_RaidPlayerProxyInteractionContract", {
-		description = "Modern and Legacy raid rows route RAID_PLAYER through the secure proxy without breaking child overlays",
+	self:RegisterTest("integration", "RaidFrame_RaidMenuProxyInteractionContract", {
+		description = "Modern and Legacy raid rows reserve right-click for the secure proxy without breaking child overlays",
 		condition = function()
 			return BFL.IsRetail
 		end,
@@ -17573,7 +17371,7 @@ function TestSuite:RegisterRaidInteractionTest()
 				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
 				V:AssertEqual(attributes.type2, nil, "Modern Raid leaves right-click to the secure proxy")
 				V:AssertEqual(attributes["menu-function"], nil, "Modern Raid does not install an insecure menu callback")
-				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Modern Raid uses the Raid Player menu")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Modern Raid records the visual fallback menu")
 				V:AssertType(RaidFrame.ShowSecureProxyForButton, "function", "Retail exposes the raid secure proxy path")
 				V:AssertType(RaidFrame.PositionSecureProxyForButton, "function", "Retail exposes safe proxy positioning")
 				V:AssertEqual(RaidFrame:ResolveMemberButton(childOverlay), fakeButton, "Child tooltip overlays resolve to their raid member row")
@@ -17595,7 +17393,7 @@ function TestSuite:RegisterRaidInteractionTest()
 				RaidFrame:UpdateSecureAttributesForButton(fakeButton)
 				V:AssertEqual(attributes.type2, nil, "Legacy Raid also leaves right-click to the secure proxy")
 				V:AssertEqual(attributes["menu-function"], nil, "Legacy Raid does not install an insecure menu callback")
-				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Legacy Raid uses the Raid Player menu")
+				V:AssertEqual(fakeButton.BFL_RaidContextMenuType, "RAID_PLAYER", "Legacy Raid records the visual fallback menu")
 
 				attributes = {}
 				BFL.HasSecretValues = false

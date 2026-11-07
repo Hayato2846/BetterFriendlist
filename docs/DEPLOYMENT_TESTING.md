@@ -42,6 +42,91 @@ work is driven by a GitHub issue, include the issue number in both names with an
 
 For non-issue work, use a concise feature name such as `quickfilter-sorter-tab`.
 
+## Offline UI captures
+
+Run the capture script from the checkout you want to inspect. It uses the prepared
+Retail simulator kit under `references/wow-ui-sim-v0.1.40` in the BFL hub and reads
+installed game assets while WoW is closed.
+
+```powershell
+.\tools\BFL-UISimCapture.ps1
+.\tools\BFL-UISimCapture.ps1 -Scenario nickname_hint
+```
+
+The default capture renders the friend list at normal and narrow widths. The
+nickname scenario renders four states, from `modern-collapsed` and
+`modern-expanded` through `legacy-collapsed` and `legacy-expanded`. Add
+`-Variant modern-expanded` to capture just that state. Add `-Fade` to capture
+the hint halfway through its fade-out. Each run writes PNGs and
+frame logs under `diagnostics/bfl-ui-tests`. Use the same scenario before and
+after a change to compare screenshots and geometry. The Retail simulator uses
+Retail artwork for both interface styles.
+
+## Native friend menu
+
+Run this check on Retail, Forever, Classic progression, Classic Era, and Anniversary. Include both interface styles on clients that offer them.
+
+Client selection and API availability are checked separately. The native
+route requires Blizzard's link handler, mouse routing and menu extension
+APIs. The client test below checks whether the route keeps Whisper taint-free.
+
+- Right-click directly on a friend row and choose Whisper in Blizzard's menu.
+- Check that BFL's groups, nickname, tags, private note, known characters and
+  account controls appear for eligible friends. Check that standard friend
+  actions and Menu Bridge entries appear once.
+- On Forever, with a friend on another ruleset, check that Invite or Request to
+  Join shows the ruleset restriction. For a friend with multiple accounts,
+  verify that only the blocked character is disabled in the account submenu.
+- Left-click a row, then move the pointer away. The selection should stay
+  highlighted after the tooltip disappears. A second click clears it.
+  Check that dragging a row still works.
+- Enable Click to Whisper with Single Click and check that one click opens
+  the Blizzard edit box. In Double Click mode, check that the first click
+  selects and a quick second click opens the edit box once. A late second
+  click or moving to another row should start a new sequence.
+- In Legacy, select a friend and click Send Message. Select a different
+  friend and verify the next click targets the new selection. Deselecting
+  should disable the button.
+- In the Friends Broker tooltip, left-click a friend, then right-click and
+  choose Whisper. Check both a Battle.net friend and a character friend.
+  Check that Alt- and Shift-click still run their broker actions and that
+  collapsing and reopening a group routes clicks to the current row.
+- In Who, click a result to select it, then repeat with a quick double-click
+  to open a whisper. Verify that changing the double-click action to Invite
+  still invites. Check Ctrl-click column search, Alt-click in the Search
+  Builder, and Whisper from the right-click menu.
+- In the guild window, right-click an online guild member and choose Whisper.
+  In Guild Broker, test a left-click and Whisper from the right-click menu.
+  Verify the recipient after selecting a different member, including one on
+  another realm if available. Check that Alt-click and Shift-click retain
+  their broker actions.
+- In Recent Allies, choose Whisper from a character's right-click menu.
+- Check that the Blizzard chat field opens and inspect the taint log. Opening
+  the field is sufficient for this test. No message needs to be sent.
+- In combat, Streamer Mode or chat lockdown, or when a native link cannot be
+  built, verify that the action shows an unavailable message. Verify that
+  whispering and the native menu are available again after the restriction lifts.
+- With Total RP 3 enabled and its profile action allowed, disable the Menu
+  Bridge companion and reload. Verify that the profile action appears once.
+  Re-enable the companion to verify captured third-party actions in BFL-owned
+  menus such as Who and Recent Allies.
+
+## Native raid member menu
+
+- Join a raid and open BFL's Raid tab. Right-click two members in different
+  groups before opening Blizzard's Raid tab. Verify that the native raid
+  management menu targets the clicked member.
+- Try an available raid management action. Repeat after a roster or subgroup
+  change and in both BFL layouts on clients that offer them.
+- Enter combat while hovering a member and verify the old click target is
+  cleared. Check the native menu again after combat.
+
+The installed EllesmereUI Friends List uses the same Blizzard hyperlink
+template and mouse routing. The offline smoke test checks that the upper
+layer passes right-clicks to Blizzard's unchanged hyperlink handler and
+delegates other supported row interactions to BFL. The taint log measures
+the actual right-click and Whisper path in the client.
+
 ## Modes
 
 - `CleanCopy`: mirrors a repo or worktree into the active client AddOn folder when that folder already exists as a normal non-git directory. If the client path is missing or already linked, it uses the deployment slot/link layout.

@@ -1585,6 +1585,17 @@ local function ClearTopTabSearchState(frame, tabIndex)
 	end
 end
 
+function BFL:ClearFriendsListSearch()
+	local friends = GetFriendsList()
+	if friends then friends:SetSearchText("", true) end
+	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+	if header and (PanelTemplates_GetSelectedTab(header) or 1) == 1 then
+		CancelSearchDebounceTimer()
+		searchText = ""
+		SetSearchBoxTextSilently(header.SearchBox, "")
+	end
+end
+
 -- Handle search box text changes (called from XML)
 -- Routes search to the correct module based on active top tab
 function BetterFriendsFrame_OnSearchTextChanged(editBox)
@@ -2212,10 +2223,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData, menuTypeWrapper)
-				-- Only mutate menus that BFL opened itself. Native Blizzard menus should not
-				-- inherit BFL responders just because our Menu.ModifyMenu callback exists.
-				if not BFL_IsOwnMenuContext(contextData) then
+			local function BFL_ReplaceCopyNameButton(owner, rootDescription, contextData, menuTypeWrapper, nativeRow)
+				if not nativeRow and not BFL_IsOwnMenuContext(contextData) then
 					return
 				end
 				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
@@ -2305,8 +2314,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				pcall(function()
 					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
 						-- Check text (handle function or string)
-						local text = elementDescription.text
-						if type(text) == "function" then
+						local text
+						if nativeRow then
+							text = BFL.Compat.GetMenuElementText(elementDescription)
+						else
+							text = elementDescription.text
+						end
+						if BFL:IsSecret(text) then text = nil end
+						if not nativeRow and type(text) == "function" then
 							local success, result = pcall(text)
 							if success then
 								text = result
@@ -2327,11 +2342,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						then
 							isMatch = true
 						-- Match by internal data key (Blizzard usually uses this for UnitPopup)
-						elseif elementDescription.data == "COPY_CHARACTER_NAME" then
-							isMatch = true
+						else
+							local data = elementDescription.data
+							isMatch = not BFL:IsSecret(data) and data == "COPY_CHARACTER_NAME"
 						end
 
 						if isMatch then
+							-- Keep the existing action if this client rejects a proxy change.
+							if nativeRow then foundAndReplaced = true end
 							if multiAccountEntries and #multiAccountEntries > 1 then
 								-- Multi-account: Convert to submenu
 								elementDescription:SetResponder(function()
@@ -2398,64 +2416,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			-- Legacy BFL-owned UnitPopup wrapper for clients without secret values.
-			-- Secret-value builds use the BFL custom menu and Taint-Free Whisper paths instead
-			-- of replacing native Blizzard responders.
-			local function BFL_ReplaceWhisperButton(owner, rootDescription, contextData)
-				if BFL.HasSecretValues then
-					return
-				end
-				-- This workaround is only for BFL-created UnitPopup contextData.
-				if not BFL_IsOwnMenuContext(contextData) then
-					return
-				end
-				if not rootDescription or not rootDescription.EnumerateElementDescriptions then
-					return
-				end
-				if not contextData then
-					return
-				end
-				if BFL.IsOfflineTitleFriend and BFL.IsOfflineTitleFriend(contextData, contextData.isOffline) then
-					return
-				end
-
-				pcall(function()
-					for _, elementDescription in rootDescription:EnumerateElementDescriptions() do
-						local text = elementDescription.text
-						if type(text) == "function" then
-							local success, result = pcall(text)
-							if success then
-								text = result
-							end
-						end
-						if text == WHISPER then
-							elementDescription:SetResponder(function()
-								local isBNetAccount = contextData.bnetIDAccount
-								if not isBNetAccount then
-									local playerLocation = contextData.playerLocation
-									if playerLocation and playerLocation.IsBattleNetGUID then
-										isBNetAccount = playerLocation:IsBattleNetGUID()
-									end
-								end
-								if isBNetAccount then
-									BFL:SecureSendBNetTell(contextData.name, contextData.bnetIDAccount)
-								else
-									local fullName
-									if UnitPopupSharedUtil and UnitPopupSharedUtil.GetFullPlayerName then
-										fullName = UnitPopupSharedUtil.GetFullPlayerName(contextData)
-									else
-										fullName = contextData.name
-									end
-									BFL:SecureSendTell(fullName)
-								end
-								return MenuResponse.Close
-							end)
-							break
-						end
-					end
-				end)
-			end
-
 			local function BFL_GetDisplayedInviteTypeSafe(guid)
 				if not guid or not GetDisplayedInviteType or BFL:IsSecret(guid) then
 					return nil
@@ -2484,8 +2444,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if not entry or entry.isInvitable == false or not entry.gameAccountID then
 					return false
 				end
-				if BFL.IsForever and not BFL.ValidateForeverInviteTarget(entry.raw or entry) then
-					return false
+				if BFL.IsForever then
+					local allowed, reason = BFL.ValidateForeverInviteTarget(entry.raw or entry)
+					if not allowed then return false, reason end
 				end
 
 				local inviteType = entry.inviteType or BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
@@ -2668,12 +2629,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end)
 			end
 
-			local function AddGroupsToFriendMenu(owner, rootDescription, contextData)
+			local function AddGroupsToFriendMenu(owner, rootDescription, contextData, verifiedFriend)
 				if not contextData or not rootDescription or not rootDescription.CreateButton then
 					return
 				end
 
 				local isOwnMenu = BFL_IsOwnMenuContext(contextData)
+				local hasBFLFriend = isOwnMenu or verifiedFriend ~= nil
 				local allowApiFallbacks = isOwnMenu or not BFL.HasSecretValues
 
 				-- Native Menu.ModifyMenu callbacks may receive secret-backed contextData on 12.x.
@@ -2682,7 +2644,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 
-				local bnetIDAccount = BFL_SafeContextValue(contextData, "bnetIDAccount")
+				local bnetIDAccount = BFL_NumberOrNil(BFL_SafeContextValue(contextData, "bnetIDAccount"))
 				local battleTag = BFL_SafeContextValue(contextData, "battleTag")
 				local contextName = BFL_SafeContextValue(contextData, "name")
 				local contextIndex = BFL_NumberOrNil(BFL_SafeContextValue(contextData, "index"))
@@ -2717,13 +2679,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local friendUID
-				local friendData
+				local friendData = verifiedFriend
 
 				-- Prefer BFL's already-cached FriendsList data. This is the only resolver used by
 				-- native secret-value menus.
 				local FriendsList = GetFriendsList()
 				if FriendsList and FriendsList.friendsList then
-					if contextUID then
+					if verifiedFriend then
+						friendUID = FriendsList:GetFriendUID(verifiedFriend)
+					elseif contextUID then
 						for _, friend in ipairs(FriendsList.friendsList) do
 							local cachedUID = friend.uid or FriendsList:GetFriendUID(friend)
 							if cachedUID == contextUID then
@@ -2901,7 +2865,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				local FriendTags = BFL:GetModule("FriendTags")
 				local tagFriendData
-				if isOwnMenu and FriendTags then
+				if hasBFLFriend and FriendTags then
 					if not friendData and bnetIDAccount and FriendsList and FriendsList.friendsList then
 						for _, f in ipairs(FriendsList.friendsList) do
 							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
@@ -2925,13 +2889,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local KnownCharacters = BFL:GetModule("KnownCharacters")
-				if isOwnMenu and KnownCharacters and not BFL:IsSecret(friendData) then
+				if hasBFLFriend and KnownCharacters and not BFL:IsSecret(friendData) then
 					KnownCharacters:PopulateMenu(rootDescription, friendData or {
 						battleTag = battleTag, type = (BFL:IsSecret(bnetIDAccount) or bnetIDAccount ~= nil) and "bnet" or "wow", name = contextName,
 					})
 				end
 				local ContactMemory = BFL:GetModule("ContactMemory")
-				if isOwnMenu and ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
+				if hasBFLFriend and ContactMemory and ContactMemory.IsEnabled and ContactMemory:IsEnabled() then
 					local contactKey = friendData and ContactMemory:ResolveContactKeyFromFriend(friendData)
 						or ContactMemory:ResolveContactKeyFromContext(contextData)
 						or ContactMemory:ResolveContactKeyFromFriend(friendUID)
@@ -2948,7 +2912,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 				end
 
-				if isOwnMenu and FriendTags and tagFriendData then
+				if hasBFLFriend and FriendTags and tagFriendData then
 					FriendTags:PopulateMenu(
 						rootDescription,
 						tagFriendData,
@@ -2960,10 +2924,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					)
 				end
 
-				-- Keep richer game-account controls on BFL-owned menus only. Native Blizzard
-				-- Menu.ModifyMenu callbacks append BFL group/nickname entries without mutating
-				-- or expanding Blizzard-owned menu behavior.
-				if bnetIDAccount and isOwnMenu then
+				if bnetIDAccount and hasBFLFriend then
 					if not friendData and FriendsList and FriendsList.friendsList then
 						for _, f in ipairs(FriendsList.friendsList) do
 							if f.type == "bnet" and f.bnetAccountID == bnetIDAccount then
@@ -3215,15 +3176,36 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				return nil, FriendsList
 			end
 
-			local function BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline)
+			local function BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline, nativeInvite, verifiedFriend)
 				if isOffline or not rootDescription or not contextData then
+					if nativeInvite then nativeInvite:SetEnabled(false) end
 					return
 				end
 
 				if isBNet then
-					local friendData, FriendsList = BFL_FindBNetFriendData(contextData)
+					local friendData, FriendsList
+					if verifiedFriend then
+						friendData, FriendsList = verifiedFriend, GetFriendsList()
+					else
+						friendData, FriendsList = BFL_FindBNetFriendData(contextData)
+					end
 					local accountEntries = friendData and FriendsList.GetInviteAccountEntries
 						and FriendsList:GetInviteAccountEntries(friendData)
+					local function CreateInvite(text, callback, enabled, reason)
+						if not nativeInvite then
+							return BFL.CreateMenuButton(rootDescription, text, callback, { enabled = enabled, tooltip = reason })
+						end
+						nativeInvite:SetResponder(callback)
+						BFL.Compat.SetMenuElementText(nativeInvite, text)
+						nativeInvite:SetEnabled(enabled)
+						if reason and nativeInvite.SetTooltip then
+							nativeInvite:SetTooltip(function(tooltip)
+								tooltip:SetText(text)
+								tooltip:AddLine(reason, 1, 0.25, 0.25, true)
+							end)
+						end
+						return nativeInvite
+					end
 					if friendData and ((accountEntries and #accountEntries > 0)
 						or (friendData.invitableAccounts and #friendData.invitableAccounts > 0)) then
 						local friendUID = FriendsList and FriendsList.GetFriendUID and FriendsList:GetFriendUID(friendData)
@@ -3243,9 +3225,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						end
 
 						local function InviteEntry(entry)
-							local didInvite = BFL_InvokeBNetInviteOrRequest(entry)
+							local didInvite, reason = BFL_InvokeBNetInviteOrRequest(entry)
 							if didInvite and friendUID and entry.gameAccountID and FriendsList.SetLastInvitedAccountID then
 								FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
+							elseif verifiedFriend and reason and UIErrorsFrame and UIErrorsFrame.AddExternalErrorMessage then
+								UIErrorsFrame:AddExternalErrorMessage(reason)
 							end
 						end
 
@@ -3259,10 +3243,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								end
 							end
 
-							local inviteMenu = rootDescription:CreateButton(
-								mixedInviteTypes and (TRAVEL_PASS_INVITE or PARTY_INVITE or INVITE or "Invite")
-									or (inviteText or BFL_GetInviteButtonText(nil))
-							)
+							local title = mixedInviteTypes and (TRAVEL_PASS_INVITE or PARTY_INVITE or INVITE or "Invite")
+								or (inviteText or BFL_GetInviteButtonText(nil))
+							local inviteMenu
+							if nativeInvite then
+								inviteMenu = CreateInvite(title, function() return MenuResponse.Open end, true)
+							else
+								inviteMenu = rootDescription:CreateButton(title)
+							end
 							for _, entry in ipairs(entries) do
 								local label = entry.text or entry.name or UNKNOWN or "Unknown"
 								if mixedInviteTypes and entry.inviteText then
@@ -3273,10 +3261,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								end, { enabled = entry.isInvitable ~= false, tooltip = entry.restrictionText })
 							end
 						elseif entries[1] then
-							BFL.CreateMenuButton(rootDescription, entries[1].inviteText or BFL_GetInviteButtonText(nil), function()
-								InviteEntry(entries[1])
-							end, { enabled = entries[1].isInvitable ~= false, tooltip = entries[1].restrictionText })
+							local entry = entries[1]
+							CreateInvite(entry.inviteText or BFL_GetInviteButtonText(nil), function()
+								InviteEntry(entry)
+							end, entry.isInvitable ~= false, entry.restrictionText)
+						elseif nativeInvite then
+							nativeInvite:SetEnabled(false)
 						end
+					elseif nativeInvite then
+						-- A native action without a readable BFL target cannot be validated.
+						nativeInvite:SetEnabled(false)
 					end
 					return
 				end
@@ -3702,6 +3696,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					isFavorite and (REMOVE_FAVORITE_STATUS or "Remove Favorite") or (ADD_FAVORITE_STATUS or "Add Favorite"),
 					function()
 						BNSetFriendFavoriteFlag(contextData.bnetIDAccount, not isFavorite)
+						if not isFavorite then
+							local hints = BFL:GetModule("FavoriteHints")
+							if hints then hints:OnAdded() end
+						end
 					end
 				)
 			end
@@ -3949,9 +3947,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					or menuType == "BN_FRIEND_OFFLINE"
 					or menuType == "FRIEND"
 					or menuType == "FRIEND_OFFLINE"
-				local isOfflineTitleFriend = isBNet
-					and BFL.IsOfflineTitleFriend
-					and BFL.IsOfflineTitleFriend(contextData, isOffline)
 				local menuTypeWrapper = contextData.bflWhoPlayerMenu and "WHO" or nil
 
 				createContextMenu(owner, function(ownerRegion, rootDescription)
@@ -3979,25 +3974,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
 
-					if ((not isOffline) or isBNet) and not isOfflineTitleFriend then
-						local canWhisper = not BFL.CanSendWhisper or BFL.CanSendWhisper()
-						local restrictionTooltip = not canWhisper
-							and BFL.GetAgeVerificationRestrictionTooltip
-							and BFL.GetAgeVerificationRestrictionTooltip()
-						local createButton = BFL.CreateMenuButton or function(root, text, callback)
-							return root:CreateButton(text, callback)
+					if not isBNet and not isOffline and (menuTypeWrapper == "WHO" or isRecentAlly or not isFriendMenu) then
+						local friendMenu = BFL:GetModule("NativeFriendMenu")
+						if friendMenu then
+							friendMenu:AddCharacterWhisperMenuItem(rootDescription, BFL_GetContextFullName(contextData), WHISPER or "Whisper")
 						end
-						createButton(rootDescription, WHISPER or "Whisper", function()
-							if isBNet then
-								BFL:SecureSendBNetTell(contextData.name, contextData.bnetIDAccount)
-							else
-								BFL:SecureSendTell(BFL_GetContextFullName(contextData))
-							end
-						end, {
-							enabled = canWhisper,
-							tooltip = restrictionTooltip,
-							tooltipTitle = WHISPER or "Whisper",
-						})
 					end
 
 					if not isOffline then
@@ -4049,7 +4030,103 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				return true
 			end
 
+			-- Build an addon-owned context. Supplying friendsList here gives BFL's own
+			-- actions their list context without changing the data used by native Whisper.
+			local function BFL_AddNativeFriendMenu(root, tag, row, friend, isBNet)
+				local friends = GetFriendsList()
+				local function Read(record, key)
+					return friends:GetReadableInviteField(record, key)
+				end
+				local index = Read(friend, "index")
+				local connected = Read(friend, "connected")
+				local context = {
+					name = Read(friend, "name"),
+					guid = Read(friend, "guid"),
+					uid = friends:GetFriendUID(friend),
+					index = index,
+					friendsIndex = index,
+					friendsList = isBNet or index,
+					isOffline = connected == false,
+					ownerFrame = row,
+				}
+				if isBNet then
+					context.bnetIDAccount = Read(friend, "bnetAccountID")
+					context.battleTag = Read(friend, "battleTag")
+					context.name = BFL_FirstSafeText(Read(friend, "accountName"), context.battleTag, Read(friend, "name"))
+					local gameAccount = Read(friend, "gameAccountInfo")
+					context.accountInfo = {
+						bnetAccountID = context.bnetIDAccount,
+						battleTag = context.battleTag,
+						accountName = context.name,
+						friendLevel = Read(friend, "friendLevel"),
+						isFavorite = Read(friend, "isFavorite"),
+						isFriend = true,
+						gameAccountInfo = gameAccount,
+					}
+					context.guid = Read(gameAccount, "playerGuid")
+				end
+
+				local elements = {}
+				for _, element in root:EnumerateElementDescriptions() do
+					local label = BFL.Compat.GetMenuElementText(element)
+					if not BFL:IsSecret(label) and type(label) == "string" then elements[label] = element end
+				end
+
+				local invite = elements[PARTY_INVITE] or elements[REQUEST_INVITE] or elements[SUGGEST_INVITE]
+					or elements[TRAVEL_PASS_INVITE_CROSS_FACTION] or elements[TRAVEL_PASS_INVITE] or elements[INVITE]
+				if isBNet or not invite then
+					BFL_AddInviteButton(root, context, isBNet, context.isOffline, invite, friend)
+				end
+
+				-- Blizzard omits list-only entries from player-link menus. Reuse the BFL
+				-- actions for missing labels and let existing native actions keep their handlers.
+				local missing = {}
+				local function Add(method, label, ...)
+					if elements[label] then return elements[label] end
+					local element = method(root, label, ...)
+					elements[label] = element
+					return element
+				end
+				function missing:CreateButton(label, ...)
+					return Add(root.CreateButton, label, ...)
+				end
+				if root.CreateRedHighlightButton then
+					function missing:CreateRedHighlightButton(label, ...)
+						return Add(root.CreateRedHighlightButton, label, ...)
+					end
+				end
+				BFL_AddSetNoteButton(missing, context, isBNet)
+				if isBNet then
+					BFL_AddSetCustomTitleFriendNameButton(missing, context)
+					BFL_AddUpgradeTitleFriendButton(missing, context)
+					BFL_AddViewBNetFriendsButton(missing, context)
+					BFL_AddFavoriteButton(missing, context)
+				end
+				BFL_AddRafSummonButton(missing, context, isBNet, context.isOffline)
+				BFL_AddViewHousesButton(missing, context, isBNet)
+				BFL_AddIgnoreOrBlockButton(missing, context, isBNet)
+				BFL_AddRemoveFriendButton(missing, context, isBNet)
+				BFL_AddReportButtons(missing, context, isBNet, false)
+				if not isBNet then BFL_AddPvpReportAfkButton(missing, context) end
+				BFL_ReplaceCopyNameButton(row, root, context, nil, true)
+				AddGroupsToFriendMenu(row, root, context, friend)
+
+				local bridge = BFL:GetModule("MenuBridge")
+				if bridge then
+					local menuType = isBNet and "BN_FRIEND" or "FRIEND"
+					if context.isOffline then menuType = menuType .. "_OFFLINE" end
+					bridge:PopulateMenu(row, root, context, menuType, tag)
+				end
+			end
+
 			if Menu and Menu.ModifyMenu then
+				local nativeFriendMenu = BFL:GetModule("NativeFriendMenu")
+				local hasNativeFriendMenu = nativeFriendMenu and nativeFriendMenu:IsSupported()
+				if hasNativeFriendMenu then
+					local bridge = BFL:GetModule("MenuBridge")
+					-- Track modifiers registered after ours even without the Companion.
+					if bridge then bridge:InstallModifyMenuDiagnostic() end
+				end
 				local groupMenuTags = {
 					"MENU_UNIT_BN_FRIEND",
 					"MENU_UNIT_BN_FRIEND_OFFLINE",
@@ -4073,7 +4150,26 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				for _, tag in ipairs(groupMenuTags) do
-					Menu.ModifyMenu(tag, AddGroupsToFriendMenu)
+					local isBNet = tag == "MENU_UNIT_BN_FRIEND" or tag == "MENU_UNIT_BN_FRIEND_OFFLINE"
+					local isWoW = tag == "MENU_UNIT_FRIEND" or tag == "MENU_UNIT_FRIEND_OFFLINE"
+					if isBNet or (hasNativeFriendMenu and isWoW) then
+						local menuTag = tag
+						Menu.ModifyMenu(menuTag, function(owner, root, context)
+							local row, friend
+							if hasNativeFriendMenu then row, friend = nativeFriendMenu:GetMenuFriend(context, isBNet) end
+							if isBNet and (row or BFL_SafeContextValue(context, "bflOrigin") == ADDON_NAME) then
+								local hints = BFL:GetModule("FavoriteHints")
+								if hints then hints:ObserveMenu(root) end
+							end
+							if row then
+								BFL_AddNativeFriendMenu(root, menuTag, row, friend, isBNet)
+								return
+							end
+							AddGroupsToFriendMenu(owner, root, context)
+						end)
+					else
+						Menu.ModifyMenu(tag, AddGroupsToFriendMenu)
+					end
 				end
 			end
 
@@ -4121,12 +4217,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_StreamerModeRenameTitle)
 				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_StreamerModeRenameTitle)
-
-				-- Legacy whisper responder replacement for BFL-owned pre-secret menus.
-				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceWhisperButton)
-				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND_OFFLINE", BFL_ReplaceWhisperButton)
-				Menu.ModifyMenu("MENU_UNIT_FRIEND", BFL_ReplaceWhisperButton)
-				Menu.ModifyMenu("MENU_UNIT_FRIEND_OFFLINE", BFL_ReplaceWhisperButton)
 
 				-- Fix "Copy Character Name" button (Must be registered BEFORE AddGroupsToFriendMenu)
 				Menu.ModifyMenu("MENU_UNIT_BN_FRIEND", BFL_ReplaceCopyNameButton)
@@ -4462,9 +4552,6 @@ function BetterFriendsFrame_ShowTab(tabIndex)
 	HideChildFrame(frame.RecruitAFriendFrame)
 	HideChildFrame(frame.ScrollFrame)
 	HideChildFrame(frame.MinimalScrollBar)
-	if BFL.IsInlineTaintFreeWhisperShown and BFL:IsInlineTaintFreeWhisperShown() then
-		BFL:CloseTaintFreeWhisper()
-	end
 	HideChildFrame(frame.AddFriendButton)
 	HideChildFrame(frame.SendMessageButton)
 	HideChildFrame(frame.RecruitmentButton)
@@ -5354,7 +5441,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 end
 
 -- Button OnClick Handler (matching Blizzard's FriendsFrame_SelectFriend behavior)
-function BetterFriendsList_Button_OnClick(button, mouseButton)
+function BetterFriendsList_Button_OnClick(button, mouseButton, skipWhisper)
 	if not button.friendData then
 		return
 	end
@@ -5424,11 +5511,13 @@ function BetterFriendsList_Button_OnClick(button, mouseButton)
 				FriendsListModule:UpdateSendMessageButton()
 			end
 
-			if FriendsListModule.HandleFriendWhisperClick then
+			if not skipWhisper and FriendsListModule.HandleFriendWhisperClick then
 				FriendsListModule:HandleFriendWhisperClick(button.friendData, "single")
 			end
 		end
 	elseif mouseButton == "RightButton" then
+		local friendMenu = BFL:GetModule("NativeFriendMenu")
+		if friendMenu and friendMenu:HandleUnavailableClick() then return end
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 
 		local friendData = button.friendData
@@ -6121,9 +6210,6 @@ function BetterFriendsFrame_ShowBottomTab(tabIndex)
 	-- Use hybrid helper functions
 	HideChildFrame(frame.ScrollFrame)
 	HideChildFrame(frame.MinimalScrollBar)
-	if BFL.IsInlineTaintFreeWhisperShown and BFL:IsInlineTaintFreeWhisperShown() then
-		BFL:CloseTaintFreeWhisper()
-	end
 	HideChildFrame(frame.AddFriendButton)
 	HideChildFrame(frame.SendMessageButton)
 	HideChildFrame(frame.RecruitmentButton)

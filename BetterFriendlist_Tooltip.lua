@@ -421,9 +421,12 @@ local function ShouldSafeGameAccountShowRichPresence(gameAccountInfo)
 end
 
 local function GetSafeGameAccountPresence(gameAccountInfo)
-	local presence = SafeString(GetGameAccountField(gameAccountInfo, "richPresence", nil), "")
+	local presence = BFL.GetGameAccountRichPresence(gameAccountInfo) or ""
 	if not BFL.IsWoWAccountRulesetLocation(gameAccountInfo) then return presence end
-	local location, _, realmEvidence = BFL.GetWoWAccountLocation(gameAccountInfo)
+	local location, _, realmEvidence, presenceArea = BFL.GetWoWAccountLocation(gameAccountInfo)
+	if presenceArea and location ~= "" then
+		return presenceArea .. "\n" .. BFL.L.RULESET_LABEL .. " " .. location
+	end
 	local replaced = 0
 	for _, realm in ipairs({
 		SafeString(GetGameAccountField(gameAccountInfo, "realmDisplayName", nil), ""),

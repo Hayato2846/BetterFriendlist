@@ -102,6 +102,15 @@ local function ValidateDialogInput(editBox, isRename)
 	end
 end
 
+local function CreateGroupFromDialog(editBox, friendUID)
+	local groups = BFL:GetModule("Groups")
+	local friends = BFL:GetModule("FriendsList")
+	local name = editBox:GetText()
+	if groups and friends and groups:ValidateGroupName(name) then
+		return friends:CreateGroup(name, friendUID)
+	end
+end
+
 function Dialogs:RegisterDialogs()
 	-- Dialog for creating a new group
 	StaticPopupDialogs["BETTER_FRIENDLIST_CREATE_GROUP"] = {
@@ -110,34 +119,13 @@ function Dialogs:RegisterDialogs()
 		button2 = L.DIALOG_CREATE_GROUP_BTN2,
 		hasEditBox = true,
 		OnAccept = function(self)
-			local groupName = self.EditBox:GetText()
-			local Groups = BFL:GetModule("Groups")
-			if Groups then
-				local isValid = Groups:ValidateGroupName(groupName)
-				if isValid then
-					local success, groupId = Groups:Create(groupName)
-					if success then
-						BFL:ForceRefreshFriendsList()
-					end
-				end
-			end
+			CreateGroupFromDialog(self.EditBox)
 		end,
 		EditBoxOnTextChanged = function(self)
 			ValidateDialogInput(self, false)
 		end,
 		EditBoxOnEnterPressed = function(self)
-			local parent = self:GetParent()
-			local groupName = self:GetText()
-			local Groups = BFL:GetModule("Groups")
-			if Groups then
-				-- Double check validation before proceeding on Enter
-				local isValid = Groups:ValidateGroupName(groupName)
-				if isValid then
-					Groups:Create(groupName)
-					BFL:ForceRefreshFriendsList()
-					parent:Hide()
-				end
-			end
+			if CreateGroupFromDialog(self) then self:GetParent():Hide() end
 		end,
 		EditBoxOnEscapePressed = function(self)
 			self:GetParent():Hide()
@@ -159,38 +147,14 @@ function Dialogs:RegisterDialogs()
 		button2 = L.DIALOG_CREATE_GROUP_BTN2,
 		hasEditBox = true,
 		OnAccept = function(self, friendUID)
-			local groupName = self.EditBox:GetText()
-			local Groups = BFL:GetModule("Groups")
-			if Groups then
-				local isValid = Groups:ValidateGroupName(groupName)
-				if isValid then
-					local success, groupId = Groups:Create(groupName)
-					if success then
-						Groups:ToggleFriendInGroup(friendUID, groupId)
-						BFL:ForceRefreshFriendsList()
-					end
-				end
-			end
+			CreateGroupFromDialog(self.EditBox, friendUID)
 		end,
 		EditBoxOnTextChanged = function(self)
 			ValidateDialogInput(self, false)
 		end,
 		EditBoxOnEnterPressed = function(self, friendUID)
 			local parent = self:GetParent()
-			local groupName = self:GetText()
-			local Groups = BFL:GetModule("Groups")
-			if Groups then
-				-- Double check validation
-				local isValid = Groups:ValidateGroupName(groupName)
-				if isValid then
-					local success, groupId = Groups:Create(groupName)
-					if success then
-						Groups:ToggleFriendInGroup(friendUID, groupId)
-						BFL:ForceRefreshFriendsList()
-						parent:Hide()
-					end
-				end
-			end
+			if CreateGroupFromDialog(self, friendUID or parent.data) then parent:Hide() end
 		end,
 		EditBoxOnEscapePressed = function(self)
 			self:GetParent():Hide()

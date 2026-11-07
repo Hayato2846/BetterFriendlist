@@ -983,9 +983,8 @@ end
 -- ========================================
 -- SECURE ATTRIBUTES SYSTEM
 -- ========================================
--- SecretValues builds route raid member interactions through a UIParent proxy.
--- Its secure "togglemenu" action resolves raid units to RAID_PLAYER in both UI
--- layouts. Pre-secret clients keep the visual button fallback.
+-- A secure UIParent proxy forwards right clicks to Blizzard's raid roster
+-- button when available. Secure "togglemenu" remains the fallback.
 
 local RAID_SHORTCUT_MODIFIERS = {
 	["SHIFT"] = "shift-",
@@ -1440,6 +1439,7 @@ function RaidFrame:RegisterEvents()
 	end, 50)
 
 	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function(...)
+		RaidFrame:HideSecureProxy()
 		RaidFrame:OnRaidRosterUpdate(...)
 	end, 50)
 
@@ -2629,6 +2629,7 @@ end
 
 function RaidFrame:OnGroupLeft(...)
 	-- Clear member list
+	self:HideSecureProxy()
 	wipe(self.raidMembers)
 	wipe(self.displayList)
 	self.selectedMember = nil
@@ -2803,16 +2804,16 @@ end
 	5. Comprehensive presets for different scenarios
 	
 	Commands:
-	- /bfl raid mock           - Create 25-player raid (5 groups)
-	- /bfl raid mock full      - Create full 40-player raid (8 groups)
-	- /bfl raid mock small     - Create 10-player raid (2 groups)
-	- /bfl raid mock mythic    - Create 20-player mythic raid (4 groups)
-	- /bfl raid mock stress    - Create 40 players with rapid changes
-	- /bfl raid event readycheck - Simulate ready check
-	- /bfl raid event rolechange - Simulate role changes
-	- /bfl raid event move      - Simulate player group moves
-	- /bfl raid config         - Show/set mock configuration
-	- /bfl raid clear          - Remove mock data
+	- /bflraid mock           - Create 25-player raid (5 groups)
+	- /bflraid mock full      - Create full 40-player raid (8 groups)
+	- /bflraid mock small     - Create 10-player raid (2 groups)
+	- /bflraid mock mythic    - Create 20-player mythic raid (4 groups)
+	- /bflraid mock stress    - Create 40 players with rapid changes
+	- /bflraid event readycheck - Simulate ready check
+	- /bflraid event rolechange - Simulate role changes
+	- /bflraid event move      - Simulate player group moves
+	- /bflraid config         - Show/set mock configuration
+	- /bflraid clear          - Remove mock data
 ]]
 
 -- ============================================
@@ -3722,7 +3723,7 @@ end
 -- SLASH COMMAND HANDLER
 -- ============================================
 
--- Legacy slash command (redirects to /bfl raid)
+-- /bflmock is an alias for /bflraid.
 SLASH_BFLMOCKRAID1 = "/bflmock"
 SLASH_BFLRAIDFRAME1 = "/bflraid"
 SlashCmdList["BFLMOCKRAID"] = function(msg)
@@ -3779,9 +3780,9 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 			RaidFrame:SimulateGroupMoves()
 		else
 			BFL:DebugPrint(BFL.L.RAID_EVENT_COMMANDS)
-			BFL:DebugPrint("  |cffffcc00/bfl raid event readycheck|r - Simulate ready check")
-			BFL:DebugPrint("  |cffffcc00/bfl raid event rolechange|r - Simulate role changes")
-			BFL:DebugPrint("  |cffffcc00/bfl raid event move|r - Shuffle players between groups")
+			BFL:DebugPrint("  |cffffcc00/bflraid event readycheck|r - Simulate ready check")
+			BFL:DebugPrint("  |cffffcc00/bflraid event rolechange|r - Simulate role changes")
+			BFL:DebugPrint("  |cffffcc00/bflraid event move|r - Shuffle players between groups")
 		end
 	elseif cmd == "config" then
 		local setting = args[2] and args[2]:lower()
@@ -3809,8 +3810,8 @@ SlashCmdList["BFLRAIDFRAME"] = function(msg)
 			BFL:DebugPrint(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, RaidFrame.mockConfig.updateInterval))
 			BFL:DebugPrint(string.format(BFL.L.RAID_MEMBERS_STATUS, #RaidFrame.raidMembers))
 			BFL:DebugPrint("")
-			BFL:DebugPrint("  |cffffcc00/bfl raid config dynamic on|off|r")
-			BFL:DebugPrint("  |cffffcc00/bfl raid config interval <seconds>|r")
+			BFL:DebugPrint("  |cffffcc00/bflraid config dynamic <on/off>|r")
+			BFL:DebugPrint("  |cffffcc00/bflraid config interval <seconds>|r")
 		end
 	elseif cmd == "clear" then
 		RaidFrame:ClearMockData()
@@ -3914,7 +3915,12 @@ function RaidFrame:CreateSecureProxy()
 		return self.SecureProxy
 	end
 
-	local proxy = CreateFrame("Button", "BFL_RaidFrame_SecureProxy", UIParent, "SecureActionButtonTemplate")
+	local proxy = CreateFrame(
+		"Button",
+		"BFL_RaidFrame_SecureProxy",
+		UIParent,
+		"SecureActionButtonTemplate,SecureHandlerStateTemplate"
+	)
 	proxy:SetFrameStrata("DIALOG")
 	proxy:SetFrameLevel(9999)
 	proxy:SetAttribute("useOnKeyDown", false)
@@ -3951,37 +3957,21 @@ function RaidFrame:CreateSecureProxy()
 		end
 	end)
 
-	proxy:SetScript("OnLeave", function(self)
-		local visualButton = self.visualButton
-		if visualButton and visualButton.Highlight then
-			visualButton.Highlight:Hide()
-		end
-		if GameTooltip and GameTooltip:GetOwner() == self then
-			GameTooltip:Hide()
-		end
-		self:Hide()
-		self:ClearAllPoints()
-		self.visualButton = nil
-		self.unit = nil
-		self.name = nil
-		self.id = nil
-		self.groupIndex = nil
-		self.slotIndex = nil
+	proxy:SetScript("OnLeave", function()
+		self:HideSecureProxy()
 	end)
 
-	proxy:RegisterEvent("PLAYER_REGEN_DISABLED")
-	proxy:SetScript("OnEvent", function(self, event)
-		if event == "PLAYER_REGEN_DISABLED" then
-			self:Hide()
-			self:ClearAllPoints()
-			self.visualButton = nil
-		end
-	end)
+	-- Combat can begin with the cursor still over the proxy. Hide it from a
+	-- secure state handler so the action cannot survive a raid roster change.
+	proxy:SetAttribute("_onstate-combat", [[
+		if newstate == "combat" then self:Hide() end
+	]])
+	RegisterStateDriver(proxy, "combat", "[combat] combat; nocombat")
 
 	proxy:SetScript("PostClick", function(self, button)
 		local visualButton = self.visualButton
 		if visualButton and BetterRaidMemberButton_PostClick then
-			BetterRaidMemberButton_PostClick(visualButton, button)
+			BetterRaidMemberButton_PostClick(visualButton, button, true)
 		end
 	end)
 
@@ -3989,19 +3979,71 @@ function RaidFrame:CreateSecureProxy()
 	return proxy
 end
 
+function RaidFrame:HideSecureProxy()
+	local proxy = self.SecureProxy
+	local visualButton = proxy and proxy.visualButton
+	if not visualButton then return end
+	proxy.visualButton = nil
+	proxy.unit = nil
+	proxy.name = nil
+	proxy.id = nil
+	proxy.groupIndex = nil
+	proxy.slotIndex = nil
+	if visualButton.Highlight then visualButton.Highlight:Hide() end
+	if GameTooltip and GameTooltip:GetOwner() == proxy then GameTooltip:Hide() end
+	if not InCombatLockdown() then
+		proxy:Hide()
+		proxy:ClearAllPoints()
+		proxy:SetAttribute("clickbutton2", nil)
+	end
+end
+
+local function IsBlizzardRaidButtonRestricted(target, method, ...)
+	local check = target[method]
+	if not check then return false end
+	local ok, result = pcall(check, target, ...)
+	return not ok or BFL:IsSecret(result) or result == true
+end
+
+local function GetBlizzardRaidButton(unit, index, rosterName)
+	if not _G.RaidGroupButton1 then
+		-- Blizzard normally loads and populates this roster on login or a
+		-- group update. A late load can leave the rows unnamed until Blizzard
+		-- refreshes them, so the identity check below must still pass.
+		local loadAddOn = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+		if loadAddOn then pcall(loadAddOn, "Blizzard_RaidUI") end
+	end
+	local target = _G["RaidGroupButton" .. index]
+	if BFL:IsSecret(target) or not target or IsBlizzardRaidButtonRestricted(target, "IsForbidden")
+		or IsBlizzardRaidButtonRestricted(target, "HasAccessConstraints")
+	then return end
+	local scriptedInput = Enum and Enum.ForbiddenAspect and Enum.ForbiddenAspect.ScriptedInput
+	if scriptedInput and IsBlizzardRaidButtonRestricted(target, "HasAnyForbiddenAspects", scriptedInput) then return end
+	local targetUnit, targetName = target.unit, target.name
+	if BFL:IsSecret(targetUnit) or BFL:IsSecret(targetName)
+		or targetUnit ~= unit or targetName ~= rosterName or not target.Click
+	then return end
+	return target
+end
+
 function RaidFrame:ShowSecureProxyForButton(button)
-	if not BFL.HasSecretValues then
+	if InCombatLockdown() or not RegisterStateDriver then
 		return false
 	end
-	if InCombatLockdown() then
+	if not button or (button.memberData and button.memberData._isMock)
+		or button.pendingName or BFL:IsSecret(button.name) or IsPendingRaidRosterName(button.name)
+	then
 		return false
 	end
-	if not button or not button.unit or button.pendingName or IsPendingRaidRosterName(button.name) then
+	local unit = button.unit
+	local index = not BFL:IsSecret(unit) and type(unit) == "string" and tonumber(unit:match("^raid(%d+)$"))
+	if not index or index < 1 or index > RAID_MEMBERS_TO_DISPLAY or not UnitExists(unit) then
 		return false
 	end
-	if not UnitExists(button.unit) then
-		return false
-	end
+	local rosterName = GetRaidRosterInfo(index)
+	if BFL:IsSecret(rosterName) or rosterName ~= button.name then return false end
+	local target = GetBlizzardRaidButton(unit, index, rosterName)
+	if not target and not BFL.HasSecretValues then return false end
 
 	local proxy = self:CreateSecureProxy()
 	if not proxy then
@@ -4015,18 +4057,18 @@ function RaidFrame:ShowSecureProxyForButton(button)
 	proxy.groupIndex = button.groupIndex
 	proxy.slotIndex = button.slotIndex
 
-	proxy:SetAttribute("unit", button.unit)
+	proxy:SetAttribute("unit", unit)
 	proxy:SetAttribute("*type1", nil)
 	proxy:SetAttribute("type1", nil)
-	proxy:SetAttribute("type2", "togglemenu")
-	proxy.BFL_RaidContextMenuType = "RAID_PLAYER"
+	proxy:SetAttribute("clickbutton2", target)
+	proxy:SetAttribute("type2", target and "click" or "togglemenu")
+	proxy.BFL_RaidContextMenuType = target and "RAID" or "RAID_PLAYER"
 
 	local DB = BFL and BFL:GetModule("DB")
 	ApplyRaidShortcutAttributes(proxy, DB and DB:Get("raidShortcuts") or {})
 
 	if not self:PositionSecureProxyForButton(proxy, button) then
-		proxy:Hide()
-		proxy.visualButton = nil
+		self:HideSecureProxy()
 		return false
 	end
 	proxy:Show()
@@ -4035,7 +4077,8 @@ end
 
 function RaidFrame:ApplyMemberContextMenuAttributes(button)
 	button.BFL_RaidContextMenuType = "RAID_PLAYER"
-	button:SetAttribute("type2", BFL.HasSecretValues and nil or "togglemenu")
+	local fallback = not BFL.HasSecretValues and "togglemenu" or nil
+	button:SetAttribute("type2", fallback)
 end
 
 function RaidFrame:ResolveMemberButton(frame)
@@ -4106,7 +4149,7 @@ end
     
     Testing:
     - RaidFrame:CreateMockRaidData()
-    - /bflmock raid - Slash command
+    - /bflmock mock - Slash command
 ]]
 
 function RaidFrame:ResolveReadyCheckButtonState(enabled, inGroup, inRaid, isLeader, isAssistant, inCombat)

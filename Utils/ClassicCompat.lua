@@ -494,6 +494,20 @@ function Compat.CreateMenuButton(rootDescription, text, callback, options)
 	return element
 end
 
+function Compat.SupportsNativeMenuExtensions()
+	return Menu and type(Menu.ModifyMenu) == "function" and MenuUtil
+		and type(MenuUtil.GetElementText) == "function" and type(MenuUtil.SetElementText) == "function"
+end
+
+function Compat.GetMenuElementText(element)
+	if not (MenuUtil and MenuUtil.GetElementText) then return element.text end
+	return MenuUtil.GetElementText(element)
+end
+
+function Compat.SetMenuElementText(element, text)
+	MenuUtil.SetElementText(element, text)
+end
+
 function Compat.StyleSimpleMenuCheckbox(element)
 	if not (BFL.IsClassic and element and element.AddInitializer) then
 		return
@@ -572,6 +586,10 @@ local function RunSimpleMenuItem(item, value)
 	if type(item.func) == "function" then
 		return item.func(value)
 	end
+	if item.type == "whisper" then
+		local friendMenu = BFL:GetModule("NativeFriendMenu")
+		if friendMenu then friendMenu:ShowWhisperUnavailable() end
+	end
 end
 
 function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
@@ -592,6 +610,11 @@ function Compat.PopulateSimpleMenu(rootDescription, itemsOrFactory)
 				else
 					local title = rootDescription:CreateButton(item.text or "", function() end)
 					SetSimpleMenuElementEnabled(title, false)
+				end
+			elseif itemType == "whisper" then
+				local friendMenu = BFL:GetModule("NativeFriendMenu")
+				if friendMenu then
+					friendMenu:AddCharacterWhisperMenuItem(rootDescription, item.whisperTarget, item.text)
 				end
 			elseif GetSimpleMenuChildren(item) then
 				local element = rootDescription:CreateButton(item.text or "")
@@ -1638,6 +1661,10 @@ local FOREVER_RULESET_LABEL_KEYS = {
 	PVE = "RULESET_TYPE_NORMAL", PVP = "RULESET_TYPE_PVP",
 	RP = "RULESET_TYPE_RP", RPPVP = "RULESET_TYPE_RPPVP",
 }
+local FOREVER_PRESENCE_RULESET_TOKENS = {
+	NORMAL = "PVE", PVE = "PVE", PVP = "PVP", RP = "RP",
+	RPPVP = "RPPVP", ["RP-PVP"] = "RPPVP", ["RP PVP"] = "RPPVP",
+}
 -- BFL's own restriction values 0..13 are used by its invite UI. Do not extend
 -- Blizzard's BattleNetFriendPartyInviteRestrictionType or priority tables.
 BFL.INVITE_RESTRICTION_RULESET = 14
@@ -1688,6 +1715,18 @@ end
 
 local function GetForeverPresenceRuleset(richPresence)
 	if not IsSafeNameValue(richPresence) then return nil end
+	-- Retail also receives the user-observed "Forever · Normal · Ashenvale"
+	-- form without any realm fields. Read only its explicit ruleset segment.
+	if #richPresence <= 2048 and not richPresence:find("[%c]") then
+		local normalized = richPresence:gsub("%s+·%s+", " - ")
+		local prefix, ruleset, area = normalized:match("^%s*(.-)%s+%-%s+(.-)%s+%-%s+(.+)$")
+		if prefix and prefix:upper() == "FOREVER" and not area:find(" - ", 1, true) then
+			ruleset = ruleset:match("^%s*(.-)%s*$")
+			area = area:match("^%s*(.-)%s*$")
+			local token = FOREVER_PRESENCE_RULESET_TOKENS[ruleset:upper()]
+			if token and area ~= "" then return token, ruleset, area end
+		end
+	end
 	-- FriendsList already reads "Zone - Realm" from this target's own native
 	-- rich presence. Accept only a CAMWOW realm suffix, never arbitrary PvP text
 	-- in an area/status or a caller's fallback realm (which may be unrelated).
@@ -1704,23 +1743,38 @@ end
 local function GetForeverAccountRuleset(gameAccountInfo)
 	local realm = gameAccountInfo.realmName
 	local token = GetForeverRealmRuleset(realm)
+	local area
 	if not token then
 		realm = gameAccountInfo.realmDisplayName
 		token = GetForeverRealmRuleset(realm)
 	end
 	if not token then
-		token, realm = GetForeverPresenceRuleset(gameAccountInfo.richPresence)
+		token, realm, area = GetForeverPresenceRuleset(gameAccountInfo.richPresence)
 	end
-	return token, realm
+	return token, realm, area
+end
+
+-- Display only. Ignore a recognized Forever status when the account's project
+-- already identifies another WoW client, even if its area is still missing.
+function Compat.GetGameAccountRichPresence(gameAccountInfo)
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return nil end
+	local presence = gameAccountInfo.richPresence
+	if not IsSafeNameValue(presence) then return nil end
+	local project, client = gameAccountInfo.wowProjectID, gameAccountInfo.clientProgram
+	if BFL.IsSecret and (BFL:IsSecret(project) or BFL:IsSecret(client)) then return nil end
+	if client == (BNET_CLIENT_WOW or "WoW") and type(project) == "number"
+		and project ~= FOREVER_PROJECT_ID and GetForeverPresenceRuleset(presence)
+	then return nil end
+	return presence
 end
 
 local function GetForeverRulesetLabel(gameAccountInfo)
-	local token, realm = GetForeverAccountRuleset(gameAccountInfo)
+	local token, realm, area = GetForeverAccountRuleset(gameAccountInfo)
 	-- RealmList's native labels belong to GlueXML and are not guaranteed in
 	-- the in-game addon environment. Use BFL's always-loaded locale catalog.
 	local key = token and FOREVER_RULESET_LABEL_KEYS[token]
 	local label = key and BFL.L and BFL.L[key]
-	if IsSafeNameValue(label) then return label, realm end
+	if IsSafeNameValue(label) then return label, realm, area end
 	return "", nil
 end
 
@@ -1829,7 +1883,8 @@ end
 -- Display only: never substitute this result for a realm in character names,
 -- contact keys, invites or account identity. Forever publishes no target
 -- ruleset field; recognize the user-verified type tokens in that account's
--- own realm text instead. Unknown text stays empty, without player-rule data.
+-- own realm or structured presence text instead. The optional fourth result
+-- is that presence's area. Unknown text stays empty, without player-rule data.
 function Compat.GetWoWAccountLocation(gameAccountInfo, fallbackRealm)
 	local kind = Compat.IsWoWAccountRulesetLocation(gameAccountInfo) and "ruleset" or "realm"
 	if BFL.IsSecret and BFL:IsSecret(gameAccountInfo) then
@@ -1848,9 +1903,9 @@ function Compat.GetWoWAccountLocation(gameAccountInfo, fallbackRealm)
 		end
 	end
 	if kind == "ruleset" then
-		local label, realm
-		if gameAccountInfo then label, realm = GetForeverRulesetLabel(gameAccountInfo) end
-		return label or "", kind, realm
+		local label, realm, area
+		if gameAccountInfo then label, realm, area = GetForeverRulesetLabel(gameAccountInfo) end
+		return label or "", kind, realm, area
 	end
 	if gameAccountInfo then
 		if IsSafeNameValue(gameAccountInfo.realmDisplayName) then
@@ -4012,6 +4067,7 @@ BFL.GetBNetFriendInfo = Compat.GetBNetFriendInfo
 BFL.GetBNetFriendGameAccountInfo = Compat.GetBNetFriendGameAccountInfo
 BFL.IsWoWAccountRulesetLocation = Compat.IsWoWAccountRulesetLocation
 BFL.GetWoWAccountLocation = Compat.GetWoWAccountLocation
+BFL.GetGameAccountRichPresence = Compat.GetGameAccountRichPresence
 BFL.GetForeverRulesetInviteRestriction = Compat.GetForeverRulesetInviteRestriction
 BFL.ValidateForeverInviteTarget = Compat.ValidateForeverInviteTarget
 Compat.IsReadableGameAccountInfo = IsReadableGameAccountInfo

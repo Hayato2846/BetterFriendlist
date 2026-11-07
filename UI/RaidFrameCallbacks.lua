@@ -238,6 +238,9 @@ end
 
 -- OnHide: Cleanup
 function BetterRaidFrame_OnHide(self)
+	local RaidFrame = GetRaidFrame()
+	if RaidFrame then RaidFrame:HideSecureProxy() end
+
 	-- Clear multi-selections on hide (Phase 8.2)
 	ClearAllSelections()
 
@@ -806,7 +809,7 @@ function BetterRaidMemberButton_OnLeave(self)
 	end
 end
 
-function BetterRaidMemberButton_PostClick(self, button)
+function BetterRaidMemberButton_PostClick(self, button, routedByProxy)
 	-- PostClick wird NACH Attribute-Verarbeitung aufgerufen
 	-- Hier ist sicher, dass Secure Attributes bereits verarbeitet wurden
 
@@ -850,10 +853,9 @@ function BetterRaidMemberButton_PostClick(self, button)
 			ClearAllSelections()
 		end
 	elseif button == "RightButton" then
-		-- RightButton: Context menu is handled by the secure "togglemenu" action.
-		-- PostClick still runs after the secure action; on Retail SecretValues builds,
-		-- reopening UnitPopup from addon Lua taints protected entries like Set Focus.
-		if not IsModifierKeyDown() and self.unit then
+		-- The proxy has already opened the menu. Keep the visual row fallback
+		-- for pre-secret clients when the proxy could not be set up.
+		if not routedByProxy and not IsModifierKeyDown() and self.unit then
 			if BFL.HasSecretValues then
 				return
 			end

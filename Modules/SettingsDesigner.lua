@@ -587,7 +587,9 @@ end
 
 local function RefreshGuild()
 	local GuildFrame = BFL:GetModule("GuildFrame")
-	if GuildFrame and GuildFrame.Refresh then
+	if GuildFrame and GuildFrame.RefreshSettings then
+		GuildFrame:RefreshSettings()
+	elseif GuildFrame and GuildFrame.Refresh then
 		GuildFrame:Refresh()
 	end
 	if CallSettings("RefreshGuildTabVisibility") then
@@ -777,10 +779,8 @@ local NEW_TAGS = {
 	["externalMenuBridgeEnabled"] = true,
 	["groups.order"] = true,
 	["groups.quickfilter.editor"] = true,
-	["privacy.whisper"] = true,
 	["social.guild"] = true,
 	["syncGroupsToNote"] = true,
-	["taintFreeWhisper"] = true,
 }
 
 local function GetSeenNewTags()
@@ -1186,7 +1186,7 @@ local function RefreshBrokerDisplays()
 		if Broker.UpdateText then
 			Broker:UpdateText()
 		elseif Broker.UpdateBrokerText then
-			Broker:UpdateBrokerText()
+			Broker:UpdateBrokerText(true)
 		end
 		if Broker.RefreshTooltip then
 			Broker:RefreshTooltip()
@@ -1197,7 +1197,7 @@ local function RefreshBrokerDisplays()
 		if GuildBroker.UpdateText then
 			GuildBroker:UpdateText()
 		elseif GuildBroker.UpdateBrokerText then
-			GuildBroker:UpdateBrokerText()
+			GuildBroker:UpdateBrokerText(true)
 		end
 		if GuildBroker.RefreshTooltip then
 			GuildBroker:RefreshTooltip()
@@ -2325,7 +2325,7 @@ local function AddInput(pageID, data)
 			if data.setValue then
 				data.setValue(value)
 			else
-				SetDB(data.key, value, data.after)
+				SetViaSettings(data.key, value, data.method, data.after)
 			end
 		end,
 	})
@@ -4202,8 +4202,8 @@ local function RegisterSocialPages()
 	RegisterPage({ id = "social.guild", category = "social", title = T("SETTINGS_CENTER_PAGE_SOCIAL_GUILD", GUILD or "Guild"), iconKey = "bfl-social-guild", mainToggleID = "enableGuildTab", order = 120, visibleWhen = IsGuildTabVisible, newTagID = "social.guild" })
 	AddGroup("social.guild", "guild", T("SETTINGS_GUILD_ROSTER_HEADER", "Roster Defaults"), 100)
 	AddToggle("social.guild", { key = "enableGuildTab", group = "guild", label = T("SETTINGS_ENABLE_GUILD_TAB", "Enable Guild Tab"), desc = T("SETTINGS_ENABLE_GUILD_TAB_DESC", "Show the BetterFriendlist Guild tab."), default = false, order = 100, method = "OnEnableGuildTabChanged", refreshOnChange = true, newTagID = "enableGuildTab" })
-	AddDropdown("social.guild", { key = "guildTabFilterMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_FILTER", "Default Filter"), list = guildFilterList, orderList = guildFilterOrder, default = "online", order = 110, after = RefreshGuild })
-	AddDropdown("social.guild", { key = "guildTabSortMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_SORT", "Default Sort"), list = guildSortList, orderList = guildSortOrder, default = "rank", order = 120, after = RefreshGuild })
+	AddDropdown("social.guild", { key = "guildTabFilterMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_FILTER", "Default Filter"), list = guildFilterList, orderList = guildFilterOrder, default = "online", order = 110, method = "OnGuildFilterModeChanged" })
+	AddDropdown("social.guild", { key = "guildTabSortMode", group = "guild", label = T("SETTINGS_GUILD_DEFAULT_SORT", "Default Sort"), list = guildSortList, orderList = guildSortOrder, default = "rank", order = 120, method = "OnGuildSortModeChanged" })
 	AddToggle("social.guild", { key = "guildTabShowClassIcons", group = "guild", label = T("SETTINGS_GUILD_SHOW_CLASS_ICONS", "Show Class Icons"), default = true, order = 130, after = RefreshGuild })
 	AddToggle("social.guild", { key = "guildTabUseNicknames", group = "guild", label = T("SETTINGS_GUILD_USE_NICKNAMES", "Use BFL Guild Nicknames"), default = true, order = 140, after = RefreshGuild })
 end
@@ -4345,13 +4345,9 @@ end
 local function RegisterPrivacyPages()
 	RegisterPage({ id = "privacy.streamer", category = "privacy", title = T("SETTINGS_CENTER_PAGE_PRIVACY_STREAMER", "Streamer Mode"), iconKey = "bfl-privacy-streamer", mainToggleID = "showStreamerModeButton", order = 100 })
 	AddGroup("privacy.streamer", "streamer", T("SETTINGS_TAB_STREAMER", "Streamer Mode"), 100)
-	AddToggle("privacy.streamer", { key = "showStreamerModeButton", group = "streamer", label = T("SETTINGS_ENABLE_STREAMER_MODE", "Show Streamer Mode Button"), default = true, order = 100, after = RefreshFriends })
-	AddInput("privacy.streamer", { key = "streamerModeHeaderText", group = "streamer", label = T("SETTINGS_STREAMER_HEADER_TEXT", "Header Text"), default = "Streamer Mode", inputWidth = 260, maxChars = 32, order = 110, after = RefreshFriends })
+	AddToggle("privacy.streamer", { key = "showStreamerModeButton", group = "streamer", label = T("SETTINGS_ENABLE_STREAMER_MODE", "Show Streamer Mode Button"), default = true, order = 100, method = "OnShowStreamerModeButtonChanged" })
+	AddInput("privacy.streamer", { key = "streamerModeHeaderText", group = "streamer", label = T("SETTINGS_STREAMER_HEADER_TEXT", "Header Text"), default = "Streamer Mode", inputWidth = 260, maxChars = 32, order = 110, method = "OnStreamerModeHeaderTextChanged" })
 	AddDropdown("privacy.streamer", { key = "streamerModeNameFormat", group = "streamer", label = T("SETTINGS_STREAMER_NAME_FORMAT", "Name Formatting"), desc = T("SETTINGS_STREAMER_NAME_FORMAT_DESC", "Choose how names are displayed in Streamer Mode."), list = { battletag = T("SETTINGS_STREAMER_NAME_FORMAT_BATTLENET", "Force BattleTag"), nickname = T("SETTINGS_STREAMER_NAME_FORMAT_NICKNAME", "Force Nickname"), note = T("SETTINGS_STREAMER_NAME_FORMAT_NOTE", "Force Note") }, orderList = { "battletag", "nickname", "note" }, default = "battletag", order = 120, after = RefreshFriends })
-
-	RegisterPage({ id = "privacy.whisper", category = "privacy", title = T("SETTINGS_CENTER_PAGE_PRIVACY_WHISPER", "Whisper"), iconKey = "bfl-privacy-whisper", mainToggleID = "taintFreeWhisper", order = 110, newTagID = "privacy.whisper" })
-	AddGroup("privacy.whisper", "whisper", T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), 100)
-	AddToggle("privacy.whisper", { key = "taintFreeWhisper", group = "whisper", label = T("SETTINGS_TAINT_FREE_WHISPER", "Taint-Free Whisper"), desc = T("SETTINGS_TAINT_FREE_WHISPER_DESC", "Use a BFL-owned whisper box without changing Blizzard chat."), default = false, order = 100, newTagID = "taintFreeWhisper", after = function(value) if not value and BFL.CloseTaintFreeWhisper then BFL:CloseTaintFreeWhisper(true) end end })
 
 	RegisterPage({ id = "privacy.notes", category = "privacy", title = T("CONTACT_MEMORY_TITLE", "Private Notes"), iconKey = "bfl-privacy-whisper", mainToggleID = "contactMemory.enabled", order = 120 })
 	RegisterPage({ id = "privacy.characters", category = "privacy", title = L.KC_TITLE, iconKey = "bfl-privacy-whisper", mainToggleID = "knownCharacters.enabled", order = 130, newTagID = "privacy.characters" })

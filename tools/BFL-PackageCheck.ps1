@@ -18,11 +18,13 @@ $compatAllowedPathPatterns = @(
     # This standalone test runs Blizzard's native queue helpers in a mocked
     # environment. tools/ is excluded from deployment and release packages.
     '^tools/BFL-ContextMenuSectionsSmoke\.lua$',
+    # The raid smoke test mocks the native menu call in its own Lua environment.
+    '^tools/BFL-RaidMenuSmoke\.lua$',
     '^Libs/LibSettingsDesigner/'
 )
 
 $compatViolations = @()
-$luaFiles = & git ls-files '*.lua'
+$luaFiles = & git ls-files '*.lua' | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
 
 Write-Host ''
 Write-Host '[BFL] Blizzard global ownership guard'

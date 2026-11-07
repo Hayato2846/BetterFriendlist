@@ -406,40 +406,18 @@ local function OnFriendLineClick(cell, data, mouseButton)
 	-- LibQTip might not pass mouseButton - we need to get it ourselves!
 	local actualButton = mouseButton or (cell and cell.bflLastMouseButton) or (GetMouseButtonClicked and GetMouseButtonClicked())
 
-	-- BattleNet friend click handlers
-	if data.type == "bnet" then
-		if IsAltKeyDown() then
-			SmartInviteOrJoin("bnet", data)
-		elseif IsShiftKeyDown() then
-			if data.client == "WoW" and data.characterName and data.characterName ~= "" then
-				AddNameToEditBox(data.characterName, data.realmName)
-			end
-		elseif actualButton == "RightButton" then
-			OpenFriendContextMenu(data)
-		else
-			if data.bnetAccountID then
-				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
-				BFL:SecureSendBNetTell(safeName, data.bnetAccountID)
-			elseif not BFL:IsSecret(data.accountName) and data.accountName and data.accountName ~= "" then
-				local safeName = BFL:GetSafeAccountName(data.accountName, data.battleTag)
-				BFL:SecureSendBNetTell(safeName, data.bnetAccountID)
-			end
+	if IsAltKeyDown() then
+		SmartInviteOrJoin(data.type, data)
+	elseif IsShiftKeyDown() then
+		if data.characterName and (data.type == "wow" or (data.client == "WoW" and data.characterName ~= "")) then
+			AddNameToEditBox(data.characterName, data.realmName)
 		end
-	-- WoW friend click handlers
-	elseif data.type == "wow" then
-		if IsAltKeyDown() then
-			SmartInviteOrJoin("wow", data)
-		elseif IsShiftKeyDown() then
-			if data.characterName then
-				AddNameToEditBox(data.characterName, data.realmName)
-			end
-		elseif actualButton == "RightButton" then
-			OpenFriendContextMenu(data)
-		else
-			if data.fullName then
-				local whisperName = data.fullName:gsub(" ", "")
-				BFL:SecureSendTell(whisperName)
-			end
+	else
+		local friendMenu = BFL:GetModule("NativeFriendMenu")
+		if actualButton == "RightButton" then
+			if not friendMenu or not friendMenu:HandleUnavailableClick() then OpenFriendContextMenu(data) end
+		elseif actualButton == "LeftButton" and friendMenu then
+			friendMenu:ShowWhisperUnavailable()
 		end
 	end
 end
@@ -2239,8 +2217,10 @@ local function CreateLibQTipTooltip(anchorFrame)
 						id = friendUID,
 						type = "wow",
 						accountName = name,
+						name = fullName,
 						characterName = name,
 						fullName = fullName,
+						guid = friendInfo.guid,
 						level = friendInfo.level or 0,
 						className = friendInfo.className or "UNKNOWN",
 						classID = friendInfo.classID,
@@ -2559,6 +2539,9 @@ local function CreateLibQTipTooltip(anchorFrame)
 				OnFriendLineClick(frame, friend, button)
 				frame.bflLastMouseButton = nil
 			end)
+
+			local nativeMenu = not previewData and BFL:GetModule("NativeFriendMenu")
+			if nativeMenu then nativeMenu:UpdateBrokerRow(row, friend) end
 
 			return row
 		end

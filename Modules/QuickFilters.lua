@@ -477,6 +477,16 @@ function QuickFilters:SetFilter(mode)
 	return true
 end
 
+function QuickFilters:ResetFilters()
+	local selectedTags = self:GetSelectedTagFilters()
+	if next(selectedTags) then
+		wipe(selectedTags)
+		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+		self:InvalidateTagFilterCache()
+	end
+	self:SetFilter("all")
+end
+
 function QuickFilters:GetFilter()
 	local currentFilter = ResolveFilter(BetterFriendlistDB and BetterFriendlistDB.quickFilter or filterMode or "all")
 	filterMode = currentFilter

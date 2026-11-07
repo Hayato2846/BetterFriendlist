@@ -1625,6 +1625,10 @@ function BFL:InstallFriendsFrameRedirects()
 
 		C_Timer.After(0.1, function()
 			BFL.AllowBlizzardFriendsFrame = false
+			local whoModule = BFL:GetModule("WhoFrame")
+			if whoModule and whoModule:UsesPersistentNativeWhoIsolation() then
+				whoModule:SuspendNativeWhoListUpdates()
+			end
 		end)
 	end
 
@@ -2089,14 +2093,6 @@ function BFL:SafeToString(value)
 	return tostring(value)
 end
 
--- Secure wrappers for Blizzard chat APIs.
--- When BFL (tainted addon code) calls chat APIs directly, the taint propagates
--- into Blizzard's chat frame code, permanently tainting globals like LAST_ACTIVE_CHAT_EDIT_BOX.
--- On 12.0.0+ this causes "attempt to perform arithmetic on a secret number value" errors
--- when FCF_OpenTemporaryWindow later reads the tainted global during UpdateHeader.
--- Fix: On 12.0.0+, use securecallfunction() to call Blizzard APIs in a new secure
--- execution context that does not inherit the caller's taint.
-
 function BFL:ShowWhisperRestrictionError()
 	local reason = self.GetAgeVerificationRestrictionTooltip
 		and self.GetAgeVerificationRestrictionTooltip()
@@ -2104,73 +2100,6 @@ function BFL:ShowWhisperRestrictionError()
 		UIErrorsFrame:AddExternalErrorMessage(reason)
 	end
 	return reason
-end
-
-function BFL:SecureSendBNetTell(name, bnetIDAccount, displayName)
-	if self.CanSendWhisper and not self.CanSendWhisper() then
-		self:ShowWhisperRestrictionError()
-		return false
-	end
-	local safeName = name
-	if BFL:IsSecret(safeName) then
-		safeName = nil
-	end
-	local safeDisplayName = displayName
-	if BFL:IsSecret(safeDisplayName) then
-		safeDisplayName = nil
-	end
-	safeDisplayName = safeDisplayName or safeName
-	local safeBNetID = bnetIDAccount
-	if BFL:IsSecret(safeBNetID) then
-		safeBNetID = nil
-	elseif type(safeBNetID) == "string" then
-		safeBNetID = tonumber(safeBNetID)
-	elseif type(safeBNetID) ~= "number" then
-		safeBNetID = nil
-	end
-
-	-- Taint-Free Whisper: Use the BFL-owned composer instead of Blizzard chat.
-	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper then
-		if safeBNetID then
-			BFL:OpenTaintFreeWhisper(safeDisplayName, nil, safeBNetID, true)
-		else
-			BFL:DebugPrint("SecureSendBNetTell: Missing safe BNet account ID")
-		end
-		return safeBNetID ~= nil
-	end
-	if not safeName then return false end
-	local func = ChatFrameUtil and ChatFrameUtil.SendBNetTell or ChatFrame_SendBNetTell
-	if not func then return false end
-	if BFL.HasSecretValues and securecallfunction then
-		securecallfunction(func, safeName)
-	else
-		func(safeName)
-	end
-	return true
-end
-
-function BFL:SecureSendTell(name)
-	if self.CanSendWhisper and not self.CanSendWhisper() then
-		self:ShowWhisperRestrictionError()
-		return false
-	end
-	if BFL:IsSecret(name) then
-		return false
-	end
-	if not name then return false end
-	-- Taint-Free Whisper: Use the BFL-owned composer instead of Blizzard chat.
-	if BetterFriendlistDB and BetterFriendlistDB.taintFreeWhisper then
-		BFL:OpenTaintFreeWhisper(name, name, nil, false)
-		return true
-	end
-	local func = ChatFrameUtil and ChatFrameUtil.SendTell or ChatFrame_SendTell
-	if not func then return false end
-	if BFL.HasSecretValues and securecallfunction then
-		securecallfunction(func, name)
-	else
-		func(name)
-	end
-	return true
 end
 
 function BFL:SecureOpenChat(msg)
@@ -3008,7 +2937,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	-- ==========================================
 	-- Test Suite Commands (for QA/Development)
 	-- ==========================================
-	elseif msg:match("^test") then
+	elseif msg == "test" or msg:match("^test%s") then
 		local TestSuite = BFL:GetModule("TestSuite")
 		if TestSuite then
 			local fullArgs = msg:match("^test%s*(.*)") or ""
@@ -3028,32 +2957,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 			end
 		end
 
-	-- Test Translations (Encoding Check)
-	elseif msg == "testlocales" or msg == "testencoding" or msg == "testenc" then
-		-- BFL:DebugPrint(
-		--     "|cff00ff00BetterFriendlist:|r " .. (BFL.L.CORE_HELP_TEST_LOCALES or "Testing Localization Encoding...")
-		-- )
-		-- BFL:DebugPrint("Locale: " .. GetLocale())
-		-- List of strings with special characters to test
-		local testKeys = {
-			"DIALOG_DELETE_GROUP_TEXT", -- é, ê, û
-			"CORE_STATISTICS_HEADER", -- é
-			"SETTINGS_BETA_FEATURES_ENABLED", -- é, È
-			"DIALOG_MIGRATE_TEXT", -- é, è
-			"FILTER_SEARCH_ONLINE", -- varies by locale
-			"STATUS_AFK", -- varies
-		}
-
-		for _, key in ipairs(testKeys) do
-			if BFL.L[key] then
-				-- BFL:DebugPrint(string.format("|cffffcc00%s:|r %s", key, BFL.L[key]))
-			else
-				-- BFL:DebugPrint(string.format("|cffff0000Missing:|r %s", key))
-			end
-		end
-		-- BFL:DebugPrint("|cff00ff00End of Test|r")
-
-		-- Reset Frame Position
+	-- Reset Frame Position
 	elseif msg == "reset" then
 		local FrameSettings = BFL:GetModule("FrameSettings")
 		if FrameSettings then

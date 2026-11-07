@@ -296,7 +296,6 @@ local defaults = {
 	syncGroupsToNote = false, -- Sync group assignments to friend notes (default: OFF)
 
 	-- Taint-Free Whisper
-	taintFreeWhisper = false, -- Use custom EditBox for whispers to avoid tainting Blizzard chat (default: OFF)
 
 	-- Recently Added Group
 	enableRecentlyAddedGroup = false, -- Enable "Recently Added" builtin group (default: OFF)
@@ -573,6 +572,7 @@ function DB:PrepareImportedProfile(importData)
 	staged = codec:Copy(publicSource)
 	staged.exportVersion = nil
 	staged.exportFlavor = nil
+	staged.taintFreeWhisper = nil
 	for key, expected in pairs(defaults) do
 		if staged[key] ~= nil and type(staged[key]) ~= type(expected) then return nil, "ERROR_EXPORT_STRUCTURE" end
 	end
@@ -925,6 +925,7 @@ function DB:Initialize()
 		BetterFriendlistDB = {}
 	end
 
+	BetterFriendlistDB.taintFreeWhisper = nil
 	self:ApplyExternalMenuBridgeDefaultMigration(BetterFriendlistDB)
 
 	-- The short-lived Appear Offline Broker action moved into the existing
@@ -1345,6 +1346,11 @@ function DB:Set(key, value)
 	local FriendsList = BFL and BFL:GetModule("FriendsList")
 	if FriendsList and FriendsList.InvalidateSettingsCache then
 		FriendsList:InvalidateSettingsCache()
+	end
+
+	if key == "friendListClickWhisperEnabled" or key == "friendListClickWhisperMode" or key == "whoDoubleClickAction" then
+		local friendMenu = BFL:GetModule("NativeFriendMenu")
+		if friendMenu then friendMenu:RefreshClickRouting() end
 	end
 
 	-- NoteSync: Re-sync all friend notes when group order changes

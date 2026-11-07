@@ -3,7 +3,7 @@
 local repo = arg[1] or "."
 local function read(path)
 	local file = assert(io.open(repo .. "/" .. path, "rb"))
-	local text = file:read("*a"); file:close(); return text
+	local text = file:read("*a"); file:close(); return text:gsub("\r\n", "\n")
 end
 local function between(text, first, last)
 	local start = assert(text:find(first, 1, true), first)

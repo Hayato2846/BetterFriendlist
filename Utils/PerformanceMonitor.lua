@@ -2,12 +2,6 @@
 	Performance Monitor Utility
 	
 	Provides performance profiling for BetterFriendlist operations.
-	
-	Usage:
-	/bfl perf - Show performance statistics
-	/bfl perf reset - Reset statistics
-	/bfl perf start <operation> - Start timing operation
-	/bfl perf stop <operation> - Stop timing operation
 ]]
 
 local addonName, BFL = ...
@@ -260,14 +254,4 @@ function PerformanceMonitor:EnableAutoMonitoring()
 	end)
 	
 	BFL:DebugPrint(BFL.L.PERF_HEADER_PREFIX .. " " .. BFL.L.PERF_AUTO_ENABLED)
-end
-
--- Legacy slash command (redirects to /bfl perf)
--- Kept for backwards compatibility
-SLASH_BFLPERF1 = "/bflperf"
-SlashCmdList["BFLPERF"] = function(msg)
-	-- Redirect to main /bfl command
-	local cmd = msg and msg:lower():trim() or ""
-	if cmd == "" then cmd = "report" end
-	SlashCmdList["BETTERFRIENDLIST"]("perf " .. cmd)
 end

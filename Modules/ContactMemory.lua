@@ -101,6 +101,40 @@ local function RefreshSurfaces(refreshCallback)
 	end
 end
 
+local function SavePrivateNote(contactKey, text, refreshCallback)
+	local saved, hasNewText = ContactMemory:SetPrivateNote(contactKey, text)
+	RefreshSurfaces(refreshCallback)
+	if not (saved and hasNewText and ContactMemory:IsEnabled())
+		or ContactMemory:GetSetting("showTooltipSection", true) ~= false then
+		return
+	end
+
+	local hints = BFL:GetModule("FeatureHints")
+	local settings = BFL:GetModule("Settings")
+	if not (hints and settings) then return end
+
+	local L = BFL.L
+	local path = L.CONTACT_MEMORY_TITLE .. " > " .. L.CONTACT_MEMORY_SETTINGS_TOOLTIPS
+	if settings:IsSettingsCenterEnabled() then
+		path = L.SETTINGS_CENTER_CATEGORY_PRIVACY .. " > " .. path
+	end
+	hints:Show({
+		id = "privateNotes.tooltips",
+		title = L.PRIVATE_NOTE_HINT_TITLE,
+		icon = "Interface\\AddOns\\BetterFriendlist\\Icons\\check-circle.blp",
+		entries = {
+			{
+				text = L.PRIVATE_NOTE_HINT_TOOLTIPS,
+				path = path,
+				page = SETTINGS_DESIGNER_PAGE_ID,
+				control = "contactMemory.showTooltipSection",
+				category = 14,
+				legacySection = "privateNotesTooltips",
+			},
+		},
+	})
+end
+
 local function NotifySettingsChanged(refreshCallback)
 	if BFL then
 		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
@@ -175,16 +209,14 @@ function ContactMemory:Initialize()
 		OnAccept = function(dialog, data)
 			local editBox = GetPopupEditBox(dialog)
 			if data and data.contactKey and editBox then
-				ContactMemory:SetPrivateNote(data.contactKey, editBox:GetText())
-				RefreshSurfaces(data.refreshCallback)
+				SavePrivateNote(data.contactKey, editBox:GetText(), data.refreshCallback)
 			end
 		end,
 		EditBoxOnEnterPressed = function(editBox, data)
 			local dialog = editBox:GetParent()
 			local popupData = data or (dialog and dialog.data)
 			if popupData and popupData.contactKey then
-				ContactMemory:SetPrivateNote(popupData.contactKey, editBox:GetText())
-				RefreshSurfaces(popupData.refreshCallback)
+				SavePrivateNote(popupData.contactKey, editBox:GetText(), popupData.refreshCallback)
 			end
 			if dialog then
 				dialog:Hide()
@@ -616,11 +648,12 @@ function ContactMemory:SetPrivateNote(contactKey, note)
 	end
 
 	note = CleanString(note)
+	local hasNewText = note ~= nil and note ~= contact.privateNote
 	contact.privateNote = note
 	contact.lastSeen = SafeTime()
 	contact.lastSeenSource = "manual"
 	self:CleanupContact(contactKey)
-	return true
+	return true, hasNewText
 end
 
 function ContactMemory:GetSortedTags()
@@ -1011,8 +1044,7 @@ function ContactMemory:EnsureNoteDialog()
 	saveButton:SetHighlightFontObject("BetterFriendlistFontHighlight")
 	saveButton:SetScript("OnClick", function()
 		if frame.contactKey then
-			ContactMemory:SetPrivateNote(frame.contactKey, frame.editBox:GetText())
-			RefreshSurfaces(frame.refreshCallback)
+			SavePrivateNote(frame.contactKey, frame.editBox:GetText(), frame.refreshCallback)
 		end
 		frame:Hide()
 	end)

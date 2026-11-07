@@ -448,13 +448,6 @@ function GuildActions:GetGuildCapabilities()
 	}
 end
 
-function GuildActions:Whisper(member)
-	local fullName = self:GetFullName(member)
-	if fullName and BFL.SecureSendTell then
-		BFL:SecureSendTell(fullName)
-	end
-end
-
 function GuildActions:InviteParty(member)
 	if self:CanInviteParty(member) then
 		BFL.InviteUnit(self:GetFullName(member))
@@ -602,6 +595,8 @@ function GuildActions:SetNicknameDialog(member)
 			local newNick = editBox and Trim(editBox:GetText()) or ""
 			DB:SetGuildNickname(fullName, newNick ~= "" and newNick or nil)
 			RefreshGuildSurfaces(false)
+			local hints = BFL:GetModule("NicknameHints")
+			if hints then hints:OnNicknameSaved(newNick, currentNick, "guild") end
 		end,
 		OnAlt = function()
 			DB:SetGuildNickname(fullName, nil)
@@ -612,6 +607,8 @@ function GuildActions:SetNicknameDialog(member)
 			local newNick = Trim(editBox:GetText())
 			DB:SetGuildNickname(fullName, newNick ~= "" and newNick or nil)
 			RefreshGuildSurfaces(false)
+			local hints = BFL:GetModule("NicknameHints")
+			if hints then hints:OnNicknameSaved(newNick, currentNick, "guild") end
 			parent:Hide()
 		end,
 		EditBoxOnEscapePressed = function(editBox)
@@ -892,10 +889,9 @@ function GuildActions:GetMemberMenuItems(member)
 	local hasCommunication = false
 	if caps.whisper then
 		table.insert(items, {
+			type = "whisper",
 			text = T("GUILD_ACTION_WHISPER", WHISPER or "Whisper"),
-			func = function()
-				self:Whisper(member)
-			end,
+			whisperTarget = self:GetFullName(member),
 		})
 		hasCommunication = true
 	end

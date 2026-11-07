@@ -2691,31 +2691,8 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						-- Get selected friend from FriendsList module
-						local FriendsList = BFL and BFL:GetModule("FriendsList")
-						if not FriendsList then
-						return
-						end
-
-						local friend = FriendsList.ResolveSelectedFriend and
-						FriendsList:ResolveSelectedFriend() or FriendsList.selectedFriend
-						if not friend then
-						return
-						end
-
-						if friend.type == "bnet" then
-						-- 12.0.0+ kString Safety: Use battleTag when accountName is a secret value
-						local tellName = friend.accountName
-						if BFL:IsSecret(tellName) then
-						tellName = friend.battleTag
-						end
-						local bnetIDAccount = friend.bnetIDAccount or friend.bnetAccountID
-						if tellName then
-						BFL:SecureSendBNetTell(tellName, bnetIDAccount)
-						end
-						elseif friend.type == "wow" and friend.name then
-						BFL:SecureSendTell(friend.name)
-						end
+						local friendMenu = BFL:GetModule("NativeFriendMenu")
+						if friendMenu then friendMenu:ShowWhisperUnavailable() end
 					</OnClick>
 				</Scripts>
 			</Button>

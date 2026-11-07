@@ -93,6 +93,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.2]        - 2026-11-07
+
+BetterFriendlist 3.0.2 brings back Blizzard's friend menu, fixes chat taint when you start a whisper, and makes friend tags easier to edit.
+
+### All WoW Versions
+
+#### Added
+- **Hints** - BFL can now show a hint when a nickname, friend tag, private note, new group, or favorite is hidden. You can open the options from the hint.
+
+#### Improved
+- **Friend Menus** - Blizzard's friend menu is back in both layouts when you right-click a friend in the list or Friends Broker. BFL's group, nickname, and tag options are there too, along with actions from compatible addons.
+- **Raid Tab** - Right-click a raid member to open Blizzard's raid menu.
+- **Friend Tag Editor** - Preview changes for each tag and use Save All to save your drafts when closing the editor. Reset previews the default look, and the delete prompt shows how many friends have the tag.
+- **Tag Appearance** - Open the icon picker in one click, enter a custom path, or remove the icon. Icon Only keeps your custom text for later, and hiding a tag keeps your choices for where it appears.
+
+#### Fixed
+- **Chat Taint** - Whisper from a right-click menu, single- and double-click whispers, and the Legacy Send Message button now use Blizzard's own whisper action to fix chat taint. Who, Recent Allies, the guild tab, and both brokers use it too, so the separate Taint-Free Whisper window and setting are gone.
+- **Friend Tag Editor** - Fixed a bug that could reset a custom tag's name, icon, text, or colors when you switched tags or made a new one.
+- **Settings** - Guild filters, sorting, and row options now take effect right away in both settings windows. The same goes for Streamer Mode and broker display options.
+
+### Retail Midnight
+
+#### Improved
+- **Forever Friends** - See a Forever friend's realm ruleset in the friends list and tooltips, or add it to a custom format with `%ruleset%`. The display updates when they switch between Forever and Retail.
+
+#### Fixed
+- **Blizzard Friend Tags** - Removing a friend's last Blizzard tag updates the list right away. You can edit another friend's tags while the first change is still pending.
+
+### Retail Midnight & WoW Forever
+
+#### Improved
+- **Legacy Settings** - When you use the Modern friends list, Legacy Settings uses the same backgrounds, dividers, and scrollbar.
+
+### WoW Forever
+
+#### Improved
+- **Friend Invites** - Invite and Request to Join in Blizzard's friend menu check realm rulesets, even if your friend has more than one character online.
+
+#### Fixed
+- **Who Searches** - The friends list stays put when another addon runs a Who search in the background.
+
+---
+
 ## [3.0.1]        - 2026-11-06
 
 BetterFriendlist 3.0.1 improves group note sync and backups, adds ruleset checks for invites in WoW Forever, and makes smooth scrolling optional.
@@ -368,22 +411,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 - **Icon-Only Tags** - Icons now stay centered inside colored chips, including the default Tank, Healer, and DPS icons.
 - **Battle.net Levels** - Invalid level 0 values from Battle.net are no longer shown as a real character level. Available zone or game information is shown instead.
 - **Custom Names** - Friends with digits in their BattleTag no longer trigger repeated rename messages after logging in or reloading the UI.
-
----
-
-## [2.8.4]        - 2026-08-22
-
-### Improved
-- **Raid Tab** - When you are not in a raid, the Raid tab now shows Blizzard's helpful explanation instead of a short placeholder.
-- **Recruit A Friend** - The recruit list now adjusts correctly after changing the game's text size, even if the tab was closed at the time.
-
-### Fixed
-- **Friend Requests** - Accepting or declining a Battle.net friend request no longer causes the game to freeze.
-- **ElvUI BattleTag** - Your BattleTag now stays visible and keeps the same colors when switching between Legacy and Modern or using the copy button.
-- **Changelog Notice** - The “NEW” glow around the BFL avatar now follows round and square avatar styles in every theme.
-- **ElvUI Simple Mode** - The avatar now stays hidden when switching between Legacy and Modern while Simple Mode is active.
-- **ElvUI Guild Tab** - The Legacy guild member list now uses a background that matches the ElvUI theme.
-- **Modern Raid Tab** - Raid member right-click menus, shortcuts, selections, and drag-and-drop now stay connected to the correct player.
 
 ---
 

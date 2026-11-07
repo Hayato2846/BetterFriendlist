@@ -5,7 +5,7 @@ local checks = 0
 local function check(value, message) checks = checks + 1; assert(value, message) end
 local function read(path)
 	local file = assert(io.open(repo .. "/" .. path, "rb"))
-	local source = file:read("*a"); file:close(); return source
+	local source = file:read("*a"); file:close(); return source:gsub("\r\n", "\n")
 end
 local function between(source, first, last)
 	local start = assert(source:find(first, 1, true), first)

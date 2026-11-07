@@ -35,6 +35,7 @@ local function setup(nativeRoot)
 	}, { __index = _G })
 	local function execute(content, label) return assert(load(content, "@" .. label, "t", env))("BetterFriendlist", BFL) end
 	execute(read(repo, "Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
+	execute(read(repo, "Modules/NativeFriendMenu.lua"), "Modules/NativeFriendMenu.lua")
 	local rows
 	if nativeRoot then
 		-- Execute the actual native queue, clear and insert functions, not a reimplementation.
@@ -93,18 +94,19 @@ for _, backend in ipairs({ forever, classic, false }) do
 	local context = setup(backend)
 	for _, fixture in ipairs({
 		{ menu = "BN_FRIEND_OFFLINE", level = 3, interact = false },
-		{ menu = "BN_FRIEND_OFFLINE", level = 1, interact = true },
-		{ menu = "BN_FRIEND_OFFLINE", level = 2, interact = true },
+		{ menu = "BN_FRIEND_OFFLINE", level = 1, interact = false },
+		{ menu = "BN_FRIEND_OFFLINE", level = 2, interact = false },
 		{ menu = "FRIEND_OFFLINE", interact = false },
 		{ menu = "BN_FRIEND", level = 3, interact = true, invite = true },
 		{ menu = "FRIEND", interact = true, invite = true },
 		{ menu = "BN_FRIEND_OFFLINE", level = 3, houses = true, interact = true },
-		{ menu = "BN_FRIEND", level = 3, restricted = true, interact = true, invite = true },
+		{ menu = "FRIEND", who = true, restricted = true, interact = true, invite = true },
 	}) do
 		context.env.UNIT_VIEW_HOUSES = fixture.houses and "View Houses" or nil
 		context.BFL.CanSendWhisper = function() return not fixture.restricted end
 		context.BFL.InviteUnit = function() end
-		local data = { name = "Ada Lovelace", friendLevel = fixture.level, bnetIDAccount = fixture.level and 42 or nil }
+		local data = { name = "Ada Lovelace", friendLevel = fixture.level, bnetIDAccount = fixture.level and 42 or nil,
+			bflWhoPlayerMenu = fixture.who }
 		check(context.BFL:OpenBetterFriendlistContextMenu({}, fixture.menu, data, data.name), "The production context menu opens")
 		local titles, buttons, currentSection = {}, {}, nil
 		local rows = context.rows()
@@ -122,8 +124,11 @@ for _, backend in ipairs({ forever, classic, false }) do
 		check(titles.Other and titles.BetterFriendlist and buttons["Set Note"] and buttons["Remove Friend"], "Other options and BFL actions remain present")
 		if fixture.invite then equal(buttons.Invite.section, "Interact", "An online invite retains its section") end
 		if fixture.houses then equal(buttons["View Houses"].section, "Interact", "Offline housing keeps Interact when an action really exists") end
-		if fixture.level == 3 and fixture.menu == "BN_FRIEND_OFFLINE" then check(not buttons.Whisper, "Offline Title friends still have no Whisper action") end
-		if fixture.restricted then equal(buttons.Whisper.enabled, false, "A visible disabled action still keeps its section") end
+		if fixture.who then
+			equal(buttons.Whisper.enabled, false, "Who retains its restricted character-whisper action")
+		else
+			check(not buttons.Whisper, "the fallback friend menu leaves whispering to Blizzard's native menu")
+		end
 	end
 end
 io.write("[OK] Context menu sections smoke: " .. assertions .. " assertions (native Forever/Classic queue helpers and real legacy fallback; mocked widgets/C APIs)\n")

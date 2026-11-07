@@ -47,7 +47,24 @@ whoFrame.SetupScrollView, whoFrame.InitFilterMenu = function() end, function() e
 whoFrame.WhoFrameTotals = { SetText = function() end }
 whoFrame.ScrollBox = { SetDataProvider = function() end }
 whoFrame.UpdateWhoList = env.LFGWhoListMixin.UpdateWhoList
-whoFrame.EditBox = { GetText = function() return "native LFG query" end, ClearFocus = function() end }
+local function nativeWidget(script, handler, methods)
+	local widget = methods or {}
+	widget.IsForbidden = function() return false end
+	function widget:HookScript(name, callback)
+		equal(name, script, "only the search action is hooked")
+		check(not self.postHook, "native search widget is hooked once")
+		self.postHook = callback
+	end
+	function widget:Run()
+		handler(self)
+		if self.postHook then self.postHook(self) end
+	end
+	return widget
+end
+whoFrame.EditBox = nativeWidget("OnEnterPressed", env.WhoFrameEditBoxMixin.OnEnterPressed, {
+	GetText = function() return "native LFG query" end, ClearFocus = function() end,
+})
+whoFrame.WhoSearch = nativeWidget("OnClick", env.WhoSearchMixin.OnClick)
 function whoFrame:SetShown(value)
 	if self.shown == value then return end
 	self.shown = value
@@ -68,13 +85,21 @@ env.SLASH_COMMAND_CATEGORY = { SOCIAL = 1 }
 env.SlashCommandUtil = { CheckAddSlashCommand = function(key, _, callback) env.SlashCmdList[key] = callback end }
 loadNative("native /who", between(slash, "SlashCommandUtil.CheckAddSlashCommand(SLASH_COMMAND.WHO,", "SlashCommandUtil.CheckAddSlashCommand(SLASH_COMMAND.CHANNEL,"))
 local item = readFile(native .. "/Interface/AddOns/Blizzard_UIPanels_Game/Mainline/ItemRefHandlers.lua")
-env.LinkTypes = { Player = "player", PlayerCommunity = "community", PlayerGM = "GM" }
-env.IsModifiedClick, env.StaticPopup_Visible = function() return true end, function() end
-env.ChatFrameUtil = { GetActiveWindow = function() end }
+loadNative("Interface/AddOns/Blizzard_SharedXML/LinkUtil.lua")
+local processLink = env.LinkUtil.ProcessLink
+env.LinkUtil.ProcessLink = function(...)
+	local result = processLink(...)
+	for _, callback in ipairs(s.linkHooks) do callback(...) end
+	return result
+end
+local chatlinkModified, chatWindow, popup = true, nil, nil
+env.IsModifiedClick = function(key) return key == "CHATLINK" and chatlinkModified end
+env.StaticPopup_Visible = function(name) if name == popup then return "AddFriend" end end
+env.ChatFrameUtil = { GetActiveWindow = function() return chatWindow end, InsertLink = function() end, SendTell = function() end }
 env.C_NameUtil = { ReplaceSurnameSeparatorWithLinkSeparator = function(name) return name end }
 env.WHO_TAG_EXACT = 'x-'
-env.string = setmetatable({ split = function(_, value) return value end }, { __index = string })
-local nativePlayerLink = loadNative("native player-link Who", between(item, "local function HandlePlayerLink(", "LinkUtil.RegisterLinkHandler(LinkTypes.Player,") .. "\nreturn HandlePlayerLink")
+env.string = setmetatable({ split = function(_, value) return value:match("^([^:]+):?(.*)$") end }, { __index = string })
+loadNative("native player-link Who", item:sub(1, assert(item:find("LinkUtil.RegisterLinkHandler(LinkTypes.LevelUpToast,", 1, true)) - 1))
 function s:emit()
 	self.callbacks.WHO_LIST_UPDATE()
 	if whoFrame.registered then env.LFGWhoListMixin.OnEvent(whoFrame, "WHO_LIST_UPDATE") end
@@ -104,7 +129,9 @@ local xmlStart = assert(xml:find("-- CRITICAL: Set Who data routing FIRST", 1, t
 local xmlEnd = assert(xml:find("</OnShow>", xmlStart, true))
 local onShow = assert(load("local self = ...\n" .. xml:sub(xmlStart, xmlEnd - 1), "@BetterFriendlist.xml Who OnShow", "t", env))
 env.BetterFriendsFrame_ShowBottomTab = function(tab)
+	env.BetterFriendsFrame.selectedTab = tab
 	if tab == 2 and not addonWho.shown then addonWho.shown = true; onShow(addonWho) end
+	if tab ~= 2 then addonWho.shown = false end
 end
 local main = readFile(repo .. "/BetterFriendlist.lua")
 loadNative("addon ShowBetterFriendsFrame", between(main, "function ShowBetterFriendsFrame(tabIndex)", "-- Hide the friends frame"))
@@ -116,21 +143,56 @@ local function resultsStayInBFL(label)
 	equal(s.nativeOpens, 0, label .. " results/late results do not open native Who/LFG")
 	check(not whoFrame.registered, label .. " cannot re-enable native Who auto-open")
 end
+env.C_FriendList.SendWho('c-"Rogue"')
+resultsStayInBFL("background scan")
+check(not env.BetterFriendsFrame.shown and not env.LFGParentFrame.shown, "background sends and results leave both windows closed")
+env.ShowBetterFriendsFrame(1)
+env.C_FriendList.SendWho('r-"Human"', env.Enum.SocialWhoOrigin.Social)
+resultsStayInBFL("background scan with an origin")
+equal(env.BetterFriendsFrame.selectedTab, 1, "background searches leave the visible Friends tab selected")
+env.BetterFriendsFrame.shown = false
+
+-- An Item origin can be supplied by any addon. An ordinary click or a link
+-- being inserted into chat in the same frame must not adopt that send.
+env.C_FriendList.SendWho("background item", env.Enum.SocialWhoOrigin.Item)
+chatlinkModified = false
+env.LinkUtil.ProcessLink("player:Ada-Lovelace", "", { button = "LeftButton" })
+check(not env.BetterFriendsFrame.shown, "ordinary player-link clicks do not adopt a preceding background send")
+env.C_FriendList.SendWho("background item", env.Enum.SocialWhoOrigin.Item)
+chatlinkModified, chatWindow = true, {}
+env.LinkUtil.ProcessLink("player:Ada-Lovelace", "", { button = "LeftButton" })
+check(not env.BetterFriendsFrame.shown, "pasting a player link into chat does not open Who")
+chatWindow, popup = nil, "ADD_FRIEND"
+env.C_FriendList.SendWho("background item", env.Enum.SocialWhoOrigin.Item)
+env.AddFriendEditBox = { SetText = function() end }
+env.LinkUtil.ProcessLink("player:Ada-Lovelace", "", { button = "LeftButton" })
+check(not env.BetterFriendsFrame.shown, "pasting a player name into a dialog does not open Who")
+popup = nil
+s.calls = {}
+
 env.SlashCmdList.WHO("")
 equal(#s.calls, 1, "actual native-slash replacement sends once")
+check(env.BetterFriendsFrame.shown and addonWho.shown, "explicit /who opens BFL")
 resultsStayInBFL("/who")
-nativePlayerLink(nil, nil, { type = "player", options = "Ada-Lovelace" }, {})
+env.BetterFriendsFrame.shown, addonWho.shown = false, false
+env.LinkUtil.ProcessLink("player:Ada-Lovelace", "", { button = "LeftButton" })
 equal(s.calls[2][1], "x-Ada-Lovelace", "actual ItemRef callback retains its exact query")
 equal(s.calls[2][2], env.Enum.SocialWhoOrigin.Item, "actual ItemRef retains hardware origin")
+check(env.BetterFriendsFrame.shown and addonWho.shown, "explicit player-link Who opens BFL")
 resultsStayInBFL("player-link/context Who")
-addonWho.shown = false
+env.BetterFriendsFrame.shown, addonWho.shown = false, false
 local routingBefore = s.routingWrites or 0
-env.WhoFrameEditBoxMixin.OnEnterPressed(whoFrame.EditBox)
+whoFrame.EditBox:Run()
 equal(#s.calls, 3, "native Who widget is observed without replay")
 equal(s.calls[3].n, 3, "native structured request remains three arguments")
 equal(s.routingWrites, routingBefore + 1, "hidden-to-shown BFL Who executes its existing XML routing once")
 equal(s.routing, true, "the existing XML OnShow selects Who UI result routing")
 resultsStayInBFL("native Who widget")
+env.BetterFriendsFrame.shown, addonWho.shown = false, false
+whoFrame.WhoSearch:Run()
+equal(#s.calls, 4, "native Who search button sends exactly once")
+check(env.BetterFriendsFrame.shown and addonWho.shown, "native Who search button opens BFL")
+resultsStayInBFL("native Who search button")
 local addonOpens = s.addonOpens
 env.ToggleGroupFinderFrame()
 check(env.LFGParentFrame.shown and env.LFGListingFrame.shown, "normal Group Finder entry still opens Listing")

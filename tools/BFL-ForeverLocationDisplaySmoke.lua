@@ -1,5 +1,6 @@
--- lua tools/BFL-ForeverLocationDisplaySmoke.lua <repo> <Forever UI source>
+-- lua tools/BFL-ForeverLocationDisplaySmoke.lua <repo> <WoW UI source> [Forever UI source]
 -- Production formatters and tooltip/QuickJoin paths; engine widgets/APIs are mocked.
+-- The optional third argument supplies Camelot NameUtil when testing Retail's tooltip.
 local repo, native = assert(arg[1]), assert(arg[2])
 local function read(path) local f = assert(io.open(path, "rb")); local s = f:read("*a"); f:close(); return s end
 local function fixture(path, boundary, body)
@@ -104,8 +105,125 @@ account.wowProjectID, account.realmName = 18, "Unrecognized Realm"
 equal(list:FormatInfoLine(friend), "Elwynn", "unknown ruleset has no dangling separator")
 account.realmName = "CAMWOW EU5 Realm 6 PvP"
 BFL.IsForever = false
-equal(list:FormatInfoLine(friend), "Elwynn", "Retail client default stays unchanged for Forever targets")
-io.write("[OK] location display formatters: " .. assertions .. " checks\n")
+equal(list:FormatInfoLine(friend), "Elwynn, PvP", "Retail displays a known Forever target ruleset in the default info line")
+for _, modern in ipairs({ false, true }) do
+	for _, variant in ipairs({ { "Normal", "Normal" }, { "PvP", "PvP" }, { "RP", "RP" }, { "RP-PvP", "RP-PvP" } }) do
+		local snapshot = normal("Ada#1234")
+		local game = snapshot.gameAccountInfo
+		game.realmName, game.realmDisplayName, game.areaName = nil, nil, nil
+		game.richPresence = "Forever · " .. variant[1] .. " · Ashenvale"
+		local current = setup({ snapshot }, { modern = modern })
+		current.BFL.IsForever, current.env.WOW_PROJECT_ID = false, 1
+		current.list:UpdateFriendsList()
+		local row = assert(current.list.friendsList[1])
+		equal(row.areaName, "Ashenvale", "Retail ingests the Forever presence's area without the game/ruleset prefix")
+		equal(game.realmName, nil, "Native account identity remains unchanged")
+		equal(select(2, current.list:GetFormattedButtonText(row)), "Ashenvale, " .. variant[2], "Both layouts display the Forever ruleset from presence")
+		current.list.settingsCache.infoFormatPreset = "custom"
+		current.list.settingsCache.infoFormatString = "%zone% (%ruleset%)"
+		equal(current.list:FormatInfoLine(row), "Ashenvale (" .. variant[2] .. ")", "Custom formats reuse the same parsed ruleset")
+		current.list.settingsCache.nameFormatString = "%character% [%ruleset%]"
+		equal(current.list:GetDisplayName(row), "Ada Lovelace [" .. variant[2] .. "]", "Name formats share the ruleset parsed from presence")
+		row.gameAccountInfo.richPresence = "Forever · PvP · Ashenvale"
+		equal(current.list:GetDisplayName(row), "Ada Lovelace [PvP]", "A changed presence invalidates the cached ruleset label")
+	end
+end
+-- Warm caches, then change only the target project. Identical realm/ruleset
+-- labels and a stale presence must not allow cached Forever tokens in Retail.
+for _, modern in ipairs({ false, true }) do
+	for _, replaceSnapshot in ipairs({ false, true }) do
+		local snapshot = normal("Stable#1234")
+		local current = setup({ snapshot }, { modern = modern, nameFormat = "%character% %ruleset%" })
+		current.BFL.IsForever, current.env.WOW_PROJECT_ID = false, 1
+		current.env.BetterFriendlistDB.colorClassNames = false
+		current.env.GetDB = function() return current.BFL.modules.DB end
+		current.env.GetFriendGameName = function() return "WoW" end
+		local currentBroker = assert(load(between(broker, "local function GetDisplayLocation(", "local function GetFriendsList()")
+			.. between(broker, "local function ReplaceTokenCaseInsensitive(", "-- Helper: Get colored level text")
+			.. "\nreturn GetFriendDisplayName", "@broker client transitions", "t", current.env))()
+		local firstRow, stableUID
+		for _, state in ipairs({
+			{ 18, 123, nil, "Forever · Normal · Ashenvale", nil, "Ashenvale", "Normal" },
+			{ 1, 123, nil, "Forever · Normal · Ashenvale", nil, "Online", "" },
+			{ 1, 123, "Normal", "Forever · Normal · Ashenvale", "Stormwind", "Stormwind", "" },
+			{ 18, 123, nil, "Forever · PvP · Ashenvale", nil, "Ashenvale", "PvP" },
+			{ 1, 456, nil, "Forever - PvP - Ashenvale", nil, "Online", "" },
+			{ 1, 456, "PvP", "Forever · PvP · Ashenvale", "Valdrakken", "Valdrakken", "" },
+			{ 18, 789, nil, "Forever · RP · Elwynn", nil, "Elwynn", "RP" },
+			{ 1, 456, "Retail Realm", "Stormwind - Retail Realm", "Stormwind", "Stormwind", "" },
+		}) do
+			local nextAccount = game(true)
+			nextAccount.wowProjectID, nextAccount.gameAccountID = state[1], state[2]
+			nextAccount.realmName, nextAccount.realmDisplayName = state[3], state[3]
+			nextAccount.richPresence, nextAccount.areaName = state[4], state[5]
+			if replaceSnapshot then
+				snapshot.gameAccountInfo = nextAccount
+			else
+				for key in pairs(snapshot.gameAccountInfo) do snapshot.gameAccountInfo[key] = nil end
+				for key, value in pairs(nextAccount) do snapshot.gameAccountInfo[key] = value end
+			end
+			current.list:UpdateFriendsList()
+			local row = assert(current.list.friendsList[1])
+			firstRow, stableUID = firstRow or row, stableUID or row.uid
+			equal(row, firstRow, "client switches reuse the same pooled friend row")
+			equal(row.uid, stableUID, "client switches preserve the friend identity")
+			local expectedName = "Ada Lovelace" .. (state[7] ~= "" and (" " .. state[7]) or "")
+			equal(current.list:GetDisplayName(row), expectedName, "persistent name cache follows the current project")
+			equal(currentBroker(row), expectedName, "broker ruleset token follows the current project")
+			local line1, line2 = current.list:GetFormattedButtonText(row)
+			equal(line1, expectedName, "rendered row follows the current project")
+			equal(line2, state[6] .. (state[7] ~= "" and (", " .. state[7]) or ""), "default info clears ruleset on every Retail transition")
+			equal(select(2, current.list:GetFormattedButtonText(row)), line2, "warmed rendered cache remains correct")
+			current.list.settingsCache.infoFormatPreset, current.list.settingsCache.infoFormatString = "custom", "%zone%, %ruleset%"
+			equal(current.list:FormatInfoLine(row), line2, "custom info clears ruleset and its dangling separator")
+			current.list.settingsCache.infoFormatPreset = "default"
+		end
+	end
+end
+
+-- Selecting a preferred active account must override the focused account in
+-- both directions, and an offline preferred account must not remain displayed.
+for _, modern in ipairs({ false, true }) do
+	local snapshot = normal("Preferred#1234")
+	local foreverAccount, retailAccount = game(true), game(true)
+	foreverAccount.gameAccountID, foreverAccount.realmName, foreverAccount.areaName = 201, nil, nil
+	foreverAccount.richPresence = "Forever · Normal · Ashenvale"
+	retailAccount.gameAccountID, retailAccount.wowProjectID = 202, 1
+	retailAccount.realmName, retailAccount.realmDisplayName, retailAccount.areaName = "Normal", "Normal", "Stormwind"
+	retailAccount.richPresence = "Stormwind - Normal"
+	snapshot.gameAccountInfo = foreverAccount
+	local current = setup({ snapshot }, { modern = modern, nameFormat = "%character% %ruleset%" })
+	current.BFL.IsForever, current.env.WOW_PROJECT_ID = false, 1
+	local activeAccounts, preferredID = { foreverAccount, retailAccount }
+	current.env.C_BattleNet.GetFriendNumGameAccounts = function() return #activeAccounts end
+	current.env.C_BattleNet.GetFriendGameAccountInfo = function(_, index) return activeAccounts[index] end
+	current.BFL.modules.DB.GetPreferredGameAccount = function() return preferredID end
+	current.BFL.modules.DB.SetPreferredGameAccount = function(_, _, id) preferredID = id end
+	current.BFL.ForceRefreshFriendsList = function() current.list:UpdateFriendsList() end
+	current.list:UpdateFriendsList()
+	local uid = current.list.friendsList[1].uid
+	for _, selection in ipairs({ { 201, "Ashenvale, Normal" }, { 202, "Stormwind" }, { 201, "Ashenvale, Normal" } }) do
+		current.list:SetPreferredGameAccount(uid, selection[1])
+		local row = current.list.friendsList[1]
+		equal(row.gameAccountInfo.gameAccountID, selection[1], "preferred account controls ruleset metadata")
+		equal(select(2, current.list:GetFormattedButtonText(row)), selection[2], "preferred client changes invalidate the rendered ruleset")
+	end
+	retailAccount.areaName, retailAccount.realmName, retailAccount.realmDisplayName = nil, nil, nil
+	retailAccount.richPresence = "Forever · Normal · Ashenvale"
+	current.list:SetPreferredGameAccount(uid, 202)
+	equal(select(2, current.list:GetFormattedButtonText(current.list.friendsList[1])), "Online", "preferred Retail account also rejects old Forever presence while location is missing")
+	retailAccount.areaName, retailAccount.realmName, retailAccount.richPresence = "Stormwind", "Normal", "Stormwind - Normal"
+	current.list:SetPreferredGameAccount(uid, 201)
+	foreverAccount.isOnline = false
+	snapshot.gameAccountInfo, activeAccounts = retailAccount, { retailAccount }
+	current.list:UpdateFriendsList()
+	equal(select(2, current.list:GetFormattedButtonText(current.list.friendsList[1])), "Stormwind", "offline preferred Forever account does not leave a Retail ruleset")
+	foreverAccount.isOnline, foreverAccount.richPresence = true, "Forever · PvP · Elwynn"
+	activeAccounts = { retailAccount, foreverAccount }
+	current.list:UpdateFriendsList()
+	equal(select(2, current.list:GetFormattedButtonText(current.list.friendsList[1])), "Elwynn, PvP", "returning preferred Forever account uses its new ruleset")
+end
+io.write("[OK] location display formatters and client transitions: " .. assertions .. " checks\n")
 ]=])
 
 fixture("BFL-TitleFriendTooltipSmoke.lua", "local game = { gameAccountID", [=[
@@ -153,6 +271,33 @@ secondary.realmName = nil
 secondary.richPresence = "Elwynn Forest - CAMWOW EU5 Realm 9 RP PvP"
 showSafe({}, {}, friend)
 equal(env.FriendsTooltipGameAccount1Info.text, "Elwynn Forest - RP-PvP", "realm evidence from target presence is replaced without leaking CAMWOW")
+env.WOW_PROJECT_ID = 1
+BFL.IsForever = false
+secondary.realmName, secondary.realmDisplayName, secondary.areaName = nil, nil, nil
+secondary.richPresence = "Forever · Normal · Ashenvale"
+showSafe({}, {}, friend)
+equal(env.FriendsTooltipGameAccount1Info.text, "Ashenvale\nRuleset: Normal", "Retail tooltip formats structured presence like a Forever tooltip")
+secondary.richPresence = "Forever - PvP - Lune-d’Argent"
+showSafe({}, {}, friend)
+equal(env.FriendsTooltipGameAccount1Info.text, "Lune-d’Argent\nRuleset: PvP", "ASCII presence keeps the zone and avoids duplicate rulesets")
+for _, replaceSnapshot in ipairs({ false, true }) do
+	for _, state in ipairs({
+		{ 18, nil, nil, "Forever · Normal · Ashenvale", "Ashenvale\nRuleset: Normal" },
+		{ 1, nil, nil, "Forever · Normal · Ashenvale", "" },
+		{ 1, "Normal", "Stormwind", "Forever · Normal · Ashenvale", "Zone: Stormwind\nRealm: Normal" },
+		{ 18, nil, nil, "Forever · PvP · Elwynn", "Elwynn\nRuleset: PvP" },
+		{ 1, nil, nil, "Forever - PvP - Elwynn", "" },
+		{ 1, "PvP", "Valdrakken", "Valdrakken - PvP", "Zone: Valdrakken\nRealm: PvP" },
+	}) do
+		if replaceSnapshot then secondary = { gameAccountID = 102, clientProgram = "WoW", isOnline = true } end
+		secondary.isInCurrentRegion = true
+		secondary.wowProjectID, secondary.realmName, secondary.realmDisplayName = state[1], state[2], state[2]
+		secondary.areaName, secondary.richPresence = state[3], state[4]
+		friend.gameAccountInfo = secondary
+		showSafe({}, {}, friend)
+		equal(env.FriendsTooltipGameAccount1Info.text, state[5], "same tooltip widget replaces all old client/ruleset text")
+	end
+end
 io.write("[OK] mixed-client tooltips: " .. count .. " checks\n")
 ]=])
 
@@ -174,7 +319,7 @@ local function execute(path, suffix)
 	return assert(load(read(path) .. (suffix or ""), "@" .. path, "t", env))("BetterFriendlist", BFL)
 end
 execute(repo .. "/Utils/ClassicCompat.lua")
-execute(native .. "/Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua")
+execute((arg[3] or native) .. "/Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua")
 local entryType = execute(repo .. "/Modules/QuickJoin.lua", "\nreturn QuickJoinEntry")
 local entry = setmetatable({ groupInfo = { leaderGUID = "Player-18-1234" }, displayedQueues = {},
 	displayedMembers = { { guid = "Player-18-1234" } } }, entryType)

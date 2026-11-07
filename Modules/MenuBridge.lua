@@ -225,6 +225,15 @@ local function CreateExternalSection(rootDescription, safeContext)
 	}
 	local wrappers = {}
 
+	function section:HasButtonText(label)
+		if not rootDescription.EnumerateElementDescriptions then return false end
+		for _, element in rootDescription:EnumerateElementDescriptions() do
+			local text = BFL.Compat.GetMenuElementText(element)
+			if not IsSecret(text) and text == label then return true end
+		end
+		return false
+	end
+
 	local function EnsureSection()
 		if section.created then
 			return true
@@ -342,6 +351,7 @@ function MenuBridge:RegisterProvider(provider)
 		canShow = provider.canShow,
 		populate = provider.populate,
 		allowInCombat = provider.allowInCombat == true,
+		requiresCompanion = provider.requiresCompanion ~= false,
 		fallbackIfDynamicModifier = provider.fallbackIfDynamicModifier == true,
 		disabled = false,
 		lastError = nil,
@@ -533,20 +543,20 @@ function MenuBridge:DisableDynamicModifier(entry, errorValue)
 	entry.lastError = tostring(errorValue or "unknown error")
 end
 
-function MenuBridge:HasDynamicModifierForAddon(menuTag, addonName)
+function MenuBridge:HasDynamicModifierForAddon(menuTag, addonName, includeDisabled)
 	local entries = self.dynamicModifiersByTag[menuTag]
 	if not entries then
 		return false
 	end
 	for _, entry in ipairs(entries) do
-		if not entry.disabled and SameAddOnName(entry.addonName, addonName) then
+		if (includeDisabled or not entry.disabled) and SameAddOnName(entry.addonName, addonName) then
 			return true
 		end
 	end
 	return false
 end
 
-function MenuBridge:IsProviderEligible(provider, owner, safeContext)
+function MenuBridge:IsProviderEligible(provider, owner, safeContext, modifierTag, nativeMenu)
 	if provider.disabled then
 		return false
 	end
@@ -556,7 +566,9 @@ function MenuBridge:IsProviderEligible(provider, owner, safeContext)
 	if not provider.allowInCombat and BFL.IsActionRestricted and BFL:IsActionRestricted() then
 		return false
 	end
-	if provider.fallbackIfDynamicModifier and provider.addonName and self:HasDynamicModifierForAddon(safeContext.menuTag, provider.addonName) then
+	if modifierTag and provider.fallbackIfDynamicModifier and provider.addonName
+		and self:HasDynamicModifierForAddon(modifierTag, provider.addonName, nativeMenu)
+	then
 		return false
 	end
 	if provider.canShow then
@@ -598,15 +610,16 @@ function MenuBridge:ReplayDynamicModifiers(owner, section, safeContext)
 	return section.created == true
 end
 
-function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType)
-	if not self:IsEnabled() then
+function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType, nativeTag)
+	if not BFL.HasSecretValues then
 		return false
 	end
 	if not (rootDescription and rootDescription.CreateButton and contextData and menuType) then
 		return false
 	end
 
-	self:ImportEarlyCaptures()
+	local bridgeEnabled = self:IsEnabled()
+	if bridgeEnabled or nativeTag then self:ImportEarlyCaptures() end
 
 	local safeContext = self:CreateSafeContext(contextData, menuType, owner)
 	if not safeContext.menuType then
@@ -614,11 +627,15 @@ function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType)
 	end
 
 	local section = CreateExternalSection(rootDescription, safeContext)
-	self:ReplayDynamicModifiers(owner, section, safeContext)
+	-- Blizzard already runs the original registrations on its own menus.
+	if bridgeEnabled and not nativeTag then self:ReplayDynamicModifiers(owner, section, safeContext) end
+	local modifierTag = nativeTag or (bridgeEnabled and safeContext.menuTag)
 
 	for _, id in ipairs(self.providerOrder) do
 		local provider = self.providers[id]
-		if provider and self:IsProviderEligible(provider, owner, safeContext) then
+		if provider and (bridgeEnabled or not provider.requiresCompanion)
+			and self:IsProviderEligible(provider, owner, safeContext, modifierTag, nativeTag ~= nil)
+		then
 			local ok, result = pcall(provider.populate, owner, section, safeContext)
 			if not ok then
 				self:DisableProvider(provider, result)

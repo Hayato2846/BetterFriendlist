@@ -211,10 +211,10 @@ combat = false
 local root = { CreateButton = function(self, _, callback) self.callback = callback end }
 check(known:PopulateMenu(root, friend), "Own friend menus expose known characters")
 local menuBlock = between(read("BetterFriendlist.lua"), '\t\t\t\tlocal KnownCharacters = BFL:GetModule("KnownCharacters")', '\t\t\t\tlocal ContactMemory = BFL:GetModule("ContactMemory")')
-env.isOwnMenu, env.friendData = false, secret
+env.hasBFLFriend, env.friendData = false, secret
 env.rootDescription = setmetatable({}, { __index = function() error("Native/protected menu mutated") end })
 execute(menuBlock, "Native menu exclusion")
-env.isOwnMenu = true
+env.hasBFLFriend = true
 execute(menuBlock, "Opaque own-menu snapshot exclusion")
 env.friendData, env.rootDescription = friend, root
 root.callback = nil

@@ -167,7 +167,13 @@ end
 
 function StreamerMode:UpdateState()
 	local KnownCharacters = BFL:GetModule("KnownCharacters")
-	if KnownCharacters and self:IsActive() then KnownCharacters:HideSurfaces() end
+	local friendMenu = BFL:GetModule("NativeFriendMenu")
+	if self:IsActive() then
+		if KnownCharacters then KnownCharacters:HideSurfaces() end
+		if friendMenu then friendMenu:HideLinks() end
+	elseif friendMenu then
+		friendMenu:RefreshClickRouting()
+	end
 	if not self.toggleButton then
 		-- Try to find it again (if loaded late)
 		if BetterFriendsFrame and BetterFriendsFrame.StreamerModeButton then
@@ -182,6 +188,7 @@ function StreamerMode:UpdateState()
 		-- Auto-disable Streamer Mode if button is hidden
 		if BetterFriendlistDB.streamerModeActive then
 			BetterFriendlistDB.streamerModeActive = false
+			if friendMenu then friendMenu:RefreshClickRouting() end
 			-- Restore original header if it was changed
 			if
 				self.originalHeaderText

@@ -329,6 +329,16 @@ local function CopySet(set)
 	return result
 end
 
+local function SameTagSet(left, right)
+	for id, enabled in pairs(left) do
+		if enabled == true and right[id] ~= true then return false end
+	end
+	for id, enabled in pairs(right) do
+		if enabled == true and left[id] ~= true then return false end
+	end
+	return true
+end
+
 local function CountSet(set)
 	local count = 0
 	if type(set) == "table" then
@@ -440,7 +450,10 @@ local function NormalizeRoleTagIconOverrides(db)
 	for tagId, roleKey in pairs(ROLE_ICON_KEY_BY_TAG_ID) do
 		local profile = db.friendTagProfiles[tagId]
 		local roleIcon = ROLE_ICONS[roleKey]
-		if HasLegacyRoleIconOverride(profile, roleIcon) then
+		-- Current editor choices carry an explicit mode. Migrate only old implicit
+		-- defaults, never a user's deliberate selection of a former default icon.
+		if type(profile) == "table" and not NormalizeChipIconMode(profile.iconMode)
+			and HasLegacyRoleIconOverride(profile, roleIcon) then
 			profile.iconType = nil
 			profile.iconValue = nil
 			profile.icon = nil
@@ -889,7 +902,7 @@ local function GetLocalizedTagName(def)
 	return T(def.labelKey, def.name or def.fallback or def.id)
 end
 
-local function FindConflictingTagName(self, name, ignoredTagId)
+local function FindConflictingTagName(self, name, ignoredTagId, pendingNames)
 	name = NormalizeTagName(name)
 	if not name then
 		return nil
@@ -911,11 +924,25 @@ local function FindConflictingTagName(self, name, ignoredTagId)
 
 	local db = self:NormalizeDB()
 	for id, def in pairs(db.customFriendTags or {}) do
-		if id ~= ignoredTagId and type(def) == "table" and Matches(def.name) then
+		if id ~= ignoredTagId and type(def) == "table" and Matches(pendingNames and pendingNames[id] or def.name) then
 			return id, SOURCE_CUSTOM
 		end
 	end
 	return nil
+end
+
+local function ValidateCustomTagRename(self, db, tagId, name, pendingNames)
+	name = NormalizeTagName(name)
+	local def = type(tagId) == "string" and db.customFriendTags[tagId]
+	if type(def) ~= "table" or not name then return nil, "invalidTag" end
+	local conflictingId, source = FindConflictingTagName(self, name, tagId, pendingNames)
+	if conflictingId then return nil, source == SOURCE_BLIZZARD and "reservedName" or "exists" end
+	return def, name
+end
+
+local function SetCustomTagName(def, name)
+	def.name = name
+	def.updatedAt = time and time() or def.updatedAt
 end
 
 local function GetRuntimeCache(self)
@@ -1420,6 +1447,8 @@ function FriendTags:OnDatabaseImported()
 	self.normalizedDBReady = false
 	self.roleIconNormalizedDB = nil
 	self.friendAssignmentVersions = {}
+	self.pendingBlizzardTagSets = {}
+	self.pendingBlizzardTagWrites = {}
 	BumpDefinitionVersion()
 	self.allFriendAssignmentsVersion = BumpAssignmentVersion()
 	ClearRuntimeCaches()
@@ -1815,6 +1844,9 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 	if profile.chipLabel ~= nil then
 		pruned.chipLabel = tostring(profile.chipLabel)
 	end
+	if type(profile.customChipLabel) == "string" and profile.customChipLabel ~= "" then
+		pruned.customChipLabel = profile.customChipLabel
+	end
 	local iconMode = NormalizeChipIconMode(profile.iconMode)
 	if iconMode then
 		pruned.iconMode = iconMode
@@ -1839,6 +1871,17 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 	end
 	if type(profile.texCoord) == "table" and not SameTexCoord(profile.texCoord, defaultProfile.texCoord) then
 		pruned.texCoord = CopyTexCoord(profile.texCoord)
+	end
+	if pruned.iconType ~= nil or pruned.iconValue ~= nil or pruned.icon ~= nil
+		or pruned.atlas ~= nil or pruned.texture ~= nil then
+		-- An icon is one bundle. Keeping only individual differences can blend a
+		-- selected icon with the default texture, crop or atlas on the next read.
+		for _, field in ipairs(CHIP_PROFILE_ICON_FIELDS) do
+			if field ~= "iconMode" then
+				if field == "texCoord" then pruned[field] = CopyTexCoord(profile[field])
+				else pruned[field] = profile[field] end
+			end
+		end
 	end
 	if profile.iconZoom ~= nil then
 		local profileIconZoom = NormalizeIconZoom(profile.iconZoom)
@@ -1893,14 +1936,24 @@ function FriendTags:GetChipProfile(tag)
 		return nil
 	end
 	local override = CopyProfile(db.friendTagProfiles[tag.id])
-	local iconType = override.iconType ~= nil and override.iconType or defaultProfile.iconType
-	local iconValue = override.iconValue ~= nil and override.iconValue or defaultProfile.iconValue
-	local legacyIcon = override.icon ~= nil and override.icon or defaultProfile.icon
-	local atlas = override.atlas ~= nil and override.atlas or defaultProfile.atlas
-	local fallbackAtlas = override.fallbackAtlas ~= nil and override.fallbackAtlas or defaultProfile.fallbackAtlas
-	local texture = override.texture ~= nil and override.texture or defaultProfile.texture
+	local ownIcon = override.iconType ~= nil or override.iconValue ~= nil or override.icon ~= nil
+		or override.atlas ~= nil or override.texture ~= nil
+	local source = ownIcon and override or defaultProfile
+	local iconType = source.iconType or (source.atlas and "atlas") or defaultProfile.iconType
+	local iconValue = source.iconValue
+	if iconValue == nil then
+		if iconType == "atlas" then iconValue = source.atlas or source.icon
+		else iconValue = source.texture or source.icon end
+	end
+	if iconValue == nil then iconValue = defaultProfile.iconValue end
+	local legacyIcon = source.icon or iconValue
+	local atlas = iconType == "atlas" and (source.atlas or iconValue) or nil
+	local fallbackAtlas = override.fallbackAtlas or source.fallbackAtlas
+	local texture = source.texture
+	if iconType == "texture" and texture == nil then texture = iconValue end
 	local texCoord = override.texCoord ~= nil and CopyTexCoord(override.texCoord) or CopyTexCoord(defaultProfile.texCoord)
-	local iconZoom = NormalizeIconZoom(defaultProfile.iconZoom)
+	if ownIcon then texCoord = CopyTexCoord(override.texCoord) end
+	local iconZoom = NormalizeIconZoom(source.iconZoom)
 	if override.iconZoom ~= nil then
 		iconZoom = NormalizeIconZoom(override.iconZoom)
 	end
@@ -1945,17 +1998,7 @@ function FriendTags:GetChipProfile(tag)
 	return profile
 end
 
-function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
-	if type(tagId) ~= "string" or type(profilePatch) ~= "table" or not self:GetTagDefinition(tagId) then
-		return false
-	end
-	local db = self:NormalizeDB()
-	if profilePatch.reset == true then
-		db.friendTagProfiles[tagId] = nil
-		RefreshSurfaces(refreshCallback)
-		return true
-	end
-
+local function BuildChipProfileOverride(self, db, tagId, profilePatch)
 	local profile = CopyProfile(db.friendTagProfiles[tagId])
 	local clearFields = type(profilePatch.clearFields) == "table" and profilePatch.clearFields or {}
 	if profilePatch.replaceIcon == true then
@@ -1970,7 +2013,11 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 	end
 
 	if profilePatch.chipLabel ~= nil then
-		profile.chipLabel = profilePatch.chipLabel == false and nil or tostring(profilePatch.chipLabel)
+		profile.chipLabel = nil
+		if profilePatch.chipLabel ~= false then profile.chipLabel = tostring(profilePatch.chipLabel) end
+	end
+	if profilePatch.customChipLabel ~= nil then
+		profile.customChipLabel = Trim(profilePatch.customChipLabel)
 	end
 	if profilePatch.iconMode ~= nil then
 		profile.iconMode = profilePatch.iconMode == false and nil or NormalizeChipIconMode(profilePatch.iconMode)
@@ -1990,13 +2037,16 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 		end
 	end
 	if profilePatch.atlas ~= nil then
-		profile.atlas = profilePatch.atlas == false and nil or tostring(profilePatch.atlas)
+		profile.atlas = nil
+		if profilePatch.atlas ~= false then profile.atlas = tostring(profilePatch.atlas) end
 	end
 	if profilePatch.fallbackAtlas ~= nil then
-		profile.fallbackAtlas = profilePatch.fallbackAtlas == false and nil or tostring(profilePatch.fallbackAtlas)
+		profile.fallbackAtlas = nil
+		if profilePatch.fallbackAtlas ~= false then profile.fallbackAtlas = tostring(profilePatch.fallbackAtlas) end
 	end
 	if profilePatch.texture ~= nil then
-		profile.texture = profilePatch.texture == false and nil or NormalizeIconReference(profilePatch.texture)
+		profile.texture = nil
+		if profilePatch.texture ~= false then profile.texture = NormalizeIconReference(profilePatch.texture) end
 	end
 	if profilePatch.texCoord ~= nil then
 		profile.texCoord = profilePatch.texCoord == false and nil or CopyTexCoord(profilePatch.texCoord)
@@ -2029,7 +2079,46 @@ function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
 		profile.textColor = CopyColor(profilePatch.textColor)
 	end
 
-	db.friendTagProfiles[tagId] = self:PruneChipProfileOverride(tagId, profile)
+	return self:PruneChipProfileOverride(tagId, profile)
+end
+
+function FriendTags:SetChipProfile(tagId, profilePatch, refreshCallback)
+	if type(tagId) ~= "string" or type(profilePatch) ~= "table" or not self:GetTagDefinition(tagId) then
+		return false
+	end
+	local saved, reason = self:SetChipProfiles({ [tagId] = profilePatch }, refreshCallback)
+	return saved, reason
+end
+
+function FriendTags:SetChipProfiles(patches, refreshCallback)
+	if type(patches) ~= "table" or not next(patches) then return false end
+	local db = self:NormalizeDB()
+	local pendingNames = {}
+	for tagId, patch in pairs(patches) do
+		if type(patch) ~= "table" or not self:GetTagDefinition(tagId) then return false, "invalidTag", tagId end
+		if patch.reset ~= true and patch.tagName ~= nil then
+			local name = NormalizeTagName(patch.tagName)
+			if not name then return false, "invalidTag", tagId end
+			pendingNames[tagId] = name
+		end
+	end
+
+	-- Validate against the final names so a rename can reuse a name freed in the same save.
+	local overrides = {}
+	for tagId, patch in pairs(patches) do
+		if pendingNames[tagId] then
+			local def, reason = ValidateCustomTagRename(self, db, tagId, pendingNames[tagId], pendingNames)
+			if not def then return false, reason, tagId end
+		end
+		if patch.reset ~= true then
+			overrides[tagId] = BuildChipProfileOverride(self, db, tagId, patch)
+		end
+	end
+
+	for tagId in pairs(patches) do
+		db.friendTagProfiles[tagId] = overrides[tagId]
+		if pendingNames[tagId] then SetCustomTagName(db.customFriendTags[tagId], pendingNames[tagId]) end
+	end
 	RefreshSurfaces(refreshCallback)
 	return true
 end
@@ -2155,6 +2244,25 @@ function FriendTags:TryHandoffLocalBlizzardTags(friend, nativeSet)
 	return false, nativeSet
 end
 
+function FriendTags:TrackPendingBlizzardTags(uid, accountID, desired)
+	self.pendingBlizzardTagSets = self.pendingBlizzardTagSets or {}
+	self.pendingBlizzardTagWrites = self.pendingBlizzardTagWrites or {}
+	self.pendingBlizzardTagSets[uid] = CopySet(desired)
+	-- Each write owns its expiry, so a late callback cannot undo a newer edit.
+	local write = {}
+	self.pendingBlizzardTagWrites[uid] = write
+	if C_Timer and C_Timer.After then
+		C_Timer.After(10, function()
+			if not self.pendingBlizzardTagWrites or self.pendingBlizzardTagWrites[uid] ~= write then return end
+			self.pendingBlizzardTagWrites[uid] = nil
+			self.pendingBlizzardTagSets[uid] = nil
+			-- Re-read authoritative state if the server never acknowledged the edit.
+			-- Capture identity, not a pooled friend row that may have been reused.
+			RefreshFriendAssignment(nil, { type = "bnet", uid = uid, bnetAccountID = accountID }, uid)
+		end)
+	end
+end
+
 function FriendTags:GetBlizzardTagIdSetForFriend(friend, explicitUID, runtimeCache)
 	local cache = runtimeCache or GetRuntimeCache(self)
 	local cacheKey = GetFriendCacheKey(self, friend, "blizzardSet", explicitUID)
@@ -2174,8 +2282,16 @@ function FriendTags:GetBlizzardTagIdSetForFriend(friend, explicitUID, runtimeCac
 		local nativeSet = self:GetNativeBlizzardTagIdSet(friend)
 		local uid = self:GetFriendUID(friend, explicitUID)
 		local pendingSet = uid and self.pendingBlizzardTagSets and self.pendingBlizzardTagSets[uid]
-		if HasAny(pendingSet) then
-			result = CopySet(pendingSet)
+		if pendingSet ~= nil then
+			-- An empty pending set is a real request to remove the final tag.
+			-- Only this account's matching snapshot acknowledges its latest write.
+			if SameTagSet(pendingSet, nativeSet) then
+				self.pendingBlizzardTagSets[uid] = nil
+				if self.pendingBlizzardTagWrites then self.pendingBlizzardTagWrites[uid] = nil end
+				result = nativeSet
+			else
+				result = CopySet(pendingSet)
+			end
 		else
 			local storedSet = GetStoredBlizzardTagIdSet(self, friend, explicitUID)
 			for tagId, enabled in pairs(storedSet) do
@@ -2217,8 +2333,7 @@ function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 		local ok = pcall(C_BattleNet.SetFriendTags, accountID, enumTags)
 		if ok then
 			db.friendBlizzardTags[uid] = nil
-			self.pendingBlizzardTagSets = self.pendingBlizzardTagSets or {}
-			self.pendingBlizzardTagSets[uid] = CopySet(desired)
+			self:TrackPendingBlizzardTags(uid, accountID, desired)
 			if not options.suppressRefresh then
 				RefreshFriendAssignment(options.refreshCallback, friend, uid)
 			else
@@ -2232,6 +2347,7 @@ function FriendTags:SetBlizzardTagsForFriend(friend, tagIds, options)
 	if self.pendingBlizzardTagSets then
 		self.pendingBlizzardTagSets[uid] = nil
 	end
+	if self.pendingBlizzardTagWrites then self.pendingBlizzardTagWrites[uid] = nil end
 	if not options.suppressRefresh then
 		RefreshFriendAssignment(options.refreshCallback, friend, uid)
 	else
@@ -2441,22 +2557,22 @@ function FriendTags:AddCustomTag(name, refreshCallback)
 end
 
 function FriendTags:RenameCustomTag(tagId, name, refreshCallback)
-	name = NormalizeTagName(name)
-	local db = self:NormalizeDB()
-	local def = type(tagId) == "string" and db.customFriendTags[tagId]
-	if type(def) ~= "table" or not name then
-		return false, "invalidTag"
-	end
-
-	local conflictingId, source = FindConflictingTagName(self, name, tagId)
-	if conflictingId then
-		return false, source == SOURCE_BLIZZARD and "reservedName" or "exists"
-	end
-
-	def.name = name
-	def.updatedAt = time and time() or def.updatedAt
+	local def, result = ValidateCustomTagRename(self, self:NormalizeDB(), tagId, name)
+	if not def then return false, result end
+	SetCustomTagName(def, result)
 	RefreshSurfaces(refreshCallback)
 	return true
+end
+
+function FriendTags:GetCustomTagAssignmentCount(tagId)
+	local db = self:NormalizeDB()
+	local count = 0
+	for _, set in pairs(db.friendCustomTags) do
+		if type(set) == "table" and set[tagId] then
+			count = count + 1
+		end
+	end
+	return count
 end
 
 function FriendTags:DeleteCustomTag(tagId, refreshCallback)
@@ -2746,6 +2862,13 @@ function FriendTags:OpenSettings(tagId)
 	return false
 end
 
+local function NotifyTagAssignment(friend, tagIds)
+	local hints = BFL:GetModule("FriendTagHints")
+	if hints and #tagIds > 0 then
+		hints:OnAssigned(friend, tagIds)
+	end
+end
+
 function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallback, options)
 	options = options or {}
 	friend = self:NormalizeFriendContext(friend, explicitUID)
@@ -2766,6 +2889,12 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 		or {}
 
 	local function ReplaceWorkingSet(target, definitions, selected)
+		local added = {}
+		if selected then
+			for _, def in ipairs(definitions) do
+				if not target[def.id] then added[#added + 1] = def.id end
+			end
+		end
 		for tagId in pairs(target) do
 			target[tagId] = nil
 		end
@@ -2774,6 +2903,7 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 				target[def.id] = true
 			end
 		end
+		return added
 	end
 
 	if options.showHeader then
@@ -2785,18 +2915,24 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 
 	local function ApplyBulkSelection(selected)
 		local refreshViaCustomTags = featureEnabled == true
+		local added = {}
 		if hasBlizzardTags then
-			ReplaceWorkingSet(workingBlizzardSet, blizzardTags, selected)
-			self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
+			local blizzardAdded = ReplaceWorkingSet(workingBlizzardSet, blizzardTags, selected)
+			if self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
 				refreshCallback = refreshCallback,
 				userInitiated = true,
 				suppressRefresh = refreshViaCustomTags,
-			})
+			}) then
+				added = blizzardAdded
+			end
 		end
 		if featureEnabled then
-			ReplaceWorkingSet(workingCustomSet, customTags, selected)
-			self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID)
+			local customAdded = ReplaceWorkingSet(workingCustomSet, customTags, selected)
+			if self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID) then
+				for _, id in ipairs(customAdded) do added[#added + 1] = id end
+			end
 		end
+		NotifyTagAssignment(friend, added)
 		return MenuResponse and MenuResponse.Refresh
 	end
 
@@ -2815,13 +2951,6 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 	items[#items + 1] = { type = "divider" }
 
 	if hasBlizzardTags then
-		local function CommitBlizzardTags()
-			self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
-				refreshCallback = refreshCallback,
-				userInitiated = true,
-			})
-		end
-
 		local handoffInfo = self:GetLocalBlizzardHandoffInfo(friend, explicitUID)
 		if handoffInfo.available then
 			items[#items + 1] = {
@@ -2855,7 +2984,12 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 				end,
 				func = function()
 					workingBlizzardSet[tagId] = not workingBlizzardSet[tagId] or nil
-					CommitBlizzardTags()
+					if self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
+						refreshCallback = refreshCallback,
+						userInitiated = true,
+					}) and workingBlizzardSet[tagId] then
+						NotifyTagAssignment(friend, { tagId })
+					end
 					return MenuResponse and MenuResponse.Refresh
 				end,
 			}
@@ -2879,7 +3013,10 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 					end,
 					func = function()
 						workingCustomSet[tagId] = not workingCustomSet[tagId] or nil
-						self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID)
+						if self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID)
+							and workingCustomSet[tagId] then
+							NotifyTagAssignment(friend, { tagId })
+						end
 						return MenuResponse and MenuResponse.Refresh
 					end,
 				}
@@ -2971,10 +3108,21 @@ function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayNa
 	return self:PopulateMenuContent(submenu, friend, explicitUID, displayName, refreshCallback, options)
 end
 
+local function CreateAndAssignCustomTag(editBox, data)
+	local tagId, reason = FriendTags:CreateCustomTag(editBox and editBox:GetText())
+	if not tagId then
+		FriendTags:ShowTagNameError(reason)
+	elseif data and data.friend
+		and FriendTags:SetCustomTagForFriend(data.friend, tagId, true, data.refreshCallback) then
+		NotifyTagAssignment(data.friend, { tagId })
+	end
+end
+
 function FriendTags:Initialize()
 	self:NormalizeDB()
 	self.migrationFailures = {}
 	self.pendingBlizzardTagSets = {}
+	self.pendingBlizzardTagWrites = {}
 
 	StaticPopupDialogs["BFL_FRIEND_TAGS_CREATE_CUSTOM_TAG"] = {
 		text = T("FRIEND_TAGS_CUSTOM_PROMPT", "Create custom friend tag for %s:"),
@@ -2990,23 +3138,12 @@ function FriendTags:Initialize()
 			end
 		end,
 		OnAccept = function(dialog, data)
-			local editBox = GetPopupEditBox(dialog)
-			local tagId, reason = FriendTags:CreateCustomTag(editBox and editBox:GetText())
-			if tagId and data and data.friend then
-				FriendTags:SetCustomTagForFriend(data.friend, tagId, true, data.refreshCallback)
-			elseif not tagId then
-				FriendTags:ShowTagNameError(reason)
-			end
+			CreateAndAssignCustomTag(GetPopupEditBox(dialog), data)
 		end,
 		EditBoxOnEnterPressed = function(editBox, data)
 			local dialog = editBox:GetParent()
 			local popupData = data or (dialog and dialog.data)
-			local tagId, reason = FriendTags:CreateCustomTag(editBox:GetText())
-			if tagId and popupData and popupData.friend then
-				FriendTags:SetCustomTagForFriend(popupData.friend, tagId, true, popupData.refreshCallback)
-			elseif not tagId then
-				FriendTags:ShowTagNameError(reason)
-			end
+			CreateAndAssignCustomTag(editBox, popupData)
 			if dialog then
 				dialog:Hide()
 			end
@@ -3028,9 +3165,6 @@ function FriendTags:Initialize()
 			end, 35)
 		end
 		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(friendIndex)
-			if type(self.pendingBlizzardTagSets) == "table" then
-				wipe(self.pendingBlizzardTagSets)
-			end
 			local FriendsList = BFL:GetModule("FriendsList")
 			local tagsChanged, friend, canReconcileUnknownEvent
 			if FriendsList and FriendsList.GetLastBNetFriendInfoEventTagsChanged then

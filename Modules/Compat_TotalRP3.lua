@@ -310,6 +310,9 @@ function Compat:AddOpenProfileButton(owner, rootDescription, contextData, menuTy
 	if not label or not profileTarget or not self:CanShowOpenProfileButton(owner, contextData, menuType) then
 		return false
 	end
+	if rootDescription.HasButtonText and rootDescription:HasButtonText(label) then
+		return false
+	end
 
 	local header = GetTRP3Locale("UNIT_POPUPS_ROLEPLAY_OPTIONS_HEADER")
 	if not suppressHeader and header and rootDescription.CreateDivider and rootDescription.CreateTitle then
@@ -345,6 +348,7 @@ function Compat:Initialize()
 		id = "totalrp3-open-profile",
 		addonName = "totalRP3",
 		menuTypes = menuTypes,
+		requiresCompanion = false,
 		fallbackIfDynamicModifier = true,
 		canShow = function(owner, contextData)
 			return Compat:CanShowOpenProfileButton(owner, contextData, contextData and contextData.menuType)

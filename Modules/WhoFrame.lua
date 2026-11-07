@@ -592,6 +592,9 @@ function WhoFrame:RestoreNativeWhoListUpdates()
 end
 
 function WhoFrame:OnNativeWhoListAddonLoaded(addonName, nativeWhoFrame)
+	if BFL.IsForever and addonName == FOREVER_GROUP_FINDER_ADDON then
+		self:InstallNativeWhoWidgetHooks()
+	end
 	if (addonName ~= FOREVER_GROUP_FINDER_ADDON and addonName ~= "Blizzard_FriendsFrame")
 		or (not self.whoPending and not self:UsesPersistentNativeWhoIsolation())
 	then
@@ -616,7 +619,7 @@ function WhoFrame:ReleaseNativeWhoRequest(requestGuard)
 	return true
 end
 
-function WhoFrame:OnNativeWhoRequestSent()
+function WhoFrame:OnNativeWhoRequestSent(showResults)
 	if self.nativeWhoSendInProgress then
 		return false
 	end
@@ -628,19 +631,54 @@ function WhoFrame:OnNativeWhoRequestSent()
 	if not BFL.IsForever then
 		return self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
 	end
-	-- Native /who, player-link/context actions and LFG-Who widgets share this
-	-- API. Observe their completed send without reading secret arguments,
-	-- resending or replacing the restricted native function. Opening BFL Who
-	-- keeps its existing XML OnShow routing; the observer adds no routing call.
-	-- The post-hook cannot tell whether WHO_LIST_UPDATE already fired inside
-	-- the native call. Do not invent an outstanding request/timeout here. Show
-	-- the shared results now and let subsequent WHO_LIST_UPDATE refresh them.
+	self:SuspendNativeWhoListUpdates()
+	if not showResults then return false end
+	-- An explicit native UI action already sent the query. Its result may
+	-- already be available, so show the shared list without starting a timeout.
 	self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
 	self.lastWhoSendTime = GetTime()
 	self:StartRefreshButtonCooldown()
 	self:StartBuilderSearchButtonCooldown()
-	self:SuspendNativeWhoListUpdates()
 	return self:ShowWhoResults()
+end
+
+function WhoFrame:OnNativeWhoPlayerLinkProcessed(link)
+	if not self.nativeWhoLinkSent then return end
+	self.nativeWhoLinkSent = nil
+	if (BFL.IsSecret and BFL:IsSecret(link)) or type(link) ~= "string" or not LinkTypes then return end
+	local linkType = link:match("^([^:]+):[^:]+")
+	if linkType ~= LinkTypes.Player and linkType ~= LinkTypes.PlayerCommunity and linkType ~= LinkTypes.PlayerGM then
+		return
+	end
+	-- The Blizzard handler also uses modified clicks to paste player names.
+	-- A send observed earlier in the same frame must not turn a paste into Who.
+	if not IsModifiedClick("CHATLINK") or ChatFrameUtil.GetActiveWindow()
+		or StaticPopup_Visible("ADD_IGNORE") or StaticPopup_Visible("ADD_FRIEND")
+		or StaticPopup_Visible("ADD_GUILDMEMBER") or StaticPopup_Visible("CHANNEL_INVITE")
+	then
+		return
+	end
+	self:OnNativeWhoRequestSent(true)
+end
+
+function WhoFrame:InstallNativeWhoWidgetHooks()
+	local frame = _G.LFGWhoListFrame
+	if (BFL.IsSecret and BFL:IsSecret(frame)) or not frame then return end
+	self.nativeWhoWidgetHooks = self.nativeWhoWidgetHooks or {}
+	local function hook(widget, script)
+		if (BFL.IsSecret and BFL:IsSecret(widget)) or not widget or self.nativeWhoWidgetHooks[widget] then return end
+		if widget:IsForbidden() then return end
+		widget:HookScript(script, function()
+			self:OnNativeWhoRequestSent(true)
+		end)
+		self.nativeWhoWidgetHooks[widget] = true
+	end
+	pcall(function()
+		if not frame:IsForbidden() then
+			hook(frame.EditBox, "OnEnterPressed")
+			hook(frame.WhoSearch, "OnClick")
+		end
+	end)
 end
 
 function WhoFrame:InstallNativeWhoRequestObserver()
@@ -653,8 +691,24 @@ function WhoFrame:InstallNativeWhoRequestObserver()
 	then
 		return false
 	end
-	hooksecurefunc(C_FriendList, "SendWho", function()
+	local itemOrigin = Enum and Enum.SocialWhoOrigin and Enum.SocialWhoOrigin.Item
+	local observePlayerLinks = BFL.IsForever and itemOrigin and LinkUtil and type(LinkUtil.ProcessLink) == "function"
+	if observePlayerLinks then
+		hooksecurefunc(LinkUtil, "ProcessLink", function(link)
+			self:OnNativeWhoPlayerLinkProcessed(link)
+		end)
+	end
+	hooksecurefunc(C_FriendList, "SendWho", function(_, origin)
 		self:OnNativeWhoRequestSent()
+		-- The origin alone is just an argument any caller can pass. Wait for
+		-- the player-link handler to finish before taking an action in the UI.
+		if observePlayerLinks and not self.nativeWhoSendInProgress
+			and not (BFL.IsSecret and BFL:IsSecret(origin))
+			and origin == itemOrigin and not self.nativeWhoLinkSent
+		then
+			self.nativeWhoLinkSent = true
+			RunNextFrame(function() self.nativeWhoLinkSent = nil end)
+		end
 	end)
 	self.nativeWhoSendObserverInstalled = true
 	return true
@@ -665,7 +719,10 @@ function WhoFrame:Initialize()
 		return
 	end
 	self:InstallNativeWhoRequestObserver()
-	if self:UsesPersistentNativeWhoIsolation() then self:SuspendNativeWhoListUpdates() end
+	if BFL.IsForever then
+		self:InstallNativeWhoWidgetHooks()
+		if self:UsesPersistentNativeWhoIsolation() then self:SuspendNativeWhoListUpdates() end
+	end
 	-- Register event callback for WHO list updates
 	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
 		self:OnWhoListUpdate(...)
@@ -2011,6 +2068,9 @@ function WhoFrame:InitButton(button, elementData)
 	-- Update selection state
 	local selected = BetterFriendsFrame.WhoFrame.selectedWho == index
 	self:SetButtonSelected(button, selected)
+	local friendMenu = BFL:GetModule("NativeFriendMenu")
+	local friends = BFL:GetModule("FriendsList")
+	if friendMenu and friends then friendMenu:UpdateRow(friends, button, info, true) end
 end
 
 -- Check if WHO search is currently on cooldown
@@ -3031,10 +3091,11 @@ function _G.BetterWhoListButton_OnDoubleClick(self, mouseButton)
 	local name = self.info.fullName
 	if action == "invite" then
 		BFL.InviteUnit(name)
-	else
-		-- WHO results provide names and GUIDs, but no inspectable unit token. Keep
-		-- legacy/invalid action values on the safe, supported Whisper path.
-		BFL:SecureSendTell(name)
+	elseif not (IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown()
+		or (IsModifiedClick and IsModifiedClick("CHATLINK")))
+	then
+		local friendMenu = BFL:GetModule("NativeFriendMenu")
+		if friendMenu then friendMenu:ShowWhisperUnavailable() end
 	end
 end
 

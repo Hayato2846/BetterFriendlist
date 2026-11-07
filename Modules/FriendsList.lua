@@ -601,7 +601,6 @@ local function GetFriendTextRightPadding(
 		local favoriteLayout = GetFavoriteIconLayout(nameSize, settings and settings.favoriteIconStyle)
 		padding = padding + favoriteLayout.rightPadding
 	end
-
 	return padding
 end
 
@@ -3501,73 +3500,22 @@ function FriendsList:ResolveSelectedFriend()
 	return self:ResolveFriendByUID(self.selectedFriendUID)
 end
 
-function FriendsList:WhisperFriend(friend)
-	if not friend then
-		return false
+function FriendsList:GetClickWhisperMode()
+	local DB = GetDB()
+	if not DB or not DB:Get("friendListClickWhisperEnabled", false) then
+		return nil
 	end
-
-	if friend.type == "bnet" then
-		local accountID = friend.bnetIDAccount or friend.bnetAccountID
-		local accountName = friend.accountName
-		local battleTag = friend.battleTag
-		local accountInfo
-
-		if accountID and C_BattleNet and C_BattleNet.GetAccountInfoByID then
-			accountInfo = C_BattleNet.GetAccountInfoByID(accountID)
-			if accountInfo then
-				accountID = accountInfo.bnetAccountID or accountID
-				accountName = accountInfo.accountName or accountName
-				battleTag = accountInfo.battleTag or battleTag
-			end
-		end
-
-		local isOffline = friend.connected == false
-		if accountInfo and accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline ~= nil then
-			isOffline = accountInfo.gameAccountInfo.isOnline == false
-		end
-		if BFL.IsOfflineTitleFriend and BFL.IsOfflineTitleFriend(accountInfo or friend, isOffline) then
-			return false
-		end
-
-		local tellName = nil
-		if BFL:IsSecret(accountName) then
-			tellName = battleTag
-		elseif accountName and accountName ~= "" and accountName ~= "???" then
-			tellName = accountName
-		else
-			tellName = battleTag
-		end
-		if BFL:IsSecret(tellName) then
-			tellName = nil
-		end
-
-		if tellName and tellName ~= "" then
-			BFL:SecureSendBNetTell(tellName, accountID)
-			return true
-		end
-	elseif friend.type == "wow" and friend.connected and friend.name then
-		BFL:SecureSendTell(friend.name)
-		return true
-	end
-
-	return false
+	return DB:Get("friendListClickWhisperMode", "double") == "single" and "single" or "double"
 end
 
 function FriendsList:HandleFriendWhisperClick(friend, clickMode)
-	local DB = GetDB()
-	if not DB or not DB:Get("friendListClickWhisperEnabled", false) then
+	if self:GetClickWhisperMode() ~= clickMode or (IsModifiedClick and IsModifiedClick("CHATLINK")) then
 		return false
 	end
 
-	local configuredMode = DB:Get("friendListClickWhisperMode", "double")
-	if configuredMode ~= "single" and configuredMode ~= "double" then
-		configuredMode = "double"
-	end
-	if configuredMode ~= clickMode then
-		return false
-	end
-
-	return self:WhisperFriend(friend)
+	local friendMenu = BFL:GetModule("NativeFriendMenu")
+	if friendMenu and friend then friendMenu:ShowWhisperUnavailable() end
+	return false
 end
 
 -- Replace token case-insensitively in format string
@@ -3888,7 +3836,7 @@ function FriendsList:FormatInfoLine(friend)
 		end
 	end
 
-	-- Keep the original default layout, with the target ruleset on Forever.
+	-- Include a known Forever target's ruleset regardless of the viewer's client.
 	if infoPreset == "default" then
 		if friend.connected then
 			local text
@@ -3908,7 +3856,7 @@ function FriendsList:FormatInfoLine(friend)
 			else
 				text = L.ONLINE_STATUS or "Online"
 			end
-			if BFL.IsForever and ruleset ~= "" then
+			if ruleset ~= "" then
 				text = text ~= "" and (text .. ", " .. ruleset) or ruleset
 			end
 			return isBNet and AppendMultiAccountInfo(text) or text
@@ -4467,22 +4415,15 @@ function FriendsList:UpdateSendMessageButton()
 
 	local button = frame.SendMessageButton
 	local friend = self:ResolveSelectedFriend()
+	local friendMenu = BFL:GetModule("NativeFriendMenu")
+	if friendMenu then friendMenu:UpdateSendMessage(self, button, friend) end
 
-	if not friend then
-		button:Disable()
-		return
-	end
-
-	if friend.type == "wow" then
-		if friend.connected then
-			button:Enable()
-		else
-			button:Disable()
-		end
-	elseif friend.type == "bnet" then
-		-- BNet friends can receive messages via app even if appearing offline/away
-		-- Blizzard enables it for all BNet friends
+	if friend and (friend.type == "bnet" or (friend.type == "wow"
+		and not BFL:IsSecret(friend.connected) and friend.connected == true))
+	then
 		button:Enable()
+	else
+		button:Disable()
 	end
 end
 
@@ -5653,16 +5594,20 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 						-- Classic Fix: Parse richPresence if areaName is missing (format: "Zone - Realm")
 						-- Use " - " (space-dash-space) as separator to avoid splitting localized zone names
 						-- that contain hyphens (e.g. French "Lune-d'Argent" for Silvermoon City)
-						if (not friend.areaName or friend.areaName == "") and gameInfo.richPresence then
-							local sep = string.find(gameInfo.richPresence, " - ", 1, true)
-							if sep then
-								friend.areaName = strtrim(string.sub(gameInfo.richPresence, 1, sep - 1))
-								local richRealm = strtrim(string.sub(gameInfo.richPresence, sep + 3))
+						local richPresence = BFL.GetGameAccountRichPresence(gameInfo)
+						if (not friend.areaName or friend.areaName == "") and richPresence then
+							local _, _, _, presenceArea = BFL.GetWoWAccountLocation(gameInfo)
+							local sep = string.find(richPresence, " - ", 1, true)
+							if presenceArea then
+								friend.areaName = presenceArea
+							elseif sep then
+								friend.areaName = strtrim(string.sub(richPresence, 1, sep - 1))
+								local richRealm = strtrim(string.sub(richPresence, sep + 3))
 								if richRealm ~= "" and (not friend.realmName or friend.realmName == "") then
 									friend.realmName = richRealm
 								end
 							else
-								friend.areaName = strtrim(gameInfo.richPresence)
+								friend.areaName = strtrim(richPresence)
 							end
 						end
 
@@ -5781,16 +5726,20 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 								friend.gameName = nil
 								-- Classic richPresence fallback (format: "Zone - Realm")
 								-- Use " - " separator to preserve localized zone names with hyphens
-								if (not friend.areaName or friend.areaName == "") and prefAccount.richPresence then
-									local sep = string.find(prefAccount.richPresence, " - ", 1, true)
-									if sep then
-										friend.areaName = strtrim(string.sub(prefAccount.richPresence, 1, sep - 1))
-										local richRealm = strtrim(string.sub(prefAccount.richPresence, sep + 3))
+								local richPresence = BFL.GetGameAccountRichPresence(prefAccount)
+								if (not friend.areaName or friend.areaName == "") and richPresence then
+									local _, _, _, presenceArea = BFL.GetWoWAccountLocation(prefAccount)
+									local sep = string.find(richPresence, " - ", 1, true)
+									if presenceArea then
+										friend.areaName = presenceArea
+									elseif sep then
+										friend.areaName = strtrim(string.sub(richPresence, 1, sep - 1))
+										local richRealm = strtrim(string.sub(richPresence, sep + 3))
 										if richRealm ~= "" and (not friend.realmName or friend.realmName == "") then
 											friend.realmName = richRealm
 										end
 									else
-										friend.areaName = strtrim(prefAccount.richPresence)
+										friend.areaName = strtrim(richPresence)
 									end
 								end
 							elseif prefAccount.clientProgram == "BSAp" then
@@ -7163,19 +7112,22 @@ function FriendsList:ToggleGroup(groupId)
 end
 
 -- Create a new custom group
-function FriendsList:CreateGroup(groupName)
+function FriendsList:CreateGroup(groupName, friendUID)
 	local Groups = GetGroups()
 	if not Groups then
 		return false, "Groups module not available"
 	end
 
-	local success, err = Groups:Create(groupName)
+	local success, result = Groups:Create(groupName)
 	if success then
+		local assigned = friendUID and Groups:ToggleFriendInGroup(friendUID, result)
 		self:SyncGroups()
 		BFL:ForceRefreshFriendsList()
+		local hints = BFL:GetModule("NewGroupHints")
+		if hints then hints:OnCreated(self, assigned and friendUID or nil) end
 	end
 
-	return success, err
+	return success, result
 end
 
 -- Rename a group
@@ -9476,11 +9428,13 @@ function FriendsList:SetButtonSelectionVisual(button, selected)
 		return
 	end
 	selected = selected == true
+	button.bflSelected = selected
+	local highlighted = selected or button.bflNativeHover == true
 	if button.SetHighlightLocked then
-		button:SetHighlightLocked(selected)
-	elseif selected and button.LockHighlight then
+		button:SetHighlightLocked(highlighted)
+	elseif highlighted and button.LockHighlight then
 		button:LockHighlight()
-	elseif not selected and button.UnlockHighlight then
+	elseif not highlighted and button.UnlockHighlight then
 		button:UnlockHighlight()
 	elseif button.selectionHighlight then
 		button.selectionHighlight:SetShown(selected)
@@ -9515,7 +9469,6 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	button.friendIndex = friend.index
 	button.friendData = friend
 	button.groupId = groupId
-
 	-- Sync selection state to the recycled row. Modern cards use the template's
 	-- native friends-card-selected highlight; legacy rows retain their custom
 	-- selection texture.
@@ -10285,6 +10238,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	if FriendsUI and FriendsUI.StyleFriendCard then
 		FriendsUI:StyleFriendCard(button)
 	end
+
+	local friendMenu = BFL:GetModule("NativeFriendMenu")
+	if friendMenu then friendMenu:UpdateRow(self, button, friend) end
 
 	-- Ensure button is visible
 	button:Show()

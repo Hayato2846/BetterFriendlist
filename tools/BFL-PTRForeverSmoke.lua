@@ -180,7 +180,9 @@ function env.FriendTags:AreBlizzardTagsEnabled() return true end
 env.CopySet = function(value) local result = {}; for k, v in pairs(value) do result[k] = v end; return result end
 env.RefreshFriendAssignment = function() end
 env.C_BattleNet.SetFriendTags = mutate
-execute(between(read("Modules/FriendTags.lua"), "function FriendTags:SetBlizzardTagsForFriend(", "function FriendTags:GetLocalBlizzardHandoffInfo("), "Native tag mutation")
+local tagSource = read("Modules/FriendTags.lua")
+execute(between(tagSource, "function FriendTags:TrackPendingBlizzardTags(", "function FriendTags:GetBlizzardTagIdSetForFriend(")
+	.. between(tagSource, "function FriendTags:SetBlizzardTagsForFriend(", "function FriendTags:GetLocalBlizzardHandoffInfo("), "Native tag mutation")
 check(not env.FriendTags:SetBlizzardTagsForFriend({ type = "bnet", bnetAccountID = secret }, {}, { userInitiated = true }), "Secret tag account IDs are rejected before identity lookup")
 check(not env.FriendTags:SetBlizzardTagsForFriend({ type = "bnet", bnetAccountID = 42 }, {}, {}), "Native tags require the existing explicit-user gate")
 equal(mutationCount, before, "Rejected tag changes do not call the C API")

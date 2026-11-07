@@ -446,6 +446,10 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if FriendsUI and FriendsUI.ApplyTheme then
 		FriendsUI:ApplyTheme(friendsUITheme)
 	end
+	local FeatureHints = BFL:GetModule("FeatureHints")
+	if FeatureHints and FeatureHints.RefreshAppearance then
+		FeatureHints:RefreshAppearance()
+	end
 	local EllesmereUISkin = BFL:GetModule("EllesmereUISkin")
 	if theme == "ellesmereui" and EllesmereUISkin and EllesmereUISkin.Apply then
 		EllesmereUISkin:Apply(reason or "theme-manager")

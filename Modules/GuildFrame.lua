@@ -827,6 +827,14 @@ end
 -- Refresh & Render (Retail ScrollBox)
 -- ========================================
 
+function GuildFrame:RefreshSettings()
+	-- Row visuals and nickname sorting can change without a roster event.
+	MarkDisplayListDirty(self)
+	MarkRetailRowsDirty(self)
+	self:RefreshHeaderControls(true)
+	self:Refresh()
+end
+
 function GuildFrame:Refresh()
 	if not self:IsEnabled() then
 		self.guildMembers = {}
@@ -3523,7 +3531,10 @@ function GuildFrame:SaveMemberInfoPanel_Legacy()
 	local DB = GetDB()
 	if DB and DB.SetGuildNickname then
 		local newNick = panel.nickBox:GetText() or ""
+		local previous = DB:GetGuildNickname(member.fullName)
 		DB:SetGuildNickname(member.fullName, newNick ~= "" and newNick or nil)
+		local hints = BFL:GetModule("NicknameHints")
+		if hints then hints:OnNicknameSaved(newNick, previous, "guild") end
 	end
 
 	self:HideMemberInfoPanel()

@@ -19,7 +19,7 @@ local function check(value, message) assertions = assertions + 1; assert(value, 
 local function equal(actual, expected, message) check(actual == expected, message) end
 local core, module = read("Core.lua"), read("Modules/WhoFrame.lua")
 local function fixture(flavor, lateNative)
-	local state = { now = 100, calls = {}, timers = {}, callbacks = {}, nativeOpens = 0, addonOpens = 0, hints = 0, hooks = {} }
+	local state = { now = 100, calls = {}, timers = {}, callbacks = {}, nativeOpens = 0, addonOpens = 0, hints = 0, hooks = {}, linkHooks = {} }
 	local BFL = { modules = {}, L = {}, IsMainline = flavor ~= "classic", IsForever = flavor == "forever", HasSecretValues = flavor ~= "classic" }
 	function BFL:RegisterModule(name, value) self.modules[name] = value; return value end
 	function BFL:GetModule(name) return self.modules[name] end
@@ -83,6 +83,7 @@ local function fixture(flavor, lateNative)
 		NormalizeFriendsFrameTab = function(tab) return tab or 1 end,
 		NormalizeFriendsSubPanel = function(tab) return tab end,
 		WhoFrameEditBoxMixin = {}, WhoFrameColumnDropdownMixin = {},
+		LinkUtil = { ProcessLink = function() end },
 	}, { __index = _G })
 	env._G = env
 	state.env, state.BFL = env, BFL
@@ -101,9 +102,14 @@ local function fixture(flavor, lateNative)
 		for _, callback in ipairs(state.hooks) do callback(...) end
 	end
 	env.hooksecurefunc = function(owner, key, callback)
-		equal(owner, env.C_FriendList, "only the native request API is observed")
-		equal(key, "SendWho", "no native visibility function is hooked")
-		state.hooks[#state.hooks + 1] = callback
+		if owner == env.LinkUtil then
+			equal(key, "ProcessLink", "only the explicit link dispatcher is observed")
+			state.linkHooks[#state.linkHooks + 1] = callback
+		else
+			equal(owner, env.C_FriendList, "the native request API is observed")
+			equal(key, "SendWho", "no native visibility function is hooked")
+			state.hooks[#state.hooks + 1] = callback
+		end
 	end
 	local nativeSend, nativeMixin = env.C_FriendList.SendWho, env.WhoFrameEditBoxMixin
 	local who = assert(load(module, "@Modules/WhoFrame.lua", "t", env))("BetterFriendlist", BFL)
@@ -118,6 +124,7 @@ local function fixture(flavor, lateNative)
 	equal(env.C_FriendList.SendWho, nativeSend, "observer leaves native SendWho unchanged")
 	who:InstallNativeWhoRequestObserver()
 	equal(#state.hooks, 1, "observer installation is idempotent")
+	equal(#state.linkHooks, flavor == "forever" and 1 or 0, "only Forever observes the link dispatcher")
 	function state:emit()
 		self.callbacks.WHO_LIST_UPDATE()
 		if self.env.LFGWhoListFrame and self.env.LFGWhoListFrame.registered then self.nativeOpens = self.nativeOpens + 1 end
@@ -154,7 +161,7 @@ for _, flavor in ipairs({ "forever", "retail", "classic" }) do
 	equal(s.nativeOpens, 0, flavor .. " does not open native Who")
 end
 
-for _, origin in ipairs({ "own", "slash-empty", "slash-text", "native-slash", "context-item", "native-who-widget" }) do
+for _, origin in ipairs({ "own", "slash-empty", "slash-text", "background", "background-chat", "background-item", "background-social", "background-secret" }) do
 	local s = fixture("forever")
 	s.BFL:InstallFriendsFrameRedirects()
 	local opaque = setmetatable({}, { __index = function() error("secret indexed") end, __tostring = function() error("secret formatted") end })
@@ -167,19 +174,27 @@ for _, origin in ipairs({ "own", "slash-empty", "slash-text", "native-slash", "c
 	elseif origin == "slash-text" then
 		s.env.SlashCmdList.WHO('n-"Ada"')
 		equal(s.calls[1][1], 'n-"Ada"', "/who keeps the exact user query")
-	elseif origin == "native-slash" then
+	elseif origin == "background-chat" then
 		s.nativeSlash("native query")
-	elseif origin == "context-item" then
+	elseif origin == "background-item" then
 		s.env.C_FriendList.SendWho(opaque, s.env.Enum.SocialWhoOrigin.Item, opaque)
 		equal(s.calls[1][1], opaque, "observer never reads native query values")
 		equal(s.calls[1][3], opaque, "observer preserves native structured arguments")
+	elseif origin == "background-social" then
+		s.env.C_FriendList.SendWho("background query with origin", s.env.Enum.SocialWhoOrigin.Social)
+	elseif origin == "background-secret" then
+		s.env.C_FriendList.SendWho("background query with secret origin", opaque)
 	else
-		s.env.C_FriendList.SendWho("native widget", 1, opaque)
+		s.env.C_FriendList.SendWho("background query")
 	end
 	equal(#s.calls, 1, origin .. " sends exactly once")
 	equal(s.routingWrites or 0, (origin == "own" or origin == "slash-empty" or origin == "slash-text") and 1 or 0,
 		origin .. " standalone observer adds no routing call (real XML chain is tested separately)")
-	if origin ~= "own" then check(s.addonOpens > 0, origin .. " displays BFL Who") end
+	local userSlash = origin == "slash-empty" or origin == "slash-text"
+	equal(s.addonOpens, userSlash and 1 or 0, origin .. " only opens BFL from the installed slash command")
+	if origin:match("^background") then
+		check(not s.who.lastWhoSendTime, origin .. " does not start the BFL cooldown")
+	end
 	equal(s.who.whoPending == true, origin == "own" or origin == "slash-empty" or origin == "slash-text", origin .. " tracks only requests BFL actually dispatches")
 	check(not s.env.LFGWhoListFrame.registered, origin .. " isolates native auto-open")
 	s:emit(); s:advance(0)
@@ -187,6 +202,7 @@ for _, origin in ipairs({ "own", "slash-empty", "slash-text", "native-slash", "c
 	check(not s.env.LFGWhoListFrame.registered, origin .. " completion cannot expose native auto-open")
 	s:advance(20); s:emit()
 	equal(s.nativeOpens, 0, origin .. " duplicate/late results stay isolated")
+	equal(s.addonOpens, userSlash and 1 or 0, origin .. " duplicate/late results do not open BFL")
 end
 
 local s = fixture("forever")
@@ -225,6 +241,7 @@ end
 
 for _, failure in ipairs({ "sendError", "routeError", "falseReturn" }) do
 	s = fixture("forever")
+	local dispatch = s.who.DispatchWhoRequest
 	if failure == "falseReturn" then s.who.DispatchWhoRequest = function() return false end else s[failure] = true end
 	local ok, result = pcall(s.who.SendWhoRequest, s.who, "owned", 1)
 	equal(ok, failure == "falseReturn", failure .. " preserves failure contract")
@@ -232,15 +249,21 @@ for _, failure in ipairs({ "sendError", "routeError", "falseReturn" }) do
 	check(not s.who.nativeWhoSendInProgress and not s.who.nativeWhoRequestGuard, failure .. " clears its dispatch marker")
 	check(not s.env.LFGWhoListFrame.registered and not s.who.whoPending, failure .. " keeps late native results isolated")
 	s.sendError, s.routeError = nil, nil
+	s.who.DispatchWhoRequest = dispatch
 	s.env.C_FriendList.SendWho("native after failure", 1)
 	equal(#s.calls, 1, failure .. " next native request sends once")
-	check(s.addonOpens > 0, failure .. " next request belongs to BFL")
+	equal(s.addonOpens, 0, failure .. " an unrelated native request cannot open BFL")
+	s:advance(6)
+	s.BFL:InstallFriendsFrameRedirects()
+	check(s.env.SlashCmdList.WHO("user after failure"), failure .. " the next explicit BFL query still submits")
+	equal(s.addonOpens, 1, failure .. " the next explicit BFL query opens Who")
 end
 
 s = fixture("forever")
 s.synchronousResult = true
 s.env.C_FriendList.SendWho("synchronous event", 3)
 equal(s.nativeOpens, 0, "persistent isolation covers an event inside native SendWho")
+equal(s.addonOpens, 0, "a synchronous background result does not open BFL")
 s:advance(0)
 check(not s.env.LFGWhoListFrame.registered, "synchronous completion cannot restore native auto-open")
 check(not s.who.whoPending and not s.who.whoTimeoutTimer, "post-hook cannot turn an already delivered result into pending work")
@@ -274,10 +297,16 @@ equal(#s.calls, 0, "restricted BFL request cannot reach native API")
 s.env.C_FriendList.SendWho("native secure request", 3)
 equal(#s.calls, 1, "observer never replays/restricts native successful sends")
 equal(s.routingWrites or 0, 0, "standalone observer adds no routing call")
-s.BFL.AllowBlizzardFriendsFrame = true
+s.BFL:InstallFriendsFrameRedirects()
+s.BFL.OriginalOpenFriendsFrame = function() end
+s.BFL.ShowBlizzardFriendsFrame()
 s.env.C_FriendList.SendWho("explicit native bypass", 1)
 check(s.env.LFGWhoListFrame.registered, "explicit native bypass restores original registrations")
 local bypassOpens = s.addonOpens
 s.env.C_FriendList.SendWho("native bypass again", 1)
 equal(s.addonOpens, bypassOpens, "native bypass never opens BFL")
+s:advance(0.1)
+check(not s.env.LFGWhoListFrame.registered, "ending the native bypass isolates even a synchronous background result")
+s:emit()
+equal(s.nativeOpens, 0, "background results after the bypass do not open native LFG")
 io.write(("Who ownership smoke: %d checks passed\n"):format(assertions))

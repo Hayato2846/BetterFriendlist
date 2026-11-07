@@ -137,6 +137,33 @@ for _, example in ipairs({
 	location(account, "CAMWOW EU5 Realm 6 PvP", example[2], "ruleset", "Only the target's CAMWOW presence suffix can supply missing realm data")
 end
 local unknownTarget = game(18)
+for _, separator in ipairs({ " - ", " · " }) do
+	for _, variant in ipairs({ { "Normal", "Normal" }, { "PvE", "Normal" }, { "PvP", "PvP" },
+		{ "RP", "RP" }, { "RP-PvP", "RP-PvP" }, { "RP PvP", "RP-PvP" } }) do
+		local account = game(18)
+		account.realmName, account.realmDisplayName = nil, nil
+		account.richPresence = "Forever" .. separator .. variant[1] .. separator .. "Ashenvale"
+		location(account, "CAMWOW EU5 Realm 6 PvP", variant[2], "ruleset", "Structured Forever presence supplies the exact target ruleset")
+		equal(select(4, BFL.GetWoWAccountLocation(account)), "Ashenvale", "Presence area is separate from ruleset evidence")
+		equal(account.realmName, nil, "Presence parsing never invents a realm name")
+	end
+end
+for _, presence in ipairs({ "Forever · Heroic · Ashenvale", "Forever · Normal · ", "Forever · Normal", "WoW · PvP · Ashenvale",
+	"Battlefield PvP", "Ashenvale - PvP", "Forever · Normal · Ashenvale · Extra" }) do
+	local account = game(18)
+	account.realmName, account.realmDisplayName, account.richPresence = nil, nil, presence
+	location(account, nil, "", "ruleset", "Unrecognized presence is not a realm ruleset")
+end
+local statusAccount = game(18)
+statusAccount.realmName, statusAccount.realmDisplayName = nil, nil
+statusAccount.richPresence = "Forever · Normal · PvP Arena"
+location(statusAccount, nil, "Normal", "ruleset", "PvP in the zone cannot override the explicit Normal segment")
+statusAccount.richPresence = "Forever - RP-PvP - Lune-d’Argent"
+equal(select(4, BFL.GetWoWAccountLocation(statusAccount)), "Lune-d’Argent", "Zone hyphens and glyphs are preserved")
+statusAccount.wowProjectID = 1
+location(statusAccount, nil, "", "realm", "The presence format cannot classify a normal Retail account as Forever")
+statusAccount.wowProjectID, statusAccount.richPresence = 18, secret
+location(statusAccount, nil, "", "ruleset", "Restricted structured presence is rejected before parsing")
 unknownTarget.realmName, unknownTarget.realmDisplayName, unknownTarget.richPresence = nil, nil, secret
 location(unknownTarget, "CAMWOW EU5 Realm 6 PvP", "", "ruleset", "Secret presence cannot activate an unrelated caller fallback")
 unknownTarget.richPresence = nil
@@ -165,6 +192,34 @@ local hidden = game(secret)
 location(hidden, "Fallback", "", "realm", "An unreadable project cannot select an unrelated realm")
 regular.realmDisplayName, regular.realmName = secret, secret
 location(regular, secret, "", "realm", "Secret strings are never formatted or returned")
+
+-- Reuse one native record across client changes, including inconsistent
+-- presence data until the next Battle.net update. Never mutate its contents.
+local changingAccount = game(18)
+for _, presence in ipairs({ "Forever · Normal · Ashenvale", "Forever - PvP - Elwynn",
+	"Westfall - CAMWOW EU5 Realm 9 RP PvP" }) do
+	changingAccount.richPresence, changingAccount.wowProjectID = presence, 18
+	equal(BFL.GetGameAccountRichPresence(changingAccount), presence, "Forever keeps its own presence")
+	for _, project in ipairs({ 1, 2 }) do
+		changingAccount.wowProjectID = project
+		equal(BFL.GetGameAccountRichPresence(changingAccount), nil, "Other WoW clients do not reuse Forever presence")
+		equal(changingAccount.richPresence, presence, "Filtering never modifies the native snapshot")
+	end
+	changingAccount.wowProjectID = 18
+	equal(BFL.GetGameAccountRichPresence(changingAccount), presence, "Returning to Forever recovers without a cached empty value")
+end
+changingAccount.wowProjectID, changingAccount.richPresence = 1, "Stormwind - Normal"
+equal(BFL.GetGameAccountRichPresence(changingAccount), "Stormwind - Normal", "Current Retail presence remains intact")
+changingAccount.richPresence = "PvP Arena"
+equal(BFL.GetGameAccountRichPresence(changingAccount), "PvP Arena", "Generic PvP text is not classified as Forever")
+changingAccount.richPresence = secret
+equal(BFL.GetGameAccountRichPresence(changingAccount), nil, "Restricted presence is never parsed")
+changingAccount.richPresence, changingAccount.wowProjectID = "Forever · PvP · Elwynn", secret
+equal(BFL.GetGameAccountRichPresence(changingAccount), nil, "Restricted projects are not compared")
+equal(BFL.GetGameAccountRichPresence(restricted), nil, "Restricted account tables are not indexed")
+equal(BFL.GetGameAccountRichPresence(secret), nil, "Secret accounts are not inspected")
+equal(BFL.GetGameAccountRichPresence({ clientProgram = "D3", wowProjectID = 1, richPresence = "Adventure Mode" }),
+	"Adventure Mode", "Other games retain their normal status")
 
 BFL.IsForever = true
 location(game(18), "Fallback", "", "ruleset", "Forever friends have no invented ruleset")

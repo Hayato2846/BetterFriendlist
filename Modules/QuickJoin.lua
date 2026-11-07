@@ -3678,15 +3678,15 @@ end
 	- "petbattle": Pet Battle queue
 	
 	Commands:
-	- /bfl qj mock           - Create comprehensive test data
-	- /bfl qj mock dungeon   - Create dungeon-specific mocks
-	- /bfl qj mock pvp       - Create PvP-specific mocks
-	- /bfl qj mock raid      - Create raid-specific mocks
-	- /bfl qj mock stress    - Create 50+ groups for stress testing
-	- /bfl qj add <params>   - Add custom mock group
-	- /bfl qj event <type>   - Simulate events (add, remove, update)
-	- /bfl qj list           - List all mock groups
-	- /bfl qj clear          - Remove all mock groups
+	- /bflqj mock           - Create comprehensive test data
+	- /bflqj mock dungeon   - Create dungeon-specific mocks
+	- /bflqj mock pvp       - Create PvP-specific mocks
+	- /bflqj mock raid      - Create raid-specific mocks
+	- /bflqj mock stress    - Create 50+ groups for stress testing
+	- /bflqj add <params>   - Add custom mock group
+	- /bflqj event <type>   - Simulate events (add, remove, update)
+	- /bflqj list           - List all mock groups
+	- /bflqj clear          - Remove all mock groups
 ]]
 
 -- ============================================
@@ -4803,7 +4803,7 @@ end
 -- SLASH COMMAND HANDLER
 -- ============================================
 
--- Legacy slash command (redirects to /bfl qj)
+-- Both spellings use the same Quick Join QA commands.
 SLASH_BFLQUICKJOIN1 = "/bflqj"
 SLASH_BFLQUICKJOIN2 = "/bflquickjoin"
 SlashCmdList["BFLQUICKJOIN"] = function(msg)
@@ -4835,7 +4835,7 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			QuickJoin:CreateMockPreset_All()
 		end
 	elseif cmd == "add" then
-		-- /bfl qj add <leader> <activity> [members]
+		-- /bflqj add <leader> <activity> [members]
 		local leaderName = args[2] or "TestPlayer"
 		local activityName = args[3] or "Custom Group"
 		local numMembers = tonumber(args[4]) or 2
@@ -4861,9 +4861,9 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			QuickJoin:SimulateMockEvent("group_updated")
 		else
 			AddChatMessage(BFL.L.QJ_EVENT_COMMANDS)
-			AddChatMessage("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
-			AddChatMessage("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
-			AddChatMessage("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
+			AddChatMessage("  |cffffcc00/bflqj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
+			AddChatMessage("  |cffffcc00/bflqj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
+			AddChatMessage("  |cffffcc00/bflqj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
 		end
 	elseif cmd == "clear" then
 		QuickJoin:ClearMockGroups()
@@ -4911,8 +4911,8 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 			)
 			AddChatMessage(string.format(BFL.L.RAID_UPDATE_INTERVAL_STATUS, QuickJoin.mockConfig.updateInterval))
 			AddChatMessage("")
-			AddChatMessage("  |cffffcc00/bfl qj config dynamic on|off|r")
-			AddChatMessage("  |cffffcc00/bfl qj config interval <seconds>|r")
+			AddChatMessage("  |cffffcc00/bflqj config dynamic <on/off>|r")
+			AddChatMessage("  |cffffcc00/bflqj config interval <seconds>|r")
 		end
 	else
 		-- Help
@@ -4923,8 +4923,8 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_DUNGEON)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_PVP)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_RAID)
-		AddChatMessage("  |cffffffff/bfl qj mock preview|r - Tooltip class rows")
-		AddChatMessage("  |cffffffff/bfl qj mock 12.1|r - Retail 12.1 PTR")
+		AddChatMessage("  |cffffffff/bflqj mock preview|r - Tooltip class rows")
+		AddChatMessage("  |cffffffff/bflqj mock 12.1|r - Retail 12.1 PTR")
 		AddChatMessage(BFL.L.QJ_MOCK_ICONS_HELP)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_STRESS)
 		AddChatMessage("")
@@ -4934,9 +4934,9 @@ SlashCmdList["BFLQUICKJOIN"] = function(msg)
 		AddChatMessage(BFL.L.CORE_HELP_QJ_CLEAR)
 		AddChatMessage("")
 		AddChatMessage(BFL.L.RAID_HELP_EVENTS)
-		AddChatMessage("  |cffffcc00/bfl qj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
-		AddChatMessage("  |cffffcc00/bfl qj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
-		AddChatMessage("  |cffffcc00/bfl qj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
+		AddChatMessage("  |cffffcc00/bflqj event add|r - " .. BFL.L.QJ_HELP_CMD_ADD_DESC)
+		AddChatMessage("  |cffffcc00/bflqj event remove|r - " .. BFL.L.QJ_HELP_CMD_REMOVE_DESC)
+		AddChatMessage("  |cffffcc00/bflqj event update|r - " .. BFL.L.QJ_HELP_CMD_UPDATE_DESC)
 		AddChatMessage("")
 		AddChatMessage(BFL.L.HELP_HEADER_CONFIGURATION)
 		AddChatMessage(BFL.L.QJ_CMD_CONFIG_HELP)
