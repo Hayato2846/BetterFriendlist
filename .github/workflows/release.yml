@@ -35,7 +35,69 @@ jobs:
           import os
           import json
           import re
+          import time
+          import urllib.error
+          import urllib.parse
           import urllib.request
+
+          EMBED_DESCRIPTION_LIMIT = 4096
+          MESSAGE_EMBED_TEXT_LIMIT = 6000
+          MESSAGE_EMBED_LIMIT = 10
+
+          def discord_length(text):
+              # Count UTF-16 units conservatively for characters such as emoji.
+              return len(text.encode("utf-16-le")) // 2
+
+          def split_description(text, limit):
+              # Decode only complete characters if the limit falls inside a surrogate pair.
+              prefix = text[:limit].encode("utf-16-le")[:limit * 2].decode("utf-16-le", errors="ignore")
+              if len(prefix) == len(text):
+                  return text, ""
+
+              # Move intact lines to the next message if the current one has too little room.
+              end = prefix.rfind("\n") + 1
+              if not end:
+                  next_line = text[:EMBED_DESCRIPTION_LIMIT + 1].partition("\n")[0]
+                  if limit < EMBED_DESCRIPTION_LIMIT and discord_length(next_line) <= EMBED_DESCRIPTION_LIMIT:
+                      return "", text
+
+                  # An oversized line can span embeds. Prefer splitting between words.
+                  end = prefix.rfind(" ") + 1 or len(prefix)
+              return text[:end], text[end:]
+
+          def build_messages(description, title, color, footer):
+              message_title = title
+              while description:
+                  remaining = MESSAGE_EMBED_TEXT_LIMIT - discord_length(message_title) - discord_length(footer)
+                  embeds = []
+                  while description and remaining and len(embeds) < MESSAGE_EMBED_LIMIT:
+                      chunk, description = split_description(description, min(EMBED_DESCRIPTION_LIMIT, remaining))
+                      if not chunk:
+                          break
+                      if not chunk.strip():
+                          continue
+
+                      embed = {"description": chunk, "color": color}
+                      if not embeds:
+                          embed.update(title=message_title, footer={"text": footer})
+                      embeds.append(embed)
+                      remaining -= discord_length(chunk)
+
+                  yield embeds
+                  message_title = f"{title} (continued)"
+
+          def send_message(request, payload):
+              data = json.dumps(payload).encode("utf-8")
+              for attempt in range(3):
+                  try:
+                      with urllib.request.urlopen(request, data, timeout=30) as response:
+                          return response.status
+                  except urllib.error.HTTPError as error:
+                      retry_after = error.headers.get("Retry-After")
+                      if error.code != 429 or retry_after is None or attempt == 2:
+                          raise
+                      error.close()
+                      time.sleep(float(retry_after))
 
           def format_discord_markdown(markdown):
               formatted_lines = []
@@ -121,11 +183,6 @@ jobs:
               "[WoWInterface](https://www.wowinterface.com/downloads/info26984-BetterFriendlist.html)"
           )
 
-          # Truncate body if too long for Embed Description (Limit is 4096)
-          # We leave some buffer for links and headers
-          if len(body) > 3500:
-              body = body[:3500] + "\n...(truncated)"
-
           beta_notice = ""
           if is_beta:
               beta_notice = (
@@ -146,30 +203,27 @@ jobs:
               else "BetterFriendlist - World of Warcraft Addon"
           )
 
-          # Construct JSON Payload with Embed
-          payload = {
-              "username": webhook_username,
-              "avatar_url": "https://media.forgecdn.net/avatars/thumbnails/1514/711/64/64/638983629917728143.png",
-              "embeds": [
-                  {
-                      "title": embed_title,
-                      "description": f"{links}\n\n{beta_notice}{body}",
-                      "color": embed_color,
-                      "footer": {
-                          "text": footer_text
-                      }
-                  }
-              ]
-          }
+          # Confirm each message before sending the next, preserving options such as thread_id.
+          webhook = urllib.parse.urlsplit(webhook_url)
+          query = urllib.parse.parse_qsl(webhook.query, keep_blank_values=True)
+          query = [(key, value) for key, value in query if key != "wait"]
+          query.append(("wait", "true"))
+          req = urllib.request.Request(webhook._replace(query=urllib.parse.urlencode(query)).geturl())
+          req.add_header("Content-Type", "application/json")
+          req.add_header("User-Agent", "GitHub-Action")
 
-          # Send Request
-          req = urllib.request.Request(webhook_url)
-          req.add_header('Content-Type', 'application/json')
-          req.add_header('User-Agent', 'GitHub-Action')
+          description = f"{links}\n\n{beta_notice}{body}"
+          messages = build_messages(description, embed_title, embed_color, footer_text)
+          for number, embeds in enumerate(messages, start=1):
+              payload = {
+                  "username": webhook_username,
+                  "avatar_url": "https://media.forgecdn.net/avatars/thumbnails/1514/711/64/64/638983629917728143.png",
+                  "embeds": embeds,
+              }
 
-          try:
-              response = urllib.request.urlopen(req, json.dumps(payload).encode('utf-8'))
-              print(f"Notification sent successfully. Status Code: {response.status}")
-          except Exception as e:
-              print(f"Failed to send notification: {e}")
-              exit(1)
+              try:
+                  status = send_message(req, payload)
+                  print(f"Discord message {number} sent successfully. Status code: {status}")
+              except Exception as error:
+                  print(f"Failed to send Discord message {number}: {error}")
+                  exit(1)
