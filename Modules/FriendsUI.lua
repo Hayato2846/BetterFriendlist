@@ -3617,9 +3617,8 @@ function FriendsUI:ApplyModernScrollBarGeometry()
 			-MODERN_SCROLL_BOX_RIGHT_INSET,
 			24
 		)
-		-- The header, totals and search builder change the Who viewport.
-		-- Use the shared content rail to keep both scrollbar ends stationary.
-		AnchorModernScrollBar(who.ScrollBar, frame.ScrollFrame, nil, nil, referenceWidth)
+		-- The scrollbar belongs below the Search Builder and above the totals.
+		AnchorModernScrollBar(who.ScrollBar, who.ScrollBox, nil, nil, referenceWidth)
 	end
 
 	local guild = frame.GuildFrame
@@ -6395,7 +6394,7 @@ function FriendsUI:RegisterTests()
 				if BetterFriendsFrame.WhoFrame then
 					anchoredScrollBars[#anchoredScrollBars + 1] = {
 						BetterFriendsFrame.WhoFrame.ScrollBar,
-						BetterFriendsFrame.ScrollFrame,
+						BetterFriendsFrame.WhoFrame.ScrollBox,
 						"Who",
 					}
 				end
@@ -7811,7 +7810,41 @@ function FriendsUI:RegisterTests()
 	})
 end
 
+local function HideCoveredMapQuestTooltip(tooltip)
+	local frame = BetterFriendsFrame
+	local map = WorldMapFrame
+	if not (frame and frame:IsVisible() and map and map:IsVisible()) then
+		return
+	end
+
+	local owner = tooltip:GetOwner()
+	if BFL:IsSecret(owner) or not owner or (owner.IsForbidden and owner:IsForbidden()) then
+		return
+	end
+	if owner.owningMap ~= map or owner.pinTemplate ~= "QuestBlobPinTemplate" then
+		return
+	end
+
+	-- Quest areas refresh their tooltip from map coordinates, even if another
+	-- window has mouse focus. Use the foremost focus so the map still works on top.
+	local focus = GetMouseFoci()[1]
+	while not BFL:IsSecret(focus) and focus do
+		if focus == frame then
+			tooltip:Hide()
+			return
+		end
+		if focus.IsForbidden and focus:IsForbidden() then
+			return
+		end
+		focus = focus:GetParent()
+	end
+end
+
 function FriendsUI:Initialize()
+	if GameTooltip and GetMouseFoci then
+		-- The map calls Show again even for a tooltip that is already visible.
+		hooksecurefunc(GameTooltip, "Show", HideCoveredMapQuestTooltip)
+	end
 	if not BFL.IsMainline then
 		self.appliedStyle = STYLE_LEGACY
 		return
