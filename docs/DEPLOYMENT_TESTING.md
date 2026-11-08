@@ -111,6 +111,11 @@ APIs. The client test below checks whether the route keeps Whisper taint-free.
   Re-enable the companion to verify captured third-party actions in BFL-owned
   menus such as Who and Recent Allies.
 
+The offline smoke test checks that the row's hyperlink layer passes
+right-clicks to Blizzard's native handler and delegates other supported row
+interactions to BFL. In the client, choose Whisper from the resulting menu and
+inspect the taint log for the right-click and Whisper path.
+
 ## Native raid member menu
 
 - Join a raid and open BFL's Raid tab. Right-click two members in different
@@ -120,12 +125,6 @@ APIs. The client test below checks whether the route keeps Whisper taint-free.
   change and in both BFL layouts on clients that offer them.
 - Enter combat while hovering a member and verify the old click target is
   cleared. Check the native menu again after combat.
-
-The installed EllesmereUI Friends List uses the same Blizzard hyperlink
-template and mouse routing. The offline smoke test checks that the upper
-layer passes right-clicks to Blizzard's unchanged hyperlink handler and
-delegates other supported row interactions to BFL. The taint log measures
-the actual right-click and Whisper path in the client.
 
 ## Modes
 
