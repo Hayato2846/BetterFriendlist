@@ -103,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Retail Midnight & WoW Forever
 
+#### Improved
+- **Copy BattleTag** - In the Modern friends list, Blizzard’s copy button puts your BattleTag directly on the clipboard when available.
+
 #### Fixed
 - **Who Search Builder** - In the Modern layout, the Who results scrollbar stays below the builder and clear of its close button.
 

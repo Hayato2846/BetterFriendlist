@@ -1534,6 +1534,30 @@ function FriendsUI:RestoreLegacyActionButtonTemplates()
 	end
 end
 
+local function CreateNativeBattleTagCopyButton(bar)
+	if not (BFL.IsMainline and C_XMLUtil and C_XMLUtil.GetTemplateInfo) then
+		return
+	end
+
+	local template = "SocialUICopyBattleTagToClipboardButtonTemplate"
+	if not C_XMLUtil.GetTemplateInfo(template) and C_AddOns and C_AddOns.LoadAddOn then
+		pcall(C_AddOns.LoadAddOn, "Blizzard_SocialUI")
+	end
+	if not C_XMLUtil.GetTemplateInfo(template) then
+		return
+	end
+
+	local button = CreateFrame("Button", nil, bar, template)
+	button:Hide()
+	if not button:GetScript("OnClick") then
+		return
+	end
+
+	-- Let the hardware click reach the inherited Blizzard script directly.
+	button:SetAllPoints(bar.CopyBattleTagButton)
+	return button
+end
+
 function FriendsUI:CreateModernRoot()
 	if self.root or not BetterFriendsFrame or not BFL.IsRetail then
 		return self.root
@@ -1664,6 +1688,7 @@ function FriendsUI:CreateModernRoot()
 		GameTooltip:Show()
 	end)
 	copyBattleTagButton:SetScript("OnLeave", GameTooltip_Hide)
+	root.BattleNetBar.NativeCopyBattleTagButton = CreateNativeBattleTagCopyButton(root.BattleNetBar)
 
 	self:CreateNavigationTabs()
 	self:InitializeRequestsScrollBox()
@@ -2032,15 +2057,25 @@ function FriendsUI:RefreshBattleTag()
 	local bnetFrame = header.BattlenetFrame
 	if bnetFrame and bnetFrame.Tag then
 		local PreviewMode = BFL:GetModule("PreviewMode")
-		local battleTag = PreviewMode
+		local previewBattleTag = PreviewMode
 			and PreviewMode.GetPreviewBattleTag
 			and PreviewMode:GetPreviewBattleTag()
+		local bar = self.root.BattleNetBar
+		if bar.NativeCopyBattleTagButton then
+			local useNativeButton = not previewBattleTag and BNConnected()
+			SafeShow(bar.NativeCopyBattleTagButton, useNativeButton)
+			SafeShow(bar.CopyBattleTagButton, not useNativeButton)
+		end
+
+		local battleTag = previewBattleTag
 		if not battleTag and BNGetInfo then
 			local ok, _, realBattleTag = pcall(BNGetInfo)
-			battleTag = ok and realBattleTag or nil
+			if ok and not BFL:IsSecret(realBattleTag) then
+				battleTag = realBattleTag
+			end
 		end
+		self.battleTag = battleTag
 		if battleTag then
-			self.battleTag = battleTag
 			local _, themed = self:GetModernThemeColors()
 			local StreamerMode = BFL.StreamerMode or BFL:GetModule("StreamerMode")
 			local streamerActive = StreamerMode and StreamerMode.IsActive and StreamerMode:IsActive()
@@ -2126,6 +2161,10 @@ function FriendsUI:LayoutBattleTagActions()
 	copyButton:ClearAllPoints()
 	copyButton:SetPoint("LEFT", tag, "RIGHT", 8, 0)
 	copyButton:SetFrameLevel(root.BattleNetBar:GetFrameLevel() + 4)
+	local nativeCopyButton = root.BattleNetBar.NativeCopyBattleTagButton
+	if nativeCopyButton then
+		nativeCopyButton:SetFrameLevel(copyButton:GetFrameLevel())
+	end
 
 	local streamerButton = frame.StreamerModeButton
 	if streamerButton then
@@ -5347,14 +5386,13 @@ function FriendsUI:ApplyTheme(theme)
 	local menuIcon = self.root.BattleNetBar and self.root.BattleNetBar.MenuButton and self.root.BattleNetBar.MenuButton.Icon
 	SetTextureDesaturated(menuIcon, themed)
 	ApplyTextureColor(menuIcon, themed and OpaqueThemeColor(palette.accent) or MODERN_BLIZZARD_THEME_COLORS.control)
-	local copyButton = self.root.BattleNetBar and self.root.BattleNetBar.CopyBattleTagButton
+	local bar = self.root.BattleNetBar
 	local copyColor = themed and MODERN_WHITE or MODERN_BLIZZARD_THEME_COLORS.control
-	for _, texture in ipairs({
-		copyButton and copyButton.Icon,
-		copyButton and (copyButton.HighlightTexture or (copyButton.GetHighlightTexture and copyButton:GetHighlightTexture())),
-	}) do
-		SetTextureDesaturated(texture, themed)
-		ApplyTextureColor(texture, copyColor)
+	for _, button in ipairs({ bar.CopyBattleTagButton, bar.NativeCopyBattleTagButton }) do
+		for _, texture in ipairs({ button.Icon, button.HighlightTexture or button:GetHighlightTexture() }) do
+			SetTextureDesaturated(texture, themed)
+			ApplyTextureColor(texture, copyColor)
+		end
 	end
 	local StreamerMode = BFL.StreamerMode or BFL:GetModule("StreamerMode")
 	if modernActive and StreamerMode and StreamerMode.ApplyToggleButtonVisualState then
@@ -7912,9 +7950,11 @@ function FriendsUI:Initialize()
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function()
 		self:ScheduleRequestsRefresh(false)
 	end, 20)
-	BFL:RegisterEventCallback("BN_INFO_CHANGED", function()
-		self:RefreshBattleTag()
-	end, 20)
+	for _, event in ipairs({ "BN_INFO_CHANGED", "BN_CONNECTED", "BN_DISCONNECTED" }) do
+		BFL:RegisterEventCallback(event, function()
+			self:RefreshBattleTag()
+		end, 20)
+	end
 	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function()
 		self:RefreshStoryRaidTabState()
 	end, 80)

@@ -3881,6 +3881,7 @@ function ElvUISkin:SkinModernFrames(E, S, frame, FriendsUI)
 	)
 	self:SkinModernActionButton(S, root.BattleNetBar and root.BattleNetBar.MenuButton)
 	self:SkinModernBorderlessActionButton(S, root.BattleNetBar and root.BattleNetBar.CopyBattleTagButton)
+	self:SkinModernBorderlessActionButton(S, root.BattleNetBar and root.BattleNetBar.NativeCopyBattleTagButton)
 	self:SkinModernBorderlessActionButton(S, frame.StreamerModeButton)
 	self:SkinModernTabs(FriendsUI)
 
