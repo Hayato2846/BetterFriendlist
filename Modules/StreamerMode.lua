@@ -81,6 +81,38 @@ function StreamerMode:IsActive()
 	return BetterFriendlistDB and BetterFriendlistDB.streamerModeActive
 end
 
+function StreamerMode:GetFriendMenuLabel(friend)
+	if not self:IsActive() or not friend then return end
+	local friends = BFL:GetModule("FriendsList")
+	if not friends or not friends:IsReadableInviteRecord(friend) then return end
+	local DB = BFL:GetModule("DB")
+	local format = DB and DB:Get("streamerModeNameFormat", "battletag") or "battletag"
+	local label
+	if format == "nickname" and DB then
+		local uid = friends:GetReadableInviteField(friend, "uid") or friends:GetReadableInviteField(friend, "id")
+		if not uid and not BFL:IsSecret(friend.battleTag) and not BFL:IsSecret(friend.bnetAccountID)
+			and not BFL:IsSecret(friend.name)
+		then
+			uid = friends:GetFriendUID(friend)
+		end
+		label = DB:GetNickname(uid)
+	elseif format == "note" then
+		label = friends:GetReadableInviteField(friend, "note")
+		if not label or label == "" then label = friends:GetReadableInviteField(friend, "notes") end
+	end
+	if not BFL:IsSecret(label) and type(label) == "string" and label:find("%S") then return label end
+
+	if friends:GetReadableInviteField(friend, "type") == "bnet" then
+		-- Match the friend list's Streamer Mode fallback. The account name can be a Real ID name.
+		local tag = friends:GetReadableInviteField(friend, "battleTag")
+		local prefix = type(tag) == "string" and tag:match("^[^#]+")
+		if prefix and prefix:find("%S") then return prefix end
+		local name = friends:GetReadableInviteField(friend, "characterName")
+		if type(name) == "string" and name:find("%S") then return name end
+		return L.UNKNOWN
+	end
+end
+
 function StreamerMode:ApplyToggleButtonVisualState()
 	local button = self.toggleButton
 	local icon = button and button.Icon
@@ -168,10 +200,8 @@ end
 function StreamerMode:UpdateState()
 	local KnownCharacters = BFL:GetModule("KnownCharacters")
 	local friendMenu = BFL:GetModule("NativeFriendMenu")
-	if self:IsActive() then
-		if KnownCharacters then KnownCharacters:HideSurfaces() end
-		if friendMenu then friendMenu:HideLinks() end
-	elseif friendMenu then
+	if self:IsActive() and KnownCharacters then KnownCharacters:HideSurfaces() end
+	if friendMenu then
 		friendMenu:RefreshClickRouting()
 	end
 	if not self.toggleButton then

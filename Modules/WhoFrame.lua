@@ -2102,8 +2102,7 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 	if not self:IsAvailable() then
 		return
 	end
-	if (BFL.IsSocialActionRestricted and BFL.IsSocialActionRestricted())
-		or (BFL.IsSecret and (BFL:IsSecret(text) or BFL:IsSecret(origin)))
+	if (BFL.IsSecret and (BFL:IsSecret(text) or BFL:IsSecret(origin)))
 		or (text ~= nil and type(text) ~= "string")
 		or (origin ~= nil and type(origin) ~= "number")
 	then
@@ -3091,7 +3090,7 @@ function _G.BetterWhoListButton_OnDoubleClick(self, mouseButton)
 	local name = self.info.fullName
 	if action == "invite" then
 		BFL.InviteUnit(name)
-	elseif not (IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown()
+	elseif not (InCombatLockdown() or IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown()
 		or (IsModifiedClick and IsModifiedClick("CHATLINK")))
 	then
 		local friendMenu = BFL:GetModule("NativeFriendMenu")

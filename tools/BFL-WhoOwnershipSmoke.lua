@@ -241,6 +241,7 @@ end
 
 for _, failure in ipairs({ "sendError", "routeError", "falseReturn" }) do
 	s = fixture("forever")
+	s.restricted = true
 	local dispatch = s.who.DispatchWhoRequest
 	if failure == "falseReturn" then s.who.DispatchWhoRequest = function() return false end else s[failure] = true end
 	local ok, result = pcall(s.who.SendWhoRequest, s.who, "owned", 1)
@@ -290,10 +291,16 @@ frame.forbiddenEvents = false
 s.who:RestoreNativeWhoListUpdates()
 check(frame.registered, "restore recovers after aspect restriction lifts")
 
+s = fixture("retail")
+s.restricted = true
+check(s.who:SendWhoRequest("owned", 1), "BFL attempts a Who search during addon restrictions")
+equal(#s.calls, 1, "BFL submits the Who search to the client exactly once")
+check(s.who.whoPending, "the submitted query waits for results")
+s:emit()
+check(not s.who.whoPending, "the result completes the query during addon restrictions")
+
 s = fixture("forever")
 s.restricted = true
-equal(s.who:SendWhoRequest("owned", 1), false, "restricted BFL query is rejected")
-equal(#s.calls, 0, "restricted BFL request cannot reach native API")
 s.env.C_FriendList.SendWho("native secure request", 3)
 equal(#s.calls, 1, "observer never replays/restricts native successful sends")
 equal(s.routingWrites or 0, 0, "standalone observer adds no routing call")
