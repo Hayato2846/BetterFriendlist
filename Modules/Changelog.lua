@@ -93,6 +93,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### All WoW Versions
+
+#### Fixed
+- **Friend Menus** - Fixed cases where right-clicking a friend failed to open their menu.
+- **Whispers** - Click to Whisper and the Whisper menu option now open the chat box in cases where they previously failed.
+- **Who Searches** - Who no longer skips searches that previously left the results list unchanged.
+
+---
+
 ## [3.0.2]        - 2026-11-07
 
 BetterFriendlist 3.0.2 brings back Blizzard's friend menu, fixes chat taint when you start a whisper, and makes friend tags easier to edit.
@@ -390,27 +401,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 - **Raid Tab** - Long raid information now stays inside the window, and the Legacy controls no longer overlap.
 - **Interface Switching** - Raid Roster Help and Streamer Mode now reappear immediately after switching from Modern to Legacy.
 - **Modern Ready Check** - Removed a small visual artifact from the Ready Check button.
-
----
-
-## [2.8.5]        - 2026-08-22
-
-### Added
-- **Friend Tag Actions** - Friend right-click menus can now select or clear all built-in and custom tags at once.
-- **Icon-Only Tags** - Tags that only show an icon can optionally keep their colored chip background.
-- **Dynamic Tag Groups** - A new option hides all tag chips inside dynamic tag groups. The existing option to hide only the group's own tag remains available.
-
-### Improved
-- **Friend Tag Layout** - Friend rows can now show up to 20 tags and use the available row width before wrapping.
-- **Friend Tag Settings** - The visibility options now explain where each tag is shown: friend rows, tooltips, or Data Broker.
-
-### Fixed
-- **Friend Tag Editor** - Reordering, resetting, or deleting tags now updates friend rows immediately. After deleting a tag, another valid tag stays selected.
-- **Friend Tag Names** - Custom tags can no longer use the name of a built-in tag.
-- **Compact Friend Rows** - Status, game, and Invite icons now stay aligned when rows have different heights. Status markers remain readable and Invite artwork stays inside its button.
-- **Icon-Only Tags** - Icons now stay centered inside colored chips, including the default Tank, Healer, and DPS icons.
-- **Battle.net Levels** - Invalid level 0 values from Battle.net are no longer shown as a real character level. Available zone or game information is shown instead.
-- **Custom Names** - Friends with digits in their BattleTag no longer trigger repeated rename messages after logging in or reloading the UI.
 
 ---
 

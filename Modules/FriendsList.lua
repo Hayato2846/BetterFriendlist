@@ -3509,7 +3509,7 @@ function FriendsList:GetClickWhisperMode()
 end
 
 function FriendsList:HandleFriendWhisperClick(friend, clickMode)
-	if self:GetClickWhisperMode() ~= clickMode or (IsModifiedClick and IsModifiedClick("CHATLINK")) then
+	if InCombatLockdown() or self:GetClickWhisperMode() ~= clickMode or (IsModifiedClick and IsModifiedClick("CHATLINK")) then
 		return false
 	end
 

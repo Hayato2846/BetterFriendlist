@@ -1,0 +1,16 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Button name="BFLNativeWhoCatchTemplate" virtual="true" hidden="true" enableMouse="true"
+		registerForClicks="LeftButtonUp, RightButtonUp" propagateMouseInput="Motion"/>
+	<Button name="BFLNativeWhoLeftCatchTemplate" inherits="BFLNativeWhoCatchTemplate" virtual="true"
+		passThroughButtons="LeftButton"/>
+	<Button name="BFLNativeFriendCatchTemplate" virtual="true" hidden="true" enableMouse="true"
+		registerForClicks="LeftButtonUp" passThroughButtons="RightButton" propagateMouseInput="Motion"/>
+	<Button name="BFLNativeLeftCatchTemplate" virtual="true" hidden="true" enableMouse="true"
+		passThroughButtons="LeftButton" propagateMouseInput="Motion"/>
+	<Button name="BFLNativeBothCatchTemplate" virtual="true" hidden="true" enableMouse="true"
+		registerForClicks="LeftButtonUp" passThroughButtons="RightButton, LeftButton" propagateMouseInput="Motion"/>
+	<Button name="BFLNativeWhisperCatchTemplate" virtual="true" hidden="true" enableMouse="true"
+		passThroughButtons="LeftButton, RightButton, Button3, Button4, Button5" propagateMouseInput="Motion"/>
+	<Frame name="BFLNativeWhisperLinkTemplate" virtual="true" inherits="InlineHyperlinkFrameTemplate" enableMouse="true"
+		passThroughButtons="RightButton, Button3, Button4, Button5"/>
+</Ui>

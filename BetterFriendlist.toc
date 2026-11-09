@@ -149,6 +149,7 @@ Modules\Compat_TotalRP3.lua
 Modules\FontFix.lua
 
 # UI Callbacks
+UI\NativeFriendMenu.xml
 UI\RaidFrameCallbacks.lua
 UI\QuickJoinCallbacks.lua [AllowLoadGameType mainline]
 

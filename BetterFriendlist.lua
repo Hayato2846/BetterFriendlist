@@ -3915,7 +3915,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 
-			function BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name)
+			function BFL:OpenBetterFriendlistContextMenu(button, menuType, contextData, name, verifiedFriend, isBroker)
 				local createContextMenu = BFL.CreateContextMenu
 				if not (createContextMenu and contextData) then
 					return false
@@ -3974,15 +3974,17 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 					BFL_AddRafSummonButton(rootDescription, contextData, isBNet, isOffline)
 
-					if not isBNet and not isOffline and (menuTypeWrapper == "WHO" or isRecentAlly or not isFriendMenu) then
-						local friendMenu = BFL:GetModule("NativeFriendMenu")
-						if friendMenu then
+					local friendMenu = BFL:GetModule("NativeFriendMenu")
+					if friendMenu then
+						if verifiedFriend then
+							friendMenu:AddFriendWhisperMenuItem(rootDescription, verifiedFriend, isBroker, WHISPER or "Whisper")
+						elseif not isBNet and not isOffline and (menuTypeWrapper == "WHO" or isRecentAlly or not isFriendMenu) then
 							friendMenu:AddCharacterWhisperMenuItem(rootDescription, BFL_GetContextFullName(contextData), WHISPER or "Whisper")
 						end
 					end
 
 					if not isOffline then
-						BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline)
+						BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline, nil, verifiedFriend)
 					end
 
 					BFL_AddViewHousesButton(rootDescription, contextData, isBNet)
@@ -4019,7 +4021,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 
 					if isFriendMenu then
-						AddGroupsToFriendMenu(ownerRegion, rootDescription, contextData)
+						AddGroupsToFriendMenu(ownerRegion, rootDescription, contextData, verifiedFriend)
 					end
 
 					if MenuBridge and MenuBridge.PopulateMenu then
@@ -4030,9 +4032,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				return true
 			end
 
-			-- Build an addon-owned context. Supplying friendsList here gives BFL's own
-			-- actions their list context without changing the data used by native Whisper.
-			local function BFL_AddNativeFriendMenu(root, tag, row, friend, isBNet)
+			local function BFL_CreateFriendMenuContext(row, friend, isBNet)
 				local friends = GetFriendsList()
 				local function Read(record, key)
 					return friends:GetReadableInviteField(record, key)
@@ -4040,7 +4040,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				local index = Read(friend, "index")
 				local connected = Read(friend, "connected")
 				local context = {
-					name = Read(friend, "name"),
+					name = Read(friend, "fullName") or Read(friend, "name"),
 					guid = Read(friend, "guid"),
 					uid = friends:GetFriendUID(friend),
 					index = index,
@@ -4053,18 +4053,42 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					context.bnetIDAccount = Read(friend, "bnetAccountID")
 					context.battleTag = Read(friend, "battleTag")
 					context.name = BFL_FirstSafeText(Read(friend, "accountName"), context.battleTag, Read(friend, "name"))
-					local gameAccount = Read(friend, "gameAccountInfo")
+					local account = Read(friend, "accountInfo")
+					local gameAccount = Read(friend, "gameAccountInfo") or Read(account, "gameAccountInfo")
 					context.accountInfo = {
 						bnetAccountID = context.bnetIDAccount,
 						battleTag = context.battleTag,
 						accountName = context.name,
-						friendLevel = Read(friend, "friendLevel"),
-						isFavorite = Read(friend, "isFavorite"),
+						friendLevel = Read(friend, "friendLevel") or Read(account, "friendLevel"),
+						isFavorite = Read(friend, "isFavorite") == true or Read(account, "isFavorite") == true,
 						isFriend = true,
 						gameAccountInfo = gameAccount,
 					}
 					context.guid = Read(gameAccount, "playerGuid")
 				end
+				local streamer = BFL.StreamerMode
+				if streamer and streamer:IsActive() then
+					context.bfl_streamerDisplayName = streamer:GetFriendMenuLabel(friend)
+						or BFL_FirstSafeText(Read(friend, "characterName"), not isBNet and context.name, BFL.L.UNKNOWN)
+				end
+				return context
+			end
+
+			function BFL:OpenFriendMenuFallback(row, friend, isBroker)
+				local friends = GetFriendsList()
+				if not friends or not friends:IsReadableInviteRecord(friend) then return end
+				local friendType = friends:GetReadableInviteField(friend, "type")
+				if friendType ~= "bnet" and friendType ~= "wow" then return end
+				local isBNet = friendType == "bnet"
+				local context = BFL_CreateFriendMenuContext(row, friend, isBNet)
+				local menuType = isBNet and "BN_FRIEND" or "FRIEND"
+				if context.isOffline then menuType = menuType .. "_OFFLINE" end
+				self:OpenBetterFriendlistContextMenu(row, menuType, context, context.name, friend, isBroker)
+			end
+
+			-- Extend the native menu using BFL's own context, separate from Whisper.
+			local function BFL_AddNativeFriendMenu(root, tag, row, friend, isBNet)
+				local context = BFL_CreateFriendMenuContext(row, friend, isBNet)
 
 				local elements = {}
 				for _, element in root:EnumerateElementDescriptions() do
@@ -4156,7 +4180,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						local menuTag = tag
 						Menu.ModifyMenu(menuTag, function(owner, root, context)
 							local row, friend
-							if hasNativeFriendMenu then row, friend = nativeFriendMenu:GetMenuFriend(context, isBNet) end
+							if hasNativeFriendMenu then
+								row, friend = nativeFriendMenu:GetMenuFriend(context, isBNet)
+								nativeFriendMenu:MaskNativeMenuTitle(root, friend, isBNet)
+							end
 							if isBNet and (row or BFL_SafeContextValue(context, "bflOrigin") == ADDON_NAME) then
 								local hints = BFL:GetModule("FavoriteHints")
 								if hints then hints:ObserveMenu(root) end
@@ -5516,64 +5543,8 @@ function BetterFriendsList_Button_OnClick(button, mouseButton, skipWhisper)
 			end
 		end
 	elseif mouseButton == "RightButton" then
-		local friendMenu = BFL:GetModule("NativeFriendMenu")
-		if friendMenu and friendMenu:HandleUnavailableClick() then return end
 		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-
-		local friendData = button.friendData
-
-		if friendData.type == "bnet" then
-			-- BattleNet friend context menu
-			-- FIXED: Use bnetAccountID instead of index to avoid stale data issues
-			local accountInfo = friendData.bnetAccountID and C_BattleNet.GetAccountInfoByID(friendData.bnetAccountID)
-				or nil
-			if accountInfo then
-				local resolvedIndex = FriendsListModule
-						and FriendsListModule.ResolveBNetFriendIndex
-						and FriendsListModule:ResolveBNetFriendIndex(friendData.bnetAccountID, friendData.battleTag)
-					or friendData.index
-				BetterFriendsList_ShowBNDropdown(
-					BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
-					accountInfo.gameAccountInfo.isOnline,
-					nil, -- lineID
-					nil, -- chatType
-					nil, -- chatFrame
-					true, -- showMenuFlag (Pass TRUE to force menu show, NOT friendsList index)
-					accountInfo.bnetAccountID,
-					nil, -- communityClubID
-					nil, -- communityStreamID
-					nil, -- communityEpoch
-					nil, -- communityPosition
-					accountInfo.battleTag,
-					resolvedIndex,
-					accountInfo.friendLevel
-				)
-			end
-		else
-			-- WoW friend context menu
-			-- FIXED: Use index instead of guid (guid is not stored in friend data)
-			local resolvedIndex = FriendsListModule
-					and FriendsListModule.ResolveWoWFriendIndex
-					and FriendsListModule:ResolveWoWFriendIndex(friendData.name)
-				or friendData.index
-			local info = resolvedIndex and BFL.GetWoWFriendInfoByIndex(resolvedIndex) or nil
-			if info then
-				BetterFriendsList_ShowDropdown(
-					info.name,
-					info.connected,
-					nil, -- lineID
-					nil, -- chatType
-					nil, -- chatFrame
-					resolvedIndex, -- friendsList (Pass INDEX here, not true)
-					nil, -- communityClubID
-					nil, -- communityStreamID
-					nil, -- communityEpoch
-					nil, -- communityPosition
-					info.guid,
-					resolvedIndex
-				)
-			end
-		end
+		BFL:OpenFriendMenuFallback(button, button.friendData)
 	end
 end
 
