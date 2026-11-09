@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [3.0.3]        - 2026-11-09
 
 ### All WoW Versions
 
