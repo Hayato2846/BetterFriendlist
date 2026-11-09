@@ -352,49 +352,7 @@ local function OpenFriendContextMenu(data)
 	contextMenuAnchor:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
 	contextMenuAnchor:Show()
 
-	local MenuSystem = BFL:GetModule("MenuSystem")
-	if not MenuSystem then
-		return
-	end
-
-	if data.type == "bnet" then
-		local bnetAccountID = data.bnetAccountID
-
-		if not bnetAccountID and data.id then
-			bnetAccountID = tonumber(data.id:match("^bnet_(%d+)$"))
-		end
-
-		if bnetAccountID then
-			local FriendsList = BFL and BFL:GetModule("FriendsList")
-			local resolvedIndex = FriendsList
-					and FriendsList.ResolveBNetFriendIndex
-					and FriendsList:ResolveBNetFriendIndex(bnetAccountID, data.battleTag)
-				or data.index
-			local extraData = {
-				name = BFL:GetSafeAccountName(data.accountName, data.battleTag) or data.characterName or "",
-				battleTag = data.battleTag,
-				connected = true,
-				accountInfo = data.accountInfo,
-				index = resolvedIndex,
-			}
-			MenuSystem:OpenFriendMenu(contextMenuAnchor, "BN", bnetAccountID, extraData)
-		end
-	elseif data.type == "wow" then
-		local FriendsList = BFL and BFL:GetModule("FriendsList")
-		local friendIndex = FriendsList
-				and FriendsList.ResolveWoWFriendIndex
-				and FriendsList:ResolveWoWFriendIndex(data.fullName)
-			or nil
-
-		if friendIndex then
-			local extraData = {
-				name = data.fullName or data.characterName or "",
-				connected = true,
-				index = friendIndex,
-			}
-			MenuSystem:OpenFriendMenu(contextMenuAnchor, "WOW", friendIndex, extraData)
-		end
-	end
+	BFL:OpenFriendMenuFallback(contextMenuAnchor, data, true)
 end
 
 -- Main click handler for friend lines in LibQTip tooltip
@@ -415,8 +373,8 @@ local function OnFriendLineClick(cell, data, mouseButton)
 	else
 		local friendMenu = BFL:GetModule("NativeFriendMenu")
 		if actualButton == "RightButton" then
-			if not friendMenu or not friendMenu:HandleUnavailableClick() then OpenFriendContextMenu(data) end
-		elseif actualButton == "LeftButton" and friendMenu then
+			OpenFriendContextMenu(data)
+		elseif actualButton == "LeftButton" and friendMenu and not InCombatLockdown() then
 			friendMenu:ShowWhisperUnavailable()
 		end
 	end

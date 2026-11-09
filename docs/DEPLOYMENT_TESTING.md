@@ -103,9 +103,29 @@ APIs. The client test below checks whether the route keeps Whisper taint-free.
 - In Recent Allies, choose Whisper from a character's right-click menu.
 - Check that the Blizzard chat field opens and inspect the taint log. Opening
   the field is sufficient for this test. No message needs to be sent.
-- In combat, Streamer Mode or chat lockdown, or when a native link cannot be
-  built, verify that the action shows an unavailable message. Verify that
-  whispering and the native menu are available again after the restriction lifts.
+- On Forever and Retail, enter combat with Click to Whisper set to Single Click.
+  Test a Battle.net and character friend, including after scrolling to new rows.
+  Repeat with Double-click and verify that the first click selects the row.
+  Repeat with Streamer Mode active. Check that changing rows or pressing the
+  chat-link modifier cancels the pending second click.
+- In the same combat, test Send Message in Legacy, left-click in both brokers,
+  and double-click in Who. Repeat with Streamer Mode enabled and verify the
+  recipient each time. Check that broker Alt- and Shift-click and Who's
+  Invite option still take their own paths.
+- With Streamer Mode active, test both double-click and right-click followed
+  by Whisper on a Who result. Open the Guild Broker's right-click menu and
+  choose Whisper. Check the recipient and inspect the taint log.
+- With Streamer Mode active, test the BattleTag, Nickname, and Note formats on
+  the menu title. For a Real ID friend without a nickname or note, verify the
+  short BattleTag appears in both the native and BFL fallback menus. Check the
+  character-name fallback on a character friend. Choose Whisper and confirm
+  the chat edit box still targets that friend. Inspect the taint log for both steps.
+- While chat lockdown is active, test native right-click and Whisper on a
+  character and a Battle.net friend. Check whether the client opens the menu
+  and chat edit box, and inspect the taint log.
+- When a link cannot be built, check that right-click opens the BFL menu and
+  that group actions are available. With the Menu Bridge
+  enabled, supported third-party actions should appear once.
 - With Total RP 3 enabled and its profile action allowed, disable the Menu
   Bridge companion and reload. Verify that the profile action appears once.
   Re-enable the companion to verify captured third-party actions in BFL-owned

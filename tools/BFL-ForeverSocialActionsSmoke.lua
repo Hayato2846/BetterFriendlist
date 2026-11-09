@@ -506,6 +506,7 @@ do
 		return timer
 	end }
 	local hasNativeHandler = true
+	local routingTemplates = read(repo, "UI/NativeFriendMenu.xml")
 	local function frame()
 		local f = { scripts = {}, hooks = {}, level = 10, height = 40 }
 		function f:SetScript(event, callback) self.scripts[event] = callback end
@@ -516,32 +517,35 @@ do
 		function f:IsShown() return self.shown end
 		function f:IsVisible() return self.shown end
 		function f:IsMouseOver() return self.underMouse ~= false end
-		function f:EnableMouse(value) self.mouse = value end
+		function f:EnableMouse(value)
+			assert(self.template == "InlineHyperlinkFrameTemplate", "only the direct Blizzard link enables mouse input in Lua")
+			self.mouse = value
+		end
 		function f:GetHeight() return self.height end
 		function f:SetAllPoints(target) self.cover = target end
+		function f:SetClipsChildren(value) self.clips = value end
 		function f:GetFrameLevel() return self.level end
 		function f:SetFrameLevel(level) self.level = level end
 		function f:LockHighlight() self.highlighted = true end
 		function f:UnlockHighlight() self.highlighted = false end
 		function f:IsEnabled() return true end
 		function f:SetButtonState(state, lock) self.buttonState, self.buttonStateLocked = state, lock end
-		function f:RegisterForClicks(button) self.click = button end
+		function f:RegisterForClicks() error("click registration must come from XML") end
 		function f:RegisterForDrag(button) self.drag = button end
 		function f:RegisterEvent(event) self[event] = true end
-		function f:SetPassThroughButtons(right, left)
-			assert(not combat)
-			self.pass, self.passLeft = right, left
-		end
-		function f:SetPropagateMouseMotion(enabled) assert(not combat); self.motion = enabled end
+		function f:SetPassThroughButtons() error("mouse forwarding must come from XML") end
+		function f:SetPropagateMouseMotion() error("mouse motion forwarding must come from XML") end
 		function f:CreateFontString()
-			local font = {}
+			local font = { points = {} }
 			function font:SetJustifyH() end
 			function font:SetJustifyV() end
 			function font:SetWordWrap(value) self.wrap = value end
 			function font:SetAlpha(value) self.alpha = value end
 			function font:SetFont(_, size) self.size = size end
-			function font:ClearAllPoints() end
-			function font:SetPoint() end
+			function font:GetLineHeight() return self.size + 2 end
+			function font:SetPoint(point, target, anchor, x, y)
+				self.points[point] = { target = target, anchor = anchor, x = x or 0, y = y or 0 }
+			end
 			function font:SetFormattedText(format, ...)
 				assert(self.size, "SetFormattedText: Font not set")
 				self.format, self.args = format, { ... }
@@ -551,11 +555,25 @@ do
 		end
 		return f
 	end
+	local function templateAttributes(template)
+		if template == "InlineHyperlinkFrameTemplate" then return { nativeLink = true } end
+		local definition = template and routingTemplates:match('<[%w]+ name="' .. template .. '"[^>]+>')
+		if not definition then return {} end
+		local attributes = templateAttributes(definition:match('inherits="([^"]+)"'))
+		for key, value in definition:gmatch('(%w+)="([^"]+)"') do attributes[key] = value end
+		return attributes
+	end
 	env.CreateFrame = function(_, _, parent, template)
 		local f = frame()
 		f.parent = parent
-		if template then
-			equal(template, "InlineHyperlinkFrameTemplate", "the hit frame inherits Blizzard's template")
+		f.template = template
+		local attrs = templateAttributes(template)
+		f.pass, f.passLeft = (attrs.passThroughButtons or ""):match("^(%w+),?%s*(%w*)")
+		if f.passLeft == "" then f.passLeft = nil end
+		f.motion = attrs.propagateMouseInput == "Motion" or nil
+		f.mouse = attrs.enableMouse == "true" or nil
+		f.click = attrs.registerForClicks
+		if attrs.nativeLink then
 			if hasNativeHandler then f:SetScript("OnHyperlinkClick", nativeClick) end
 		end
 		frames[#frames + 1] = f
@@ -567,6 +585,15 @@ do
 	local whisperMode
 	function friends:GetClickWhisperMode() return whisperMode end
 	function friends:IsReadableInviteRecord(value) return type(value) == "table" and value ~= secret end
+	function friends:GetReadableInviteField(value, key)
+		if self:IsReadableInviteRecord(value) and not BFL:IsSecret(value[key]) then return value[key] end
+	end
+	local friendSource = read(repo, "Modules/FriendsList.lua")
+	friends.HandleFriendWhisperClick = execute("local FriendsList = {}\n"
+		.. between(friendSource, "function FriendsList:HandleFriendWhisperClick(", "-- Replace token case-insensitively")
+		.. "\nreturn FriendsList.HandleFriendWhisperClick", "friend click whisper action")
+	execute("local StreamerMode = BFL.StreamerMode\nlocal L = BFL.L\n" .. between(read(repo, "Modules/StreamerMode.lua"),
+		"function StreamerMode:GetFriendMenuLabel(", "function StreamerMode:ApplyToggleButtonVisualState("), "Streamer Mode menu title")
 	local selectionVisual = execute("local FriendsList = {}\n" .. between(read(repo, "Modules/FriendsList.lua"),
 		"function FriendsList:SetButtonSelectionVisual(", "function FriendsList:ClearSelection()")
 		.. "\nreturn FriendsList.SetButtonSelectionVisual", "selection and hover visual")
@@ -590,10 +617,11 @@ do
 	test:Initialize()
 	friends:RenderDisplay()
 	equal(env.SlashCmdList.BFLNATIVEWHISPER, nil, "the friend menu has no session command")
-	equal(#frames, 3, "the first render attaches the native click layers")
-	local events, hit, catch = table.unpack(frames)
+	equal(#frames, 4, "the first render attaches the native click layers")
+	local events, hit, catch, leftCatch = table.unpack(frames)
 	check(hit.shown and catch.shown, "offline multi-account rows use the same route")
 	check(hit.mouse and catch.mouse, "both layers receive mouse input")
+	equal(hit.template, "InlineHyperlinkFrameTemplate", "friend links use Blizzard's template directly")
 	check(hit.cover == row and catch.cover == row, "click layers cover the actual friend row")
 	check(hit:GetScript("OnHyperlinkClick") == nativeClick, "BFL leaves Blizzard's hyperlink handler intact")
 	equal(hit.pass, nil, "the native template keeps its mouse routing")
@@ -602,7 +630,14 @@ do
 	check(row.travelPassButton.level > catch.level, "the invite control keeps its own click target")
 	equal(catch.click, "LeftButtonUp", "left click keeps BFL's ordinary release behavior")
 	equal(hit.font.wrap, false, "native hyperlink uses one line across the row")
-	equal(hit.font.size, row.height + 8, "native hyperlink line is taller than the row")
+	check(hit.clips and hit.cover == row, "the native hyperlink is clipped to its own row")
+	local top, bottom = hit.font.points.TOPLEFT, hit.font.points.BOTTOMRIGHT
+	check(top.target == hit and top.anchor == "TOPLEFT" and top.y == 0, "the link starts at the row's top edge")
+	check(bottom.target == hit and bottom.anchor == "BOTTOMRIGHT" and bottom.y == 0, "the link ends at the row's bottom edge")
+	equal(hit.font:GetLineHeight(), row.height, "the hyperlink uses font metrics to fit inside the row")
+	row.height = 62
+	hit:GetScript("OnSizeChanged")(hit, 350, row.height)
+	equal(hit.font:GetLineHeight(), row.height, "the hyperlink follows row height changes after binding")
 	equal(hit.font.alpha, 0, "native hyperlink is invisible")
 	equal(hit.font.args[2], 42, "the row binds the correct account ID")
 	mouseFocus = catch
@@ -656,7 +691,7 @@ do
 	up(catch, "LeftButton")
 	equal(callbacks.OnClick, 1, "a recycled row cannot inherit a pending left press")
 	equal(test:GetMenuFriend({ bnetIDAccount = 42 }, true), nil, "a recycled row does not match the old link")
-	equal(#frames, 3, "reused rows reuse both click layers")
+	equal(#frames, 4, "reused rows reuse their click layers")
 	equal(hit.font.args[2], 91, "the recycled row uses the new friend ID")
 	check(rawequal(hit.font.args[1], secret), "a secret name goes directly into the native font formatter")
 	friend = { type = "wow", name = "Example-Realm" }
@@ -667,23 +702,98 @@ do
 	equal(test:GetMenuFriend({ name = "Example", server = "OtherRealm" }, false), nil, "same-name characters on another realm are distinct")
 	test:UpdateRow(friends, row, { type = "bnet", bnetAccountID = secret })
 	check(not hit.shown and not catch.shown, "unavailable identity hides both layers")
-	check(test:HandleUnavailableClick(), "a failed route suppresses the old BFL menu on supported clients")
-	equal(messages[#messages], BFL.L.NATIVE_FRIEND_MENU_UNAVAILABLE, "a failed route has a short explanation")
+	local fallbackFriend, fallbackOwner
+	env.GetFriendsList = function() return friends end
+	env.PlaySound, env.SOUNDKIT = function() end, {}
+	function BFL:OpenFriendMenuFallback(owner, target) fallbackOwner, fallbackFriend = owner, target end
+	execute(between(legacy, "function BetterFriendsList_Button_OnClick(", "function BetterFriendsList_Button_OnDoubleClick("),
+		"friend row fallback click")
+	env.BetterFriendsList_Button_OnClick(row, "RightButton")
+	check(fallbackOwner == row and fallbackFriend == row.friendData, "a click that misses the link opens the BFL menu for the current row")
 
 	friend = first
 	friends:RenderDisplay()
 	combat = true
 	events:GetScript("OnEvent")(events, "PLAYER_REGEN_DISABLED")
-	check(not hit.shown and not catch.shown, "both layers are suspended as combat begins")
-	equal(row.travelPassButton.level, 10, "suspension restores the invite control level")
+	check(hit.shown and catch.shown and not leftCatch.shown, "combat keeps right-click when click-to-whisper is off")
+	equal(catch.pass, "RightButton", "the XML catch frame passes right-click")
+	equal(catch.passLeft, nil, "the selection frame keeps left-click with BFL")
+	local beforeMessages = #messages
+	for _, mode in ipairs({ "single", "double" }) do
+		whisperMode = mode
+		friends:HandleFriendWhisperClick(friend, mode)
+	end
+	whisperMode = nil
+	equal(#messages, beforeMessages, "combat click actions suppress the whisper error")
+	equal(nativeWhispers, 0, "combat click actions do not open chat")
+	mouseFocus = catch
+	check(test:GetMenuFriend({ bnetIDAccount = 42 }, true) == row, "the fixed frame identifies the clicked friend in combat")
+	local combatRow = frame()
+	combatRow.friendData = first
+	test:UpdateRow(friends, combatRow, first)
+	local combatHit, combatCatch = frames[#frames - 2], frames[#frames - 1]
+	check(combatHit.shown and combatCatch.shown, "a row first rendered in combat can bind its right-click")
 	combat = false
 	events:GetScript("OnEvent")(events, "PLAYER_REGEN_ENABLED")
 	check(hit.shown and catch.shown, "native routing resumes as combat ends")
-	for _, mode in ipairs({ "streamer", "chat" }) do
-		streamer, chatLocked = mode == "streamer", mode == "chat"
-		test:UpdateRow(friends, row, friend)
-		check(not hit.shown and not catch.shown, "both layers are suspended in " .. mode)
+	mouseFocus = catch
+	streamer = true
+	test:UpdateRow(friends, row, friend)
+	check(hit.shown and catch.shown, "Streamer Mode keeps the native right-click")
+	local title = {}
+	function title:AddInitializer(callback) self.initializer = callback end
+	local titleRoot = { EnumerateElementDescriptions = function() return ipairs({ title }) end }
+	local titleFrame = { fontString = { SetText = function(self, value) self.text = value end } }
+	local whisperContext = { name = secret, bnetIDAccount = 42 }
+	local originalDB = BFL:GetModule("DB")
+	local format, nickname = "battletag", "Friend alias"
+	BFL:RegisterModule("DB", { Get = function() return format end, GetNickname = function(_, uid)
+		equal(uid, "bnet_Masked#1234", "menu title looks up the existing nickname by stable UID")
+		return nickname
+	end })
+	friend.uid, friend.battleTag, friend.note = "bnet_Masked#1234", "Masked#1234", "Friend note"
+	friend.friendLevel = env.Enum.BattleNetFriendLevel.RealID
+	for _, example in ipairs({ { "battletag", "Masked" }, { "nickname", "Friend alias" }, { "note", "Friend note" } }) do
+		format = example[1]
+		test:MaskNativeMenuTitle(titleRoot, friend)
+		titleFrame.fontString:SetText(whisperContext.name)
+		title.initializer(titleFrame)
+		equal(titleFrame.fontString.text, example[2], "the title uses the configured " .. format)
+		check(rawequal(whisperContext.name, secret), "the title does not change the native recipient")
 	end
+	format, nickname = "nickname", ""
+	title.initializer = nil
+	test:MaskNativeMenuTitle(titleRoot, friend)
+	title.initializer(titleFrame)
+	equal(titleFrame.fontString.text, "Masked", "a missing nickname falls back to the short BattleTag for Real ID")
+	friend.battleTag, friend.characterName = nil, "Character"
+	test:MaskNativeMenuTitle(titleRoot, friend)
+	title.initializer(titleFrame)
+	equal(titleFrame.fontString.text, "Character", "a Real ID friend without a readable tag falls back to the character")
+	friend.characterName = nil
+	test:MaskNativeMenuTitle(titleRoot, friend)
+	title.initializer(titleFrame)
+	equal(titleFrame.fontString.text, BFL.L.UNKNOWN, "a Real ID name is kept private even without a tag or character")
+	test:MaskNativeMenuTitle(titleRoot, nil, true)
+	title.initializer(titleFrame)
+	equal(titleFrame.fontString.text, BFL.L.UNKNOWN, "unreadable Battle.net context keeps a BFL row's Real ID name private")
+	format = "battletag"
+	title.initializer = nil
+	test:MaskNativeMenuTitle(titleRoot, { type = "wow", name = "Character-Realm" })
+	equal(title.initializer, nil, "a character without a BattleTag keeps Blizzard's character name")
+	BFL.modules.DB = originalDB
+	mouseFocus = catch
+	local chatLink = true
+	env.IsModifiedClick = function(mode) return chatLink and mode == "CHATLINK" end
+	events.scripts.OnEvent(events, "MODIFIER_STATE_CHANGED")
+	check(not hit.shown, "Streamer Mode prevents a modified link click from exposing the name")
+	chatLink = false
+	events.scripts.OnEvent(events, "MODIFIER_STATE_CHANGED")
+	check(hit.shown, "releasing the chat-link modifier restores the menu")
+	chatLocked = true
+	test:UpdateRow(friends, row, friend)
+	check(hit.shown and catch.shown, "chat lockdown keeps the native friend menu link")
+	check(test:GetMenuFriend({ bnetIDAccount = 42 }, true) == row, "chat lockdown keeps the native friend context")
 	streamer, chatLocked = false, false
 	friends:RenderDisplay()
 	check(hit.shown and catch.shown, "the native route recovers after restrictions lift")
@@ -701,59 +811,78 @@ do
 		nativeSelections = nativeSelections + 1
 	end
 	local function click(button)
-		if button == "RightButton" or catch.passLeft == button then
+		local activeCatch = leftCatch.shown and leftCatch or catch
+		if activeCatch.pass == button or activeCatch.passLeft == button then
 			hit:GetScript("OnHyperlinkClick")(hit, nil, nil, button)
 			hit.hooks.OnHyperlinkClick(hit, nil, nil, button)
 		else
-			down(catch, button)
-			up(catch, button)
+			down(activeCatch, button)
+			up(activeCatch, button)
 		end
 	end
 	local canWhisper = true
 	BFL.CanSendWhisper = function() return canWhisper end
 	whisperMode = "single"
+	chatLocked = true
 	test:RefreshClickRouting()
-	equal(catch.passLeft, "LeftButton", "single-click mode passes the hardware click directly to Blizzard")
+	check(leftCatch.shown and not catch.shown, "single-click mode uses the fixed frame that forwards both clicks")
+	equal(leftCatch.passLeft, "LeftButton", "single-click mode passes the hardware click directly to Blizzard")
+	combat = true
+	events.scripts.OnEvent(events, "PLAYER_REGEN_DISABLED")
+	check(leftCatch.shown and not catch.shown, "single-click remains routed in combat")
 	click("LeftButton")
-	equal(nativeWhispers, 1, "one native click opens one whisper")
+	equal(nativeWhispers, 1, "one click reaches the native whisper handler in combat with chat lockdown")
 	equal(nativeSelections, 1, "single click still updates the selection")
 	hit:GetScript("OnDragStart")(hit, "LeftButton")
 	hit:GetScript("OnDragStop")(hit, "LeftButton")
 	equal(callbacks.OnDragStart, 2, "single-click mode preserves row dragging")
 	equal(callbacks.OnDragStop, 2, "single-click mode preserves drag release")
+	streamer = true
 	whisperMode = "double"
 	test:RefreshClickRouting()
 	local previousSelections = callbacks.OnClick
 	click("LeftButton")
 	equal(nativeWhispers, 1, "the first click selects without whispering")
 	equal(callbacks.OnClick, previousSelections + 1, "the first click goes to BFL selection")
+	check(leftCatch.shown and not catch.shown, "the first click arms the fixed left-click route in combat with Streamer Mode")
 	equal(clickTimers[#clickTimers].seconds, 0.3, "the second click has a bounded window")
+	catch:GetScript("OnLeave")(catch)
+	check(leftCatch.shown, "switching catch frames does not cancel the pending whisper")
 	catch:GetScript("OnDoubleClick")(catch, "LeftButton")
 	equal(callbacks.OnDoubleClick, 1, "native double-click does not run BFL's old whisper callback")
 	click("LeftButton")
-	equal(nativeWhispers, 2, "the second hardware click opens one whisper")
-	equal(catch.passLeft, nil, "native dispatch immediately disarms the double-click window")
+	equal(nativeWhispers, 2, "the second hardware click opens one whisper in combat with Streamer Mode")
+	check(catch.shown and not leftCatch.shown, "native dispatch immediately disarms the double-click window")
 	click("LeftButton")
 	clickTimers[#clickTimers]:Fire()
-	equal(catch.passLeft, nil, "a late second click starts another selection sequence")
+	check(catch.shown and not leftCatch.shown, "a late second click starts another selection sequence")
 	click("LeftButton")
-	catch:GetScript("OnLeave")(catch)
-	equal(catch.passLeft, nil, "leaving the row cancels the second click")
+	leftCatch:GetScript("OnLeave")(leftCatch)
+	check(catch.shown and not leftCatch.shown, "leaving the row cancels the second click")
 	click("LeftButton")
 	click("RightButton")
-	equal(catch.passLeft, nil, "a right click cancels the second click without changing native right-click")
+	check(catch.shown and not leftCatch.shown, "a right click cancels the second click without changing native right-click")
+	click("LeftButton")
+	chatLink = true
+	events.scripts.OnEvent(events, "MODIFIER_STATE_CHANGED")
+	check(not hit.shown and not leftCatch.shown, "the chat-link modifier hides the armed whisper in Streamer Mode")
+	chatLink = false
+	events.scripts.OnEvent(events, "MODIFIER_STATE_CHANGED")
+	check(catch.shown and not leftCatch.shown, "releasing the modifier starts a new double-click sequence")
 	click("LeftButton")
 	friend = second
 	friends:RenderDisplay()
-	equal(catch.passLeft, nil, "rebinding the row cancels the pending whisper for the previous friend")
+	check(catch.shown and not leftCatch.shown, "rebinding the row cancels the pending whisper for the previous friend")
 	friend = first
 	friends:RenderDisplay()
 	whisperMode = "single"
 	canWhisper = false
 	test:RefreshClickRouting()
-	equal(catch.passLeft, nil, "a chat restriction prevents the native left-click route")
-	canWhisper = true
+	check(catch.shown and not leftCatch.shown, "an age restriction still prevents the native left-click route")
+	canWhisper, chatLocked = true, false
 	whisperMode = nil
+	streamer = false
+	combat = false
 	test:RefreshClickRouting()
 
 	local alt, shift = false, false
@@ -772,39 +901,43 @@ do
 		brokerClicks = brokerClicks + 1
 		check(button == "LeftButton" or button == "RightButton", "broker forwards the actual mouse button")
 	end)
+	streamer = true
 	test:UpdateBrokerRow(brokerRow, brokerFriend)
-	local brokerHit, brokerCatch = frames[#frames - 1], frames[#frames]
-	local brokerDown = brokerCatch:GetScript("OnMouseDown")
-	local brokerUp = brokerCatch:GetScript("OnMouseUp")
-	check(brokerHit.shown and brokerCatch.shown, "the broker uses the native hit area")
+	local brokerHit, brokerCatch, brokerLeftCatch, brokerBothCatch = table.unpack(frames, #frames - 3, #frames)
+	check(brokerHit.shown and brokerBothCatch.shown, "the broker uses the native hit area")
+	equal(brokerHit.template, "InlineHyperlinkFrameTemplate", "broker links use Blizzard's template directly")
 	check(brokerHit:GetScript("OnHyperlinkClick") == nativeClick, "the broker keeps Blizzard's hyperlink handler")
-	equal(brokerHit.font.size, 9, "a fresh broker row can bind its link before final tooltip layout")
+	check(brokerHit.font.size > 0 and brokerHit.font.format, "a fresh broker row can bind its link before final tooltip layout")
 	equal(brokerHit.font.args[1], "Native recipient", "the broker uses the API recipient for the native link")
 	equal(brokerHit.font.args[2], 76, "the broker binds the clicked account ID")
-	equal(brokerCatch.pass, "RightButton", "the broker right click goes to the native friend menu")
-	equal(brokerCatch.passLeft, "LeftButton", "broker left click is independent of the friends list click setting")
+	equal(brokerBothCatch.pass, "RightButton", "the broker right click goes to the native friend menu")
+	equal(brokerBothCatch.passLeft, "LeftButton", "broker left click is independent of the friends list click setting")
 	local function brokerClick(button)
-		if brokerCatch.shown and (brokerCatch.pass == button or brokerCatch.passLeft == button) then
+		local activeCatch = brokerBothCatch.shown and brokerBothCatch
+			or (brokerLeftCatch.shown and brokerLeftCatch) or (brokerCatch.shown and brokerCatch)
+		if activeCatch and (activeCatch.pass == button or activeCatch.passLeft == button) then
 			brokerHit:GetScript("OnHyperlinkClick")(brokerHit, nil, nil, button)
+		elseif activeCatch then
+			activeCatch:GetScript("OnMouseDown")(activeCatch, button)
+			activeCatch:GetScript("OnMouseUp")(activeCatch, button)
 		else
-			brokerDown(brokerCatch, button)
-			brokerUp(brokerCatch, button)
+			brokerRow:GetScript("OnMouseUp")(brokerRow, button)
 		end
 	end
 	local previousNativeMenus = nativeMenus
 	brokerClick("LeftButton")
 	brokerClick("RightButton")
-	equal(nativeWhispers, 3, "the broker's native left click opens one whisper")
+	equal(nativeWhispers, 3, "the Friends Broker's left click opens one whisper in Streamer Mode")
 	equal(nativeMenus, previousNativeMenus + 1, "the broker's native right click opens one menu")
 	equal(brokerClicks, 0, "native dispatch does not also invoke a broker action")
-	brokerCatch:GetScript("OnSizeChanged")(brokerCatch, 250, 27)
-	equal(brokerHit.font.size, 35, "the hit area follows LibQTip's final row height")
+	brokerHit:GetScript("OnSizeChanged")(brokerHit, 250, 27)
+	equal(brokerHit.font:GetLineHeight(), 27, "the hit area follows LibQTip's final row height")
 	brokerRow:Show()
-	brokerCatch:GetScript("OnEnter")(brokerCatch)
+	brokerBothCatch:GetScript("OnEnter")(brokerBothCatch)
 	check(brokerHover, "the broker preserves tooltip row hover")
-	brokerCatch:GetScript("OnLeave")(brokerCatch)
+	brokerBothCatch:GetScript("OnLeave")(brokerBothCatch)
 	check(not brokerHover, "leaving the overlay clears hover")
-	mouseFocus = brokerCatch
+	mouseFocus = brokerBothCatch
 	local menuRow, menuFriend = test:GetMenuFriend({ bnetIDAccount = 76 }, true)
 	check(menuRow == brokerRow and menuFriend == brokerFriend, "the broker native menu receives BFL's friend actions")
 	equal(test:GetMenuFriend({ bnetIDAccount = 42 }, true), nil, "the broker never extends a different friend's menu")
@@ -812,27 +945,30 @@ do
 	local onEvent = events:GetScript("OnEvent")
 	alt = true
 	onEvent(events, "MODIFIER_STATE_CHANGED")
-	equal(brokerCatch.pass, nil, "Alt-click keeps the broker invite action")
-	equal(brokerCatch.passLeft, nil, "Alt-left also stays with the broker")
+	check(not brokerHit.shown, "Alt-click keeps the broker invite action")
 	brokerClick("RightButton")
 	equal(brokerClicks, 1, "a captured right-click invokes the broker once")
 	alt, shift = false, true
 	onEvent(events, "MODIFIER_STATE_CHANGED")
-	equal(brokerCatch.passLeft, nil, "Shift-click keeps the broker chat insertion")
+	check(not brokerHit.shown, "Shift-click keeps the broker chat insertion")
 	shift = false
 	canWhisper = false
 	test:RefreshClickRouting()
-	equal(brokerCatch.pass, "RightButton", "chat restrictions preserve native right-click for other friend actions")
-	equal(brokerCatch.passLeft, nil, "chat restrictions suppress the broker's native whisper")
+	check(brokerCatch.shown and not brokerBothCatch.shown, "unavailable whispers still allow the broker's right-click")
 	brokerClick("LeftButton")
 	equal(brokerClicks, 2, "the unavailable left-click is returned to the broker for feedback")
 	canWhisper = true
 	combat = true
 	onEvent(events, "PLAYER_REGEN_DISABLED")
-	check(not brokerHit.shown and not brokerCatch.shown, "combat gives the click back to the original broker row")
+	check(brokerHit.shown and brokerBothCatch.shown, "combat keeps both broker click paths")
+	local beforeCombatBroker = nativeWhispers
+	brokerClick("LeftButton")
+	equal(nativeWhispers, beforeCombatBroker + 1, "the Friends Broker opens one native whisper in combat with Streamer Mode")
+	mouseFocus = brokerBothCatch
+	check(test:GetMenuFriend({ bnetIDAccount = 76 }, true) == brokerRow, "combat still resolves the broker recipient")
 	combat = false
 	onEvent(events, "PLAYER_REGEN_ENABLED")
-	check(brokerHit.shown and brokerCatch.shown, "broker clicks recover after combat")
+	check(brokerHit.shown and brokerBothCatch.shown, "broker clicks stay active after combat")
 
 	brokerRow.hooks.OnHide(brokerRow)
 	check(not brokerHit.shown and not brokerCatch.shown, "a released broker row has no overlay for the next header")
@@ -861,7 +997,8 @@ do
 		hideSendCatch(self)
 		if wasShown then self:GetScript("OnHide")(self) end
 	end
-	check(sendHit.shown and sendCatch.shown, "Send Message uses the native link over the legacy button")
+	check(sendHit.shown and sendCatch.shown, "Send Message uses the native link in Streamer Mode")
+	equal(sendHit.template, "InlineHyperlinkFrameTemplate", "Send Message uses Blizzard's template directly")
 	equal(sendCatch.pass, "LeftButton", "Send Message passes only the left click to Blizzard")
 	equal(sendHit.font.args[2], 42, "Send Message binds the selected Battle.net account")
 	check(sendHit:GetScript("OnHyperlinkClick") == nativeClick, "Send Message uses the inherited hardware handler")
@@ -912,16 +1049,19 @@ do
 	check(sendHit.shown and sendCatch.shown, "an online Title friend can be whispered")
 	chatLocked = true
 	friends:UpdateSendMessageButton()
-	check(not sendHit.shown and not sendCatch.shown, "Send Message respects chat lockdown")
+	check(sendHit.shown and sendCatch.shown, "Send Message keeps the native link during chat lockdown")
 	chatLocked = false
 	selected = first
 	friends:UpdateSendMessageButton()
 	combat = true
 	onEvent(events, "PLAYER_REGEN_DISABLED")
-	check(not sendHit.shown and not sendCatch.shown, "combat removes the Send Message click target")
+	check(sendHit.shown and sendCatch.shown, "combat keeps the Send Message click target")
+	local beforeCombatMessage = nativeWhispers
+	sendHit.scripts.OnHyperlinkClick(sendHit, nil, nil, "LeftButton")
+	equal(nativeWhispers, beforeCombatMessage + 1, "Send Message opens the native whisper in combat with Streamer Mode")
 	combat = false
 	onEvent(events, "PLAYER_REGEN_ENABLED")
-	check(sendHit.shown and sendCatch.shown, "Send Message recovers after combat")
+	check(sendHit.shown and sendCatch.shown, "Send Message remains active after combat")
 	selected = nil
 	friends:UpdateSendMessageButton()
 	check(not sendHit.shown and not sendCatch.shown, "deselecting clears the previous Send Message recipient")
@@ -937,68 +1077,77 @@ do
 		if button == "LeftButton" then selections = selections + 1 else whoMenus = whoMenus + 1 end
 	end)
 	whoRow:SetScript("OnDoubleClick", function() doubleClicks = doubleClicks + 1 end)
+	combat, streamer = true, true
 	test:UpdateRow(friends, whoRow, whoRow.info, true)
-	local whoHit, whoCatch = frames[#frames - 1], frames[#frames]
+	local whoHit, whoCatch, whoLeftCatch = table.unpack(frames, #frames - 2, #frames)
+	equal(whoHit.template, "InlineHyperlinkFrameTemplate", "Who links use Blizzard's template directly")
 	local function pressWho(button)
-		whoCatch.scripts.OnMouseDown(whoCatch, button)
-		whoCatch.scripts.OnMouseUp(whoCatch, button)
+		local activeCatch = whoLeftCatch.shown and whoLeftCatch or whoCatch
+		activeCatch.scripts.OnMouseDown(activeCatch, button)
+		activeCatch.scripts.OnMouseUp(activeCatch, button)
 	end
 	equal(whoCatch.pass, nil, "Who catches the first left click and keeps the custom right-click menu")
 	local beforeWho = nativeWhispers
 	pressWho("LeftButton")
 	equal(selections, 1, "the first Who click selects")
 	equal(nativeWhispers, beforeWho, "selecting a Who result does not open chat")
-	equal(whoCatch.pass, "LeftButton", "the next left click goes to Blizzard")
+	check(whoLeftCatch.shown and not whoCatch.shown, "the next Who left click goes to Blizzard in combat with Streamer Mode")
+	equal(whoLeftCatch.pass, "LeftButton", "Who still owns right-click while waiting for the second click")
 	equal(whoHit.font.args[1], "WhoOne-Realm", "Who targets the complete result name")
 	whoHit.scripts.OnHyperlinkClick(whoHit, nil, nil, "LeftButton")
 	whoHit.hooks.OnHyperlinkClick(whoHit, nil, nil, "LeftButton")
 	equal(nativeWhispers, beforeWho + 1, "the next click opens exactly one native whisper")
-	equal(whoCatch.pass, nil, "the next Who sequence starts with selection again")
+	check(whoCatch.shown and not whoLeftCatch.shown, "the next Who sequence starts with selection again")
 	pressWho("RightButton")
 	equal(whoMenus, 1, "Who right click still opens its own menu")
 	control = true
 	test:RefreshClickRouting()
 	pressWho("LeftButton")
-	equal(whoCatch.pass, nil, "Ctrl search does not arm Whisper")
+	check(not whoLeftCatch.shown, "Ctrl search does not arm Whisper")
 	control = false
 	whoAction = "invite"
 	test:RefreshClickRouting()
 	pressWho("LeftButton")
 	whoCatch.scripts.OnDoubleClick(whoCatch, "LeftButton")
 	equal(doubleClicks, 1, "the Invite double click reaches Who's existing handler")
-	equal(whoCatch.pass, nil, "Invite keeps the left click on the row")
+	check(not whoLeftCatch.shown, "Invite keeps the left click on the row")
 	whoAction = "whisper"
 	test:RefreshClickRouting()
 	pressWho("LeftButton")
 	whoRow.info = { fullName = "WhoTwo-Realm" }
 	test:UpdateRow(friends, whoRow, whoRow.info, true)
-	equal(whoCatch.pass, nil, "recycling a result cancels the old Who click sequence")
+	check(whoCatch.shown and not whoLeftCatch.shown, "recycling a result cancels the old Who click sequence")
 	equal(whoHit.font.args[1], "WhoTwo-Realm", "the recycled result targets its own name")
-	combat = true
-	onEvent(events, "PLAYER_REGEN_DISABLED")
-	check(not whoHit.shown, "Who drops its native target during combat")
+	chatLocked = true
+	test:RefreshClickRouting()
+	check(whoHit.shown, "Who keeps its native target during chat lockdown")
+	chatLocked = false
 	combat = false
 	onEvent(events, "PLAYER_REGEN_ENABLED")
-	check(whoHit.shown, "Who restores the current target after combat without a new search")
+	check(whoHit.shown, "Who keeps the current target in Streamer Mode after combat")
+	streamer = false
 
+	combat, streamer = true, true
 	test:UpdateBrokerRow(brokerRow, wowBrokerFriend, true)
-	equal(brokerCatch.pass, "LeftButton", "Guild Broker only passes its left click to the native link")
-	check(not brokerCatch.passLeft, "Guild Broker keeps right-click available to its guild menu")
+	check(brokerLeftCatch.shown, "Guild Broker keeps its native whisper in combat with Streamer Mode")
+	equal(brokerLeftCatch.pass, "LeftButton", "Guild Broker only passes its left click to the native link")
+	check(not brokerLeftCatch.passLeft, "Guild Broker keeps right-click available to its guild menu")
 	local beforeGuildBroker = nativeWhispers
 	brokerHit.scripts.OnHyperlinkClick(brokerHit, nil, nil, "LeftButton")
-	equal(nativeWhispers, beforeGuildBroker + 1, "Guild Broker left click opens the native whisper")
+	equal(nativeWhispers, beforeGuildBroker + 1, "Guild Broker left click opens the native whisper in Streamer Mode")
 	mouseFocus = brokerHit
 	equal(test:GetMenuFriend({ name = "Example", surname = "Realm" }, false), nil, "a Guild Broker row is not a native friend-menu source")
 	alt = true
 	test:RefreshBrokerRouting()
-	equal(brokerCatch.pass, nil, "Guild Broker keeps its Alt-click invite")
+	check(not brokerHit.shown, "Guild Broker keeps its Alt-click invite")
 	alt = false
 	shift = true
 	test:RefreshBrokerRouting()
-	equal(brokerCatch.pass, nil, "Guild Broker keeps its Shift-click name insertion")
+	check(not brokerHit.shown, "Guild Broker keeps its Shift-click name insertion")
 	shift = false
 	brokerRow.hooks.OnHide(brokerRow)
 	check(not brokerHit.shown, "releasing a Guild Broker row removes the last native recipient")
+	combat = false
 
 	local menuButton, menu = frame(), { closes = 0 }
 	menuButton.height = 0 -- Blizzard may run initializers before the final layout.
@@ -1018,7 +1167,7 @@ do
 	equal(menuElement.label, "Whisper", "guild action registers a visible menu entry")
 	menuElement.init(menuButton, menuElement, menu)
 	local menuHit, menuCatch = frames[#frames - 1], frames[#frames]
-	check(menuHit.shown and menuCatch.shown and menuCatch.motion, "the menu has separate native click and mouse motion layers")
+	check(menuHit.shown and menuCatch.shown and menuCatch.motion, "Guild menu Whisper uses the native link in Streamer Mode")
 	equal(menuCatch.pass, "LeftButton", "the menu hover layer passes left clicks through")
 	menuCatch.scripts.OnEnter(menuCatch)
 	check(menuButton.highlighted, "entering the Whisper hit area highlights the visible menu item")
@@ -1042,9 +1191,28 @@ do
 	equal(menuHit.font.args[1], "GuildTwo-Realm", "a pooled menu item uses the new recipient")
 	chatLocked = true
 	test:RefreshClickRouting()
-	check(not menuHit.shown and not menuCatch.shown, "both menu layers are removed during chat lockdown")
-	chatLocked = false
+	check(menuHit.shown and menuCatch.shown, "the menu keeps its native Whisper link during chat lockdown")
+	canWhisper = false
+	test:RefreshClickRouting()
+	check(not menuHit.shown and not menuCatch.shown, "an age restriction still hides the menu Whisper link")
+	canWhisper, chatLocked = true, false
 	menuElement.reset(menuButton)
+	combat, streamer = true, true
+	test:AddCharacterWhisperMenuItem(root, "WhoMenu-Realm", "Whisper")
+	menuElement.init(menuButton, menuElement, menu)
+	check(menuHit.shown and menuCatch.shown, "Who menu Whisper works in combat with Streamer Mode")
+	equal(menuHit.font.args[1], "WhoMenu-Realm", "Who menu Whisper binds the selected character")
+	local beforeWhoMenu = nativeWhispers
+	menuHit.scripts.OnHyperlinkClick(menuHit, nil, nil, "LeftButton")
+	menuHit.hooks.OnHyperlinkClick(menuHit, nil, nil, "LeftButton")
+	equal(nativeWhispers, beforeWhoMenu + 1, "Who menu Whisper opens Blizzard chat once")
+	menuElement.reset(menuButton)
+	test:AddFriendWhisperMenuItem(root, first, false, "Whisper")
+	menuElement.init(menuButton, menuElement, menu)
+	check(menuHit.shown and menuCatch.shown, "an explicit BFL friend-menu whisper works in combat with Streamer Mode")
+	equal(menuHit.font.args[2], first.bnetAccountID, "the fallback whisper still binds the actual Battle.net friend")
+	menuElement.reset(menuButton)
+	combat, streamer = false, false
 
 	local function createGuildBroker(tooltip)
 		local factory = execute("return function(tooltip)\nlocal GuildBroker = {}\n"
@@ -1080,7 +1248,7 @@ do
 	local modifyMenu = env.Menu.ModifyMenu
 	env.Menu.ModifyMenu = nil
 	friends:RenderDisplay()
-	check(not test:HandleUnavailableClick(), "a missing menu extension API preserves the compatibility path")
+	check(not hit.shown, "a missing menu extension API gives clicks back to the BFL menu")
 	env.Menu.ModifyMenu = modifyMenu
 	local setItemRef = env.SetItemRef
 	env.SetItemRef = nil
@@ -1118,7 +1286,12 @@ do
 		equal(verified.uid, context.uid, "feature actions receive the verified friend")
 		root:CreateButton("BetterFriendlist")
 	end
-	env.BFL_FirstSafeText = function(name) return name end
+	env.BFL_FirstSafeText = function(...)
+		for index = 1, select("#", ...) do
+			local value = select(index, ...)
+			if not BFL:IsSecret(value) and value and value ~= "" then return value end
+		end
+	end
 	env.MenuUtil = {
 		GetElementText = function(entry) return entry.text end,
 		SetElementText = function(entry, value) entry.text = value end,
@@ -1150,6 +1323,8 @@ do
 			return entry
 		end
 		function value:CreateDivider() end
+		function value:QueueDivider() end
+		function value:QueueTitle() end
 		function value:CreateTitle(label) return self:CreateButton(label) end
 		function value:SetResponder(handler) self.callback = handler end
 		function value:SetEnabled(enabled) self.enabled = enabled end
@@ -1186,7 +1361,8 @@ do
 	local populate = execute(
 		between(legacy, "local function BFL_GetDisplayedInviteTypeSafe(", "\n\t\t\t-- Multi-Game-Account:")
 		.. between(legacy, "local function BFL_FindBNetFriendData(", "local function BFL_GetBNetAccountInfo(")
-		.. between(legacy, "local function BFL_AddNativeFriendMenu(", "\n\t\t\tif Menu and Menu.ModifyMenu then")
+		.. between(legacy, "function BFL:OpenBetterFriendlistContextMenu(", "local function BFL_CreateFriendMenuContext(")
+		.. between(legacy, "local function BFL_CreateFriendMenuContext(", "\n\t\t\tif Menu and Menu.ModifyMenu then")
 		.. "\nreturn BFL_AddNativeFriendMenu", "native menu extension")
 
 	local nativeWhisper = function() end
@@ -1233,6 +1409,42 @@ do
 	menu = menuElement("root")
 	bridge:PopulateMenu(row, menu, { bnetIDAccount = 42 }, "BN_FRIEND")
 	equal(count(menu, "Third-party action"), 1, "BFL-owned menus still replay captured registrations")
+	for _, helper in ipairs({ "BFL_AddPopoutChatButton", "BFL_AddDeleteCommunityMessageButton" }) do
+		env[helper] = function() end
+	end
+	env.BFL_BuildCopyNameHandler = function() return function() end end
+	local fallback
+	local originalCreateContextMenu = BFL.CreateContextMenu
+	BFL.CreateContextMenu = function(owner, generate)
+		fallback = menuElement("root")
+		generate(owner, fallback)
+	end
+	BFL:OpenFriendMenuFallback(row, friend)
+	equal(count(fallback, "Whisper"), 1, "the fallback restores Whisper")
+	equal(count(fallback, "Note"), 1, "the fallback keeps friend list actions")
+	equal(count(fallback, "BetterFriendlist"), 1, "the fallback keeps BFL's group section")
+	equal(count(fallback, "Third-party action"), 1, "the fallback replays a captured Menu Bridge action once")
+	equal(count(fallback, "Duplicate fallback"), 0, "the fallback avoids a duplicate provider action")
+	local oldActive = BFL.StreamerMode.IsActive
+	BFL.StreamerMode.IsActive = function() return true end
+	local oldDB = BFL:GetModule("DB")
+	BFL:RegisterModule("DB", { Get = function(_, key, default)
+		if key == "streamerModeNameFormat" then return "nickname" end
+		return default
+	end, GetNickname = function() return "" end })
+	friend.friendLevel = env.Enum.BattleNetFriendLevel.RealID
+	friend.battleTag = "Masked#1234"
+	BFL:OpenFriendMenuFallback(row, friend)
+	equal(fallback.children[1].text, "Masked", "the fallback menu uses the short BattleTag when a Real ID friend has no nickname")
+	friend.battleTag, friend.characterName = nil, "Character"
+	BFL:OpenFriendMenuFallback(row, friend)
+	equal(fallback.children[1].text, "Character", "the fallback menu uses the character when the tag is unavailable")
+	friend.characterName = nil
+	BFL:OpenFriendMenuFallback(row, friend)
+	equal(fallback.children[1].text, BFL.L.UNKNOWN, "the fallback menu keeps Real ID private with no tag or character")
+	BFL.modules.DB = oldDB
+	BFL.StreamerMode.IsActive = oldActive
+	BFL.CreateContextMenu = originalCreateContextMenu
 
 	env._G = env
 	local profileTarget, showProfile = nil, true

@@ -7,21 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [DRAFT]
+## [3.0.3]        - 2026-11-09
 
 ### All WoW Versions
 
 #### Fixed
-- **Nickname Dialog** - Closing a group dialog no longer leaves a group-name warning or red text in the next nickname dialog.
-- **World Map Tooltips** - Hovering over BetterFriendlist no longer shows quest area tooltips from the world map behind it.
-
-### Retail Midnight & WoW Forever
-
-#### Improved
-- **Copy BattleTag** - In the Modern friends list, Blizzard’s copy button puts your BattleTag directly on the clipboard when available.
-
-#### Fixed
-- **Who Search Builder** - In the Modern layout, the Who results scrollbar stays below the builder and clear of its close button.
+- **Friend Menus** - Fixed cases where right-clicking a friend failed to open their menu.
+- **Whispers** - Click to Whisper and the Whisper menu option now open the chat box in cases where they previously failed.
+- **Who Searches** - Who no longer skips searches that previously left the results list unchanged.
 
 ---
 
@@ -322,6 +315,8 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 - **Raid Tab** - Long raid information now stays inside the window, and the Legacy controls no longer overlap.
 - **Interface Switching** - Raid Roster Help and Streamer Mode now reappear immediately after switching from Modern to Legacy.
 - **Modern Ready Check** - Removed a small visual artifact from the Ready Check button.
+
+---
 
 ---
 

@@ -768,7 +768,7 @@ local function OnMemberLineClick(cell, data, mouseButton)
 	elseif actualButton == "RightButton" then
 		-- Context menu
 		GuildBroker:OpenMemberContextMenu(data)
-	elseif actualButton == "LeftButton" and hasUsableFullName then
+	elseif actualButton == "LeftButton" and hasUsableFullName and not InCombatLockdown() then
 		local friendMenu = BFL:GetModule("NativeFriendMenu")
 		if friendMenu then friendMenu:ShowWhisperUnavailable() end
 	end
