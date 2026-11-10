@@ -50,10 +50,9 @@ end
 execute(read(repo, "Locales/enUS.lua"), "Locales/enUS.lua")
 execute(read(repo, "Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
 
--- The same parsed entries feed the standalone window and Settings Center.
+-- Both settings views share the parsed entries and read state.
 local changelogSource = read(repo, "Modules/Changelog.lua")
-local parseChangelog, enableChangelogResize =
-	execute(changelogSource .. "\nreturn ParseChangelog, EnableChangelogResize", "Modules/Changelog.lua")
+local parseChangelog = execute(changelogSource .. "\nreturn ParseChangelog", "Modules/Changelog.lua")
 local changelog = BFL:GetModule("Changelog")
 local entries = changelog:GetEntries()
 equal(entries[1].version, version, "The installed entry matches both manifests, including drafts")
@@ -67,10 +66,9 @@ equal(previous.date, "2026-10-11", "The previous release date is preserved")
 local settingsEntries = changelog:GetSettingsCenterEntries(2)
 equal(settingsEntries[1].title, "Version " .. version, "Settings Center shows the installed version")
 equal(settingsEntries[1].rightText, entries[1].date, "Settings Center preserves the matching draft or release date")
-check(settingsEntries[1].defaultExpanded and not settingsEntries[2].defaultExpanded, "Only the newest entry starts expanded")
+check(not settingsEntries[1].defaultExpanded and not settingsEntries[2].defaultExpanded, "All entries start collapsed")
 equal(#changelog:GetSettingsCenterEntries(0), 0, "The entry limit is honored")
 equal(#changelog:GetSettingsCenterEntries(1), 1, "A one-entry limit includes the current release")
-check(between(changelogSource, "function Changelog:CreateChangelogWindow()", "local entries = self:GetEntries()"), "Standalone window shares the same entry provider")
 local fixture = "## [DRAFT]\n- New draft\n## [2.9.1] - 2026-09-27\n- Released note\n## [Unreleased]\n- Future note"
 local parsed = parseChangelog(fixture, "2.9.2")
 equal(#parsed, 3, "Undated headings do not leak content into the previous release")
@@ -81,58 +79,33 @@ equal(parsed[3].version, "2.9.2", "Unreleased headings follow the same installed
 local markdownRelease = between(read(repo, "CHANGELOG.md"), "## [2.9.2]", "## [2.9.1]")
 equal(between(changelogSource, "## [2.9.2]", "## [2.9.1]"), markdownRelease, "Embedded release notes match CHANGELOG.md")
 
-local savedSize = { width = 1600, height = 620, x = -42, y = 18 }
-local savedWrites = 0
+local saved = { lastChangelogVersion = entries[3].version }
 BFL.modules.DB = {
-	Get = function() return savedSize end,
-	Set = function(_, key, value)
-		equal(key, "changelogWindowSize", "The changelog window geometry uses its existing save key")
-		savedSize = value
-		savedWrites = savedWrites + 1
+	Get = function(_, key, default)
+		if saved[key] ~= nil then return saved[key] end
+		return default
 	end,
+	Set = function(_, key, value) saved[key] = value end,
 }
-local function NewResizeWidget()
-	local widget = { scripts = {} }
-	function widget:SetSize(width, height) self.width, self.height = width, height end
-	function widget:GetWidth() return self.width end
-	function widget:GetHeight() return self.height end
-	function widget:SetPoint(_, _, _, x, y) self.x, self.y = x, y end
-	function widget:GetCenter() return self.x, self.y end
-	function widget:GetFrameLevel() return 1 end
-	function widget:SetScript(event, script) self.scripts[event] = script end
-	widget.HookScript = widget.SetScript
-	return setmetatable(widget, { __index = function() return function() end end })
-end
-local resizeFrame = NewResizeWidget()
-local grip = NewResizeWidget()
-env.UIParent = NewResizeWidget()
-env.UIParent:SetSize(1200, 900)
-env.UIParent:SetPoint("CENTER", nil, nil, 600, 450)
-env.CreateFrame = function() return grip end
-enableChangelogResize(resizeFrame)
-equal(resizeFrame:GetWidth(), 1200, "Saved changelog width is capped to the current screen")
-equal(resizeFrame:GetHeight(), 620, "Saved changelog height is restored")
-equal(resizeFrame.x, -42, "Saved horizontal position is restored")
-equal(resizeFrame.y, 18, "Saved vertical position is restored")
-grip.scripts.OnMouseUp()
-equal(savedWrites, 0, "Mouse-up without resizing does not save")
-grip.scripts.OnMouseDown(grip, "LeftButton")
-resizeFrame:SetSize(940, 700)
-resizeFrame:SetPoint("CENTER", nil, nil, 570, 470)
-resizeFrame.scripts.OnHide()
-grip.scripts.OnMouseUp()
-equal(savedWrites, 1, "Closing during resize saves the size once")
-equal(savedSize.width, 940, "The new changelog width is persisted")
-equal(savedSize.height, 700, "The new changelog height is persisted")
-equal(savedSize.x, -30, "Resizing persists the horizontal offset from the screen center")
-equal(savedSize.y, 20, "Resizing persists the vertical offset from the screen center")
-resizeFrame.scripts.OnDragStart()
-resizeFrame:SetPoint("CENTER", nil, nil, 640, 435)
-resizeFrame.scripts.OnDragStop()
-equal(savedWrites, 2, "Moving the window saves its position")
-equal(savedSize.x, 40, "Moving persists the horizontal offset")
-equal(savedSize.y, -15, "Moving persists the vertical offset")
-BFL.modules.DB, env.UIParent, env.CreateFrame = nil, nil, nil
+local newest, older = entries[1].version, entries[2].version
+local unread = changelog:GetUnreadVersions()
+check(unread[newest] and unread[older] and not unread[entries[3].version], "Legacy read marker preserves older releases")
+changelog:MarkVersionRead(newest)
+check(changelog:HasUnreadVersions() and changelog:GetUnreadVersions()[older], "Reading the newest leaves the older badge")
+changelog:MarkVersionRead(older)
+check(not changelog:HasUnreadVersions(), "Reading all pending releases clears the settings badge")
+saved.changelogReadState = nil
+saved.lastChangelogVersion = "0.0.0"
+unread = changelog:GetUnreadVersions()
+check(unread[newest] and not unread[older], "First visit only badges the latest release")
+changelog:MarkVersionRead(newest)
+local nextRelease = { { version = "99.0.0" }, entries[1], entries[2] }
+unread = changelog:GetUnreadVersions(nextRelease)
+check(unread["99.0.0"] and not unread[newest], "A later update keeps individually read releases read")
+saved.changelogReadState = { through = "3.0.3-dev", versions = {} }
+unread = changelog:GetUnreadVersions({ { version = "3.0.3" }, { version = "3.0.2" } })
+check(unread["3.0.3"] and not unread["3.0.2"], "A release superseding a draft can be marked unread")
+BFL.modules.DB = nil
 
 -- Name formatting retains character styling, aliases, privacy and sort behavior.
 local nickname, regional, streamer = "", true, false

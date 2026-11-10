@@ -2059,14 +2059,11 @@ function BFL:IsSecret(value)
 end
 
 function BFL:IsPendingRaidRosterName(name)
-	if name == nil or name == "" then
-		return true
-	end
-	if self:IsSecret(name) then
+	if self:IsSecret(name) or type(name) ~= "string" or name == "" then
 		return true
 	end
 	local unknownName = UNKNOWN or "Unknown"
-	return name == unknownName or name == "Unknown"
+	return name == unknownName or name == UNKNOWNOBJECT or name == "Unknown"
 end
 
 -- Get a safe (non-secret) account name for string operations.
@@ -2840,6 +2837,11 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	if msg == "debug" then
 		BFL:ToggleDebugPrint()
 
+	elseif BFL.TitleFriendNotes and BFL.TitleFriendNotes:IsSupported() and msg == "titlefriendnotes off" then
+		BFL.TitleFriendNotes:SetEnabled(false)
+	elseif BFL.TitleFriendNotes and BFL.TitleFriendNotes:IsSupported() and msg == "titlefriendnotes on" then
+		BFL.TitleFriendNotes:SetEnabled(true)
+
 	-- Discord Popup
 	elseif msg == "discord" then
 		local Changelog = BFL:GetModule("Changelog")
@@ -2881,13 +2883,16 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end
-	elseif msg == "settingslegacy" or msg == "legacysettings" then
+	elseif msg == "settingspreview" or msg == "settingslegacy" or msg == "legacysettings" then
 		local Settings = BFL:GetModule("Settings")
 		if Settings and Settings.ShowLegacy then
 			Settings:ShowLegacy()
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_SETTINGS_NOT_LOADED)
 		end
+	elseif msg == "settingshint" then
+		local Settings = BFL:GetModule("Settings")
+		if Settings then Settings:ShowRedesignHint(true) end
 	elseif msg:match("^forcemodern") then
 		local argument = msg:match("^forcemodern%s*(%S*)") or ""
 		local FriendsUI = BFL:GetModule("FriendsUI")
@@ -2968,26 +2973,20 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 
 	-- Reset Changelog Version
 	elseif msg == "reset_changelog" then
-		local DB = BFL:GetModule("DB")
-		if DB then
-			DB:Set("lastChangelogVersion", "0.0.0")
+		local Changelog = BFL:GetModule("Changelog")
+		if Changelog then
+			Changelog:ResetReadState()
 			print(
 				"|cff00ff00BetterFriendlist:|r "
 					.. (BFL.L.CHANGELOG_RESET_SUCCESS or "Changelog version reset successfully.")
 			)
-
-			-- Update indicator immediately if module is loaded
-			local Changelog = BFL:GetModule("Changelog")
-			if Changelog then
-				Changelog:CheckVersion()
-			end
 		end
 
 	-- Help (or any other unrecognized command)
 	elseif msg == "changelog" or msg == "changes" then
-		local Changelog = BFL:GetModule("Changelog")
-		if Changelog then
-			Changelog:Show()
+		local Settings = BFL:GetModule("Settings")
+		if Settings then
+			Settings:ShowChangelog()
 		else
 			print("|cffff0000BetterFriendlist:|r " .. BFL.L.CORE_CHANGELOG_NOT_LOADED)
 		end
@@ -3361,6 +3360,9 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print(BFL.L.CORE_HELP_CMD_HELP)
 		print(BFL.L.CORE_HELP_CMD_CHANGELOG)
 		print(BFL.L.CORE_HELP_CMD_RESET)
+		if BFL.TitleFriendNotes and BFL.TitleFriendNotes:IsSupported() then
+			print(BFL.L.CORE_HELP_CMD_TITLE_FRIEND_NOTES)
+		end
 		-- The internal forceModern command intentionally remains undiscoverable.
 		-- It is retained only for targeted development diagnostics and must not
 		-- appear in the supported user-command list.

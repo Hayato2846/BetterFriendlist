@@ -23,6 +23,7 @@ local defaults = {
 	groupStates = {},
 	customGroups = {},
 	friendGroups = {},
+	titleFriendNotes = { enabled = true, notes = {}, backups = {}, active = {}, originals = {} },
 	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
 	showWelcomeMessage = true, -- Show the welcome message on login
 	enableSmoothScrolling = false, -- Mainline friends list animation is opt-in
@@ -164,6 +165,8 @@ local defaults = {
 	knownCharacters = { enabled = false, observeBattleNet = false, maxTooltipCharacters = 3, contacts = {} },
 	friendTagsSchemaVersion = 1,
 	friendTagSettings = {
+		sections = {},
+		removedBlizzardTags = {},
 		enabled = true,
 		showRowChips = true,
 		showTooltipChips = true,
@@ -182,6 +185,8 @@ local defaults = {
 		chipFontFlags = "SLUG",
 		maxTooltipChips = 8,
 		enableDynamicTagGroups = false,
+		prioritizeDynamicTagGroups = false,
+		dynamicTagGroupHeaderStyle = "standard",
 		includeCustomTagsInSearch = true,
 		includeBlizzardTagsInSearch = true,
 	},
@@ -313,6 +318,7 @@ local defaults = {
 	whoSearchHistoryEnabled = true, -- Enable WHO search history (default: ON)
 	whoSearchHistoryMax = 8, -- Maximum search history entries (default: 8)
 	whoDoubleClickAction = "whisper", -- Double-click action: whisper or invite (default: whisper)
+	whoOpenOnChatShiftClick = false,
 	whoSearchHistory = {}, -- Stored search history entries
 	whoSearchPresets = {}, -- Explicitly bookmarked text queries, capped by WhoSearches
 	whoSearchBuilderDocked = false, -- Search Builder docked mode (default: OFF, flyout overlay)
@@ -324,6 +330,9 @@ local defaults = {
 	socialKeybindMigratedKeys = {}, -- Keys moved from TOGGLESOCIAL to BETTERFRIENDLIST_TOGGLE
 	themeSettingsIndependentDefaultsVersion = 1, -- Tracks independent Theme tab default derivation
 	lastChangelogVersion = "0.0.0", -- Last version the user saw the changelog for
+	settingsRedesignHintSeen = false, -- Account-wide acknowledgement of the redesigned settings
+	settingsSearchSelections = {},
+	changelogReadState = { through = "", versions = {} },
 	changelogWindowSize = { width = 600, height = 500 },
 	version = BFL.Version,
 }
@@ -455,6 +464,9 @@ local function ValidateProfileCollections(profile)
 	for _, key in ipairs({ "quickFilterVisibility", "sorterVisibility", "knownFriendUIDs", "quickFilterTags", "modernFriendTabVisibility" }) do
 		if not stringMap(profile[key], "boolean") then return false end
 	end
+	local changelogReadState = profile.changelogReadState
+	if type(changelogReadState) ~= "table" or type(changelogReadState.through) ~= "string"
+		or not stringMap(changelogReadState.versions, "boolean") then return false end
 	for _, key in ipairs({ "quickFilterOrder", "sorterOrder", "modernFriendTabOrder", "guildBrokerColumnOrder" }) do
 		if not IsProfileArray(profile[key], "string") then return false end
 	end
@@ -682,6 +694,11 @@ function DB:PrepareImportedProfile(importData)
 	if not ValidateProfileGroups(staged) or not ValidateProfileCollections(staged) or not ValidateProfileGeometry(staged) then
 		return nil, "ERROR_EXPORT_STRUCTURE"
 	end
+	for _, field in ipairs({ "notes", "backups", "originals" }) do
+		for key, value in pairs(staged.titleFriendNotes[field]) do
+			if type(key) ~= "string" or type(value) ~= "string" then return nil, "ERROR_EXPORT_STRUCTURE" end
+		end
+	end
 	for _, key in ipairs({ "colorGroupCount", "colorGroupArrow" }) do
 		if staged[key] ~= nil and not IsProfileColor(staged[key]) then return nil, "ERROR_EXPORT_STRUCTURE" end
 	end
@@ -697,6 +714,19 @@ function DB:PrepareImportedProfile(importData)
 		-- Keep the current graph and its migration/options together. This also
 		-- protects imports from older backups whose source flavor is unknown.
 		for key in pairs(codec.FLAVOR_KEYS) do staged[key] = BetterFriendlistDB[key] end
+	elseif full then
+		-- Merge note recovery data from matching-flavor backups. Import must
+		-- never remove a note whose marker is still held by Battle.net.
+		local live = BetterFriendlistDB.titleFriendNotes
+		if live then
+			for _, field in ipairs({ "notes", "backups", "originals" }) do
+				local imported = staged.titleFriendNotes[field]
+				for key, value in pairs(live[field]) do imported[key] = value end
+			end
+			staged.titleFriendNotes.enabled = live.enabled
+			staged.titleFriendNotes.returning = live.returning
+			staged.titleFriendNotes.active = codec:Copy(live.active)
+		end
 	end
 	-- Keep the imported addon version until a future version migration can see it.
 	staged.version = full and importData.version or BetterFriendlistDB.version
@@ -1333,6 +1363,12 @@ function DB:Get(key, default)
 	return default
 end
 
+-- Comparisons only need immutable defaults for choosing a second value.
+function DB:GetScalarDefault(key)
+	local value = defaults[key]
+	if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then return value end
+end
+
 -- Set a value in the database
 function DB:Set(key, value)
 	-- Optimization: Increment version counter to invalidate render caches
@@ -1364,6 +1400,10 @@ function DB:Set(key, value)
 	-- Keep every active Preview surface in sync with Settings Center and legacy
 	-- controls. PreviewMode coalesces a whole change burst into one bounded
 	-- refresh, so sliders and color pickers cannot create refresh storms.
+	local review = BFL and BFL:GetModule("LegacySettingsReview")
+	if review then
+		review:QueueSample()
+	end
 	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
 	if PreviewMode and PreviewMode.OnSettingChanged then
 		PreviewMode:OnSettingChanged(key)
@@ -1465,18 +1505,98 @@ function DB:DeleteCustomGroup(groupId)
 	BetterFriendlistDB.customGroups[groupId] = nil
 end
 
--- Get friend's groups
+-- Numeric IDs only address the live roster. Persistent groups use the marker
+-- carried by the Title Friend's Blizzard note.
+local titleTokens = {}
+local titleGroupKeysReady = false
+local TITLE_GROUP_PREFIX = "bnet_title_"
+
+local function IsTitleFriendGroupUID(uid)
+	return BFL.IsForever and type(uid) == "string" and (uid:match("^bnet_%d+$") or uid == "bnet_unknown")
+end
+
+function DB:ClearTitleFriendGroupKeys()
+	titleGroupKeysReady = false
+	if next(titleTokens) then BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1 end
+	titleTokens = {}
+end
+
+function DB:InvalidateTitleFriendGroupKeys()
+	titleGroupKeysReady = false
+end
+
+function DB:RefreshTitleFriendGroupKeys(accounts)
+	local notes = BFL.TitleFriendNotes
+	if not notes or not notes:IsEnabled() then
+		self:ClearTitleFriendGroupKeys()
+		return
+	end
+	local rows, tokens = notes:Inspect(accounts)
+	if not rows then
+		self:ClearTitleFriendGroupKeys()
+		return
+	end
+	local keys = {}
+	for _, row in ipairs(rows) do
+		if row.token and tokens[row.token] == row then keys[row.uid] = row.token end
+	end
+	local changed = false
+	for uid, token in pairs(keys) do
+		if titleTokens[uid] ~= token then changed = true; break end
+	end
+	if not changed then
+		for uid in pairs(titleTokens) do
+			if not keys[uid] then changed = true; break end
+		end
+	end
+	titleTokens = keys
+	titleGroupKeysReady = true
+	if changed then BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1 end
+end
+
+function DB:GetVerifiedTitleFriendToken(uid, fresh)
+	local notes = BFL.TitleFriendNotes
+	if not notes or not notes:IsEnabled() then return end
+	if fresh or not titleGroupKeysReady then
+		local accounts = notes:ReadRoster()
+		if accounts then self:RefreshTitleFriendGroupKeys(accounts)
+		else self:ClearTitleFriendGroupKeys() end
+	end
+	return titleTokens[uid]
+end
+
+function DB:GetStoredGroupNoteUID(key)
+	if type(key) == "string" and key:sub(1, #TITLE_GROUP_PREFIX) == TITLE_GROUP_PREFIX then return end
+	if not IsTitleFriendGroupUID(key) then return key end
+end
+
+function DB:HasVerifiedFriendGroupKey(uid, fresh)
+	return not IsTitleFriendGroupUID(uid) or self:GetVerifiedTitleFriendToken(uid, fresh) ~= nil
+end
+
+local function GetFriendGroupKey(uid, fresh)
+	if not IsTitleFriendGroupUID(uid) then return uid end
+	local token = DB:GetVerifiedTitleFriendToken(uid, fresh)
+	if token then return TITLE_GROUP_PREFIX .. token end
+end
+
+local function ReportUnavailableTitleGroupKey()
+	local message = BFL.L and BFL.L.TITLE_FRIEND_GROUP_ID_UNAVAILABLE
+	if DEFAULT_CHAT_FRAME and message then DEFAULT_CHAT_FRAME:AddMessage(message) end
+end
+
+-- Get friend's groups. With no UID, return the backing store for maintenance.
 function DB:GetFriendGroups(friendUID)
 	-- If friendUID is provided, return groups for that specific friend
 	if friendUID then
-		return BetterFriendlistDB.friendGroups[friendUID] or {}
+		return BetterFriendlistDB.friendGroups[GetFriendGroupKey(friendUID)] or {}
 	end
 	-- If no friendUID provided, return ALL friendGroups mappings
 	return BetterFriendlistDB.friendGroups or {}
 end
 
 -- Set friend's groups
-function DB:SetFriendGroups(friendUID, groups)
+function DB:SetFriendGroups(friendUID, groups, showError)
 	local sanitizedGroups = {}
 	local seenGroups = {}
 	for _, groupId in ipairs(groups or {}) do
@@ -1490,10 +1610,16 @@ function DB:SetFriendGroups(friendUID, groups)
 		end
 	end
 
+	local key = GetFriendGroupKey(friendUID, true)
+	if not key then
+		if showError and #sanitizedGroups > 0 then ReportUnavailableTitleGroupKey() end
+		return false
+	end
+
 	if #sanitizedGroups == 0 then
-		BetterFriendlistDB.friendGroups[friendUID] = nil
+		BetterFriendlistDB.friendGroups[key] = nil
 	else
-		BetterFriendlistDB.friendGroups[friendUID] = sanitizedGroups
+		BetterFriendlistDB.friendGroups[key] = sanitizedGroups
 	end
 
 	-- NoteSync: Sync group change to friend note
@@ -1501,26 +1627,32 @@ function DB:SetFriendGroups(friendUID, groups)
 	if NoteSync then
 		NoteSync:OnGroupChanged(friendUID)
 	end
+	return true
 end
 
 -- Add friend to group
-function DB:AddFriendToGroup(friendUID, groupId)
+function DB:AddFriendToGroup(friendUID, groupId, showError)
 	if not friendUID or type(groupId) ~= "string" or NON_PERSISTED_FRIEND_GROUPS[groupId] then
 		return false
 	end
+	local key = GetFriendGroupKey(friendUID, true)
+	if not key then
+		if showError then ReportUnavailableTitleGroupKey() end
+		return false
+	end
 
-	if not BetterFriendlistDB.friendGroups[friendUID] then
-		BetterFriendlistDB.friendGroups[friendUID] = {}
+	if not BetterFriendlistDB.friendGroups[key] then
+		BetterFriendlistDB.friendGroups[key] = {}
 	end
 
 	-- Check if already in group
-	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+	for _, gid in ipairs(BetterFriendlistDB.friendGroups[key]) do
 		if gid == groupId then
 			return false -- Already in group
 		end
 	end
 
-	table.insert(BetterFriendlistDB.friendGroups[friendUID], groupId)
+	table.insert(BetterFriendlistDB.friendGroups[key], groupId)
 
 	-- Optimization: Increment version counter
 	if BFL.SettingsVersion then
@@ -1542,18 +1674,21 @@ function DB:AddFriendToGroup(friendUID, groupId)
 end
 
 -- Remove friend from group
-function DB:RemoveFriendFromGroup(friendUID, groupId)
-	if not BetterFriendlistDB.friendGroups[friendUID] then
+function DB:RemoveFriendFromGroup(friendUID, groupId, storedKey)
+	local key = friendUID
+	if not storedKey then key = GetFriendGroupKey(friendUID, true) end
+	local groups = BetterFriendlistDB.friendGroups[key]
+	if not groups then
 		return false
 	end
 
-	for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
-		if BetterFriendlistDB.friendGroups[friendUID][i] == groupId then
-			table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
+	for i = #groups, 1, -1 do
+		if groups[i] == groupId then
+			table.remove(groups, i)
 
 			-- Clean up if no groups left
-			if #BetterFriendlistDB.friendGroups[friendUID] == 0 then
-				BetterFriendlistDB.friendGroups[friendUID] = nil
+			if #groups == 0 then
+				BetterFriendlistDB.friendGroups[key] = nil
 			end
 
 			-- Optimization: Increment version counter
@@ -1568,8 +1703,10 @@ function DB:RemoveFriendFromGroup(friendUID, groupId)
 
 			-- NoteSync: Sync group change to friend note
 			local NoteSync = BFL:GetModule("NoteSync")
-			if NoteSync then
-				NoteSync:OnGroupChanged(friendUID)
+			local noteUID = friendUID
+			if storedKey then noteUID = self:GetStoredGroupNoteUID(key) end
+			if NoteSync and noteUID then
+				NoteSync:OnGroupChanged(noteUID)
 			end
 
 			return true
@@ -1581,11 +1718,8 @@ end
 
 -- Check if friend is in group
 function DB:IsFriendInGroup(friendUID, groupId)
-	if not BetterFriendlistDB.friendGroups[friendUID] then
-		return false
-	end
-
-	for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+	if not friendUID then return false end
+	for _, gid in ipairs(self:GetFriendGroups(friendUID)) do
 		if gid == groupId then
 			return true
 		end

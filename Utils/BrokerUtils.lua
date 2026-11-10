@@ -32,6 +32,9 @@ function BU.C(color, text)
 	if not text then
 		return ""
 	end
+	if type(color) == "string" and color:match("^%x%x%x%x%x%x$") then
+		return "|cff" .. color .. text .. "|r"
+	end
 
 	-- Check if it's a class color (try direct match first, then convert from localized name)
 	local classColor = BFL.ClassUtils:GetClassColorByFile(color)
@@ -46,7 +49,7 @@ function BU.C(color, text)
 		return WrapClassColor(classColor, text)
 	end
 
-	-- Otherwise use predefined or custom hex
+	-- Otherwise use a named color.
 	local hex = COLOR_TABLE[color] or color
 	if color == "dkyellow" or color == "ltyellow" or color == "gold" then
 		hex = (BFL.GetThemeAccentHex and BFL:GetThemeAccentHex(hex)) or hex
@@ -72,18 +75,12 @@ end
 -- ========================================
 -- Faction Icon Helper
 -- ========================================
-function BU.GetFactionIcon(factionName)
-	if not factionName then
+function BU.GetFactionIcon(factionName, size)
+	if factionName ~= "Alliance" and factionName ~= "Horde" then
 		return ""
 	end
-
-	if factionName == "Alliance" then
-		return "|TInterface\\FriendsFrame\\PlusManz-Alliance:16:16|t"
-	elseif factionName == "Horde" then
-		return "|TInterface\\FriendsFrame\\PlusManz-Horde:16:16|t"
-	else
-		return "" -- Neutral or unknown
-	end
+	size = size or 16
+	return ("|TInterface\\FriendsFrame\\PlusManz-%s:%d:%d:0:0|t"):format(factionName, size, size)
 end
 
 -- ========================================
@@ -117,21 +114,27 @@ end
 -- ========================================
 -- Broker Tooltip Font Helpers
 -- ========================================
-local function GetBrokerFontSize(sizeOffset)
-	local size = BetterFriendlistDB and tonumber(BetterFriendlistDB.brokerFontSize) or 12
+local function GetBrokerFontSize(sizeOffset, settings)
+	settings = settings or BetterFriendlistDB
+	local size = settings and tonumber(settings.brokerFontSize) or 12
 	size = size + (sizeOffset or 0)
 	return math.max(6, math.floor(size + 0.5))
 end
 
-function BU.GetBrokerFontObject(sizeOffset)
-	local fontName = BetterFriendlistDB and BetterFriendlistDB.brokerFont or "Friz Quadrata TT"
-	local fontSize = GetBrokerFontSize(sizeOffset)
+function BU.GetBrokerRowIconSize(settings)
+	return GetBrokerFontSize(nil, settings)
+end
+
+function BU.GetBrokerFontObject(sizeOffset, settings)
+	settings = settings or BetterFriendlistDB
+	local fontName = settings and settings.brokerFont or "Friz Quadrata TT"
+	local fontSize = GetBrokerFontSize(sizeOffset, settings)
 
 	if BFL.FontManager and BFL.FontManager.ResolveFontPath and BFL.FontManager.GetOrCreateFontFamily then
 		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
 		if fontPath then
-			local useCustomNonLatinFont = BetterFriendlistDB and BetterFriendlistDB.brokerUseCustomFontForNonLatin == true
-			local fontFlags = BetterFriendlistDB and BetterFriendlistDB.brokerFontFlags or "SLUG"
+			local useCustomNonLatinFont = settings and settings.brokerUseCustomFontForNonLatin == true
+			local fontFlags = settings and settings.brokerFontFlags or "SLUG"
 			local fontObject = BFL.FontManager:GetOrCreateFontFamily(
 				fontPath,
 				fontSize,
@@ -148,48 +151,48 @@ function BU.GetBrokerFontObject(sizeOffset)
 	return (sizeOffset and sizeOffset > 0) and "GameTooltipHeaderText" or "GameTooltipText"
 end
 
-function BU.ApplyBrokerFontToFontString(fontString, sizeOffset)
+function BU.ApplyBrokerFontToFontString(fontString, sizeOffset, settings)
 	local valueType = type(fontString)
 	if (valueType == "table" or valueType == "userdata") and fontString.SetFontObject then
-		pcall(fontString.SetFontObject, fontString, BU.GetBrokerFontObject(sizeOffset))
+		pcall(fontString.SetFontObject, fontString, BU.GetBrokerFontObject(sizeOffset, settings))
 	end
 end
 
-function BU.ApplyBrokerFontToCell(cell, sizeOffset)
+function BU.ApplyBrokerFontToCell(cell, sizeOffset, settings)
 	local valueType = type(cell)
 	if (valueType == "table" or valueType == "userdata") and cell.SetFontObject then
-		pcall(cell.SetFontObject, cell, BU.GetBrokerFontObject(sizeOffset))
+		pcall(cell.SetFontObject, cell, BU.GetBrokerFontObject(sizeOffset, settings))
 		if cell.OnContentChanged then
 			pcall(cell.OnContentChanged, cell)
 		end
 	end
 end
 
-function BU.ApplyBrokerFontToRow(row, sizeOffset)
+function BU.ApplyBrokerFontToRow(row, sizeOffset, settings)
 	if not row then
 		return
 	end
 
 	if row.Cells then
 		for _, cell in pairs(row.Cells) do
-			BU.ApplyBrokerFontToCell(cell, sizeOffset)
+			BU.ApplyBrokerFontToCell(cell, sizeOffset, settings)
 		end
 	end
 
 	if row.ColSpanCells then
 		for _, cell in pairs(row.ColSpanCells) do
-			BU.ApplyBrokerFontToCell(cell, sizeOffset)
+			BU.ApplyBrokerFontToCell(cell, sizeOffset, settings)
 		end
 	end
 end
 
-function BU.ApplyBrokerFontToTooltip(tt, sizeOffset)
+function BU.ApplyBrokerFontToTooltip(tt, sizeOffset, settings)
 	if not tt or not tt.Rows then
 		return
 	end
 
 	for _, row in pairs(tt.Rows) do
-		BU.ApplyBrokerFontToRow(row, sizeOffset)
+		BU.ApplyBrokerFontToRow(row, sizeOffset, settings)
 	end
 end
 
@@ -275,8 +278,9 @@ function BU.GetDefaultBrokerSeparatorColor()
 	return CopyColor(DEFAULT_BROKER_SEPARATOR_COLOR)
 end
 
-function BU.GetBrokerSeparatorColor()
-	local color = BetterFriendlistDB and BetterFriendlistDB.brokerSeparatorColor
+function BU.GetBrokerSeparatorColor(settings)
+	settings = settings or BetterFriendlistDB
+	local color = settings and settings.brokerSeparatorColor
 	local Palette = BFL and BFL.GetModule and BFL:GetModule("ThemePalette")
 	if Palette and Palette.NormalizeBrokerSeparatorColor then
 		return Palette:NormalizeBrokerSeparatorColor(color)
@@ -302,19 +306,19 @@ local function GetPixelAlignedBrokerSeparatorHeight(region)
 	return height
 end
 
-function BU.ApplyBrokerSeparatorColor(texture)
+function BU.ApplyBrokerSeparatorColor(texture, settings)
 	if not texture or not BFL.TrySetColorTexture then
 		return nil
 	end
 
-	local color = BU.GetBrokerSeparatorColor()
+	local color = BU.GetBrokerSeparatorColor(settings)
 	if not BFL.TrySetColorTexture(texture, color.r, color.g, color.b, color.a or 1) then
 		return nil
 	end
 	return color
 end
 
-function BU.ApplyBrokerFooterSeparatorStyle(texture)
+function BU.ApplyBrokerFooterSeparatorStyle(texture, settings)
 	if not texture then
 		return nil
 	end
@@ -322,7 +326,7 @@ function BU.ApplyBrokerFooterSeparatorStyle(texture)
 	if texture.SetHeight then
 		texture:SetHeight(GetPixelAlignedBrokerSeparatorHeight(texture))
 	end
-	return BU.ApplyBrokerSeparatorColor(texture)
+	return BU.ApplyBrokerSeparatorColor(texture, settings)
 end
 
 local function GetStoredBrokerTooltipSettings(theme)
@@ -651,6 +655,68 @@ function BU.ScheduleBrokerTooltipRelease(LQT, tt)
 			pcall(LQT.ReleaseTooltip, LQT, tt)
 		end
 	end)
+end
+
+function BU.RestoreBrokerTooltipLayout(tt)
+	if tt.footerFrame then tt.footerFrame:Hide() end
+	if tt.bflTimer then tt.bflTimer:SetScript("OnUpdate", nil) end
+	if tt.ScrollFrame then
+		tt.ScrollFrame:ClearAllPoints()
+		tt.ScrollFrame:SetPoint("TOPLEFT", tt, "TOPLEFT", 10, -10)
+		tt.ScrollFrame:SetPoint("BOTTOMRIGHT", tt, "BOTTOMRIGHT", -10, 10)
+	end
+	if tt.Slider then
+		tt.Slider:ClearAllPoints()
+		tt.Slider:SetPoint("TOPRIGHT", tt, "TOPRIGHT", -10, -10)
+		tt.Slider:SetPoint("BOTTOMRIGHT", tt, "BOTTOMRIGHT", -10, 10)
+	end
+end
+
+function BU.ReleaseSettingsTooltip(tt)
+	if not tt then return end
+	tt.BFL_SettingsComparison = nil
+	BU.RemoveElvUISkin(tt)
+	BU.RestoreBrokerTooltipLayout(tt)
+	tt:Hide()
+	tt:SetParent(UIParent)
+	BFL.QTip:ReleaseTooltip(tt)
+end
+
+function BU.AcquireSettingsTooltip(parent, key, sample, columns, alignments)
+	-- LibQTip can grow an acquired layout but cannot remove columns from it.
+	if sample.tooltip and sample.tooltip:GetColumnCount() > columns then
+		BU.ReleaseSettingsTooltip(sample.tooltip)
+	end
+	local tt = BFL.QTip:AcquireTooltip(key, columns, unpack(alignments))
+	tt.BFL_SettingsComparison = sample.comparison ~= nil or nil
+	tt:SetParent(parent)
+	tt:SetScale(1)
+	tt:SetFrameStrata(parent:GetFrameStrata())
+	tt:ClearAllPoints()
+	tt:SetPoint("TOPLEFT")
+	BU.RemoveElvUISkin(tt)
+	return tt
+end
+
+function BU.SizeSettingsComparisonCell(cell, comparison, columns, spanning)
+	if not comparison then return end
+	local width = math.max(32, math.floor(comparison.width - 26))
+	if not spanning then
+		width = math.max(24, math.floor((width - 6 * (columns - 1)) / columns))
+	end
+	cell:SetMaxWidth(width)
+	if spanning and comparison.groupAlignment then cell:SetMinWidth(width) end
+end
+
+function BU.AddSettingsComparisonRow(tt, comparison, values)
+	if not comparison then return tt:AddRow(unpack(values)) end
+	local row = tt:AddRow()
+	for index, value in ipairs(values) do
+		local cell = row:GetCell(index)
+		BU.SizeSettingsComparisonCell(cell, comparison, #values, false)
+		cell:SetText(value)
+	end
+	return row
 end
 
 function BU.GetOrCreateBrokerDetailTooltip(name)

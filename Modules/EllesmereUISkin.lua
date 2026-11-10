@@ -5,6 +5,7 @@ local ADDON_NAME, BFL = ...
 local EllesmereUISkin = BFL:RegisterModule("EllesmereUISkin", {})
 
 local THEME_ID = "ellesmereui"
+local GROUP_ORDER_ICON_KEYS = { "icon" }
 local SKIN_REGISTRATION_NAME = "BetterFriendlist"
 local EUI_FRIENDS_BACKGROUND = { 0.03, 0.045, 0.05, 1 }
 local EUI_FRIENDS_ROW = { 0, 0, 0, 0.10 }
@@ -72,7 +73,8 @@ local function SkinCheckbox(api, checkbox)
 	if not checkbox then
 		return
 	end
-	SafeCall(api, "Checkbox", checkbox)
+	local inset = checkbox.BFL_SettingsCheckboxBorderInset
+	SafeCall(api, "Checkbox", checkbox, inset and { borderInset = inset } or nil)
 	RefreshCheckboxAccent(api, checkbox)
 	if not checkbox.BFL_EllesmereAccentCheckHooks and checkbox.HookScript then
 		checkbox.BFL_EllesmereAccentCheckHooks = true
@@ -155,7 +157,7 @@ local function LooksLikeCloseButton(frame, name)
 end
 
 local function SkinWidget(api, frame)
-	if not api or not frame or IsForbidden(frame) then
+	if not api or not frame or frame.BFL_SupportIcon or frame.BFL_SettingsReleaseHeader or IsForbidden(frame) then
 		return
 	end
 
@@ -167,6 +169,8 @@ local function SkinWidget(api, frame)
 		SkinCheckbox(api, frame)
 	elseif objectType == "StatusBar" then
 		SafeCall(api, "ApplyBarFill", frame)
+	elseif frame.BFL_GroupOrderAction then
+		EllesmereUISkin:SkinActionButton(frame, GROUP_ORDER_ICON_KEYS)
 	elseif LooksLikeDropdown(frame, name) then
 		SafeCall(api, "Dropdown", frame)
 	elseif objectType == "Button" and LooksLikeTab(frame, name) then
@@ -702,6 +706,20 @@ function EllesmereUISkin:SkinLegacySettings()
 		SafeCall(self.facade, "Tab", _G["BetterFriendlistSettingsFrameTab" .. index])
 	end
 	SkinWidgetTree(self.facade, frame, 6)
+	local review = BFL:GetModule("LegacySettingsReview")
+	self:SkinSettingsActions(review and review.supportButtons)
+end
+
+function EllesmereUISkin:SkinSettingsActions(buttons, editBox)
+	if not self:IsSkinEnabled() then return end
+	for _, button in ipairs(buttons or {}) do
+		if button.BFL_SettingsIconButton then
+			self:SkinIconButton(button)
+		else
+			self:SkinActionButton(button, button.BFL_SupportIcon and { "BFL_SupportIcon" } or nil)
+		end
+	end
+	if editBox then SafeCall(self.facade, "EditBox", editBox) end
 end
 
 function EllesmereUISkin:SkinAuxiliaryWindows()
@@ -709,7 +727,6 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 		return
 	end
 	for _, frameName in ipairs({
-		"BetterFriendlistChangelogFrame",
 		"BetterFriendlistHelpFrame",
 		"BetterFriendlistExportFrame",
 		"BetterFriendlistImportFrame",
@@ -842,6 +859,55 @@ function EllesmereUISkin:SkinAppearanceOnboarding(frame, onboarding)
 		SafeCall(api, "Panel", row, { inset = true })
 	end
 	return true
+end
+
+local function SkinPreviewShell(api, frame, version)
+	if frame.BFL_EllesmerePreviewVersion ~= version then
+		SafeCall(api, "Shell", frame, { noBorder = true })
+		frame.BFL_EllesmerePreviewVersion = version
+	end
+	SafeCall(api, "FadeNineSlice", frame.NineSlice)
+end
+
+local function SkinSettingsPreviewHeader(api, header, version)
+	if header and header:IsShown() and header.native and header.native:IsShown() then
+		SkinPreviewShell(api, header.native, version)
+		SafeCall(api, "CloseButton", header.native.CloseButton)
+		SafeCall(api, "EditBox", header.search)
+		SafeCall(api, "Dropdown", header.StatusDropdown)
+		SafeCall(api, "Dropdown", header.filter)
+		SafeCall(api, "Dropdown", header.sort)
+		SafeCall(api, "Button", header.battleNet.MenuButton, { "Icon" })
+	end
+end
+
+function EllesmereUISkin:SkinSettingsPreview(shell, header)
+	if not self:IsSkinEnabled() then return end
+	local api = self.facade
+	local version = self:GetPaletteVersion()
+	if shell:IsShown() then SkinPreviewShell(api, shell, version) end
+	SkinSettingsPreviewHeader(api, header, version)
+end
+
+function EllesmereUISkin:SkinSettingsComparison(review)
+	if not self:IsSkinEnabled() then return end
+	local api = self.facade
+	local version = self:GetPaletteVersion()
+	SafeCall(api, "ScrollBar", review.hoverHelp.scroll.ScrollBar, true)
+	local picker, editor = review.comparisonPicker, review.comparisonEditor
+	if picker and picker:IsShown() then SkinWidget(api, picker) end
+	if editor and editor:IsShown() then SkinWidgetTree(api, editor, 3) end
+	for _, lane in ipairs(review.comparisonLanes or {}) do
+		if lane:IsShown() then
+			SkinSettingsPreviewHeader(api, lane.headerSample, version)
+			for _, scene in pairs(lane.socialSamples or {}) do
+				if scene:IsShown() then
+					for _, column in ipairs(scene.columns or {}) do SkinWidget(api, column) end
+					if scene.group then SafeCall(api, "Inset", scene.group) end
+				end
+			end
+		end
+	end
 end
 
 function EllesmereUISkin:SkinMainFrame(frame)
@@ -1062,7 +1128,6 @@ function EllesmereUISkin:InstallHooks()
 	end
 
 	HookMainFrameObject(BFL:GetModule("FriendsUI"), "FriendsUI", "ApplyModernContentLayout")
-	HookObject(BFL:GetModule("Changelog"), "Changelog", "CreateChangelogWindow")
 	HookObject(BFL.HelpFrame, "HelpFrame", "CreateFrame")
 	HookObject(BFL:GetModule("Settings"), "Settings", "CreateExportFrame")
 	HookObject(BFL:GetModule("Settings"), "Settings", "CreateImportFrame")

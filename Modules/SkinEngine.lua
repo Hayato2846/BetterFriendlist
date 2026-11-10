@@ -1480,6 +1480,7 @@ local BUTTON_THEME_TOKENS = {
 	"borderNone",
 	"borderSoft",
 	"borderMuted",
+	"control",
 	"controlDisabled",
 	"controlBorderDisabled",
 	"controlDown",
@@ -4115,11 +4116,14 @@ function SkinEngine:ApplyRowState(row, interactionState)
 		noRowHighlight = IsGroupHeaderRow(row) == true
 		row.BFL_DarkNoRowHighlight = noRowHighlight
 	end
+	local tagColor = noRowHighlight and row.BG and row._bflTagHeaderColor
+	if tagColor then self:StyleBackdrop(row, tagColor, COLORS.borderNone) end
 	local stateKey = tostring(self.themeColorVersion or 0)
 		.. ":"
 		.. (noRowHighlight and "noHighlight" or (interactionState or "normal"))
 		.. ":"
 		.. (row.BFL_DarkRowMouseDown and "down" or "")
+		.. (tagColor and ":chip" or "")
 	if row.BFL_DarkRowStateKey == stateKey then
 		return
 	end
@@ -4133,7 +4137,7 @@ function SkinEngine:ApplyRowState(row, interactionState)
 		end
 		local highlight = row.HighlightTexture or (row.GetHighlightTexture and row:GetHighlightTexture())
 		self:SetTextureAlpha(row, highlight, 0)
-		self:StyleBackdrop(row, COLORS.row, COLORS.borderNone)
+		if not tagColor then self:StyleBackdrop(row, COLORS.row, COLORS.borderNone) end
 		return
 	end
 
@@ -4288,7 +4292,7 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 	end
 
 	for _, child in ipairs(GetCachedChildFrames(root) or {}) do
-		if child and not IsForbidden(child) then
+		if child and not IsForbidden(child) and not child.BFL_DarkManagedSubtree then
 			local objectType = GetObjectType(child)
 			local lowerName = LowerName(child)
 

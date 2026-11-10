@@ -31,6 +31,24 @@ local function GetFilterSortRegistry()
 	return BFL:GetModule("FilterSortRegistry")
 end
 
+function FriendsList:IsFriendInGameForGroup(friend, mode)
+	if not friend.connected then
+		return false
+	end
+	if friend.type == "wow" then
+		return true
+	end
+	local account = friend.type == "bnet" and friend.gameAccountInfo
+	if not account then
+		return false
+	end
+	local client = account.clientProgram
+	if mode == "any_game" then
+		return account.isOnline and client and client ~= "" and client ~= "App" and client ~= "BSAp"
+	end
+	return client == BNET_CLIENT_WOW and account.wowProjectID == WOW_PROJECT_ID
+end
+
 local function GetLocaleSortKey(value)
 	if BFL.IsSecret and BFL:IsSecret(value) then
 		return ""
@@ -210,18 +228,26 @@ local function EventCallback_FriendListUpdate()
 end
 
 local function EventCallback_BNetFriendListSizeChanged()
+	local DB = GetDB()
+	if DB and DB.ClearTitleFriendGroupKeys then DB:ClearTitleFriendGroupKeys() end
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
 local function EventCallback_BNetAccountOnline()
+	local DB = GetDB()
+	if DB and DB.InvalidateTitleFriendGroupKeys then DB:InvalidateTitleFriendGroupKeys() end
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
 local function EventCallback_BNetAccountOffline()
+	local DB = GetDB()
+	if DB and DB.InvalidateTitleFriendGroupKeys then DB:InvalidateTitleFriendGroupKeys() end
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
 local function EventCallback_BNetFriendInfoChanged(friendIndex)
+	local DB = GetDB()
+	if DB and DB.InvalidateTitleFriendGroupKeys then DB:InvalidateTitleFriendGroupKeys() end
 	BFL.FriendsList:OnBNetFriendInfoChanged(friendIndex)
 end
 
@@ -240,6 +266,8 @@ local function EventCallback_BNetConnected()
 end
 
 local function EventCallback_BNetDisconnected()
+	local DB = GetDB()
+	if DB and DB.ClearTitleFriendGroupKeys then DB:ClearTitleFriendGroupKeys() end
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
@@ -248,19 +276,36 @@ local function EventCallback_GroupRosterUpdate()
 	BFL.FriendsList:OnFriendListUpdate()
 end
 
-local function EventCallback_BNetInviteListInitialized()
-	BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05) -- Defer synchronous request-card event handling
-end
-
-local function EventCallback_BNetInviteAdded()
-	-- Play sound immediately (Phase 1)
-	PlaySound(SOUNDKIT.UI_BNET_TOAST)
-
-	local collapsed = GetCVarBool("friendInvitesCollapsed")
-	if collapsed then
-		BFL.FriendsList:FlashInviteHeader()
+local EventCallback_BNetInviteListInitialized, EventCallback_BNetInviteAdded
+do
+	local function ShowNativeFriendRequestToast(event, ...)
+		-- Both Battle.net and Title Friend requests use the same Blizzard events.
+		local toast = BNToastFrame
+		if not toast or type(toast.OnEvent) ~= "function" or toast:IsEventRegistered(event)
+			or GetCVar("showToastWindow") == "0" or GetCVar("showToastFriendRequest") == "0"
+			or BFL:IsGameRuleActive("IngameFriendsListDisabled")
+		then
+			return
+		end
+		toast:OnEvent(event, ...)
 	end
-	BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05)
+
+	function EventCallback_BNetInviteListInitialized(count)
+		if not BFL:IsSecret(count) and type(count) == "number" and count > 0 then
+			ShowNativeFriendRequestToast("BN_FRIEND_INVITE_LIST_INITIALIZED", count)
+		end
+		BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05) -- Defer synchronous request-card event handling
+	end
+
+	function EventCallback_BNetInviteAdded()
+		ShowNativeFriendRequestToast("BN_FRIEND_INVITE_ADDED")
+
+		local collapsed = GetCVarBool("friendInvitesCollapsed")
+		if collapsed then
+			BFL.FriendsList:FlashInviteHeader()
+		end
+		BFL.FriendsList:ScheduleRefresh("bnet-invite", 0.05)
+	end
 end
 
 local function EventCallback_BNetInviteRemoved()
@@ -653,7 +698,7 @@ local function MeasureWrappedFriendNameHeight(self, nameSize, nameText, nameWidt
 	end
 
 	if self and not self.nameMeasure then
-		local parent = BetterFriendsFrame or UIParent
+		local parent = self.settingsSampleParent or BetterFriendsFrame or UIParent
 		if parent then
 			self.nameMeasure = parent:CreateFontString(nil, "ARTWORK")
 			self.nameMeasure:Hide()
@@ -1160,6 +1205,18 @@ local function ClearGroupHeaderTextRetry(button)
 	button._deferredHeaderUpdateElementData = nil
 end
 
+function FriendsList:GetCenteredGroupHeaderWidth(button)
+	if button._bflTagHeaderWidth then
+		return button._bflTagHeaderWidth
+	end
+	local fs = GetGroupHeaderFontString(button)
+	local width = fs and fs:GetStringWidth() or 0
+	if button.CountText and button.CountText:IsShown() then
+		width = width + GROUP_HEADER_TEXT_GAP + (button.CountText:GetStringWidth() or 0)
+	end
+	return width
+end
+
 local function ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, textAlign, color)
 	local collapseButton = button and button.HeaderText and button.CollapseButton
 	if not collapseButton then
@@ -1177,17 +1234,13 @@ local function ApplyModernGroupCollapseButton(button, collapsed, showArrow, arro
 	end
 
 	collapseButton:Show()
-	if collapseButton.UpdateCollapsedState then
+	if collapseButton.UpdateCollapsedState and collapseButton.collapsed ~= (collapsed == true) then
 		collapseButton:UpdateCollapsedState(collapsed == true)
 	end
 
 	local xOffset = arrowAlign == "RIGHT" and -6 or arrowAlign == "LEFT" and 6 or 0
 	if arrowAlign == "CENTER" and textAlign == "CENTER" then
-		local textWidth = button.HeaderText:GetStringWidth() or 0
-		if button.CountText and button.CountText:IsShown() then
-			textWidth = textWidth + GROUP_HEADER_TEXT_GAP + (button.CountText:GetStringWidth() or 0)
-		end
-		xOffset = -(textWidth / 2) - 12
+		xOffset = -(FriendsList:GetCenteredGroupHeaderWidth(button) / 2) - 12
 	end
 	collapseButton:ClearAllPoints()
 	collapseButton:SetPoint(arrowAlign, button, arrowAlign, xOffset, 0)
@@ -1210,13 +1263,23 @@ local function ApplyModernGroupCollapseButton(button, collapsed, showArrow, arro
 	return true
 end
 
-local function ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, allowDeferred)
+local function ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, tagStyle, allowDeferred)
 	local fs = GetGroupHeaderFontString(button)
 	if not fs then
 		return
 	end
 
 	local countFs = EnsureGroupHeaderCountText(button)
+	if button.TagHeaderIcon then button.TagHeaderIcon:Hide() end
+	button._bflTagHeaderWidth = nil
+	if button._bflLegacyHeaderMaxLines and not tagStyle then
+		fs:SetWidth(0)
+		countFs:SetWidth(0)
+		fs:SetMaxLines(button._bflLegacyHeaderMaxLines)
+		fs:SetWordWrap(button._bflLegacyHeaderWordWrap)
+		button._bflLegacyHeaderMaxLines = nil
+		button._bflLegacyHeaderWordWrap = nil
+	end
 	fs:Show()
 	countFs:Show()
 
@@ -1224,7 +1287,7 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 	if not IsFontReady(fs) or not IsFontReady(countFs) then
 		if allowDeferred ~= false then
 			ScheduleGroupHeaderTextRetry(button, function()
-				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, false)
+				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, tagStyle, false)
 			end)
 		end
 		return
@@ -1244,7 +1307,7 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 	if not okName or not okCount then
 		if allowDeferred ~= false then
 			ScheduleGroupHeaderTextRetry(button, function()
-				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, false)
+				ApplyGroupHeaderText(button, nameText, countText, nameColor, countColor, align, tagStyle, false)
 			end)
 		end
 		return
@@ -1266,26 +1329,50 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 	fs:ClearAllPoints()
 	countFs:ClearAllPoints()
 
-	if button.HeaderText then
+	if button.HeaderText or tagStyle then
 		-- The Modern 12.1 header owns independent FontStrings rather than a
 		-- stateful ButtonText. Give both regions explicit, finite widths and
 		-- one anchor each; this avoids the over-constrained
 		-- HeaderText -> CountText -> CollapseButton chain that could make the
 		-- native FontFamily layout continuously invalidate itself.
-		local collapseShown = button._bflCollapseButtonShown == true
-		local collapseAlign = button._bflCollapseButtonAlign
-		local leftPadding = collapseShown and collapseAlign == "LEFT" and 32 or 8
-		local rightPadding = collapseShown and collapseAlign == "RIGHT" and 32 or 8
-		local availableWidth = math.max(1, (button:GetWidth() or 0) - leftPadding - rightPadding)
+		local arrow = tagStyle and button._bflTagHeaderArrow
+		if not tagStyle and button._bflCollapseButtonShown then
+			arrow = button._bflCollapseButtonAlign
+		end
+		local arrowPadding = button.HeaderText and 32 or 22
+		local leftPadding = arrow == "LEFT" and arrowPadding or 8
+		local rightPadding = arrow == "RIGHT" and arrowPadding or 8
+		local buttonWidth = button:GetWidth() or 0
+		if tagStyle and arrow == "CENTER" then
+			if align == "LEFT" then
+				rightPadding = buttonWidth / 2 + 12
+			elseif align == "RIGHT" then
+				leftPadding = buttonWidth / 2 + 12
+			else
+				leftPadding, rightPadding = arrowPadding, arrowPadding
+			end
+		end
+		local availableWidth = math.max(1, buttonWidth - leftPadding - rightPadding)
 		local countWidth = GetGroupHeaderContentWidth(countFs)
 		local hasCount = countText and countText ~= ""
 		if not hasCount then
 			countWidth = 0
 		end
 		local gap = hasCount and GROUP_HEADER_TEXT_GAP or 0
+		if tagStyle then
+			countWidth = math.min(countWidth, math.max(0, availableWidth - gap - 1))
+		end
 		local maxNameWidth = math.max(1, availableWidth - countWidth - gap)
-		local nameWidth = math.min(GetGroupHeaderContentWidth(fs), maxNameWidth)
-		local totalWidth = nameWidth + gap + countWidth
+		local iconSpace = 0
+		if tagStyle == "chip" then
+			local chips = BFL:GetModule("TagChips")
+			local iconWidth = chips and chips:ShowGroupHeaderIcon(
+				button, button.elementData.tagProfile, maxNameWidth - GROUP_HEADER_TEXT_GAP - 1
+			) or 0
+			if iconWidth > 0 then iconSpace = iconWidth + GROUP_HEADER_TEXT_GAP end
+		end
+		local nameWidth = math.min(GetGroupHeaderContentWidth(fs), maxNameWidth - iconSpace)
+		local totalWidth = iconSpace + nameWidth + gap + countWidth
 		local offset = leftPadding
 		if align == "RIGHT" then
 			offset = leftPadding + math.max(0, availableWidth - totalWidth)
@@ -1293,9 +1380,22 @@ local function ApplyGroupHeaderText(button, nameText, countText, nameColor, coun
 			offset = leftPadding + math.max(0, (availableWidth - totalWidth) / 2)
 		end
 
+		if tagStyle then
+			button._bflTagHeaderWidth = totalWidth
+			if not button.HeaderText and not button._bflLegacyHeaderMaxLines then
+				button._bflLegacyHeaderMaxLines = fs:GetMaxLines()
+				button._bflLegacyHeaderWordWrap = fs:CanWordWrap()
+				fs:SetMaxLines(1)
+				fs:SetWordWrap(false)
+			end
+		end
 		fs:SetWidth(nameWidth)
 		countFs:SetWidth(math.max(1, countWidth))
-		fs:SetPoint("LEFT", button, "LEFT", offset, 0)
+		if iconSpace > 0 then
+			button.TagHeaderIcon:ClearAllPoints()
+			button.TagHeaderIcon:SetPoint("LEFT", button, "LEFT", offset, 0)
+		end
+		fs:SetPoint("LEFT", button, "LEFT", offset + iconSpace, 0)
 		countFs:SetPoint("LEFT", fs, "RIGHT", gap, 0)
 		fs:SetJustifyH("LEFT")
 		countFs:SetJustifyH("LEFT")
@@ -1416,9 +1516,17 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		local friend = item.friend
 		local hasMultiAccountRow = self and ShouldShowMultiAccountRow(self, friend) or false
 		local buttonWidth = self and self.GetButtonWidth and self:GetButtonWidth() or 0
-		local streamerModeActive = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive == true or false
+		local streamerModeActive = (self and self.settingsSampleStreamerMode)
+			or (BetterFriendlistDB and BetterFriendlistDB.streamerModeActive == true)
+			or false
 		local FriendTags = BFL:GetModule("FriendTags")
-		local fullWidthTagRows = FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true or false
+		local tagSettings = self and self.settingsSampleTagSettings
+		local fullWidthTagRows
+		if tagSettings then
+			fullWidthTagRows = tagSettings.fullWidthTagRows == true
+		else
+			fullWidthTagRows = FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true or false
+		end
 		local tagsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
 			or BFL.FriendTagsVersion
 			or 0
@@ -1457,7 +1565,7 @@ local function GetItemHeight(item, isCompactMode, nameSize, infoSize, self, info
 		end
 
 		local tagExtraHeight = 0
-		local TagChips = BFL:GetModule("TagChips")
+		local TagChips = self and self.tagChips or BFL:GetModule("TagChips")
 		local tagChipRowData
 		if TagChips and TagChips.GetRowData then
 			tagChipRowData = TagChips:GetRowData(item.friend, self, item.groupId)
@@ -1640,6 +1748,17 @@ local function AppendDisplayBuildEntry(displayList)
 	return entry
 end
 
+function FriendsList:AppendDynamicTagGroups(tags, virtualTagGroupByTagId, groupedFriends, assignedGroups, friendGroupIds, prioritize)
+	for _, tag in ipairs(tags) do
+		local tagGroupId = virtualTagGroupByTagId[tag.id]
+		if tagGroupId and groupedFriends[tagGroupId] and not assignedGroups[tagGroupId] then
+			friendGroupIds[#friendGroupIds + 1] = tagGroupId
+			assignedGroups[tagGroupId] = true
+			if prioritize then break end
+		end
+	end
+end
+
 local function BuildDisplayList(self)
 	-- PERFY OPTIMIZATION (Phase 2B): Input Version Tracking
 	-- Skip expensive rebuild if inputs unchanged (600+ friends = 600+ operations!)
@@ -1662,6 +1781,7 @@ local function BuildDisplayList(self)
 	local enableDynamicTagGroups = friendTagsEnabled
 		and FriendTags.GetSetting
 		and FriendTags:GetSetting("enableDynamicTagGroups", false) == true
+	local prioritizeTagGroups = enableDynamicTagGroups and FriendTags:GetSetting("prioritizeDynamicTagGroups", false) == true
 	local tagAssignmentsAffectDisplay = (self.searchText or "") ~= "" or enableDynamicTagGroups == true
 	local QuickFilters = BFL:GetModule("QuickFilters")
 	if not tagAssignmentsAffectDisplay and QuickFilters and QuickFilters.GetActiveTagFilterDefinitions then
@@ -1815,10 +1935,11 @@ local function BuildDisplayList(self)
 					label = tag.name or tag.id
 				end
 				local order = tonumber(profile.order) or tonumber(tag.order) or 0
-				local color = profile.color or tag.color or { r = 0.50, g = 0.78, b = 1.00, a = 1 }
 				local groupData = {
 					id = groupId,
 					tagId = tag.id,
+					tagProfile = profile,
+					tagRank = #virtualTagGroups + 1,
 					name = label,
 					builtin = true,
 					virtualTagGroup = true,
@@ -1826,12 +1947,6 @@ local function BuildDisplayList(self)
 					collapsed = BetterFriendlistDB
 						and BetterFriendlistDB.groupStates
 						and BetterFriendlistDB.groupStates[groupId] == true,
-					color = {
-						r = color.r or color[1] or 0.50,
-						g = color.g or color[2] or 0.78,
-						b = color.b or color[3] or 1.00,
-						a = color.a or color[4] or 1,
-					},
 				}
 				virtualTagGroups[#virtualTagGroups + 1] = groupData
 				virtualTagGroupByTagId[tag.id] = groupId
@@ -1864,11 +1979,7 @@ local function BuildDisplayList(self)
 		wipe(assignedGroups)
 		local friendUID = GetFriendUID(friend)
 		local isFavorite = (friend.type == "bnet" and friend.isFavorite)
-		local customGroups = (
-			BetterFriendlistDB
-			and BetterFriendlistDB.friendGroups
-			and BetterFriendlistDB.friendGroups[friendUID]
-		) or {}
+		local customGroups = friendUID and DB:GetFriendGroups(friendUID) or {}
 
 		-- Determine groups for this friend
 		local isInAnyGroup = false
@@ -1887,47 +1998,9 @@ local function BuildDisplayList(self)
 
 		-- Feature: In-Game Group (Dynamic)
 		-- Only if enabled in settings
-		if enableInGameGroup then
-			local mode = inGameGroupMode
-			local isInGame = false
-
-			if mode == "any_game" then
-				-- Any Game: WoW friends (always online in game) OR BNet friends online in ANY game
-				if friend.type == "wow" and friend.connected then
-					isInGame = true
-				elseif
-					friend.type == "bnet"
-					and friend.connected
-					and friend.gameAccountInfo
-					and friend.gameAccountInfo.isOnline
-				then
-					-- Check if actually in a game (clientProgram is set)
-					local client = friend.gameAccountInfo.clientProgram
-					if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
-						isInGame = true
-					end
-				end
-			else
-				-- Same Game (Default): WoW friends OR BNet friends in SAME WoW version
-				if friend.type == "wow" and friend.connected then
-					isInGame = true
-				elseif
-					friend.type == "bnet"
-					and friend.connected
-					and friend.gameAccountInfo
-					and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
-				then
-					-- Check Project ID (Retail vs Classic vs Classic Era)
-					if friend.gameAccountInfo.wowProjectID == WOW_PROJECT_ID then
-						isInGame = true
-					end
-				end
-			end
-
-			if isInGame then
-				table.insert(friendGroupIds, "ingame")
-				isInAnyGroup = true
-			end
+		if enableInGameGroup and self:IsFriendInGameForGroup(friend, inGameGroupMode) then
+			table.insert(friendGroupIds, "ingame")
+			isInAnyGroup = true
 		end
 
 		-- Feature: Recently Added Group (Dynamic)
@@ -1961,13 +2034,8 @@ local function BuildDisplayList(self)
 		end
 
 		if enableDynamicTagGroups then
-			for _, tag in ipairs(FriendTags:GetTagsForFriend(friend, "group")) do
-				local tagGroupId = virtualTagGroupByTagId[tag.id]
-				if tagGroupId and groupedFriends[tagGroupId] and not assignedGroups[tagGroupId] then
-					table.insert(friendGroupIds, tagGroupId)
-					assignedGroups[tagGroupId] = true
-				end
-			end
+			self:AppendDynamicTagGroups(FriendTags:GetTagsForFriend(friend, "group"), virtualTagGroupByTagId,
+				groupedFriends, assignedGroups, friendGroupIds, prioritizeTagGroups)
 		end
 
 		local passesFilters = self:PassesFilters(friend)
@@ -2028,7 +2096,9 @@ local function BuildDisplayList(self)
 	end
 
 	table.sort(orderedGroups, function(a, b)
-		return (a.order or 999) < (b.order or 999)
+		local aOrder, bOrder = a.order or 999, b.order or 999
+		if aOrder ~= bOrder then return aOrder < bOrder end
+		return (a.tagRank or 0) < (b.tagRank or 0)
 	end)
 
 	-- PERFY OPTIMIZATION: Direct cache access
@@ -2072,6 +2142,9 @@ local function BuildDisplayList(self)
 				groupHeader.totalCount = totalGroupCounts[groupData.id] or 0
 				groupHeader.onlineCount = onlineGroupCounts[groupData.id] or 0
 				groupHeader.collapsed = groupData.collapsed
+				groupHeader.virtualTagGroup = groupData.virtualTagGroup
+				groupHeader.tagId = groupData.tagId
+				groupHeader.tagProfile = groupData.tagProfile
 
 				-- Add friends if not collapsed
 				if not groupData.collapsed then
@@ -2241,7 +2314,7 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 			end
 
 			-- Clickable overlay on game icon for switching preferred game account
-			if not button.gameIconOverlay then
+			if not self.settingsSample and not button.gameIconOverlay then
 				local overlay = CreateFrame("Button", nil, button)
 				overlay.BFL_DarkInvisibleOverlayButton = true
 				overlay:SetSize(28, 28)
@@ -2264,12 +2337,12 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				end)
 				button.gameIconOverlay = overlay
 			end
-			button.gameIconOverlay.BFL_DarkInvisibleOverlayButton = true
-
-			-- Enable drag
-			button:RegisterForDrag("LeftButton")
-			button:SetScript("OnDragStart", Button_OnDragStart)
-			button:SetScript("OnDragStop", Button_OnDragStop)
+			if not self.settingsSample then
+				button.gameIconOverlay.BFL_DarkInvisibleOverlayButton = true
+				button:RegisterForDrag("LeftButton")
+				button:SetScript("OnDragStart", Button_OnDragStart)
+				button:SetScript("OnDragStop", Button_OnDragStop)
+			end
 
 			-- PERFY OPTIMIZATION (Phase 2A): Use pre-defined handler
 			-- FIX: Responsive Layout (Phase 28)
@@ -2348,11 +2421,78 @@ local function CreateExtentCalculator(self)
 end
 
 -- ========================================
+-- Settings examples share the list's factory, extent calculation and renderer.
+-- Their receiver owns its measurements, selection and text caches.
+function FriendsList:CreateSettingsSampleContext(parent)
+	local tags = BFL:GetModule("TagChips")
+	local context = setmetatable({
+		settingsSample = true,
+		settingsSampleParent = parent,
+		sampleFrames = {},
+		settingsCache = {},
+		settingsCacheVersion = false,
+		fontCache = {},
+		fontCacheVersion = 0,
+		nameMeasure = false,
+		displayNameCache = {},
+		tagChips = tags and setmetatable({}, { __index = tags }),
+		GetButtonWidth = function(self) return self.sampleWidth end,
+	}, { __index = self })
+	context.factory = CreateElementFactory(context)
+	context.extent = CreateExtentCalculator(context)
+	return context
+end
+
+function FriendsList:GetSettingsSampleRowHeight(index, data, width)
+	self.sampleWidth = width
+	self:UpdateFontCache()
+	self:UpdateSettingsCache()
+	data.buttonType = data.friend and BUTTON_TYPE_FRIEND or BUTTON_TYPE_GROUP_HEADER
+	return self.extent(index, data)
+end
+
+function FriendsList:RenderSettingsSample(parent, widgets, index, data, width)
+	local height = self:GetSettingsSampleRowHeight(index, data, width)
+	self.factory(function(template, initialize)
+		local frames = self.sampleFrames[index]
+		if not frames then
+			frames = {}
+			self.sampleFrames[index] = frames
+		end
+		local previous = widgets[index]
+		if previous and previous.sampleTemplate ~= template then
+			previous:Hide()
+			previous:ClearAllPoints()
+			previous.elementData = nil
+			previous.friendData = nil
+		end
+		local frame = frames[template]
+		if not frame then
+			frame = CreateFrame("Button", nil, parent, template)
+			frame.sampleTemplate = template
+			frames[template] = frame
+			-- XML templates carry production handlers even on a fresh frame.
+			for _, target in pairs({ row = frame, invite = frame.travelPassButton, collapse = frame.CollapseButton }) do
+				for _, script in ipairs({ "OnClick", "OnDoubleClick", "OnEnter", "OnLeave", "OnMouseDown", "OnMouseUp" }) do
+					target:SetScript(script, nil)
+				end
+				target:EnableMouse(false)
+			end
+		end
+		widgets[index] = frame
+		frame:SetWidth(width)
+		frame:SetHeight(height)
+		initialize(frame, data)
+	end, data)
+	return widgets[index]
+end
+
 -- Responsive ScrollBox Functions (Phase 3)
 -- ========================================
 
 -- Update SearchBox visibility and anchors (Phase 22 Fix)
 function FriendsList:UpdateSearchBoxState()
+	if BFL.NativeFriendsSearch then BFL.NativeFriendsSearch:QueueLayout() end
 	local frame = BetterFriendsFrame
 	if not frame or not frame.ScrollFrame then
 		return
@@ -3501,7 +3641,7 @@ function FriendsList:ResolveSelectedFriend()
 end
 
 function FriendsList:GetClickWhisperMode()
-	local DB = GetDB()
+	local DB = self.settingsSampleDB or GetDB()
 	if not DB or not DB:Get("friendListClickWhisperEnabled", false) then
 		return nil
 	end
@@ -3875,13 +4015,7 @@ function FriendsList:FormatInfoLine(friend)
 	end
 
 	-- Custom or preset format: Replace tokens
-	local formatString
-	if infoPreset == "custom" then
-		formatString = self.settingsCache.infoFormatString or "%level%, %zone%"
-	else
-		local DB = GetDB()
-		formatString = DB and DB:GetInfoFormatString() or "%level%, %zone%"
-	end
+	local formatString = self.settingsCache.infoFormatString or "%level%, %zone%"
 
 	-- For offline friends with custom format, show last online or offline status
 	if not friend.connected then
@@ -3909,7 +4043,7 @@ function FriendsList:FormatInfoLine(friend)
 			)
 			local DB = GetDB()
 			local uid = friend.uid or GetFriendUID(friend)
-			result = ReplaceTokenCaseInsensitive(result, "nickname", DB and DB:GetNickname(uid) or "")
+			result = ReplaceTokenCaseInsensitive(result, "nickname", (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or "")
 			result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or "")
 			-- Multi-Game-Account tokens (empty for offline)
 			result = ReplaceTokenCaseInsensitive(result, "accounts", "")
@@ -3949,7 +4083,7 @@ function FriendsList:FormatInfoLine(friend)
 	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
 	local DB = GetDB()
 	local uid = friend.uid or GetFriendUID(friend)
-	result = ReplaceTokenCaseInsensitive(result, "nickname", DB and DB:GetNickname(uid) or "")
+	result = ReplaceTokenCaseInsensitive(result, "nickname", (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or "")
 	result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or friend.name or "")
 
 	-- Multi-Game-Account tokens
@@ -4005,7 +4139,8 @@ end
 function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- [STREAMER MODE] Determine if active (used below to override %name%)
-	local isStreamerMode = BFL.StreamerMode and BFL.StreamerMode:IsActive()
+	local isStreamerMode = self.settingsSampleStreamerMode
+	if isStreamerMode == nil then isStreamerMode = BFL.StreamerMode and BFL.StreamerMode:IsActive() end
 	local streamerNameFormat = isStreamerMode and (self.settingsCache.streamerModeNameFormat or "battletag") or nil
 
 	if not self.displayNameCache then
@@ -4038,6 +4173,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	end
 	local rawAccountName = friend.accountName
 	local rawTitleCustomName = friend.titleCustomName
+	local friendLevel = friend.friendLevel
+	if BFL:IsSecret(friendLevel) then friendLevel = nil end
+	local timerunningSeasonID = friend.timerunningSeasonID
+	if BFL:IsSecret(timerunningSeasonID) then timerunningSeasonID = nil end
 	local hasPublicClassData = not BFL:IsSecret(friend.className)
 		and not BFL:IsSecret(friend.classID) and not BFL:IsSecret(friend.classFile)
 		and not BFL:IsSecret(friend.classFileName) and not BFL:IsSecret(friend.classFilename)
@@ -4069,7 +4208,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and cacheEntry.rawAccountName == rawAccountName
 		and cacheEntry.rawBattleTag == rawBattleTag
 		and cacheEntry.rawTitleCustomName == rawTitleCustomName
-		and cacheEntry.friendLevel == friend.friendLevel
+		and cacheEntry.friendLevel == friendLevel
+		and cacheEntry.timerunningSeasonID == timerunningSeasonID
 		and cacheEntry.connected == friend.connected
 		and cacheEntry.className == friend.className
 		and cacheEntry.classID == friend.classID
@@ -4085,7 +4225,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	-- 1. Prepare Data (Only on Cache Miss)
 	-- Fetch nickname now if we haven't already (lazy load)
 	local DB = GetDB()
-	local nickname = DB and DB:GetNickname(uid) or ""
+	local nickname = (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or ""
 	local titleCustomName = not BFL:IsSecret(rawTitleCustomName)
 		and type(rawTitleCustomName) == "string" and rawTitleCustomName ~= "" and rawTitleCustomName or nil
 	local titleCharacterName
@@ -4181,19 +4321,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	-- Collapse the standard Title name/character pair by friend type. Raw account
 	-- labels can render identically without being equal; only explicit aliases matter.
 	if titleCharacterName and (not isStreamerMode or streamerTitleFallback) then
-		local aliasLabel = not isStreamerMode and titleCustomName or nil
-		local characterLabel = titleCharacterName
-		if aliasLabel and BFL.AreRegionalUniqueNamesEnabled() then
-			aliasLabel = aliasLabel:gsub("-", " ")
-			characterLabel = characterLabel:gsub("-", " ")
-		end
-		if not aliasLabel or aliasLabel == characterLabel then
-			local nameToken = "%%[Nn][Aa][Mm][Ee]%%"
-			local characterToken = "%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%"
-			local function keepCharacter() return "%character%" end
-			result = result:gsub(nameToken .. "%s*%(%s*" .. characterToken .. "%s*%)", keepCharacter)
-			result = result:gsub(characterToken .. "%s*%(%s*" .. nameToken .. "%s*%)", keepCharacter)
-		end
+		result = BFL.GetTitleFriendNameFormat(format, titleCharacterName, not isStreamerMode and titleCustomName or nil, nickname, battletag)
 	end
 
 	-- Smart Fallback Logic:
@@ -4240,7 +4368,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		local decoratedChar = character
 
 		-- Timerunning icon
-		if friend.timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
+		if timerunningSeasonID and TimerunningUtil and TimerunningUtil.AddSmallIcon then
 			decoratedChar = TimerunningUtil.AddSmallIcon(decoratedChar)
 		end
 
@@ -4373,7 +4501,8 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		rawBattleTag = rawBattleTag,
 		rawAccountName = rawAccountName,
 		rawTitleCustomName = rawTitleCustomName,
-		friendLevel = friend.friendLevel,
+		friendLevel = friendLevel,
+		timerunningSeasonID = timerunningSeasonID,
 		connected = friend.connected,
 		className = friend.className,
 		classID = friend.classID,
@@ -4469,7 +4598,16 @@ function FriendsList:Initialize() -- Initialize sort modes and filter from datab
 	-- Initialize settings cache
 	self:UpdateSettingsCache()
 
-	-- Sync groups from Groups module
+	function FriendsList:ApplyMobileFriendState(friend, focusedGameAccount)
+	if self.settingsCache.treatMobileAsOffline
+		and self:IsFocusedAccountMobileOnly(focusedGameAccount, friend.gameAccounts)
+	then
+		friend.connected = false
+		friend.isMobileButTreatedOffline = true
+	end
+end
+
+-- Sync groups from Groups module
 	self:SyncGroups()
 
 	-- Initialize ScrollBox system (NEW - Phase 1)
@@ -4530,7 +4668,7 @@ function FriendsList:UpdateFontCache()
 		self.fontCache = {}
 	end
 
-	local DB = GetDB()
+	local DB = self.settingsSampleDB or GetDB()
 	if not DB then
 		return
 	end
@@ -4642,7 +4780,7 @@ end
 -- Update cached settings to avoid DB lookups in render loop
 -- PERFY FIX: Version-based lazy loading - only rebuild if settings changed
 function FriendsList:UpdateSettingsCache()
-	local DB = GetDB()
+	local DB = self.settingsSampleDB or GetDB()
 	if not DB then
 		return
 	end
@@ -4754,7 +4892,7 @@ function FriendsList:HasBNetFriendInfoChanged(friendIndex)
 		or friend.isAFK ~= accountInfo.isAFK
 		or friend.isDND ~= accountInfo.isDND
 		or friend.isFavorite ~= (accountInfo.isFavorite or false)
-		or not AreSafeValuesEqual(friend.note, accountInfo.note)
+		or not AreSafeValuesEqual(friend.rawNote, accountInfo.note)
 		or not AreSafeValuesEqual(friend.customMessage, accountInfo.customMessage)
 		or friend.customMessageTime ~= accountInfo.customMessageTime
 	then
@@ -5485,6 +5623,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 			YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
 		end
 		self.bnetIncompleteRetryAttempts = 0
+		local DB = GetDB()
+		if DB and DB.RefreshTitleFriendGroupKeys then DB:RefreshTitleFriendGroupKeys(bnetAccountInfos) end
 		local previousFriendTagMasks = self.bnetFriendTagMasksByAccount
 		local nextFriendTagMasks = self.nextBNetFriendTagMasksByAccount
 		if not nextFriendTagMasks then
@@ -5518,7 +5658,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 				end
 
 				friend.connected = accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline or false
-				friend.note = accountInfo.note
+				friend.rawNote = accountInfo.note
+				friend.note = BFL.FriendNotes.GetBNetDisplayNote(accountInfo)
 				friend.customMessage = accountInfo.customMessage
 				friend.customMessageTime = accountInfo.customMessageTime
 				local isFavoriteByOrder = numBNetFavorite and i <= numBNetFavorite
@@ -5685,13 +5826,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 
 				-- The setting is explicitly mobile-only: keep the friend online when any
 				-- other visible game account is active, even if Battle.net focuses Mobile.
-				if
-					self.settingsCache.treatMobileAsOffline
-					and self:IsFocusedAccountMobileOnly(accountInfo.gameAccountInfo, friend.gameAccounts)
-				then
-					friend.connected = false
-					friend.isMobileButTreatedOffline = true
-				end
+				self:ApplyMobileFriendState(friend, accountInfo.gameAccountInfo)
 
 				-- Preferred Game Account Override:
 				-- If the user has selected a preferred account for this friend,
@@ -6405,9 +6540,6 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 
 		-- Search in multiple fields depending on friend type
 		if friend.type == "bnet" then
-			-- BNet friends: search every safe identity that can be rendered in the list.
-			-- Note: accountName is a kString (Real Name) and will be skipped by contains()
-			-- This is a Blizzard privacy limitation - Real Names cannot be searched
 			found = SearchCacheContains(friend._bfl_search_accountName, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_titleCustomName, searchNormalized)
 				or SearchCacheContains(friend._bfl_search_battleTag, searchNormalized)
@@ -6424,6 +6556,9 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 
 		if not found then
 			found = SearchCacheContains(GetFriendTagSearchCache(friend), searchNormalized)
+		end
+		if not found and friend.type == "bnet" and BFL.NativeFriendsSearch then
+			found = BFL.NativeFriendsSearch:Matches(friend, self.searchText)
 		end
 
 		-- If no match found in any field, filter out this friend
@@ -6838,7 +6973,6 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 	local enableInGameGroup = DB:Get("enableInGameGroup", false)
 	local inGameGroupMode = DB:Get("inGameGroupMode", "same_game")
 	local enableRecentlyAddedGroup = DB:Get("enableRecentlyAddedGroup", false)
-	local friendGroups = (BetterFriendlistDB and BetterFriendlistDB.friendGroups) or {}
 
 	-- Get visible groups to check if favorites/ingame are actually enabled
 	local Groups = GetGroups()
@@ -6917,7 +7051,7 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 			end
 
 			-- Check Custom Groups (only count groups that actually exist)
-			local customGroups = friendGroups[friendUID] or {}
+			local customGroups = friendUID and DB:GetFriendGroups(friendUID) or {}
 			for _, groupId in ipairs(customGroups) do
 				if
 					type(groupId) == "string"
@@ -6951,7 +7085,7 @@ local _ogtNewItems = {}
 
 -- Attempt optimized group toggle without full list rebuild
 -- PERF (Round 3): Batch rebuild instead of per-item InsertAtIndex (O(N^2) → O(N))
-function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible on Retail (ScrollBox)
+function FriendsList:OptimizedGroupToggle(groupId, expanding, groupFriends) -- Only possible with ScrollBox
 	if not self.scrollBox then
 		return false
 	end
@@ -6973,7 +7107,7 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 		end
 	end
 
-	if not headerIndex then
+	if not headerIndex or (groupFriends and items[headerIndex].collapsed ~= expanding) then
 		return false
 	end
 
@@ -6985,7 +7119,7 @@ function FriendsList:OptimizedGroupToggle(groupId, expanding) -- Only possible o
 	wipe(newItems)
 
 	if expanding then
-		local friends = self:GetFriendsForGroup(groupId)
+		local friends = groupFriends or self:GetFriendsForGroup(groupId)
 
 		-- Copy items up to and including header
 		for i = 1, headerIndex do
@@ -7057,8 +7191,13 @@ function FriendsList:ToggleGroup(groupId)
 		BetterFriendlistDB.groupStates = BetterFriendlistDB.groupStates or {}
 		local newCollapsed = BetterFriendlistDB.groupStates[groupId] ~= true
 		BetterFriendlistDB.groupStates[groupId] = newCollapsed
-		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
-		BFL:ForceRefreshFriendsList()
+		-- The displayed buckets already include tag priority, filters, and sort order.
+		local groupFriends = self.groupedFriends and self.groupedFriends[groupId]
+		if groupFriends and self:OptimizedGroupToggle(groupId, not newCollapsed, groupFriends) then
+			return
+		end
+		self.lastBuildSignature = nil
+		self:RenderDisplay()
 		return
 	end
 
@@ -7300,29 +7439,13 @@ function FriendsList:GetInvitableCount(groupId)
 			if groupId == "favorites" and friend.type == "bnet" and friend.isFavorite then
 				isInGroup = true
 			elseif groupId ~= "favorites" and groupId ~= "nogroup" then
-				if
-					BetterFriendlistDB
-					and BetterFriendlistDB.friendGroups
-					and BetterFriendlistDB.friendGroups[friendUID]
-				then
-					local groups = BetterFriendlistDB.friendGroups[friendUID]
-					for _, gid in ipairs(groups) do
-						if gid == groupId then
-							isInGroup = true
-							break
-						end
-					end
-				end
+				isInGroup = friendUID and DB:IsFriendInGroup(friendUID, groupId)
 			elseif groupId == "nogroup" then
 				local hasGroup = false
 				if friend.type == "bnet" and friend.isFavorite then
 					hasGroup = true
-				elseif
-					BetterFriendlistDB
-					and BetterFriendlistDB.friendGroups
-					and BetterFriendlistDB.friendGroups[friendUID]
-				then
-					local groups = BetterFriendlistDB.friendGroups[friendUID]
+				elseif friendUID then
+					local groups = DB:GetFriendGroups(friendUID)
 					local allGroups = GetGroups()
 					local availableGroups = allGroups and allGroups:GetAll() or {}
 					for _, persistedGroupId in ipairs(groups) do
@@ -7413,30 +7536,14 @@ function FriendsList:InviteGroupToParty(groupId)
 				isInGroup = true
 			-- Check if in custom group
 			elseif groupId ~= "favorites" and groupId ~= "nogroup" then
-				if
-					BetterFriendlistDB
-					and BetterFriendlistDB.friendGroups
-					and BetterFriendlistDB.friendGroups[friendUID]
-				then
-					local groups = BetterFriendlistDB.friendGroups[friendUID]
-					for _, gid in ipairs(groups) do
-						if gid == groupId then
-							isInGroup = true
-							break
-						end
-					end
-				end
+				isInGroup = friendUID and DB:IsFriendInGroup(friendUID, groupId)
 			-- Check if in no group
 			elseif groupId == "nogroup" then
 				local hasGroup = false
 				if friend.type == "bnet" and friend.isFavorite then
 					hasGroup = true
-				elseif
-					BetterFriendlistDB
-					and BetterFriendlistDB.friendGroups
-					and BetterFriendlistDB.friendGroups[friendUID]
-				then
-					local groups = BetterFriendlistDB.friendGroups[friendUID]
+				elseif friendUID then
+					local groups = DB:GetFriendGroups(friendUID)
 					local allGroups = GetGroups()
 					local availableGroups = allGroups and allGroups:GetAll() or {}
 					for _, persistedGroupId in ipairs(groups) do
@@ -7557,85 +7664,23 @@ end
 
 -- Toggle friend in group
 function FriendsList:ToggleFriendInGroup(friendUID, groupId)
-	local DB = GetDB()
-	if not DB then
-		return
-	end
-
-	local friendGroupsData = DB:Get("friendGroups", {})
-	friendGroupsData[friendUID] = friendGroupsData[friendUID] or {}
-
-	local isInGroup = false
-	for i, gid in ipairs(friendGroupsData[friendUID]) do
-		if gid == groupId then
-			table.remove(friendGroupsData[friendUID], i)
-			isInGroup = true
-			break
-		end
-	end
-
-	if not isInGroup then
-		table.insert(friendGroupsData[friendUID], groupId)
-	end
-
-	-- Clean up if no groups
-	if #friendGroupsData[friendUID] == 0 then
-		friendGroupsData[friendUID] = nil
-	end
-
-	DB:Set("friendGroups", friendGroupsData)
+	local Groups = GetGroups()
+	if not Groups then return end
+	Groups:ToggleFriendInGroup(friendUID, groupId)
 	self:RenderDisplay()
-
-	return not isInGroup -- Return new state (true = added)
+	return Groups:IsFriendInGroup(friendUID, groupId)
 end
 
 -- Check if friend is in group
 function FriendsList:IsFriendInGroup(friendUID, groupId)
 	local DB = GetDB()
-	if not DB then
-		return false
-	end
-
-	local friendGroupsData = DB:Get("friendGroups", {})
-	if not friendGroupsData[friendUID] then
-		return false
-	end
-
-	for _, gid in ipairs(friendGroupsData[friendUID]) do
-		if gid == groupId then
-			return true
-		end
-	end
-
-	return false
+	return DB and DB:IsFriendInGroup(friendUID, groupId) or false
 end
 
 -- Remove friend from group
 function FriendsList:RemoveFriendFromGroup(friendUID, groupId)
 	local DB = GetDB()
-	if not DB then
-		return
-	end
-
-	local friendGroupsData = DB:Get("friendGroups", {})
-	if not friendGroupsData[friendUID] then
-		return
-	end
-
-	for i, gid in ipairs(friendGroupsData[friendUID]) do
-		if gid == groupId then
-			table.remove(friendGroupsData[friendUID], i)
-			break
-		end
-	end
-
-	-- Clean up if no groups
-	if #friendGroupsData[friendUID] == 0 then
-		friendGroupsData[friendUID] = nil
-	end
-
-	DB:Set("friendGroups", friendGroupsData)
-	self:RenderDisplay()
+	if DB and DB:RemoveFriendFromGroup(friendUID, groupId) then self:RenderDisplay() end
 end
 
 -- ========================================
@@ -7801,6 +7846,8 @@ function FriendsList:RenderDisplay(ignoreVisibility)
 					-- their presentation changes. The active provider owns the old element
 					-- tables, so carry every render-relevant value across the smart update.
 					oldData.virtualTagGroup = newData.virtualTagGroup
+					oldData.tagId = newData.tagId
+					oldData.tagProfile = newData.tagProfile
 					oldData.color = newData.color
 					oldData.collapsed = newData.collapsed
 				elseif newData.buttonType == BUTTON_TYPE_FRIEND then
@@ -8013,7 +8060,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	local count = elementData.count
 	local collapsed = elementData.collapsed
 
-	local Groups = GetGroups()
+	local Groups = not self.settingsSample and GetGroups()
 
 	-- Store group data on button
 	button.groupId = groupId
@@ -8030,28 +8077,43 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 	-- Get group color (Default name color)
 	local r, g, b, a = 1, 1, 1, 1 -- Default white
-	local colorCode = FormatColorCode(1, 1, 1, 1)
 
-	-- Count and Arrow Colors (Default to Group Color)
+	-- Count and arrow colors default to white.
 	local countR, countG, countB, countA = 1, 1, 1, 1
 	local arrowR, arrowG, arrowB, arrowA = 1, 1, 1, 1
+
+	local tagStyle
+	if elementData.virtualTagGroup and elementData.tagProfile then
+		local tags = BFL:GetModule("FriendTags")
+		local settings = self.settingsSampleTagSettings
+		local style = settings and settings.dynamicTagGroupHeaderStyle or tags and tags:GetSetting("dynamicTagGroupHeaderStyle", "standard")
+		if style and style ~= "standard" then
+			tagStyle = style
+		end
+	end
+	if tagStyle == "chip" and elementData.tagProfile.color then
+		local color = elementData.tagProfile.color
+		local tint = button._bflTagHeaderColor or {}
+		tint[1], tint[2], tint[3], tint[4] = color.r or 1, color.g or 1, color.b or 1, color.a or 1
+		button._bflTagHeaderColor = tint
+	else
+		button._bflTagHeaderColor = nil
+	end
 
 	if elementData.color then
 		r = elementData.color.r or elementData.color[1] or r
 		g = elementData.color.g or elementData.color[2] or g
 		b = elementData.color.b or elementData.color[3] or b
 		a = elementData.color.a or elementData.color[4] or a
-		colorCode = FormatColorCode(r, g, b, a)
 	end
 
-	if Groups and not elementData.virtualTagGroup then
-		local group = Groups:Get(groupId)
+	if (Groups or self.settingsSample) and not elementData.virtualTagGroup then
+		local group = self.settingsSample and elementData.sampleColors or (Groups and Groups:Get(groupId))
 		if group and group.color then
 			r = group.color.r or group.color[1] or 1
 			g = group.color.g or group.color[2] or 1
 			b = group.color.b or group.color[3] or 1
 			a = group.color.a or group.color[4] or 1
-			colorCode = FormatColorCode(r, g, b, a)
 		end
 
 		-- Default to White (No Inheritance)
@@ -8069,9 +8131,16 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		end
 	end
 
-	local DB = GetDB()
-	-- Count Color Code
-	local countColorCode = FormatColorCode(countR, countG, countB, countA)
+	local tagTextColor = tagStyle and elementData.tagProfile.textColor
+	if tagTextColor then
+		r, g, b, a = tagTextColor.r or 1, tagTextColor.g or 1, tagTextColor.b or 1, tagTextColor.a or 1
+	end
+	if tagStyle == "chip" then
+		countR, countG, countB, countA = r, g, b, a
+		arrowR, arrowG, arrowB, arrowA = r, g, b, a
+	end
+
+	local DB = self.settingsSampleDB or GetDB()
 
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- Set header text with color
@@ -8100,6 +8169,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		showArrow = true
 	end
 	local arrowAlign = self.settingsCache.groupArrowAlign or "LEFT"
+	button._bflTagHeaderArrow = tagStyle and showArrow and arrowAlign or nil
 	local arrowColor = { r = arrowR, g = arrowG, b = arrowB, a = arrowA }
 	local usesModernCollapse =
 		ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, align, arrowColor)
@@ -8192,7 +8262,8 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			countText,
 			{ r = r, g = g, b = b, a = a },
 			{ r = countR, g = countG, b = countB, a = countA },
-			align
+			align,
+			tagStyle
 		)
 	end
 
@@ -8232,16 +8303,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 				if align == "CENTER" then
 					-- If text is also centered, offset arrow to the left of text
-					local textWidth = 0
-					local headerFs = GetGroupHeaderFontString(button)
-					if headerFs then
-						textWidth = headerFs:GetStringWidth() or 0
-					end
-					if button.CountText and button.CountText:IsShown() then
-						textWidth = textWidth + GROUP_HEADER_TEXT_GAP + (button.CountText:GetStringWidth() or 0)
-					end
-					local offset = (textWidth / 2) + 12
-					x = -offset
+					x = -(self:GetCenteredGroupHeaderWidth(button) / 2) - 12
 				else
 					x = (targetArrow == button.DownArrow) and 0 or 2
 				end
@@ -8256,7 +8318,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			targetArrow:SetPoint(point, x, y)
 
 			-- Override mouse scripts to support alignment (only once per button)
-			if not button.isArrowScriptHooked then
+			if not self.settingsSample and not button.isArrowScriptHooked then
 				button:SetScript("OnMouseDown", function(self)
 					if self.DownArrow and self.DownArrow:IsShown() then
 						local p, relativeTo, relativePoint, x, y = self.DownArrow:GetPoint()
@@ -8295,10 +8357,17 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		end
 	end
 
-	if usesModernCollapse then
+	if usesModernCollapse and showArrow and arrowAlign == "CENTER" and align == "CENTER" then
 		-- Re-evaluate CENTER after the configurable header font and final strings
 		-- have their measured widths.
 		ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, align, arrowColor)
+	end
+
+	if self.settingsSample then
+		local ui = BFL:GetModule("FriendsUI")
+		if ui and ui.StyleGroupHeader then ui:StyleGroupHeader(button) end
+		button:Show()
+		return
 	end
 
 	-- Tooltips for group headers
@@ -8768,27 +8837,14 @@ Button_OnDragStop = function(self)
 					return
 				end
 
-				-- Without Shift: Remove from all other custom groups (move)
-				-- With Shift: Keep in other groups (add to multiple groups)
-				if not IsShiftKeyDown() then
-					if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-						for i = #BetterFriendlistDB.friendGroups[friendUID], 1, -1 do
-							if BetterFriendlistDB.friendGroups[friendUID][i] then
-								local groupId = BetterFriendlistDB.friendGroups[friendUID][i]
-								-- Check if valid group and NOT builtin (can't remove from builtin like favorites)
-								if friendGroups[groupId] and not friendGroups[groupId].builtin then
-									table.remove(BetterFriendlistDB.friendGroups[friendUID], i)
-								end
-							end
-						end
-					end
-				end
-
-				-- Add to target group
+				-- Without Shift, replace the custom memberships in one write.
 				local DB = GetDB()
 				if DB then
-					-- Robustness: Force add (DB handles duplicates)
-					DB:AddFriendToGroup(friendUID, droppedOnGroup)
+					if IsShiftKeyDown() then
+						DB:AddFriendToGroup(friendUID, droppedOnGroup, true)
+					else
+						DB:SetFriendGroups(friendUID, { droppedOnGroup }, true)
+					end
 				end
 				BFL:ForceRefreshFriendsList()
 			end
@@ -8884,7 +8940,7 @@ function FriendsList:GetFormattedButtonText(friend)
 
 		if friend.type == "bnet" then
 			-- [STREAMER MODE CHECK] Mask accountName for external addon
-			if BFL.StreamerMode and BFL.StreamerMode:IsActive() then
+			if self.settingsSampleStreamerMode or (BFL.StreamerMode and BFL.StreamerMode:IsActive()) then
 				local safeName = displayName or self:GetDisplayName(friend)
 				flcData.accountName = safeName
 				flcData.name = friend.characterName or safeName
@@ -10190,7 +10246,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			-- CRITICAL FIX: Re-apply on next frame if font changed or on reload.
 			-- After /reload or SetFont, GetStringWidth() often returns 0 or incorrect values.
 			local targetFriend = friend
-			if fontChanged or textChanged or needsRenderOnShow then -- Apply delay if any layout factor changed
+			if not self.settingsSample and (fontChanged or textChanged or needsRenderOnShow) then
 				C_Timer.After(0, function()
 					-- Only update if the button still belongs to the same friend
 					if button and button.friendData == targetFriend then
@@ -10223,7 +10279,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		self:UpdateMultiAccountRow(button, friend)
 	end
 
-	local TagChips = BFL:GetModule("TagChips")
+	local TagChips = self.tagChips or BFL:GetModule("TagChips")
 	if TagChips and TagChips.UpdateRowChips then
 		TagChips:UpdateRowChips(
 			button,
@@ -10236,10 +10292,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	if FriendsUI and FriendsUI.StyleFriendCard then
-		FriendsUI:StyleFriendCard(button)
+		FriendsUI:StyleFriendCard(button, self.settingsSample and self.settingsCache or nil)
 	end
 
-	local friendMenu = BFL:GetModule("NativeFriendMenu")
+	local friendMenu = not self.settingsSample and BFL:GetModule("NativeFriendMenu")
 	if friendMenu then friendMenu:UpdateRow(self, button, friend) end
 
 	-- Ensure button is visible

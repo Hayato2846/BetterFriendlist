@@ -476,21 +476,24 @@ function Tooltip:UpdateLayout()
 	TooltipManager:AdjustCellSizes(self)
 	TooltipManager.LayoutRegistry[self] = nil
 
-	local scale = self:GetScale()
 	local topOffset = self:GetTop()
 	local bottomOffset = self:GetBottom()
-	local screenSize = UIParent:GetHeight() / scale
-	local tooltipSize = (topOffset - bottomOffset)
+	local tooltipSize = 2 * TooltipManager.PixelSize.CellPadding + self.Height
 	local maxHeight = self.MaxHeight
+	local shrink = 0
 
-	if bottomOffset < 0 or topOffset > screenSize or (maxHeight and tooltipSize > maxHeight) then
-		local shrink = (bottomOffset < 0 and (5 - bottomOffset) or 0)
+	-- The settings comparison's outer scroll frame handles clipping at the screen edges.
+	if topOffset and bottomOffset and not self.BFL_SettingsComparison then
+		local screenSize = UIParent:GetHeight() / self:GetScale()
+		tooltipSize = topOffset - bottomOffset
+		shrink = (bottomOffset < 0 and (5 - bottomOffset) or 0)
 			+ (topOffset > screenSize and (topOffset - screenSize + 5) or 0)
+	end
+	if maxHeight and tooltipSize - shrink > maxHeight then
+		shrink = tooltipSize - maxHeight
+	end
 
-		if maxHeight and tooltipSize - shrink > maxHeight then
-			shrink = tooltipSize - maxHeight
-		end
-
+	if shrink > 0 then
 		self:SetHeight(2 * TooltipManager.PixelSize.CellPadding + self.Height - shrink)
 		self:SetWidth(2 * TooltipManager.PixelSize.CellPadding + self.Width + 20)
 

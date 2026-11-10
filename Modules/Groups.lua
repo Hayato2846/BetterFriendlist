@@ -44,6 +44,11 @@ local builtinGroups = {
 	},
 }
 
+function Groups:GetBuiltinDefaultColor(groupId)
+	local group = builtinGroups[groupId]
+	return group and group.color
+end
+
 -- All groups (built-in + custom)
 Groups.groups = {}
 
@@ -105,7 +110,7 @@ function Groups:MigrateFriendAssignments()
 
 	-- Migrate Battle.net UIDs
 	if not bnetMigrationDone then
-		if #oldBnetUIDs > 0 then
+		if #oldBnetUIDs > 0 and not BFL.IsForever then
 			-- Remove old-style UIDs (they are now invalid and can't be migrated)
 			for _, uid in ipairs(oldBnetUIDs) do
 				DB:SetFriendGroups(uid, nil) -- Remove assignment
@@ -851,7 +856,7 @@ function Groups:Delete(groupId)
 	local NoteSync = BFL:GetModule("NoteSync")
 	local function RemoveAssignments()
 		for _, friendUID in ipairs(DB:GetAllFriendUIDs()) do
-			DB:RemoveFriendFromGroup(friendUID, groupId)
+			DB:RemoveFriendFromGroup(friendUID, groupId, true)
 		end
 	end
 	if NoteSync then NoteSync:WithGroupDefinitionChange(RemoveAssignments) else RemoveAssignments() end
@@ -928,7 +933,7 @@ function Groups:ToggleFriendInGroup(friendUID, groupId)
 		return DB:RemoveFriendFromGroup(friendUID, groupId)
 	else
 		-- Add to group
-		return DB:AddFriendToGroup(friendUID, groupId)
+		return DB:AddFriendToGroup(friendUID, groupId, true)
 	end
 end
 

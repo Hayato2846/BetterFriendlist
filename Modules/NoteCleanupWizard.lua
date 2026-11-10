@@ -359,23 +359,25 @@ function NoteCleanupWizard:ScanFriends()
 	scanTotal = bnetTotal + wowTotal
 	scanComplete = bnetComplete and wowComplete
 	for _, account in ipairs(bnetFriends) do
-		local uid = FriendNotes.GetBNetUID(account)
-		local noteText = account.note or ""
-		local actualNote, groups = ParseFriendGroupsNote(noteText, uid)
-		local tag = IsText(account.battleTag) and account.battleTag or ""
-		local game = account.gameAccountInfo
-		local characterName = FriendNotes.IsReadableTable(game) and SafeLabel(game.characterName) or L.UNKNOWN
-		friendData[#friendData + 1] = {
-			accountName = SafeLabel(account.accountName, tag ~= "" and tag or characterName),
-			battleTag = tag,
-			identity = FriendNotes.CreateBNetIdentity(account),
-			backupKey = uid,
-			originalNote = noteText,
-			cleanedNote = actualNote,
-			groups = groups,
-			hasGroups = #groups > 0,
-			isBNet = true,
-		}
+		if not (BFL.TitleFriendNotes and BFL.TitleFriendNotes:ManagesAccount(account)) then
+			local uid = FriendNotes.GetBNetUID(account)
+			local noteText = account.note or ""
+			local actualNote, groups = ParseFriendGroupsNote(noteText, uid)
+			local tag = IsText(account.battleTag) and account.battleTag or ""
+			local game = account.gameAccountInfo
+			local characterName = FriendNotes.IsReadableTable(game) and SafeLabel(game.characterName) or L.UNKNOWN
+			friendData[#friendData + 1] = {
+				accountName = SafeLabel(account.accountName, tag ~= "" and tag or characterName),
+				battleTag = tag,
+				identity = FriendNotes.CreateBNetIdentity(account),
+				backupKey = uid,
+				originalNote = noteText,
+				cleanedNote = actualNote,
+				groups = groups,
+				hasGroups = #groups > 0,
+				isBNet = true,
+			}
+		end
 	end
 	for _, info in ipairs(wowFriends) do
 		local noteText = info.notes or ""
@@ -507,6 +509,10 @@ function NoteCleanupWizard:ApplyCleanedNotes()
 	local toUpdate = {}
 	for _, data in ipairs(friendData) do
 		local current = ReadEntry(data, data.characterName, snapshot)
+		local uid = WriteKey(data, data.characterName)
+		if uid and uid:match("^bnet_%d+$") then
+			data.cleanedNote = FriendNotes.PreserveTitleGroupToken(current, data.cleanedNote)
+		end
 		-- A delayed acknowledgement may arrive between batches or while the
 		-- window is idle. Already-applied changes need no new backup or write.
 		if current == data.cleanedNote and not active then
@@ -1247,13 +1253,18 @@ function NoteCleanupWizard:RestoreBackup()
 
 		local data = toRestore[currentIndex]
 		data.status = "pending"
+		local restoredNote = data.backedUpNote
+		local uid = data.available and WriteKey(data.backupEntry, data.key)
+		if uid and uid:match("^bnet_%d+$") then
+			restoredNote = FriendNotes.PreserveTitleGroupToken(data.currentNote, restoredNote)
+		end
 		local completed = false
 		local function Complete(success)
 			if version ~= operationVersion then return end
 			completed = true
 			if success then
 				data.status = "success"
-				data.currentNote = data.backedUpNote
+				data.currentNote = restoredNote
 				data.noteChanged = false
 				successCount = successCount + 1
 			else
@@ -1266,12 +1277,12 @@ function NoteCleanupWizard:RestoreBackup()
 			local operation = restoreOperationRows and restoreOperationRows[data.key]
 			if operation then
 				operation.status = data.status
-				if success then operation.currentNote, operation.noteChanged = data.backedUpNote, false end
+				if success then operation.currentNote, operation.noteChanged = restoredNote, false end
 			end
 			for _, visible in ipairs(backupFilteredData) do
 				if visible.key == data.key then
 					visible.status = data.status
-					if success then visible.currentNote, visible.noteChanged = data.backedUpNote, false end
+					if success then visible.currentNote, visible.noteChanged = restoredNote, false end
 				end
 			end
 			NoteCleanupWizard:RefreshBackupRows()
@@ -1280,7 +1291,7 @@ function NoteCleanupWizard:RestoreBackup()
 		if not data.available then
 			Complete(false)
 		else
-			WriteEntry(data.backupEntry, data.key, data.backedUpNote, data.currentNote, "restore", Complete)
+			WriteEntry(data.backupEntry, data.key, restoredNote, data.currentNote, "restore", Complete)
 		end
 		if not completed then NoteCleanupWizard:RefreshBackupRows() end
 		C_Timer.After(WRITE_INTERVAL, ProcessNext)

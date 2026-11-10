@@ -40,7 +40,7 @@ end
 function BetterFriendlistSettings_ShowTab(tabID)
 	local Settings = GetSettings()
 	if Settings then
-		Settings:SelectCategory(tabID)
+		Settings:ShowLegacy(tabID)
 	end
 end
 

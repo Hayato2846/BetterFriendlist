@@ -384,34 +384,19 @@ function BetterRaidFrame_UpdateControlPanelButtons()
 			isAssistant,
 			readyCheckInCombat
 		)
-		controlPanel.ReadyCheckButton:SetShown(showReadyCheck)
-		controlPanel.ReadyCheckButton.tooltip = nil
-
-		if canReadyCheck then
-			controlPanel.ReadyCheckButton:Enable()
-		else
-			controlPanel.ReadyCheckButton:Disable()
-			if showReadyCheck then
-				if readyCheckInCombat then
-					controlPanel.ReadyCheckButton.tooltip = ERR_AFFECTING_COMBAT
-				elseif not isInGroup then
-					controlPanel.ReadyCheckButton.tooltip = L.RAID_ERR_NOT_IN_GROUP or "You are not in a group"
-				elseif not canControl then
-					controlPanel.ReadyCheckButton.tooltip = L.RAID_ERROR_READY_CHECK_PERMISSION
-						or "You must be the raid leader or assistant to initiate a ready check."
-				end
+		local button = controlPanel.ReadyCheckButton
+		button.tooltip = nil
+		if showReadyCheck and not canReadyCheck then
+			if readyCheckInCombat then
+				button.tooltip = ERR_AFFECTING_COMBAT
+			elseif not isInGroup then
+				button.tooltip = L.RAID_ERR_NOT_IN_GROUP or "You are not in a group"
+			elseif not canControl then
+				button.tooltip = L.RAID_ERROR_READY_CHECK_PERMISSION
+					or "You must be the raid leader or assistant to initiate a ready check."
 			end
 		end
-
-		if controlPanel.ReadyCheckButton.Icon then
-			local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-			if FriendsUI and FriendsUI.RefreshModernReadyCheckIconColor and FriendsUI:IsModernActive() then
-				FriendsUI:RefreshModernReadyCheckIconColor(controlPanel.ReadyCheckButton)
-			else
-				controlPanel.ReadyCheckButton.Icon:SetDesaturated(not canReadyCheck)
-				controlPanel.ReadyCheckButton.Icon:SetAlpha(canReadyCheck and 1.0 or 0.45)
-			end
-		end
+		RaidFrame:ApplyReadyCheckVisualState(button, showReadyCheck, canReadyCheck)
 	end
 
 	-- Convert to Raid: Only if in Party (not Raid) and is Leader

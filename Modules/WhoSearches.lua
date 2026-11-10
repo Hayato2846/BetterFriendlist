@@ -21,9 +21,7 @@ local function QueryLabel(query)
 	return (table.concat(characters):gsub("|", "||"))
 end
 
-function WhoSearches:GetEntries(key, limit)
-	local db = BFL:GetModule("DB")
-	local source = db and db:Get(key)
+local function CollectEntries(source, limit)
 	local entries, seen = {}, {}
 	if type(source) == "table" and not (BFL.IsSecret and BFL:IsSecret(source)) then
 		for _, value in ipairs(source) do
@@ -37,15 +35,42 @@ function WhoSearches:GetEntries(key, limit)
 	return entries
 end
 
+function WhoSearches:GetEntries(key, limit)
+	local db = BFL:GetModule("DB")
+	return CollectEntries(db and db:Get(key), limit)
+end
+
+function WhoSearches:GetHistoryLimit(configuredMax)
+	if BFL.IsSecret and BFL:IsSecret(configuredMax) then configuredMax = nil end
+	local limit = tonumber(configuredMax) or 8
+	if limit ~= limit then limit = 8 end
+	return math.floor(math.max(1, math.min(MAX_HISTORY, limit)))
+end
+
+function WhoSearches:GetSettingsHistorySample(settings, queries)
+	if not settings:Get("whoSearchHistoryEnabled", true) then return {} end
+	return CollectEntries(queries, self:GetHistoryLimit(settings:Get("whoSearchHistoryMax", 8)))
+end
+
+function WhoSearches:GetHistoryLimitCap()
+	return MAX_HISTORY
+end
+
+function WhoSearches:SetHistoryEnabled(enabled)
+	local db = BFL:GetModule("DB")
+	if db then
+		db:Set("whoSearchHistoryEnabled", enabled == true)
+		if not enabled then
+			db:Set("whoSearchHistory", {})
+		end
+	end
+end
+
 function WhoSearches:Record(value)
 	local query = SafeQuery(value)
 	local db = BFL:GetModule("DB")
 	if not query or not db or db:Get("whoSearchHistoryEnabled", true) ~= true then return false end
-	local configuredMax = db:Get("whoSearchHistoryMax", 8)
-	if BFL.IsSecret and BFL:IsSecret(configuredMax) then configuredMax = nil end
-	local limit = tonumber(configuredMax) or 8
-	if limit ~= limit then limit = 8 end
-	limit = math.floor(math.max(1, math.min(MAX_HISTORY, limit)))
+	local limit = self:GetHistoryLimit(db:Get("whoSearchHistoryMax", 8))
 	local entries = self:GetEntries("whoSearchHistory", MAX_HISTORY)
 	for i = #entries, 1, -1 do
 		if entries[i] == query then table.remove(entries, i) end
@@ -118,8 +143,7 @@ function WhoSearches:OpenMenu(owner, editBox)
 		checked = function() return db:Get("whoSearchHistoryEnabled", true) == true end,
 		func = function()
 			local enabled = db:Get("whoSearchHistoryEnabled", true) ~= true
-			db:Set("whoSearchHistoryEnabled", enabled)
-			if not enabled then db:Set("whoSearchHistory", {}) end
+			self:SetHistoryEnabled(enabled)
 		end }
 	if db:Get("whoSearchHistoryEnabled", true) == true then
 		for _, value in ipairs(self:GetEntries("whoSearchHistory", MAX_HISTORY)) do

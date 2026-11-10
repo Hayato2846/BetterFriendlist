@@ -324,66 +324,45 @@ sync:ReconcileIndexRemoval("MyRealm")
 check(stored["Ada-Byron"].deleted and not stored["Grace-Hopper"].deleted, "Only the missing full name is marked as deleted")
 
 titleEnabled = true
-local dialogShown = false
-local inviteDialog = env.BattleNetInviteFrame
-local closeHook, sendHook, nextPrompt
-inviteDialog.IsShown = function() return dialogShown end
-inviteDialog.HookScript = function(_, _, callback) closeHook = callback end
-inviteDialog.SendButton = { HookScript = function(_, _, callback) sendHook = callback end }
-inviteDialog.InviteeName = { GetText = function() return pendingName end }
-env.C_Timer.After = function(_, callback) nextPrompt = callback end
-local function CloseInvite(confirmed)
-	if confirmed then pendingCallback() end
-	dialogShown = false
-	closeHook(inviteDialog)
-	if confirmed then sendHook() end
-	local callback = nextPrompt
-	nextPrompt = nil
-	return callback
-end
-local originalConfirm = env.BattleNetInviteFrame.ShowInviteConfirmation
-env.BattleNetInviteFrame.ShowInviteConfirmation = function(...)
-	dialogShown = true
-	originalConfirm(...)
-end
-local lastPrompt = pendingName
-before = #sentTitles
-sync:PerformSync()
-equal(pendingName, lastPrompt, "Title Friends background sync opens no dialog")
-equal(#sentTitles, before, "Title Friends background sync sends no invitations")
-check(sync:RestoreStoredFriend("Alliance", "Grace-Hopper"), "A database action opens Blizzard confirmation")
-equal(pendingName, "Grace-Hopper", "Blizzard receives the full Forever name")
-stored["Katherine-Johnson"] = {}
-check(not sync:RestoreStoredFriend("Alliance", "Katherine-Johnson"), "A second click cannot replace a pending confirmation")
-equal(pendingName, "Grace-Hopper", "The original confirmation keeps its target")
-equal(#sentTitles, before, "Opening a confirmation never sends an invitation")
-titleEnabled = secret
-check(not sync:RestoreStoredFriend("Alliance", "Katherine-Johnson"), "An unreadable Title Friends flag prevents friend actions")
-titleEnabled = true
-CloseInvite(false)()
-stored["Ada-Lovelace"] = {}
-env.BNGetNumFriends = function() return 1 end
-env.C_BattleNet.GetFriendAccountInfo = function()
-	return { friendLevel = 3, gameAccountInfo = { characterName = "Katherine-Johnson" } }
-end
-stored["Alan-Turing"] = {}
-local pending = sync:GetPendingTitleFriends()
-equal(table.concat(pending, ","), "Alan-Turing,Grace-Hopper",
-	"Only missing, non-deleted friends other than the current character are listed")
-check(sync:StartTitleInvites(pending), "Add All opens the first native confirmation")
-equal(pendingName, "Alan-Turing", "First candidate opens without sending")
-equal(#sentTitles, before, "The queue opens dialogs without sending invitations")
-local advance = CloseInvite(true)
-equal(pendingName, "Alan-Turing", "The second dialog waits for the first click and hide handlers")
-advance()
-equal(pendingName, "Grace-Hopper", "The second candidate opens after the first dialog closes")
-equal(#sentTitles, before + 1, "Only the native confirmation sent an invitation")
-CloseInvite(false)()
-equal(table.concat(sync:GetPendingTitleFriends(), ","), "Grace-Hopper",
-	"A cancelled invite remains in the list while a confirmed request is suppressed for the session")
-env.BNGetNumFriends, env.C_BattleNet.GetFriendAccountInfo = nil, nil
-env.BattleNetInviteFrame.ShowInviteConfirmation = originalConfirm
 env.BetterFriendlistDB, env.C_ChatInfo, env.C_Timer = nil, nil, nil
+
+-- Run the production request event callbacks through Blizzard's actual toast handler.
+local requestCallbacks = execute(between(read(repo, "Modules/FriendsList.lua"),
+	"local EventCallback_BNetInviteListInitialized,", "local function HookScript_OnFrameShow(")
+	.. "\nreturn { added = EventCallback_BNetInviteAdded, initialized = EventCallback_BNetInviteListInitialized }",
+	"friend request callbacks")
+local toastCVars = { showToastWindow = "1", showToastFriendRequest = "1" }
+local originalGetCVar, originalGetCVarBool = env.GetCVar, env.GetCVarBool
+local originalGameRule, originalFriendsList = BFL.IsGameRuleActive, BFL.FriendsList
+env.GetCVar = function(name) return toastCVars[name] end
+env.GetCVarBool = function(name) return toastCVars[name] == "1" end
+BFL.IsGameRuleActive = function() return false end
+BFL.FriendsList = { ScheduleRefresh = function() end }
+for _, native in ipairs({ { forever, "Mainline" }, { classic, "Classic" } }) do
+	execute(read(native[1], "Interface/AddOns/Blizzard_BNet/" .. native[2] .. "/BNet.lua"), "Blizzard BNet")
+	local registered, notifications = false, {}
+	env.BNToastFrame = setmetatable({
+		IsEventRegistered = function() return registered end,
+		AddToast = function(_, kind, count) notifications[#notifications + 1] = { kind, count } end,
+	}, { __index = env.BNToastMixin })
+	requestCallbacks.added(secret)
+	requestCallbacks.initialized(2)
+	equal(notifications[1][1], 5, native[2] .. " uses Blizzard's new request toast")
+	equal(notifications[2][1], 4, native[2] .. " uses Blizzard's pending request toast")
+	equal(notifications[2][2], 2, native[2] .. " preserves the pending count")
+	requestCallbacks.initialized(0)
+	requestCallbacks.initialized(secret)
+	registered = true
+	requestCallbacks.added()
+	registered, toastCVars.showToastWindow = false, "0"
+	requestCallbacks.added()
+	toastCVars.showToastWindow, toastCVars.showToastFriendRequest = "1", "0"
+	requestCallbacks.added()
+	toastCVars.showToastFriendRequest = "1"
+	equal(#notifications, 2, native[2] .. " suppresses empty, secret, duplicate and disabled notifications")
+end
+env.BNToastFrame, env.GetCVar, env.GetCVarBool = nil, originalGetCVar, originalGetCVarBool
+BFL.IsGameRuleActive, BFL.FriendsList = originalGameRule, originalFriendsList
 
 -- Exercise the production copy handler for focused accounts and plain contexts.
 local legacy = read(repo, "BetterFriendlist.lua")

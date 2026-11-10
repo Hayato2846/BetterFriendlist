@@ -8,6 +8,10 @@ local titleIdentities = setmetatable({}, { __mode = "k" })
 local watchingRoster = false
 local acceptedWrites = {}
 local JOURNAL_KEY = "noteSyncPendingWrites"
+local TITLE_GROUP_MARKER = "%[BFLG?:"
+local TITLE_GROUP_PATTERN = "%[BFL(G?):(%w+)%]"
+local TITLE_GROUP_TOKEN_LENGTH = 8
+local BNET_NOTE_LIMIT = 127
 
 local function IsSecret(value)
 	return BFL.IsSecret and BFL:IsSecret(value)
@@ -19,6 +23,68 @@ end
 
 function FriendNotes.IsReadableString(value)
 	return not IsSecret(value) and type(value) == "string"
+end
+
+local function IsTitleGroupToken(format, token)
+	if format == "G" then return #token == 16 and not token:find("[^0-9a-f]") end
+	return (#token == TITLE_GROUP_TOKEN_LENGTH or #token == 14) and not token:find("[^0-9ABCDEFGHJKMNPQRSTVWXYZ]")
+end
+
+function FriendNotes.SplitTitleGroupNote(note)
+	if not FriendNotes.IsReadableString(note) then return nil, nil, "unavailable" end
+	local start = note:find(TITLE_GROUP_MARKER)
+	if not start then return note end
+	local first, last, format, token = note:find(TITLE_GROUP_PATTERN, start)
+	if first ~= start or not IsTitleGroupToken(format, token) or note:find(TITLE_GROUP_MARKER, last + 1) then
+		return note, nil, "ambiguous"
+	end
+	-- Remove the single separator we added, preserving existing whitespace.
+	if start > 1 and note:sub(start - 1, start - 1) == " " then start = start - 1 end
+	return note:sub(1, start - 1) .. note:sub(last + 1), token
+end
+
+function FriendNotes.AppendTitleGroupToken(note, token)
+	if not token then return note end
+	local marker = #token == 16 and "[BFLG:" or "[BFL:"
+	return note .. (note ~= "" and " " or "") .. marker .. token .. "]"
+end
+
+-- Account data is kept intact for writes and group lookups. Only strip the
+-- marker when projecting a note into BFL's rows, tooltips and search.
+function FriendNotes.GetBNetDisplayNote(account)
+	local note = account.note
+	if not BFL.IsTitleFriend or not BFL.IsTitleFriend(account) or not FriendNotes.IsReadableString(note) then
+		return note
+	end
+	local localNote = BFL.TitleFriendNotes and BFL.TitleFriendNotes:GetDisplayNote(account)
+	if localNote ~= nil then return localNote end
+	local clean = note:gsub(" ?(" .. TITLE_GROUP_PATTERN .. ")", function(_, format, token)
+		if IsTitleGroupToken(format, token) then return "" end
+		return nil -- Keep invalid marker text, including any preceding space.
+	end)
+	return clean
+end
+
+function FriendNotes.PreserveTitleGroupToken(current, desired)
+	if not FriendNotes.IsReadableString(desired) then return desired end
+	local _, currentToken = FriendNotes.SplitTitleGroupNote(current)
+	local _, desiredToken, problem = FriendNotes.SplitTitleGroupNote(desired)
+	if currentToken and not desiredToken and not problem then
+		return FriendNotes.AppendTitleGroupToken(desired, currentToken)
+	end
+	return desired
+end
+
+function FriendNotes.CountNoteLetters(note)
+	-- Blizzard's editor limits letters, so count the leading bytes of UTF-8.
+	local _, count = note:gsub("[^\128-\191]", "")
+	return count
+end
+
+function FriendNotes.ForEachTitleGroupToken(note, callback)
+	for format, token in note:gmatch(TITLE_GROUP_PATTERN) do
+		if IsTitleGroupToken(format, token) then callback(token) end
+	end
 end
 
 local function IsName(value)
@@ -246,7 +312,9 @@ function FriendNotes.CreateBNetIdentity(account)
 	local identity = { uid = uid }
 	if not IsName(account.battleTag) then
 		identity.title = true
-		identity.characterGUID = GetCharacterGUID(account)
+		local _, groupToken = FriendNotes.SplitTitleGroupNote(account.note)
+		identity.groupToken = groupToken
+		if not groupToken then identity.characterGUID = GetCharacterGUID(account) end
 		titleIdentities[identity] = true
 		if not watchingRoster and BFL.RegisterEventCallback then
 			watchingRoster = true
@@ -270,6 +338,11 @@ function FriendNotes.ResolveBNetIdentity(identity, accountsByUID)
 	else account = FriendNotes.FindBNetFriend(identity.uid) end
 	if FriendNotes.GetBNetUID(account) ~= identity.uid then return nil, "unavailable" end
 	if identity.title then
+		if identity.groupToken then
+			local _, token = FriendNotes.SplitTitleGroupNote(account.note)
+			if token ~= identity.groupToken then return nil, "identity" end
+			return account
+		end
 		local guid = identity.characterGUID
 		if IsSecret(guid) or (guid ~= nil and not IsName(guid)) then return nil, "identity" end
 		if guid ~= nil then
@@ -293,6 +366,9 @@ end
 
 function FriendNotes.WriteBNetNote(uid, note, expected, snapshot, identity, owner)
 	local account = FreshBNetFriend(uid, snapshot)
+	if BFL.TitleFriendNotes and BFL.TitleFriendNotes:ManagesAccount(account) then
+		return false, "unavailable"
+	end
 	if identity and not FriendNotes.ResolveBNetIdentity(identity, { [uid] = account }) then return false, "unavailable" end
 	local current = ReadNote(account, "note")
 	local active = FriendNotes.ObserveAcceptedWrite(uid, current, { bnet = { [uid] = account } })
@@ -300,6 +376,14 @@ function FriendNotes.WriteBNetNote(uid, note, expected, snapshot, identity, owne
 	local valid, reason = ValidateWrite(current, note, expected)
 	if not valid then return false, reason end
 	if current == note then return true end
+	if uid:match("^bnet_%d+$") then
+		local _, currentToken, currentProblem = FriendNotes.SplitTitleGroupNote(current)
+		local _, nextToken, nextProblem = FriendNotes.SplitTitleGroupNote(note)
+		if currentProblem or nextProblem or currentToken ~= nextToken then
+			return false, "identity"
+		end
+		if nextToken and FriendNotes.CountNoteLetters(note) > BNET_NOTE_LIMIT then return false, "note-full" end
+	end
 	if type(BNSetFriendNote) ~= "function" then return false, "unavailable" end
 	local id = account.bnetAccountID
 	if IsSecret(id) or type(id) ~= "number" then return false, "unavailable" end
@@ -307,6 +391,25 @@ function FriendNotes.WriteBNetNote(uid, note, expected, snapshot, identity, owne
 	if not ok or IsSecret(result) or result == false then return false, "failed" end
 	if ReadNote(FreshBNetFriend(uid, snapshot), "note") == note then return true end
 	TrackAccepted(uid, note, current, identity or FriendNotes.CreateBNetIdentity(account), owner)
+	return false, "pending"
+end
+
+-- Only the Title Friend migration can replace the link. Recheck the live
+-- slot and its exact old note immediately before addressing the native API.
+function FriendNotes.WriteTitleFriendLink(uid, index, expected, value)
+	if type(BNSetFriendNote) ~= "function" or FriendNotes.CountNoteLetters(value) > BNET_NOTE_LIMIT then
+		return false, "unavailable"
+	end
+	local function ReadCurrent()
+		local ok, account = pcall(BFL.GetBNetFriendInfo, index)
+		if ok and FriendNotes.GetBNetUID(account) == uid and BFL.IsTitleFriend(account)
+			and not IsSecret(account.isFriend) and account.isFriend == true then return account end
+	end
+	local account = ReadCurrent()
+	if not account or ReadNote(account, "note") ~= expected then return false, "changed" end
+	local ok, result = pcall(BNSetFriendNote, account.bnetAccountID, value)
+	if not ok or IsSecret(result) or result == false then return false, "failed" end
+	if ReadNote(ReadCurrent(), "note") == value then return true end
 	return false, "pending"
 end
 

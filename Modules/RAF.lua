@@ -1596,7 +1596,7 @@ local function ProcessAndSortRecruits(recruits)
 							type = "bnet",
 							accountName = accountName,
 							battleTag = accountBattleTag,
-							note = SafeString(accountInfo.note, nil),
+							note = SafeString(BFL.FriendNotes.GetBNetDisplayNote(accountInfo), nil),
 							uid = tostring(recruitInfo.bnetAccountID),
 						}
 						local safeName = FL:GetDisplayName(friendObj)

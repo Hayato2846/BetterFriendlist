@@ -171,13 +171,13 @@ local function GetDB()
 	return BFL:GetModule("DB")
 end
 
-local function ShouldShowClassIcons()
-	local DB = GetDB()
+local function ShouldShowClassIcons(settings)
+	local DB = settings or GetDB()
 	return not DB or DB:Get("guildTabShowClassIcons", true) ~= false
 end
 
-local function ShouldUseGuildNicknames()
-	local DB = GetDB()
+local function ShouldUseGuildNicknames(settings)
+	local DB = settings or GetDB()
 	return DB and DB:Get("guildTabUseNicknames", true) ~= false
 end
 
@@ -693,6 +693,14 @@ function GuildFrame:SetSort(mode, skipToggle)
 	self:Refresh()
 end
 
+local function GetRosterNickname(member)
+	if member.settingsSample then
+		return member.sampleNickname
+	end
+	local DB = GetDB()
+	return DB and DB:GetGuildNickname(member.fullName) or nil
+end
+
 function GuildFrame:SortMembers(list)
 	local mode = self.sortMode
 	local reversed = self.sortReversed[mode]
@@ -729,9 +737,8 @@ function GuildFrame:SortMembers(list)
 				result = aZone < bZone
 			end
 		elseif mode == SORT_NICKNAME then
-			local DB = ShouldUseGuildNicknames() and GetDB()
-			local aName = DB and DB:GetGuildNickname(a.fullName) or ""
-			local bName = DB and DB:GetGuildNickname(b.fullName) or ""
+			local aName = ShouldUseGuildNicknames(self.settingsSampleDB) and GetRosterNickname(a) or ""
+			local bName = ShouldUseGuildNicknames(self.settingsSampleDB) and GetRosterNickname(b) or ""
 			if aName == "" then
 				aName = a.name or ""
 			end
@@ -2121,7 +2128,7 @@ end
 -- Button Setup & Update
 -- ========================================
 
-function GuildFrame:SetupMemberButton(button)
+function GuildFrame:SetupMemberButton(button, settingsSample)
 	-- Background (zebra striping)
 	button.bg = button:CreateTexture(nil, "BACKGROUND")
 	button.bg:SetAllPoints()
@@ -2234,6 +2241,12 @@ function GuildFrame:SetupMemberButton(button)
 	button.selectionBar:SetWidth(2)
 	button.selectionBar:Hide()
 
+	if settingsSample then
+		button:EnableMouse(false)
+		button.rowAction:EnableMouse(false)
+		return
+	end
+
 	-- Enable mouse
 	button:EnableMouse(true)
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -2283,7 +2296,7 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 
 	-- Class icon
 	local classCoords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[member.classFile]
-	if ShouldShowClassIcons() and classCoords and button.classIcon then
+	if ShouldShowClassIcons(self.settingsSampleDB) and classCoords and button.classIcon then
 		button.classIcon:SetTexCoord(unpack(classCoords))
 		button.classIcon:Show()
 		if button.iconBorder then
@@ -2310,9 +2323,8 @@ function GuildFrame:UpdateMemberButton(button, member, dataIndex)
 
 	if button.nameText then
 		local displayName = Ambiguate(member.fullName, "guild")
-		local DB = ShouldUseGuildNicknames() and GetDB()
-		local nickname = DB and DB:GetGuildNickname(member.fullName) or nil
-		if ShouldUseGuildNicknames() and nickname and nickname ~= "" then
+		local nickname = ShouldUseGuildNicknames(self.settingsSampleDB) and GetRosterNickname(member)
+		if nickname and nickname ~= "" then
 			displayName = nickname
 		end
 		if member.online then

@@ -73,6 +73,10 @@ end
 
 function NoteSync:ParseNoteGroups(noteText, friendUID)
 	if not (BFL.FriendNotes and BFL.FriendNotes.IsReadableString(noteText)) or noteText == "" then return "", {} end
+	local marker
+	if friendUID and friendUID:match("^bnet_%d+$") then
+		noteText, marker = BFL.FriendNotes.SplitTitleGroupNote(noteText)
+	end
 	local parts, groups, i = { strsplit("#", noteText) }, {}, 2
 	-- Current assignments disambiguate raw names written before delimiter escaping existed.
 	local knownNames = friendUID and self:GetGroupNamesForFriend(friendUID) or {}
@@ -99,7 +103,7 @@ function NoteSync:ParseNoteGroups(noteText, friendUID)
 		if name ~= "" then groups[#groups + 1] = name end
 		i = i + (consumed or 1)
 	end
-	return parts[1] or "", groups
+	return BFL.FriendNotes.AppendTitleGroupToken(parts[1] or "", marker), groups
 end
 
 function NoteSync:BuildNoteWithGroups(actualNote, groupNames, charLimit)
@@ -298,7 +302,9 @@ SnapshotFriends = function()
 	if not helper then return friends, false end
 	local snapshot = helper.CaptureSnapshot()
 	for uid, account in pairs(snapshot.bnet) do
-		if account then friends[uid] = { note = account.note or "", account = account } end
+		if account and not (BFL.TitleFriendNotes and BFL.TitleFriendNotes:ManagesAccount(account)) then
+			friends[uid] = { note = account.note or "", account = account }
+		end
 	end
 	for _, info in pairs(snapshot.wow) do
 		if info then
@@ -389,10 +395,11 @@ function NoteSync:ImportGroupsFromNotes(friends, excluded, snapshot)
 		if created > 0 then DB:Set("groupOrder", order) end
 		self.unresolvedImports = self.unresolvedImports or {}
 		for uid, names in pairs(assignments) do
-			local unresolved = false
+			local canAssign = not DB.HasVerifiedFriendGroupKey or DB:HasVerifiedFriendGroupKey(uid)
+			local unresolved = not canAssign
 			for _, name in ipairs(names) do
 				local id = nameMap[name]
-				if id then
+				if id and canAssign then
 					if DB:AddFriendToGroup(uid, id) then assigned = assigned + 1 end
 				else unresolved = true end
 			end
@@ -478,6 +485,10 @@ function NoteSync:WriteNote(friendUID, currentNote, groupNames, charLimit, write
 end
 
 function NoteSync:SyncBNetFriend(friendUID, groupNames, snapshot)
+	local DB = BFL:GetModule("DB")
+	if DB and DB.HasVerifiedFriendGroupKey and not DB:HasVerifiedFriendGroupKey(friendUID, true) then
+		return false, false, "unavailable"
+	end
 	local helper = BFL.FriendNotes
 	local account = helper and helper.FindBNetFriend(friendUID, snapshot)
 	local identity
@@ -738,7 +749,14 @@ function NoteSync:SyncAllFriends(callback, progressCallback)
 		elseif not self.pendingWrites[uid] then self.passiveQueued[uid] = true end
 		self:QueueFriend(uid)
 	end
-	for uid in pairs(DB:GetFriendGroups()) do QueueAuthoritative(uid) end
+	for key in pairs(DB:GetFriendGroups()) do
+		local uid = key
+		if DB.GetStoredGroupNoteUID then uid = DB:GetStoredGroupNoteUID(key) end
+		if uid then
+			if uid ~= key and snapshot.bnet[uid] then self:BindTitleIdentity(uid, snapshot.bnet[uid], true, snapshot) end
+			QueueAuthoritative(uid)
+		end
+	end
 	for uid in pairs(self.pendingWrites) do self:QueueFriend(uid) end
 	for uid, friend in pairs(friends) do if friend.note:find("#", 1, true) then QueueAuthoritative(uid) end end
 	self.profileRestorePending = false
@@ -754,6 +772,7 @@ end
 
 function NoteSync:OnGroupChanged(friendUID, preserveIdentity)
 	if self.isImporting then return end
+	if BFL.TitleFriendNotes and BFL.TitleFriendNotes:IsSupported() and friendUID:match("^bnet_%d+$") then return end
 	local snapshot, friends = self.groupDefinitionSnapshot, self.groupDefinitionFriends
 	if friendUID:match("^bnet_%d+$") and (preserveIdentity or self.isChangingGroupDefinition) then
 		local identity = self.titleIdentities[friendUID]
@@ -790,8 +809,12 @@ function NoteSync:OnGroupRenamed(groupId)
 	local DB = BFL:GetModule("DB")
 	if not DB then return end
 	self:WithGroupDefinitionChange(function()
-		for uid, ids in pairs(DB:GetFriendGroups()) do
-			for _, id in ipairs(ids) do if id == groupId then self:OnGroupChanged(uid, true); break end end
+		for key, ids in pairs(DB:GetFriendGroups()) do
+			local uid = key
+			if DB.GetStoredGroupNoteUID then uid = DB:GetStoredGroupNoteUID(key) end
+			if uid then
+				for _, id in ipairs(ids) do if id == groupId then self:OnGroupChanged(uid, true); break end end
+			end
 		end
 	end)
 end

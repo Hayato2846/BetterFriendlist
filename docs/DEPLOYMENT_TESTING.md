@@ -141,11 +141,29 @@ APIs. The client test below checks whether the route keeps Whisper taint-free.
 - Enter combat while hovering a member and verify the old click target is
   cleared. Check the native menu again after combat.
 
-The installed EllesmereUI Friends List uses the same Blizzard hyperlink
-template and mouse routing. The offline smoke test checks that the upper
+The offline smoke test checks that the upper
 layer passes right-clicks to Blizzard's unchanged hyperlink handler and
 delegates other supported row interactions to BFL. The taint log measures
 the actual right-click and Whisper path in the client.
+
+## Native friend search
+
+- In Retail and Forever, start in BFL and type the name of an offline Title Friend.
+  Check that the BFL field stays visible before focusing, while typing, and
+  after clearing it. Try a BFL nickname, note and tag as well.
+- Enter combat with both windows closed, then open BFL for the first time
+  and look up a friend whose name matches only through Blizzard's search.
+  Repeat with Social UI already loaded and with it still unloaded, and in
+  Modern and Legacy. Also enter combat while the native field is active.
+- Open Blizzard Social UI while the native field is embedded in BFL.
+  Verify the native field and list return to Blizzard and BFL's local
+  search remains usable. Close Blizzard Social UI and reopen BFL in combat.
+- Clear the search with its X, apply a BFL Quick Filter, then switch to
+  Recent Allies and back. Repeat in both BFL interface styles and Simple Mode.
+- Verify that both lists keep their own search field visible and editable.
+  In a context that restricts friend results, verify the local search remains
+  usable and previous native matches disappear. Check the taint log and
+  `ADDON_ACTION_BLOCKED` for the search and layout paths.
 
 ## Modes
 

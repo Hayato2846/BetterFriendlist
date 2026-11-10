@@ -235,8 +235,13 @@ local function SkinScrollBar(S, scrollBar)
 
 	local isClassic = BFL and BFL.IsClassic
 
+	if scrollBar.Track and scrollBar.GetThumb and S.HandleTrimScrollBar then
+		S:HandleTrimScrollBar(scrollBar)
+		return
+	end
+
 	if isClassic then
-		-- Classic Override: Always use HandleScrollBar
+		-- Classic's legacy slider uses the original scrollbar handler
 		-- HandleTrimScrollBar does not exist or shouldn't be used in Classic environments
 		if S.HandleScrollBar then
 			S:HandleScrollBar(scrollBar)
@@ -604,7 +609,7 @@ function ElvUISkin:SkinFrames(E, S)
 	local portraitButton, DB = frame.PortraitButton, BFL:GetModule("DB")
 	local simpleMode = DB and DB:Get("simpleMode", false) == true
 	local shouldSkinPortrait = portraitButton ~= nil and ShouldSkinLegacyElvUIPortrait(BFL.IsClassic, simpleMode)
-	-- Skin Portrait Button (Changelog)
+	-- Skin the BFL portrait
 	if portraitButton then
 		-- BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
 		local button = portraitButton
@@ -660,36 +665,6 @@ function ElvUISkin:SkinFrames(E, S)
 			if frame.PortraitMask then
 				frame.PortraitMask:Hide()
 			end
-
-			-- Handle Glow (New Version Indicator)
-			-- Changelog owns the shape-aware indicator instead of the skin.
-			-- Refresh after ElvUI has finalized the portrait dimensions,
-			-- so the relative anchors follow the fitted square automatically
-			-- and keep the current theme accent without a separate texture.
-			-- The Changelog module also preserves the indicator's visibility.
-			local Changelog = BFL:GetModule("Changelog")
-			if Changelog and Changelog.RefreshPortraitIndicator then
-				Changelog:RefreshPortraitIndicator()
-			end
-
-			-- Add Hover Effect
-			button:HookScript("OnEnter", function(self)
-				if self.backdrop then
-					local color = E.media.rgbvaluecolor
-					if color then
-						self.backdrop:SetBackdropBorderColor(color.r, color.g, color.b)
-					end
-				end
-			end)
-
-			button:HookScript("OnLeave", function(self)
-				if self.backdrop then
-					local color = E.media.bordercolor
-					if color then
-						self.backdrop:SetBackdropBorderColor(unpack(color))
-					end
-				end
-			end)
 		end
 	end
 	self:HideClassicPortraitArtifacts(frame, shouldSkinPortrait and portraitButton or nil, true)
@@ -1417,7 +1392,6 @@ function ElvUISkin:SkinFrames(E, S)
 	-- Skin Changelog
 	BFL:DebugPrint("ElvUISkin: Skinning Changelog")
 	xpcall(function()
-		self:SkinChangelog(E, S)
 	end, function(err)
 		BFL:DebugPrint("ElvUISkin: Error skinning Changelog: " .. tostring(err))
 	end)
@@ -1536,15 +1510,11 @@ function ElvUISkin:HookFriendsList(E, S)
 	end
 	if self.FriendsListHooksInstalled then return end; self.FriendsListHooksInstalled = true
 	hooksecurefunc(FriendsList, "UpdateGroupHeaderButton", function(_, button)
-		if self:IsSkinEnabled() and self:IsModernFriendsUIActive() then
+		if not self:IsSkinEnabled() then return end
+		if self:IsModernFriendsUIActive() then
 			self:SkinModernScrollableHeader(S, button)
-		elseif not button.BFL_ElvUILegacyHeaderSkinned then
-			CallElvUIHandler(S, "HandleButton", button)
-			-- Strip the custom background texture if it exists
-			if button.BG then
-				button.BG:SetTexture(nil)
-			end
-			button.BFL_ElvUILegacyHeaderSkinned = true
+		else
+			self:SkinLegacyGroupHeader(S, button)
 		end
 	end)
 	-- Hook Friend Button
@@ -1778,7 +1748,7 @@ function ElvUISkin:SkinSettings(E, S)
 
 	-- Skin ScrollBar
 	if frame.ContentScrollFrame and frame.ContentScrollFrame.ScrollBar then
-		S:HandleScrollBar(frame.ContentScrollFrame.ScrollBar)
+		SkinScrollBar(S, frame.ContentScrollFrame.ScrollBar)
 	end
 
 	-- Hook Refresh functions to skin EditBoxes (Point 3)
@@ -1963,87 +1933,18 @@ function ElvUISkin:SkinSettings(E, S)
 				return holder
 			end
 
-			-- Slider
+			-- Both settings slider constructors use the same Blizzard stepper template.
 			local oldCreateSlider = C.CreateSlider
 			C.CreateSlider = function(...)
 				local holder = oldCreateSlider(...)
-				if holder and holder.Slider then
-					local slider = holder.Slider
-					slider:StripTextures()
-					slider:CreateBackdrop("Transparent")
-					if slider.backdrop then
-						slider.backdrop:SetPoint("TOPLEFT", 0, -5)
-						slider.backdrop:SetPoint("BOTTOMRIGHT", 0, 5)
-					end
-
-					local thumb = slider:GetThumbTexture()
-					if thumb then
-						thumb:SetAlpha(0)
-						if not slider.BFLThumb then
-							local t = slider:CreateTexture(nil, "OVERLAY")
-							t:SetTexture(E.Media.Textures.Melli or 130751)
-							t:SetVertexColor(1, 0.82, 0)
-							t:SetSize(10, 18)
-							t:SetPoint("CENTER", thumb, "CENTER")
-							slider.BFLThumb = t
-						end
-					end
-
-					if slider.Back then
-						S:HandleNextPrevButton(slider.Back, "left")
-						slider.Back:SetSize(16, 16)
-					end
-					if slider.Forward then
-						S:HandleNextPrevButton(slider.Forward, "right")
-						slider.Forward:SetSize(16, 16)
-					end
-				end
+				if holder and holder.Slider then self:SkinSettingsSlider(S, holder.Slider) end
 				return holder
 			end
 
-			-- SliderWithColorPicker
 			local oldCreateSliderColor = C.CreateSliderWithColorPicker
 			C.CreateSliderWithColorPicker = function(...)
 				local holder = oldCreateSliderColor(...)
-				if holder and holder.Slider then
-					-- Aggressive Skinning for MinimalSliderWithSteppersTemplate
-					local slider = holder.Slider
-
-					-- 1. Strip all textures (removes default Blizzard borders/track art)
-					slider:StripTextures()
-
-					-- 2. Create proper ElvUI Backdrop (The Track)
-					slider:CreateBackdrop("Transparent")
-					if slider.backdrop then
-						slider.backdrop:SetPoint("TOPLEFT", 0, -5) -- Adjust height of track
-						slider.backdrop:SetPoint("BOTTOMRIGHT", 0, 5)
-					end
-
-					-- 3. Handle Thumb
-					local thumb = slider:GetThumbTexture()
-					if thumb then
-						thumb:SetAlpha(0) -- Hide default geometry
-
-						if not slider.BFLThumb then
-							local t = slider:CreateTexture(nil, "OVERLAY")
-							t:SetTexture(E.Media.Textures.Melli or 130751)
-							t:SetVertexColor(1, 0.82, 0)
-							t:SetSize(10, 18)
-							t:SetPoint("CENTER", thumb, "CENTER")
-							slider.BFLThumb = t
-						end
-					end
-
-					-- 4. Skin Stepper Buttons
-					if slider.Back then
-						S:HandleNextPrevButton(slider.Back, "left")
-						slider.Back:SetSize(16, 16) -- Force size
-					end
-					if slider.Forward then
-						S:HandleNextPrevButton(slider.Forward, "right")
-						slider.Forward:SetSize(16, 16)
-					end
-				end
+				if holder and holder.Slider then self:SkinSettingsSlider(S, holder.Slider) end
 				return holder
 			end
 
@@ -2218,59 +2119,6 @@ function ElvUISkin:SkinAppearanceOnboarding(frame, onboarding)
 		end
 	end
 	return true
-end
-
-function ElvUISkin:SkinChangelog(E, S)
-	local Changelog = BFL:GetModule("Changelog")
-	if not Changelog then
-		return
-	end
-
-	local function Skin()
-		local frame = _G.BetterFriendlistChangelogFrame
-		if not frame or frame.isSkinned then
-			return
-		end
-
-		BFL:DebugPrint("ElvUISkin: Applying Skin to Changelog Window")
-		S:HandlePortraitFrame(frame)
-
-		-- Skin Main Inset
-		if frame.MainInset then
-			frame.MainInset:StripTextures()
-			frame.MainInset:CreateBackdrop("Transparent")
-		end
-
-		-- Skin Buttons
-		if frame.DiscordButton then
-			S:HandleButton(frame.DiscordButton)
-		end
-		if frame.GitHubButton then
-			S:HandleButton(frame.GitHubButton)
-		end
-		if frame.KoFiButton then
-			S:HandleButton(frame.KoFiButton)
-		end
-
-		-- Skin ScrollBar
-		if frame.ScrollBar then
-			-- Retail
-			SkinScrollBar(S, frame.ScrollBar)
-		elseif frame.ScrollFrame then
-			-- Classic or Fallback
-			local children = { frame.ScrollFrame:GetChildren() }
-			for _, child in ipairs(children) do
-				if child:IsObjectType("Slider") then
-					S:HandleScrollBar(child)
-				end
-			end
-		end
-
-		frame.isSkinned = true
-	end
-
-	hooksecurefunc(Changelog, "CreateChangelogWindow", Skin)
-	Skin()
 end
 
 function ElvUISkin:SkinHelpFrame(E, S)
@@ -3105,6 +2953,12 @@ local function GetModernElvUIBackdropColors(E)
 	return bgR, bgG, bgB, borderR, borderG, borderB
 end
 
+function ElvUISkin:GetSettingsSampleBackdropColors()
+	local E = BFL:GetElvUIEngine(false)
+	local r, g, b, borderR, borderG, borderB = GetModernElvUIBackdropColors(E)
+	return { r, g, b, 1 }, { borderR, borderG, borderB, 1 }
+end
+
 local function BackdropColorMatches(surface, getterName, r, g, b, a)
 	local getter = surface and surface[getterName]
 	if type(getter) ~= "function" then
@@ -3121,7 +2975,7 @@ local function BackdropColorMatches(surface, getterName, r, g, b, a)
 		and math.abs((currentA == nil and 1 or currentA) - (a == nil and 1 or a)) <= epsilon
 end
 
-local function ApplyModernElvUIBackdrop(E, control, overrideR, overrideG, overrideB)
+local function ApplyModernElvUIBackdrop(E, control, overrideR, overrideG, overrideB, overrideA)
 	if not control then
 		return nil
 	end
@@ -3139,19 +2993,22 @@ local function ApplyModernElvUIBackdrop(E, control, overrideR, overrideG, overri
 
 	local bgR, bgG, bgB, borderR, borderG, borderB = GetModernElvUIBackdropColors(E)
 	local appliedR, appliedG, appliedB = overrideR or bgR, overrideG or bgG, overrideB or bgB
-	local backdropMatches = BackdropColorMatches(surface, "GetBackdropColor", appliedR, appliedG, appliedB, 1)
+	local appliedA = overrideA or 1
+	local backdropMatches = BackdropColorMatches(surface, "GetBackdropColor", appliedR, appliedG, appliedB, appliedA)
 	if
 		surface.SetBackdropColor
 		and (backdropMatches == false
 			or (backdropMatches == nil
 				and (surface.BFL_ElvUIBackdropR ~= appliedR
 			or surface.BFL_ElvUIBackdropG ~= appliedG
-			or surface.BFL_ElvUIBackdropB ~= appliedB)))
+			or surface.BFL_ElvUIBackdropB ~= appliedB
+			or surface.BFL_ElvUIBackdropA ~= appliedA)))
 	then
-		surface:SetBackdropColor(appliedR, appliedG, appliedB, 1)
+		surface:SetBackdropColor(appliedR, appliedG, appliedB, appliedA)
 		surface.BFL_ElvUIBackdropR = appliedR
 		surface.BFL_ElvUIBackdropG = appliedG
 		surface.BFL_ElvUIBackdropB = appliedB
+		surface.BFL_ElvUIBackdropA = appliedA
 	end
 	local borderMatches = BackdropColorMatches(surface, "GetBackdropBorderColor", borderR, borderG, borderB, 1)
 	if
@@ -3352,7 +3209,7 @@ function ElvUISkin:SkinModernFilterDropdown(S, dropdown, width, height)
 	ApplyModernElvUIBackdrop(self.ElvUIEngine, dropdown)
 end
 
-function ElvUISkin:SkinModernDirectoryHeader(S, header)
+function ElvUISkin:SkinModernDirectoryHeader(S, header, tint)
 	if not header then
 		return
 	end
@@ -3366,7 +3223,11 @@ function ElvUISkin:SkinModernDirectoryHeader(S, header)
 	end
 	HideButtonStateTextures(header)
 	HideModernNativeChrome(header)
-	ApplyModernElvUIBackdrop(self.ElvUIEngine, header)
+	if tint then
+		ApplyModernElvUIBackdrop(self.ElvUIEngine, header, unpack(tint))
+	else
+		ApplyModernElvUIBackdrop(self.ElvUIEngine, header)
+	end
 end
 
 function ElvUISkin:SkinModernHeaderDropdown(S, dropdown)
@@ -3690,10 +3551,223 @@ function ElvUISkin:SkinModernScrollableHeader(S, button)
 	-- Both group and request-section headers use ElvUI's opaque control surface.
 	-- The collapse button remains a child and therefore keeps its existing icon
 	-- and click behavior while the translucent Blizzard atlas is removed.
-	self:SkinModernDirectoryHeader(S, button)
+	self:SkinModernDirectoryHeader(S, button, button._bflTagHeaderColor)
 	button.BFL_ElvUIModernHeaderSkinned = true
 	SetTextureAlpha(button.GetNormalTexture and button:GetNormalTexture(), 0)
 	SetTextureAlpha(button.GetPushedTexture and button:GetPushedTexture(), 0)
+end
+
+function ElvUISkin:SkinLegacyGroupHeader(S, button)
+	if not button.BFL_ElvUILegacyHeaderSkinned then
+		CallElvUIHandler(S, "HandleButton", button)
+		if button.BG then button.BG:SetTexture(nil) end
+		button.BFL_ElvUILegacyHeaderSkinned = true
+	end
+	local backdrop = button.backdrop
+	local tint = button._bflTagHeaderColor
+	if backdrop and backdrop.SetBackdropColor and backdrop.GetBackdropColor then
+		if tint then
+			if not button._bflLegacyHeaderBaseColor then
+				button._bflLegacyHeaderBaseColor = { backdrop:GetBackdropColor() }
+			end
+			backdrop:SetBackdropColor(unpack(tint))
+		elseif button._bflLegacyHeaderBaseColor then
+			backdrop:SetBackdropColor(unpack(button._bflLegacyHeaderBaseColor))
+			button._bflLegacyHeaderBaseColor = nil
+		end
+	end
+end
+
+local function GetActiveSettingsSkin(self)
+	if not self:IsSkinEnabled() then return nil end
+	local E = self.ElvUIEngine or (BFL.GetElvUIEngine and BFL:GetElvUIEngine(true))
+	return self.ElvUISkinProxy or (E and E.GetModule and E:GetModule("Skins")), E
+end
+
+local function SkinSettingsStepper(S, button, direction)
+	if not button then return end
+	local width, height = button:GetSize()
+	if CallElvUIHandler(S, "HandleNextPrevButton", button, direction) then
+		button:SetSize(width, height)
+	end
+end
+
+function ElvUISkin:SkinSettingsSlider(S, steppers)
+	local slider = steppers.Slider
+	if not slider or slider.BFL_ElvUISettingsSliderSkinned then return end
+	local height = slider:GetHeight()
+	if not CallElvUIHandler(S, "HandleSliderFrame", slider) then return end
+	slider.BFL_ElvUISettingsSliderSkinned = true
+	slider:SetHeight(height)
+	if slider.backdrop then
+		slider.backdrop:ClearAllPoints()
+		slider.backdrop:SetPoint("TOPLEFT", slider, "TOPLEFT", 0, -4)
+		slider.backdrop:SetPoint("BOTTOMRIGHT", slider, "BOTTOMRIGHT", 0, 4)
+	end
+	SkinSettingsStepper(S, steppers.Back, "left")
+	SkinSettingsStepper(S, steppers.Forward, "right")
+end
+
+local function SkinSettingsControl(self, S, control)
+	if not control.IsObjectType or not control:IsShown() then return end
+	if control.Slider and control.Back and control.Forward then
+		self:SkinSettingsSlider(S, control)
+		return
+	elseif control:IsObjectType("CheckButton") then
+		if not control.IsSkinned then CallElvUIHandler(S, "HandleCheckBox", control) end
+		return
+	elseif control:IsObjectType("EditBox") then
+		self:SkinModernEditBox(S, control)
+		return
+	elseif control:IsObjectType("DropdownButton") then
+		self:SkinModernDropdown(S, control)
+		return
+	elseif control:IsObjectType("Button") then
+		if control.isTopTab then
+			if not control.BFL_ElvUISettingsTabSkinned and CallElvUIHandler(S, "HandleTab", control) then
+				control.BFL_ElvUISettingsTabSkinned = true
+				if not control:IsEnabled() and control.backdrop and control.backdrop.SetBackdropBorderColor then
+					control.backdrop:SetBackdropBorderColor(BFL:GetThemeAccentColor(1, 0.82, 0, 1))
+				end
+			end
+			return
+		elseif control.BFL_GroupOrderAction or (control:GetFontString() and (control:GetText() or "") ~= "") then
+			self:SkinModernButton(S, control)
+			return
+		end
+	end
+	if control.GetChildren then
+		for _, child in ipairs({ control:GetChildren() }) do
+			SkinSettingsControl(self, S, child)
+		end
+	end
+end
+
+function ElvUISkin:SkinSettingsActions(buttons, editBox)
+	local S = GetActiveSettingsSkin(self)
+	if not S then return end
+	for _, button in ipairs(buttons or {}) do self:SkinModernButton(S, button) end
+	self:SkinModernEditBox(S, editBox)
+end
+
+function ElvUISkin:SkinSettingsReleaseHeader(header, modern)
+	local S = GetActiveSettingsSkin(self)
+	if not S then return end
+	if modern then
+		self:SkinModernScrollableHeader(S, header)
+	else
+		self:SkinLegacyGroupHeader(S, header)
+	end
+end
+
+local function SkinSettingsPreviewHeader(self, S, E, header)
+	if header and header:IsShown() then
+		self:SkinModernEditBox(S, header.search)
+		if header.native and header.native:IsShown() then
+			if not header.native.BFL_ElvUIModernFrameSkinned then
+				CallElvUIHandler(S, "HandlePortraitFrame", header.native)
+				header.native.BFL_ElvUIModernFrameSkinned = true
+			end
+			SetTextureAlpha(header.topSurface.TopFade, 0)
+			SetTextureAlpha(header.topSurface.BottomFade, 0)
+			self:SkinModernDropdown(S, header.StatusDropdown)
+			self:SkinModernDropdown(S, header.filter)
+			self:SkinModernDropdown(S, header.sort)
+			self:SkinModernButton(S, header.battleNet.MenuButton)
+			if header.native.CloseButton then header.native.CloseButton:EnableMouse(false) end
+		end
+		if header.tag.Background then header.tag.Background:Hide() end
+		ApplyModernElvUIBackdrop(E, header.tag)
+	end
+end
+
+local function SkinSettingsPreviewScene(self, S, E, scene)
+	if not (scene and scene:IsShown()) then return end
+	for _, column in ipairs(scene.columns or {}) do
+		if IsModernDropdown(column) then
+			self:SkinModernHeaderDropdown(S, column)
+		else
+			self:SkinModernDirectoryHeader(S, column)
+		end
+	end
+	if scene.group then ApplyModernElvUIBackdrop(E, scene.group) end
+end
+
+function ElvUISkin:SkinSettingsComparison(review)
+	local S, E = GetActiveSettingsSkin(self)
+	if not S then return end
+
+	local picker, editor = review.comparisonPicker, review.comparisonEditor
+	if picker and picker:IsShown() then
+		if IsModernDropdown(picker) then
+			self:SkinModernDropdown(S, picker)
+		elseif not picker.BFL_ElvUIComparisonPickerSkinned then
+			picker.BFL_ElvUIComparisonPickerSkinned = CallElvUIHandler(S, "HandleDropDownBox", picker)
+		end
+	end
+	if editor and editor:IsShown() then SkinSettingsControl(self, S, editor) end
+	local modern = self:IsModernFriendsUIActive()
+	for _, lane in ipairs(review.comparisonLanes or {}) do
+		if lane:IsShown() then
+			for _, row in ipairs(lane.widgets) do
+				if row:IsShown() then
+					if modern then
+						self:SkinModernDynamicRow(S, row)
+					elseif row.elementData and row.elementData.groupId and not row.elementData.friend then
+						self:SkinLegacyGroupHeader(S, row)
+					end
+				end
+			end
+			SkinSettingsPreviewHeader(self, S, E, lane.headerSample)
+			for _, scene in pairs(lane.socialSamples or {}) do SkinSettingsPreviewScene(self, S, E, scene) end
+		end
+	end
+end
+
+function ElvUISkin:SkinSettingsReview(review, showPreview)
+	local S, E = GetActiveSettingsSkin(self)
+	if not S then return end
+
+	self:SkinModernEditBox(S, review.search)
+	SkinModernScrollBar(S, review.scroll.ScrollBar)
+	SkinModernScrollBar(S, review.hoverHelp.scroll.ScrollBar)
+	if not showPreview then
+		for _, row in ipairs(review.controlRows or {}) do
+			SkinSettingsControl(self, S, row)
+		end
+		return
+	end
+
+	local preview, shell = review.preview, review.previewShell
+	if shell:IsShown() then
+		if shell.Bg then shell.Bg:Hide() end
+		if shell.NineSlice then shell.NineSlice:Hide() end
+		ApplyModernElvUIBackdrop(E, shell)
+	end
+
+	local viewport = review.sampleViewport
+	if viewport and viewport:IsShown() then
+		SkinModernScrollBar(S, viewport.ScrollBar)
+		local modern = self:IsModernFriendsUIActive()
+		for _, row in ipairs(review.sampleWidgets) do
+			if row:IsShown() then
+				if modern then
+					self:SkinModernDynamicRow(S, row)
+				elseif row.elementData and row.elementData.groupId and not row.elementData.friend then
+					self:SkinLegacyGroupHeader(S, row)
+				end
+			end
+		end
+	end
+	SkinSettingsPreviewHeader(self, S, E, review.headerSample)
+
+	local tabs = preview.legacyTabFonts
+	if tabs and tabs:IsShown() and not tabs.BFL_ElvUISettingsSampleSkinned then
+		CallElvUIHandler(S, "HandleTab", tabs.selected)
+		CallElvUIHandler(S, "HandleTab", tabs.other)
+		tabs.BFL_ElvUISettingsSampleSkinned = true
+	end
+	SkinSettingsPreviewScene(self, S, E, (preview.socialSamples or {})[review.sample])
 end
 
 function ElvUISkin:SkinModernDynamicRow(S, button)
@@ -3709,7 +3783,7 @@ function ElvUISkin:SkinModernDynamicRow(S, button)
 end
 
 function ElvUISkin:SkinModernScrollBoxRows(S, scrollBox)
-	if not (scrollBox and scrollBox.ForEachFrame) then
+	if not (scrollBox and scrollBox.ForEachFrame and scrollBox.GetView and scrollBox:GetView()) then
 		return
 	end
 

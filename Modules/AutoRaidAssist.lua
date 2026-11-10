@@ -382,7 +382,9 @@ end
 local function CreateSmallButton(parent, text, width, options)
 	options = options or {}
 	if options.variant == "legacy" then
-		local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+		local components = BFL.SettingsComponents
+		local template = components and components:GetActionButtonTemplate() or "UIPanelButtonTemplate"
+		local button = CreateFrame("Button", nil, parent, template)
 		button:SetSize(width or 76, 22)
 		button:SetText(text or "")
 		button:SetNormalFontObject("BetterFriendlistFontNormal")
@@ -2457,6 +2459,7 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 		return frame
 	end
 
+	if options.variant == "legacy" then handle.guideRows = {} end
 	if handle.includeEnableToggle then
 		local enableToggle = Components and Components:CreateCheckbox(parent, {
 			label = L("AUTO_RAID_ASSIST_ENABLE", "Enable Auto Raid Assist"),
@@ -2471,6 +2474,7 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 			),
 		})
 		if enableToggle then
+			if handle.guideRows then handle.guideRows[#handle.guideRows + 1] = enableToggle end
 			Add(enableToggle, 28)
 		end
 	end
@@ -2493,6 +2497,19 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 
 	local addButton = CreateSmallButton(searchRow, L("AUTO_RAID_ASSIST_ADD", "Add"), 76, buttonOptions)
 	addButton:SetPoint("RIGHT", searchRow, "RIGHT", 0, 0)
+	local actions = buttonOptions.variant == "legacy" and { addButton }
+	if handle.guideRows then
+		searchRow.Input = searchBox
+		searchRow.BFL_SearchLabels = { searchTitle:GetText(), addButton:GetText() }
+		searchRow.BFL_SettingSlotCount = 2
+		searchRow.BFL_SettingsExactSlots = true
+		searchRow.BFL_SettingSlotRects = { searchBox, addButton }
+		searchRow.BFL_SettingDescriptions = { NameLocale("AUTO_RAID_ASSIST_MANAGE_DESC",
+			"Choose a friend, a nickname match, or enter a Character-Realm target.",
+			"Choose a friend, a nickname match, or enter a First name-Last name target."),
+			L("AUTO_RAID_ASSIST_ADD_GUIDE") }
+		handle.guideRows[#handle.guideRows + 1] = searchRow
+	end
 	Add(searchRow, 28)
 
 	local suggestionsFrame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -2572,6 +2589,14 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 		row.secondary:SetHeight(12)
 		row.removeButton = CreateSmallButton(row, L("AUTO_RAID_ASSIST_REMOVE", "Remove"), 74, buttonOptions)
 		row.removeButton:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+		if actions then actions[#actions + 1] = row.removeButton end
+		if handle.guideRows then
+			local remove = row.removeButton
+			remove.BFL_SearchLabels = { remove:GetText() }
+			remove.BFL_SettingDescriptions = { L("AUTO_RAID_ASSIST_REMOVE_GUIDE") }
+			remove.BFL_SettingIdentity = "auto-raid-assist-target/" .. index
+			handle.guideRows[#handle.guideRows + 1] = remove
+		end
 		row.removeButton:SetScript("OnClick", function()
 			if row.target then
 				AutoRaidAssist:RemoveTarget(row.target.key or row.target.id)
@@ -2580,6 +2605,10 @@ function AutoRaidAssist:RenderSettingsPage(parent, options)
 			end
 		end)
 		handle.targetRows[index] = row
+	end
+	if actions then
+		local style = BFL:GetModule("LegacySettingsStyle")
+		if style then style:SkinActions(actions, searchBox) end
 	end
 
 	local noTargets = CreateLabel(targetsFrame, L("AUTO_RAID_ASSIST_NO_TARGETS", "No targets selected"), "BetterFriendlistFontDisableSmall")

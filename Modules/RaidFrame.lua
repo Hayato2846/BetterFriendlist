@@ -25,18 +25,34 @@ local function SafeSetFont(fontObject, fontPath, fontSize, flags)
 end
 
 local function GetUnitRosterName(unit)
-	if not unit or not UnitExists(unit) then
+	local exists = UnitExists(unit)
+	if BFL:IsSecret(exists) or not exists then
 		return nil
 	end
 
-	local unitName, realm = UnitFullName(unit)
-	if BFL.AreRegionalUniqueNamesEnabled() then
-		return BFL.GetUnmodifiedUnitFullName(unit) or BFL.NormalizePlayerIdentityName(unitName, realm)
+	local regionalNames = BFL.AreRegionalUniqueNamesEnabled()
+	if regionalNames then
+		local fullName = BFL.GetUnmodifiedUnitFullName(unit)
+		if not IsPendingRaidRosterName(fullName) then return fullName end
 	end
-	if unitName and realm and realm ~= "" then
+
+	local unitName, realm = UnitFullName(unit)
+	if IsPendingRaidRosterName(unitName) then
+		unitName, realm = UnitName(unit)
+	end
+	if IsPendingRaidRosterName(unitName) or BFL:IsSecret(realm) then return nil end
+	if regionalNames then
+		return BFL.NormalizePlayerIdentityName(unitName, realm)
+	end
+	if realm and realm ~= "" then
 		return unitName .. "-" .. realm
 	end
-	return unitName or UnitName(unit)
+	return unitName
+end
+
+local function ResolveRaidRosterName(unit, rosterName)
+	if not IsPendingRaidRosterName(rosterName) then return rosterName end
+	return GetUnitRosterName(unit)
 end
 
 -- ========================================
@@ -262,7 +278,7 @@ local function SetModernRoleCountDisplay(controlPanel, tanks, healers, damagers,
 	end
 end
 
-local function SetRoleCountDisplay(roleCount, tanks, healers, damagers, minimumDigits)
+function RaidFrame:ApplyRoleCountDisplay(roleCount, tanks, healers, damagers, minimumDigits)
 	if not roleCount then
 		return
 	end
@@ -514,6 +530,91 @@ end
 
 -- Update group layout with proportional scaling (Phase 4)
 -- Icons remain 28x28 fixed (user decision: no icon scaling)
+function RaidFrame:LayoutGroupVisuals(group, width, newButtonHeight, groupHeaderHeight, newButtonGap, modernLayout, sample)
+	if group.Background then
+		if modernLayout then
+			BFL.SetTextureOrAtlas(group.Background, "friends-card-raidBG")
+			group.Background:SetVertexColor(1, 1, 1, 1)
+			group.Background:Show()
+		else
+			group.Background:SetTexture(nil)
+			group.Background:SetColorTexture(0, 0, 0, 0)
+		end
+	end
+
+	-- Resize GroupTitle (stays at top)
+	if group.GroupTitle then
+		group.GroupTitle:ClearAllPoints()
+		if modernLayout then
+			group.GroupTitle:SetPoint("TOPLEFT", group, "TOPLEFT", 6, -4)
+			group.GroupTitle:SetWidth(width - 12)
+			group.GroupTitle:SetJustifyH("LEFT")
+			ApplyModernRaidGroupTitleFont(group.GroupTitle)
+		else
+			group.GroupTitle:SetPoint("TOP", group, "TOP", 0, -7)
+			group.GroupTitle:SetWidth(width)
+			group.GroupTitle:SetJustifyH("CENTER")
+			if BetterFriendlistFontNormalSmall then
+				group.GroupTitle:SetFontObject(BetterFriendlistFontNormalSmall)
+			end
+		end
+	end
+
+	-- Resize and reposition all 5 member button slots
+	for slotNum = 1, 5 do
+		local slot = group["Slot" .. slotNum]
+		if slot then
+			slot:ClearAllPoints()
+			slot:SetSize(width - (modernLayout and 8 or 0), newButtonHeight)
+
+			-- Position: first slot below header, others stacked with gaps
+			if slotNum == 1 then
+				slot:SetPoint("TOP", group, "TOP", 0, -groupHeaderHeight)
+			else
+				local prevSlot = group["Slot" .. (slotNum - 1)]
+				slot:SetPoint("TOP", prevSlot, "BOTTOM", 0, -newButtonGap)
+			end
+
+			-- Resize internal button elements (Background, ClassColorTint, etc.)
+			if slot.Background then
+				slot.Background:ClearAllPoints()
+				slot.Background:SetPoint("TOPLEFT", slot, "TOPLEFT", -3, 0)
+				slot.Background:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 3, 0)
+				slot.Background:SetShown(not modernLayout)
+			end
+
+			if slot.ClassColorTint then
+				slot.ClassColorTint:ClearAllPoints()
+				slot.ClassColorTint:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
+				slot.ClassColorTint:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+				slot.ClassColorTint:SetShown(
+					not modernLayout or (slot.memberData and slot.memberData._isMock == true)
+				)
+			end
+
+			if slot.CombatOverlay then
+				slot.CombatOverlay:ClearAllPoints()
+				slot.CombatOverlay:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
+				slot.CombatOverlay:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+			end
+
+			-- Scale icons proportionally to button height
+			local iconSize = math.max(12, math.min(16, newButtonHeight * 0.8))
+			if slot.ClassIcon then
+				slot.ClassIcon:SetSize(iconSize, iconSize)
+			end
+			if slot.RankIcon then
+				slot.RankIcon:SetSize(iconSize, iconSize)
+			end
+			if slot.RoleIcon then
+				slot.RoleIcon:SetSize(iconSize, iconSize)
+			end
+			if not sample then PositionRaidAssignmentTooltipHitboxes(slot) end
+		end
+	end
+
+end
+
 function RaidFrame:UpdateGroupLayout()
 	local frame = BetterFriendsFrame
 	if not frame or not frame.RaidFrame then
@@ -681,16 +782,6 @@ function RaidFrame:UpdateGroupLayout()
 		if group then
 			group:ClearAllPoints()
 			group:SetScale(1.0) -- No scaling!
-			if group.Background then
-				if modernLayout then
-					BFL.SetTextureOrAtlas(group.Background, "friends-card-raidBG")
-					group.Background:SetVertexColor(1, 1, 1, 1)
-					group.Background:Show()
-				else
-					group.Background:SetTexture(nil)
-					group.Background:SetColorTexture(0, 0, 0, 0)
-				end
-			end
 
 			-- Calculate column and row (0-indexed)
 			local col = (i - 1) % bestCols
@@ -702,76 +793,7 @@ function RaidFrame:UpdateGroupLayout()
 			group:SetPoint("TOPLEFT", groupsContainer, "TOPLEFT", xPos, yPos)
 			group:SetSize(bestGroupWidth, bestGroupHeight)
 
-			-- Resize GroupTitle (stays at top)
-			if group.GroupTitle then
-				group.GroupTitle:ClearAllPoints()
-				if modernLayout then
-					group.GroupTitle:SetPoint("TOPLEFT", group, "TOPLEFT", 6, -4)
-					group.GroupTitle:SetWidth(bestGroupWidth - 12)
-					group.GroupTitle:SetJustifyH("LEFT")
-					ApplyModernRaidGroupTitleFont(group.GroupTitle)
-				else
-					group.GroupTitle:SetPoint("TOP", group, "TOP", 0, -7)
-					group.GroupTitle:SetWidth(bestGroupWidth)
-					group.GroupTitle:SetJustifyH("CENTER")
-					if BetterFriendlistFontNormalSmall then
-						group.GroupTitle:SetFontObject(BetterFriendlistFontNormalSmall)
-					end
-				end
-			end
-
-			-- Resize and reposition all 5 member button slots
-			for slotNum = 1, numButtons do
-				local slot = group["Slot" .. slotNum]
-				if slot then
-					slot:ClearAllPoints()
-					slot:SetSize(bestGroupWidth - (modernLayout and 8 or 0), newButtonHeight)
-
-					-- Position: first slot below header, others stacked with gaps
-					if slotNum == 1 then
-						slot:SetPoint("TOP", group, "TOP", 0, -groupHeaderHeight)
-					else
-						local prevSlot = group["Slot" .. (slotNum - 1)]
-						slot:SetPoint("TOP", prevSlot, "BOTTOM", 0, -newButtonGap)
-					end
-
-					-- Resize internal button elements (Background, ClassColorTint, etc.)
-					if slot.Background then
-						slot.Background:ClearAllPoints()
-						slot.Background:SetPoint("TOPLEFT", slot, "TOPLEFT", -3, 0)
-						slot.Background:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", 3, 0)
-						slot.Background:SetShown(not modernLayout)
-					end
-
-					if slot.ClassColorTint then
-						slot.ClassColorTint:ClearAllPoints()
-						slot.ClassColorTint:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
-						slot.ClassColorTint:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
-						slot.ClassColorTint:SetShown(
-							not modernLayout or (slot.memberData and slot.memberData._isMock == true)
-						)
-					end
-
-					if slot.CombatOverlay then
-						slot.CombatOverlay:ClearAllPoints()
-						slot.CombatOverlay:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
-						slot.CombatOverlay:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
-					end
-
-					-- Scale icons proportionally to button height
-					local iconSize = math.max(12, math.min(16, newButtonHeight * 0.8))
-					if slot.ClassIcon then
-						slot.ClassIcon:SetSize(iconSize, iconSize)
-					end
-					if slot.RankIcon then
-						slot.RankIcon:SetSize(iconSize, iconSize)
-					end
-					if slot.RoleIcon then
-						slot.RoleIcon:SetSize(iconSize, iconSize)
-					end
-					PositionRaidAssignmentTooltipHitboxes(slot)
-				end
-			end
+			self:LayoutGroupVisuals(group, bestGroupWidth, newButtonHeight, groupHeaderHeight, newButtonGap, modernLayout)
 
 			if i == 1 then
 				-- BFL:DebugPrint(string.format("Group 1: pos=(%.1f, %.1f), size=%.1fx%.1f, buttonHeight=%.1f",
@@ -941,25 +963,26 @@ function RaidFrame:UpdateControlPanelLayout()
 	end
 
 	-- Reposition RoleSummary (centered in available space)
-	if controlPanel.RoleSummary then
-		controlPanel.RoleSummary:ClearAllPoints()
+	local roleSummary = controlPanel.RoleSummary
+	if roleSummary then
+		roleSummary:ClearAllPoints()
 		-- Anchor to LEFT of panel, then offset to center position
-		controlPanel.RoleSummary:SetPoint("LEFT", controlPanel, "LEFT", centerStart, 0)
-		if controlPanel.RoleSummary.SetJustifyH then
-			controlPanel.RoleSummary:SetJustifyH("LEFT")
+		roleSummary:SetPoint("LEFT", controlPanel, "LEFT", centerStart, 0)
+		if roleSummary.SetJustifyH then
+			roleSummary:SetJustifyH("LEFT")
 		end
 	end
 
 	-- Reposition MemberCount (right of RoleSummary with reduced gap)
 	if controlPanel.MemberCount then
+		local roleAnchor = roleSummary and (BFL.IsRetail and roleSummary.DamagerIcon or roleSummary)
 		controlPanel.MemberCount:ClearAllPoints()
-		controlPanel.MemberCount:SetPoint(
-			"LEFT",
-			BFL.IsRetail and controlPanel.RoleSummary.DamagerIcon or controlPanel.RoleSummary,
-			"RIGHT",
-			memberCountGap,
-			0
-		)
+		if roleAnchor then
+			controlPanel.MemberCount:SetPoint("LEFT", roleAnchor, "RIGHT", memberCountGap, 0)
+		else
+			-- XML OnLoad may lay out the panel before all child keys are available.
+			controlPanel.MemberCount:SetPoint("LEFT", controlPanel, "LEFT", centerStart, 0)
+		end
 		controlPanel.MemberCount:SetJustifyH("LEFT")
 
 		local actualX = controlPanel.MemberCount:GetLeft()
@@ -1443,6 +1466,15 @@ function RaidFrame:RegisterEvents()
 		RaidFrame:OnRaidRosterUpdate(...)
 	end, 50)
 
+	-- Unit identity can arrive without another roster update.
+	BFL:RegisterEventCallback("UNIT_NAME_UPDATE", function(unit)
+		if BFL:IsSecret(unit) or type(unit) ~= "string" or RaidFrame.mockEnabled or not IsInGroup() then return end
+		if unit == "player" or unit:match("^raid%d+$") or unit:match("^party%d+$") then
+			RaidFrame:HideSecureProxy()
+			RaidFrame:OnRaidRosterUpdate()
+		end
+	end, 50)
+
 	-- Group events
 	BFL:RegisterEventCallback("GROUP_JOINED", function(...)
 		RaidFrame:OnGroupJoined(...)
@@ -1547,23 +1579,14 @@ function RaidFrame:UpdateRaidMembers()
 	for i = 1, numMembers do
 		local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(i)
 
-		if name then
+		if BFL:IsSecret(name) or name ~= nil then
 			local unit = "raid" .. i
-			local pendingName = IsPendingRaidRosterName(name)
-			if pendingName then
-				local unitName = GetUnitRosterName(unit)
-				if unitName and not IsPendingRaidRosterName(unitName) then
-					name = unitName
-					pendingName = false
-				else
-					name = UNKNOWN or "Unknown"
-				end
-			end
+			name = ResolveRaidRosterName(unit, name)
 
 			local member = {
 				index = i,
-				name = name,
-				pendingName = pendingName,
+				name = name or UNKNOWN or "Unknown",
+				pendingName = name == nil,
 				rank = rank, -- 0 = member, 1 = assistant, 2 = leader
 				subgroup = subgroup,
 				level = level,
@@ -1686,23 +1709,28 @@ end
 -- ========================================
 
 --- Cache font settings from DB to avoid repetitive lookups
-function RaidFrame:CacheFontSettings()
+function RaidFrame:CacheFontSettings(settings)
 	-- PERFY OPTIMIZATION: Skip if settings haven't changed
 	if self.fontCacheVersion == BFL.SettingsVersion then
 		return
 	end
 	self.fontCacheVersion = BFL.SettingsVersion
 
-	local db = BetterFriendlistDB or {}
+	local function Value(key, default)
+		if settings then return settings:Get(key, default) end
+		local value = BetterFriendlistDB and BetterFriendlistDB[key]
+		if value ~= nil then return value end
+		return default
+	end
 
 	-- Determine default font props
 	local defaultFontName, defaultFontSize, defaultFontOutline = _G.GameFontNormal:GetFont()
 
 	-- Raid Name Text Settings
-	local fontName = db.fontRaidName or defaultFontName
-	local fontSize = db.fontSizeRaidName or defaultFontSize or 10
-	local fontOutline = db.fontOutlineRaidName or "NORMAL"
-	local fontShadow = db.fontShadowRaidName -- boolean
+	local fontName = Value("fontRaidName", defaultFontName)
+	local fontSize = Value("fontSizeRaidName", defaultFontSize or 10)
+	local fontOutline = Value("fontOutlineRaidName", "NORMAL")
+	local fontShadow = Value("fontShadowRaidName", false)
 
 	local outlineValue = fontOutline
 	if BFL.FontManager and BFL.FontManager.GetFontFlags then
@@ -1970,7 +1998,7 @@ function RaidFrame:UpdateRoleSummary()
 		end
 	end
 
-	SetRoleCountDisplay(frame.ControlPanel.RoleSummary, tanks, healers, dps)
+	self:ApplyRoleCountDisplay(frame.ControlPanel.RoleSummary, tanks, healers, dps)
 	SetModernRoleCountDisplay(frame.ControlPanel, tanks, healers, dps)
 
 	-- Trigger layout update to recalculate centering with new string width
@@ -1980,7 +2008,7 @@ end
 --- Update a single member button with raid member data
 -- @param button: The button frame to update
 -- @param memberData: Table with member info (name, class, level, rank, role, etc.) - can be nil for empty slot
-function RaidFrame:UpdateMemberButton(button, memberData)
+function RaidFrame:UpdateMemberButton(button, memberData, settingsSample)
 	if not button then
 		return
 	end
@@ -2001,7 +2029,7 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		-- Fix #53: Clear secure attributes to prevent interaction with Blizzard raid frame
 		-- Stale "unit" attributes on empty buttons cause the game's secure action system
 		-- to route actions through these buttons, interfering with Blizzard's raid frame
-		if not self.mockEnabled and not InCombatLockdown() then
+		if not settingsSample and not self.mockEnabled and not InCombatLockdown() then
 			button:SetAttribute("unit", nil)
 			button:SetAttribute("type2", nil)
 		end
@@ -2221,6 +2249,10 @@ function RaidFrame:UpdateMemberButton(button, memberData)
 		end
 	else
 		button.ReadyCheckIcon:Hide()
+	end
+
+	if settingsSample then
+		return
 	end
 
 	-- Update Combat Overlay (always check, even for filled buttons)
@@ -3329,7 +3361,7 @@ function RaidFrame:UpdateMockControlPanel()
 			minimumDigits = 2
 		end
 
-		SetRoleCountDisplay(controlPanel.RoleSummary, tanks, healers, dps, minimumDigits)
+		self:ApplyRoleCountDisplay(controlPanel.RoleSummary, tanks, healers, dps, minimumDigits)
 		SetModernRoleCountDisplay(controlPanel, tanks, healers, dps, minimumDigits)
 	end
 
@@ -4037,11 +4069,13 @@ function RaidFrame:ShowSecureProxyForButton(button)
 	end
 	local unit = button.unit
 	local index = not BFL:IsSecret(unit) and type(unit) == "string" and tonumber(unit:match("^raid(%d+)$"))
-	if not index or index < 1 or index > RAID_MEMBERS_TO_DISPLAY or not UnitExists(unit) then
+	if not index or index < 1 or index > RAID_MEMBERS_TO_DISPLAY then
 		return false
 	end
-	local rosterName = GetRaidRosterInfo(index)
-	if BFL:IsSecret(rosterName) or rosterName ~= button.name then return false end
+	local exists = UnitExists(unit)
+	if BFL:IsSecret(exists) or not exists then return false end
+	local rosterName = ResolveRaidRosterName(unit, GetRaidRosterInfo(index))
+	if rosterName ~= button.name then return false end
 	local target = GetBlizzardRaidButton(unit, index, rosterName)
 	if not target and not BFL.HasSecretValues then return false end
 
@@ -4157,6 +4191,20 @@ function RaidFrame:ResolveReadyCheckButtonState(enabled, inGroup, inRaid, isLead
 	local canControl = isLeader == true or (inRaid == true and isAssistant == true)
 	local available = shown and inGroup == true and canControl and inCombat ~= true
 	return shown, available
+end
+
+function RaidFrame:ApplyReadyCheckVisualState(button, shown, available)
+	button:SetShown(shown)
+	button:SetEnabled(available)
+	if not button.Icon then return end
+
+	local friendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
+	if friendsUI and friendsUI.RefreshModernReadyCheckIconColor and friendsUI:IsModernActive() then
+		friendsUI:RefreshModernReadyCheckIconColor(button)
+	else
+		button.Icon:SetDesaturated(not available)
+		button.Icon:SetAlpha(available and 1 or 0.45)
+	end
 end
 
 return RaidFrame

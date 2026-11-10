@@ -296,7 +296,7 @@ function BetterFriendlist_GetRelationshipInfo(guid, missingNameFallback, clubId)
 					name = accountInfo.accountName,
 					accountName = accountInfo.accountName,
 					battleTag = accountInfo.battleTag,
-					note = accountInfo.note,
+					note = BFL.FriendNotes.GetBNetDisplayNote(accountInfo),
 					uid = guid,
 				}
 				local safeName = FL:GetDisplayName(friendObj)

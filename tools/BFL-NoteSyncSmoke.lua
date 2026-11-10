@@ -179,6 +179,15 @@ for _, name in ipairs(names) do
 	equal(#parsed, 1, "roundtrip preserves group count")
 	equal(parsed[1], name, "roundtrip preserves exact name")
 end
+local titleToken = "0123456789abcdef"
+local markedTitleNote = BFL.FriendNotes.AppendTitleGroupToken("memo#Alpha", titleToken)
+local titleNote, titleGroups = NoteSync:ParseNoteGroups(markedTitleNote, "bnet_150")
+equal(titleNote, BFL.FriendNotes.AppendTitleGroupToken("memo", titleToken), "note cleanup keeps the Title Friend token")
+equal(titleGroups[1], "Alpha", "the Title Friend token is excluded from group names")
+local rebuiltTitleNote = NoteSync:BuildNoteWithGroups(titleNote, { "Beta" }, 127)
+local _, rebuiltToken = BFL.FriendNotes.SplitTitleGroupNote(rebuiltTitleNote)
+equal(rebuiltToken, titleToken, "note sync preserves the Title Friend token when changing groups")
+
 local ordinary = NoteSync:BuildNoteWithGroups("memo", { "100% Ready" }, 127)
 equal(ordinary, "memo#100% Ready", "ordinary FriendGroups names remain byte-for-byte")
 local markerGroup = create("~BFL1~Raid%23One")

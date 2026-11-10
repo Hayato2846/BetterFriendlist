@@ -1017,8 +1017,17 @@
 	<!-- Raid Member Button Template - Individual member display with rich UI elements -->
 	<!-- IMPORTANT: NOT using SecureUnitButtonTemplate to avoid making parent frame PROTECTED -->
 	<!-- InsecureActionButtonTemplate: Allows secure attributes without parent frame tainting -->
-	<Button name="BetterRaidMemberButtonTemplate" inherits="InsecureActionButtonTemplate"
-		virtual="true">
+	<Button name="BetterRaidReadyCheckVisualTemplate" inherits="SquareIconButtonTemplate" virtual="true">
+	<KeyValues>
+		<KeyValue key="icon"
+			value="Interface\AddOns\BetterFriendlist\Icons\user-check.blp"
+			type="string" />
+		<KeyValue key="iconSize" value="14" type="number" />
+	</KeyValues>
+	<Size x="22" y="22" />
+	</Button>
+
+	<Button name="BetterRaidMemberVisualTemplate" virtual="true">
 		<Size x="180" y="20" />
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -1158,6 +1167,9 @@
 				</Texture>
 			</Layer>
 		</Layers>
+	</Button>
+
+	<Button name="BetterRaidMemberButtonTemplate" inherits="InsecureActionButtonTemplate,BetterRaidMemberVisualTemplate" virtual="true">
 		<Scripts>
 			<OnLoad>
 				BetterRaidMemberButton_OnLoad(self);
@@ -1305,7 +1317,7 @@
 	</Frame>
 
 	<!-- Raid Group Template -->
-	<Frame name="BetterRaidGroupTemplate" virtual="true">
+	<Frame name="BetterRaidGroupSurfaceTemplate" virtual="true">
 		<Size x="180" y="115" />
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -1323,6 +1335,9 @@
 				</FontString>
 			</Layer>
 		</Layers>
+	</Frame>
+
+	<Frame name="BetterRaidGroupTemplate" inherits="BetterRaidGroupSurfaceTemplate" virtual="true">
 		<Frames>
 			<!-- 5 Member Button Slots -->
 			<Button parentKey="Slot1" inherits="BetterRaidMemberButtonTemplate" id="1">
@@ -1363,6 +1378,51 @@
 	</Button>
 
 	<!-- Main Friends Frame -->
+	<Frame name="BFLBattleNetTagVisualTemplate" virtual="true">
+		<Size x="190" y="29" />
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background"
+					file="Interface\FriendsFrame\battlenet-friends-main"
+					setAllPoints="true">
+					<TexCoords left="0.00390625" right="0.74609375" top="0.00195313"
+						bottom="0.05859375" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Tag" inherits="BetterFriendlistFontNormal">
+					<Anchors>
+						<Anchor point="CENTER" />
+					</Anchors>
+					<Color r="0.345" g="0.667" b="0.867" />
+				</FontString>
+				<FontString parentKey="UnavailableLabel"
+					inherits="BetterFriendlistFriendsFontNormal"
+					text="BATTLENET_UNAVAILABLE" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" />
+					</Anchors>
+					<Color r="1" g="0.82" b="0" />
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Button name="BFLStreamerModeButtonVisualTemplate" virtual="true">
+		<Size x="24" y="24" />
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Icon"
+					file="Interface\AddOns\BetterFriendlist\Icons\twitch.blp">
+					<Size x="18" y="18" />
+					<Anchors>
+						<Anchor point="CENTER" />
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
 	<Frame name="BetterFriendsFrame" parent="UIParent" inherits="ButtonFrameTemplate"
 		toplevel="true"
 		movable="true" enableMouse="true" hidden="true">
@@ -1401,38 +1461,11 @@
 				</KeyValues>
 				<Frames>
 					<!-- Replicate Blizzard's FriendsFrameBattlenetFrame structure (11.2.5) -->
-					<Frame parentKey="BattlenetFrame">
-						<Size x="190" y="29" />
+					<Frame parentKey="BattlenetFrame" inherits="BFLBattleNetTagVisualTemplate">
 						<Anchors>
 							<Anchor point="TOP" relativeKey="$parent.$parent.TitleContainer" x="10"
 								y="-26" />
 						</Anchors>
-						<Layers>
-							<Layer level="BACKGROUND">
-								<Texture parentKey="Background"
-									file="Interface\FriendsFrame\battlenet-friends-main"
-									setAllPoints="true">
-									<TexCoords left="0.00390625" right="0.74609375" top="0.00195313"
-										bottom="0.05859375" />
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK">
-								<FontString parentKey="Tag" inherits="BetterFriendlistFontNormal">
-									<Anchors>
-										<Anchor point="CENTER" />
-									</Anchors>
-									<Color r="0.345" g="0.667" b="0.867" />
-								</FontString>
-								<FontString parentKey="UnavailableLabel"
-									inherits="BetterFriendlistFriendsFontNormal"
-									text="BATTLENET_UNAVAILABLE" hidden="true">
-									<Anchors>
-										<Anchor point="CENTER" />
-									</Anchors>
-									<Color r="1" g="0.82" b="0" />
-								</FontString>
-							</Layer>
-						</Layers>
 						<Frames>
 							<!-- Contacts Menu Button (11.2.5 - replaces old broadcast button,
 							includes ignore list) -->
@@ -1733,8 +1766,10 @@
 								if SearchBoxTemplate_OnTextChanged then
 									SearchBoxTemplate_OnTextChanged(self);
 								end
-								BetterFriendsFrame_OnSearchTextChanged(self);
+								BetterFriendsFrame_OnSearchTextChanged(self, userInput);
 							</OnTextChanged>
+							<OnEditFocusGained inherit="append" function="BetterFriendsFrame_OnSearchFocusGained" />
+							<OnHide inherit="append" function="BetterFriendsFrame_OnSearchHide" />
 						</Scripts>
 					</EditBox>
 
@@ -2504,66 +2539,21 @@
 					</OnHide>
 				</Scripts>
 			</Frame>
-			<!-- Button to open default Blizzard Friends Frame -->
-			<!-- Portrait Button - enabled for changelog interaction -->
-			<Button parentKey="PortraitButton" enableMouse="true" frameStrata="HIGH"
+			<!-- Decorative BFL portrait surface -->
+			<Button parentKey="PortraitButton" enableMouse="false" frameStrata="HIGH"
 				frameLevel="1000">
 				<Size x="60" y="60" />
 				<Anchors>
 					<Anchor point="TOPLEFT" x="-5" y="7" />
 				</Anchors>
-				<Layers>
-					<Layer level="OVERLAY" textureSubLevel="7">
-						<Texture parentKey="Glow" file="Interface\PVPFrame\TournamentOrganizer"
-							alphaMode="ADD" hidden="true">
-							<Size x="90" y="90" />
-							<Anchors>
-								<Anchor point="TOPLEFT" x="-18" y="12" />
-								<Anchor point="BOTTOMRIGHT" x="64" y="-64" />
-							</Anchors>
-							<TexCoords left="0.8525390625" right="0.9775390625" top="0.0009765625"
-								bottom="0.1259765625" />
-							<Color r="1.0" g="1.0" b="1.0" />
-						</Texture>
-					</Layer>
-				</Layers>
-				<Scripts>
-					<OnClick>
-						local Changelog = BFL and BFL:GetModule("Changelog")
-						if Changelog then
-						Changelog:ToggleChangelog()
-						end
-					</OnClick>
-					<OnEnter>
-						local Changelog = BFL and BFL:GetModule("Changelog")
-						if Changelog then
-						Changelog:OnPortraitEnter(self)
-						end
-					</OnEnter>
-					<OnLeave>
-						BFL_Tooltip:Hide()
-					</OnLeave>
-				</Scripts>
 			</Button>
 
 			<!-- Streamer Mode Button -->
-			<Button parentKey="StreamerModeButton" hidden="false" frameStrata="HIGH" frameLevel="10">
-				<Size x="24" y="24" />
+			<Button parentKey="StreamerModeButton" inherits="BFLStreamerModeButtonVisualTemplate" hidden="false" frameStrata="HIGH" frameLevel="10">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeKey="$parent.CloseButton"
 						relativePoint="TOPLEFT" x="1" y="1" />
 				</Anchors>
-				<Layers>
-					<Layer level="OVERLAY">
-						<Texture parentKey="Icon"
-							file="Interface\AddOns\BetterFriendlist\Icons\twitch.blp">
-							<Size x="18" y="18" />
-							<Anchors>
-								<Anchor point="CENTER" />
-							</Anchors>
-						</Texture>
-					</Layer>
-				</Layers>
 				<Scripts>
 					<OnShow>
 						local StreamerMode = BFL and BFL:GetModule("StreamerMode")
@@ -2909,15 +2899,7 @@
 									</OnLeave>
 								</Scripts>
 							</Button>
-							<Button parentKey="ReadyCheckButton" inherits="SquareIconButtonTemplate"
-								hidden="true" motionScriptsWhileDisabled="true">
-								<KeyValues>
-									<KeyValue key="icon"
-										value="Interface\AddOns\BetterFriendlist\Icons\user-check.blp"
-										type="string" />
-									<KeyValue key="iconSize" value="14" type="number" />
-								</KeyValues>
-								<Size x="22" y="22" />
+							<Button parentKey="ReadyCheckButton" inherits="BetterRaidReadyCheckVisualTemplate" hidden="true" motionScriptsWhileDisabled="true">
 								<Anchors>
 									<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton"
 										relativePoint="LEFT" x="-5" y="0" />
@@ -3920,6 +3902,7 @@
 				end
 			</OnShow>
 			<OnHide>
+				BetterFriendsFrame_OnSearchHide()
 				-- Fix #81: Reset bottom tab to Friends so reopen doesn't get stuck on Who/Quick Join
 				self.selectedTab = 1
 			</OnHide>

@@ -36,6 +36,10 @@ local function Widget(kind, parent)
 	return widget
 end
 env.CreateFrame = function(kind, _, parent) return Widget(kind, parent) end
+env.Components = { GetActionButtonTemplate = function(_, fallback) return fallback end }
+-- Scrollbar construction is covered by the settings style smoke. These dialogs
+-- exercise the edit box attached to the scroll frame and its action callbacks.
+function settings:CreateSettingsScrollFrame(parent) return env.CreateFrame("ScrollFrame", nil, parent) end
 local file = assert(io.open(repo .. "/Modules/Settings.lua", "rb"))
 local source = file:read("*a"); file:close()
 local first = assert(source:find("function Settings:ShowExportDialog()", 1, true))

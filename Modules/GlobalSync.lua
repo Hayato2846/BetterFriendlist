@@ -16,6 +16,11 @@ local function IsName(value)
 	return not IsSecret(value) and type(value) == "string" and value ~= ""
 end
 
+local function GetFaction()
+	local faction = UnitFactionGroup("player")
+	return faction
+end
+
 local function HasRegionalNames()
 	return BFL.AreRegionalUniqueNamesEnabled and BFL.AreRegionalUniqueNamesEnabled()
 end
@@ -58,25 +63,27 @@ local function GetReadableFriend(index)
 	end
 end
 
-function GlobalSync:UsesTitleFriends()
+function GlobalSync:IsAvailable()
 	if C_BattleNet and C_BattleNet.AreTitleFriendsEnabled then
 		local ok, enabled = pcall(C_BattleNet.AreTitleFriendsEnabled)
-		if not ok or IsSecret(enabled) or type(enabled) ~= "boolean" then
-			return nil
+		if not ok or IsSecret(enabled) or enabled ~= false then
+			return false
 		end
-		return enabled
 	end
-	return BFL.AreTitleFriendsEnabled and BFL.AreTitleFriendsEnabled() == true
-		or false
+	local ok, enabled = pcall(BFL.CanUseWoWFriendList)
+	return ok and not IsSecret(enabled) and enabled == true
+end
+
+function GlobalSync:IsLegacyRecord(entry)
+	-- Keep data written by earlier Title Friend support out of legacy sync.
+	return IsReadableTable(entry) and entry.titleFaction == nil and entry.ruleset == nil
 end
 
 local function GetStoredFriend(faction, key)
-	local friends = BetterFriendlistDB.GlobalFriends and BetterFriendlistDB.GlobalFriends[faction]
-	return friends and friends[key]
-end
-
-local function MatchesName(left, right)
-	return IsName(left) and IsName(right) and left:lower() == right:lower()
+	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
+	local friends = database and database[faction]
+	local entry = friends and friends[key]
+	return GlobalSync:IsLegacyRecord(entry) and entry or nil
 end
 
 local function CanChangeFriends()
@@ -91,169 +98,17 @@ local function CanChangeFriends()
 end
 
 local function TryFriendAction(action, ...)
-	if not CanChangeFriends() then
+	if not GlobalSync:IsAvailable() or not CanChangeFriends() then
 		return false
 	end
 	local ok, dispatched = pcall(action, ...)
 	return ok and not IsSecret(dispatched) and dispatched == true
 end
 
-local function GetKnownTitleNames()
-	local names = {}
-	local ok, count = pcall(BNGetNumFriends)
-	if not ok or IsSecret(count) or type(count) ~= "number" then
-		return names, false
-	end
-	for index = 1, count do
-		local readable, account = pcall(BFL.GetBNetFriendInfo, index)
-		if not readable or not IsReadableTable(account) or IsSecret(account.friendLevel) then
-			return names, false
-		end
-		if BFL.IsTitleFriend(account) then
-			local gameAccount = account.gameAccountInfo
-			if IsReadableTable(gameAccount) and IsName(gameAccount.characterName) then
-				names[gameAccount.characterName:lower()] = true
-			end
-		end
-	end
-	return names, true
-end
-
-function GlobalSync:IsKnownTitleFriend(name)
-	return IsName(name) and GetKnownTitleNames()[name:lower()] == true
-end
-
-function GlobalSync:GetPendingTitleFriends()
-	local entries = {}
-	if self:UsesTitleFriends() ~= true or not BetterFriendlistDB or not BetterFriendlistDB.GlobalFriends then
-		return entries
-	end
-	local known, readable = GetKnownTitleNames()
-	if not readable then
-		return entries
-	end
-	local requested = self.requestedTitleFriends or {}
-	local seen = {}
-	for _, friends in pairs(BetterFriendlistDB.GlobalFriends) do
-		for name, entry in pairs(friends) do
-			if IsName(name) and not entry.deleted and self:ShouldAddFriend(name) then
-				local key = name:lower()
-				if not known[key] and not requested[key] and not seen[key] then
-					entries[#entries + 1] = name
-					seen[key] = true
-				end
-			end
-		end
-	end
-	table.sort(entries, function(a, b) return a:lower() < b:lower() end)
-	return entries
-end
-
-local function HasStoredTitleFriend(name)
-	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
-	if not IsReadableTable(database) then return false end
-	for _, friends in pairs(database) do
-		if IsReadableTable(friends) then
-			for key, entry in pairs(friends) do
-				if MatchesName(key, name) and IsReadableTable(entry) and not entry.deleted then return true end
-			end
-		end
-	end
-	return false
-end
-
-function GlobalSync:AdvanceTitleInvites()
-	local batch = self.titleInviteBatch
-	if not batch or self.activeTitlePrompt then
-		return
-	end
-	local name = batch.names[batch.index]
-	if not name or self:UsesTitleFriends() ~= true or not CanChangeFriends() then
-		self.titleInviteBatch = nil
-		return
-	end
-	batch.index = batch.index + 1
-	if not HasStoredTitleFriend(name) or self:IsKnownTitleFriend(name) then
-		C_Timer.After(0, function()
-			if self.titleInviteBatch == batch then self:AdvanceTitleInvites() end
-		end)
-		return
-	end
-
-	local ok, dialog = pcall(BFL.RequestTitleFriendInviteConfirmation, name)
-	if not ok or IsSecret(dialog) or not dialog then
-		self.titleInviteBatch = nil
-		return
-	end
-	local prompt = { name = name, batch = batch, dialog = dialog }
-	self.activeTitlePrompt = prompt
-	if not self.titleInviteDialogs then
-		self.titleInviteDialogs = {}
-	end
-	if self.titleInviteDialogs[dialog] then
-		return true
-	end
-	self.titleInviteDialogs[dialog] = true
-	dialog.SendButton:HookScript("OnClick", function()
-		local active = self.activeTitlePrompt
-		if active and active.dialog == dialog and active.matchedOnClose then
-			active.confirmed = true
-		end
-	end)
-	dialog:HookScript("OnHide", function(owner)
-		local active = self.activeTitlePrompt
-		if not active or active.dialog ~= owner then
-			return
-		end
-		local readable, displayedName = pcall(owner.InviteeName.GetText, owner.InviteeName)
-		active.matchedOnClose = readable and MatchesName(displayedName, active.name)
-		-- Blizzard closes the popup inside Send's click handler. Let that handler
-		-- and the post-hook finish before opening the next confirmation.
-		C_Timer.After(0, function()
-			if self.activeTitlePrompt ~= active then
-				return
-			end
-			self.activeTitlePrompt = nil
-			if active.confirmed then
-				self.requestedTitleFriends = self.requestedTitleFriends or {}
-				self.requestedTitleFriends[active.name:lower()] = true
-			end
-			if self.titleInviteBatch == active.batch and active.matchedOnClose then
-				self:AdvanceTitleInvites()
-			else
-				self.titleInviteBatch = nil
-			end
-			if self.RefreshTitleFriendUI then
-				self:RefreshTitleFriendUI()
-			end
-		end)
-	end)
-	return true
-end
-
-function GlobalSync:StartTitleInvites(names)
-	if self.titleInviteBatch or self.activeTitlePrompt or #names == 0 then
-		return false
-	end
-	self.titleInviteBatch = { names = names, index = 1 }
-	return self:AdvanceTitleInvites() == true
-end
-
 function GlobalSync:RestoreStoredFriend(faction, key)
 	local entry = GetStoredFriend(faction, key)
-	if not entry or not self:ShouldAddFriend(key) then
+	if not self:IsAvailable() or not entry or not self:ShouldAddFriend(key) then
 		return false
-	end
-	local titleMode = self:UsesTitleFriends()
-	if titleMode == nil then
-		return false
-	end
-	if titleMode then
-		if self:IsKnownTitleFriend(key) or (self.requestedTitleFriends and self.requestedTitleFriends[key:lower()]) then
-			return false
-		end
-		-- The user clicked a database row. Blizzard still owns confirmation.
-		return self:StartTitleInvites({ key })
 	end
 	if TryFriendAction(BFL.AddFriend, key) then
 		self.pendingRestores = self.pendingRestores or {}
@@ -279,7 +134,7 @@ end
 
 function GlobalSync:DeleteStoredFriend(faction, key)
 	local entry = GetStoredFriend(faction, key)
-	if not entry or self:UsesTitleFriends() ~= false then
+	if not entry or not self:IsAvailable() then
 		return
 	end
 	entry.deleted, entry.deletedTime = true, time()
@@ -291,27 +146,15 @@ function GlobalSync:DeleteStoredFriend(faction, key)
 	end
 end
 
--- Removing a saved record is independent of deleting a Blizzard friendship.
--- In particular, imported legacy records must remain removable with Title Friends.
-function GlobalSync:RemoveStoredEntry(faction, key)
-	if not IsName(faction) or not IsName(key) then return false end
-	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
-	local friends = IsReadableTable(database) and database[faction]
-	local entry = IsReadableTable(friends) and friends[key]
-	if not IsReadableTable(entry) then return false end
-	friends[key] = nil
-	if self.pendingRestores then self.pendingRestores[entry] = nil end
-	if self.attemptedAdds then self.attemptedAdds[key] = nil end
-	return true
-end
-
 function GlobalSync:GetStoredEntryCount()
 	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
 	if not IsReadableTable(database) then return 0 end
 	local count = 0
 	for _, friends in pairs(database) do
 		if IsReadableTable(friends) then
-			for _ in pairs(friends) do count = count + 1 end
+			for _, entry in pairs(friends) do
+				if self:IsLegacyRecord(entry) then count = count + 1 end
+			end
 		end
 	end
 	return count
@@ -322,38 +165,44 @@ local function ClearLocalTable(value)
 	for key in pairs(value) do value[key] = nil end
 end
 
--- Remove saved records, including hidden/deleted ones, without touching native
--- friendships. Keep the graph and faction tables shared by the open editors.
-function GlobalSync:ClearStoredEntries()
+function GlobalSync:CancelSync()
 	self.storageGeneration = (self.storageGeneration or 0) + 1
 	if self.addQueueTicker then self.addQueueTicker:Cancel(); self.addQueueTicker = nil end
 	if self.updateTimer then self.updateTimer:Cancel(); self.updateTimer = nil end
 	self.processingQueue, self.syncDeferred = false, false
-	self.titleInviteBatch = nil
 	self.deletionSnapshot, self.pendingIndexRemoval, self.refreshDatabase = nil, nil, nil
 	ClearLocalTable(self.pendingRestores)
 	ClearLocalTable(self.attemptedAdds)
-	ClearLocalTable(self.requestedTitleFriends)
-	-- An already open Blizzard confirmation remains owned by Blizzard and the
-	-- user. Retain its tracking record; clearing the batch prevents a successor.
+end
+
+-- Clear the legacy database independently of the live friends list.
+function GlobalSync:ClearStoredEntries()
+	if not self:IsAvailable() then return 0 end
+	self:CancelSync()
 	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
 	if not IsReadableTable(database) then return 0 end
 	local count = self:GetStoredEntryCount()
-	for _, friends in pairs(database) do ClearLocalTable(friends) end
+	for _, friends in pairs(database) do
+		if IsReadableTable(friends) then
+			for key, entry in pairs(friends) do
+				if self:IsLegacyRecord(entry) then
+					friends[key] = nil
+				end
+			end
+		end
+	end
 	return count
 end
 
 function GlobalSync:SetStoredFriendNote(faction, key, note)
 	local entry = GetStoredFriend(faction, key)
-	if not entry or IsSecret(note) or type(note) ~= "string" then
+	if not self:IsAvailable() or not entry or IsSecret(note) or type(note) ~= "string" then
 		return
 	end
 	entry.notes = note
-	if self:UsesTitleFriends() == false then
-		local name = FindLocalFriend(self, key, entry)
-		if name then
-			TryFriendAction(BFL.SetFriendNotes, name, note)
-		end
+	local name = FindLocalFriend(self, key, entry)
+	if name then
+		TryFriendAction(BFL.SetFriendNotes, name, note)
 	end
 end
 
@@ -365,12 +214,6 @@ end
 -- Helper: Get Display Realm Name (for AddFriend API - preserves spaces/hyphens)
 local function GetDisplayRealmName()
 	return _G.GetRealmName()
-end
-
--- Helper: Get Faction
-local function GetFaction()
-	local faction = UnitFactionGroup("player")
-	return faction
 end
 
 -- Helper: Determine whether a FriendUID should be added (self-check)
@@ -409,6 +252,43 @@ function GlobalSync:ShouldAddFriend(friendUID, currentRealm, currentPlayerName)
 end
 
 function GlobalSync:Initialize()
+	if BFL.IsMainline then
+		local function RefreshAvailability()
+			self:RefreshAvailability()
+		end
+		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", RefreshAvailability)
+		BFL:RegisterEventCallback("GAME_RULES_CHANGED", RefreshAvailability)
+	end
+	self:RefreshAvailability()
+end
+
+function GlobalSync:OnPlayerLogin()
+	self:RefreshAvailability()
+end
+
+function GlobalSync:RefreshAvailability()
+	local available = self:IsAvailable()
+	local previous = self.available
+	if previous == available then return end
+	self.available = available
+	if available then
+		self:StartLegacySync()
+		self:OnFriendListUpdate()
+	elseif self.eventGate then
+		self.eventGate.active = false
+		self:CancelSync()
+	end
+	if previous ~= nil then
+		local Settings = BFL:GetModule("Settings")
+		if Settings and Settings.RefreshGlobalSyncAvailability then
+			Settings:RefreshGlobalSyncAvailability()
+		end
+		local Designer = BFL:GetModule("SettingsDesigner")
+		if Designer and Designer.RefreshFriendsUIAvailability then Designer:RefreshFriendsUIAvailability() end
+	end
+end
+
+function GlobalSync:StartLegacySync()
 	-- Initialize DB structure if missing
 	if not BetterFriendlistDB.GlobalFriends then
 		BetterFriendlistDB.GlobalFriends = {
@@ -423,7 +303,12 @@ function GlobalSync:Initialize()
 	-- Hook Deletion APIs
 	self:HookDeletionAPIs()
 
-	self:RegisterEvents()
+	if self.eventGate then
+		self.eventGate.active = true
+	else
+		self.eventGate = { active = true }
+		self:RegisterEvents()
+	end
 
 	-- Initialize session tracking for attempted adds
 	self.attemptedAdds = {}
@@ -506,7 +391,7 @@ function GlobalSync:HookDeletionAPIs()
 	-- snapshot after the explicit removal instead of replacing Blizzard's API.
 	if C_FriendList and C_FriendList.RemoveFriendByIndex then
 		hooksecurefunc(C_FriendList, "RemoveFriendByIndex", function(index)
-			if BetterFriendlistDB.enableGlobalSyncDeletion and self:UsesTitleFriends() == false
+			if BetterFriendlistDB.enableGlobalSyncDeletion and self:IsAvailable()
 				and not IsSecret(index) and type(index) == "number" and CanChangeFriends() and self.deletionSnapshot
 			then
 				local pending = self.pendingIndexRemoval
@@ -547,7 +432,7 @@ end
 
 function GlobalSync:OnFriendNoteUpdated(name, notes)
 	if not IsName(name) or IsSecret(notes) or (notes ~= nil and type(notes) ~= "string")
-		or self:UsesTitleFriends() ~= false
+		or not self:IsAvailable()
 	then
 		return
 	end
@@ -565,14 +450,15 @@ function GlobalSync:OnFriendNoteUpdated(name, notes)
 	end
 
 	-- Update DB if entry exists
-	if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
-		BetterFriendlistDB.GlobalFriends[faction][friendUID].notes = notes
+	local entry = GetStoredFriend(faction, friendUID)
+	if entry then
+		entry.notes = notes
 		-- BFL:DebugPrint("GlobalSync: Updated DB note for " .. friendUID .. " (Hooked SetFriendNotes).")
 	end
 end
 
 function GlobalSync:OnFriendAdded(name)
-	if not IsName(name) or self:UsesTitleFriends() ~= false or not CanChangeFriends() then
+	if not IsName(name) or not self:IsAvailable() or not CanChangeFriends() then
 		return
 	end
 
@@ -588,7 +474,7 @@ function GlobalSync:OnFriendAdded(name)
 		return
 	end
 
-	local entry = BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID]
+	local entry = GetStoredFriend(faction, friendUID)
 	if entry and entry.deleted then
 		self.pendingRestores = self.pendingRestores or {}
 		self.pendingRestores[entry] = true
@@ -596,7 +482,7 @@ function GlobalSync:OnFriendAdded(name)
 end
 
 function GlobalSync:OnFriendRemoved(name)
-	if not BetterFriendlistDB.enableGlobalSyncDeletion or self:UsesTitleFriends() ~= false or not CanChangeFriends() then
+	if not BetterFriendlistDB.enableGlobalSyncDeletion or not self:IsAvailable() or not CanChangeFriends() then
 		return
 	end
 	if not IsName(name) then
@@ -616,10 +502,11 @@ function GlobalSync:OnFriendRemoved(name)
 	end
 
 	-- Check if exists in DB
-	if BetterFriendlistDB.GlobalFriends[faction] and BetterFriendlistDB.GlobalFriends[faction][friendUID] then
+	local entry = GetStoredFriend(faction, friendUID)
+	if entry then
 		-- Mark as deleted instead of removing
-		BetterFriendlistDB.GlobalFriends[faction][friendUID].deleted = true
-		BetterFriendlistDB.GlobalFriends[faction][friendUID].deletedTime = time()
+		entry.deleted = true
+		entry.deletedTime = time()
 		-- BFL:DebugPrint("GlobalSync: Marked " .. friendUID .. " as DELETED in Global DB.")
 
 		self.refreshDatabase = true
@@ -630,33 +517,16 @@ end
 function GlobalSync:RegisterEvents()
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
 		self:OnFriendListUpdate()
-	end)
+	end, nil, self.eventGate)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
 		if self.syncDeferred then
 			self:OnFriendListUpdate()
 		end
-		if self.RefreshTitleFriendUI then self:RefreshTitleFriendUI() end
-	end)
-	if BFL.IsMainline and self.RefreshTitleFriendUI then
-		local function RefreshTitleFriends()
-			self:RefreshTitleFriendUI()
-		end
-		BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", RefreshTitleFriends)
-		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", RefreshTitleFriends)
-		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", RefreshTitleFriends)
-		if BetterFriendsFrame then
-			BetterFriendsFrame:HookScript("OnShow", RefreshTitleFriends)
-		end
-	end
-	pcall(function()
-		BFL:RegisterEventCallback("LEGACY_FRIEND_SYSTEM_STATUS_UPDATED", function()
-			self:OnFriendListUpdate()
-		end)
-	end)
+	end, nil, self.eventGate)
 end
 
 function GlobalSync:OnFriendListUpdate()
-	if not BetterFriendlistDB
+	if not self:IsAvailable() or not BetterFriendlistDB
 		or (not BetterFriendlistDB.enableGlobalSync and not BetterFriendlistDB.enableGlobalSyncDeletion)
 	then
 		return
@@ -669,12 +539,12 @@ function GlobalSync:OnFriendListUpdate()
 	self.updateTimer = C_Timer.NewTimer(2, function()
 		if generation ~= (self.storageGeneration or 0) then return end
 		self:PerformSync()
-		self.updateTimer = nil
+		if generation == (self.storageGeneration or 0) then self.updateTimer = nil end
 	end)
 end
 
 function GlobalSync:ReconcileIndexRemoval(realm)
-	if not BetterFriendlistDB.enableGlobalSyncDeletion then
+	if not self:IsAvailable() or not BetterFriendlistDB.enableGlobalSyncDeletion then
 		self.deletionSnapshot, self.pendingIndexRemoval = nil, nil
 		return
 	end
@@ -719,16 +589,12 @@ function GlobalSync:ReconcileIndexRemoval(realm)
 end
 
 function GlobalSync:PerformSync()
-	if not BetterFriendlistDB
+	if not self:IsAvailable() or not BetterFriendlistDB
 		or (not BetterFriendlistDB.enableGlobalSync and not BetterFriendlistDB.enableGlobalSyncDeletion)
 	then
 		return
 	end
-	-- Title friendships are managed by Blizzard through explicit invitations.
-	if self.processingQueue or self:UsesTitleFriends() ~= false then
-		return
-	end
-	if BFL.CanUseWoWFriendList and not BFL.CanUseWoWFriendList() then
+	if self.processingQueue then
 		return
 	end
 	self.syncDeferred = not CanChangeFriends()
@@ -744,16 +610,9 @@ function GlobalSync:PerformSync()
 	end
 
 	self:ReconcileIndexRemoval(realm)
-
-	-- 1. Export current friends to DB
 	self:ExportFriends(faction, realm)
-
-	-- 2. Import friends from connected realms
 	self:ImportFriends(faction, realm)
-
-	-- 3. Sync Deletions (Remove friends marked as deleted)
 	self:SyncDeletions(faction, realm)
-
 	if self.refreshDatabase then
 		self.refreshDatabase = nil
 		local Settings = BFL:GetModule("Settings")
@@ -764,6 +623,7 @@ function GlobalSync:PerformSync()
 end
 
 function GlobalSync:ExportFriends(faction, realm)
+	if not self:IsAvailable() then return end
 	local numFriends = GetFriendCount()
 	if not numFriends then
 		return
@@ -777,11 +637,9 @@ function GlobalSync:ExportFriends(faction, realm)
 	local count = 0
 	for i = 1, numFriends do
 		local info = GetReadableFriend(i)
-		if info then
-			local friendUID = self:GetFriendKey(info.name, realm)
-
-			-- Check if marked as deleted
-			local dbEntry = BetterFriendlistDB.GlobalFriends[faction][friendUID]
+		local friendUID = info and self:GetFriendKey(info.name, realm)
+		local dbEntry = friendUID and BetterFriendlistDB.GlobalFriends[faction][friendUID]
+		if friendUID and (not dbEntry or self:IsLegacyRecord(dbEntry)) then
 			local restored = dbEntry and self.pendingRestores and self.pendingRestores[dbEntry]
 			if restored then
 				self.pendingRestores[dbEntry] = nil
@@ -835,7 +693,7 @@ end
 
 function GlobalSync:ImportFriends(faction, currentRealm)
 	-- Check if sync is enabled in settings (default false)
-	if not BetterFriendlistDB.enableGlobalSync or self:UsesTitleFriends() ~= false or not CanChangeFriends() then
+	if not BetterFriendlistDB.enableGlobalSync or not self:IsAvailable() or not CanChangeFriends() then
 		return
 	end
 
@@ -885,7 +743,7 @@ function GlobalSync:ImportFriends(faction, currentRealm)
 	local now = time()
 	for friendUID, data in pairs(BetterFriendlistDB.GlobalFriends[faction]) do
 		local attempt = self.attemptedAdds[friendUID]
-		if not data.deleted and (not attempt or (attempt.count < MAX_ADD_DISPATCHES and now >= attempt.retryAt)) then
+		if self:IsLegacyRecord(data) and not data.deleted and (not attempt or (attempt.count < MAX_ADD_DISPATCHES and now >= attempt.retryAt)) then
 			-- Check if we already have this friend (exact UID match)
 			if not currentFriendList[friendUID:lower()] then
 				-- Parse UID to get Name and Realm
@@ -925,7 +783,7 @@ end
 
 function GlobalSync:SyncDeletions(faction, currentRealm)
 	-- Check if deletion sync is enabled
-	if not BetterFriendlistDB.enableGlobalSyncDeletion or self:UsesTitleFriends() ~= false then
+	if not BetterFriendlistDB.enableGlobalSyncDeletion or not self:IsAvailable() then
 		return
 	end
 	if not BetterFriendlistDB.GlobalFriends[faction] then
@@ -945,7 +803,7 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
 			local friendUID = self:GetFriendKey(info.name, currentRealm)
 
 			-- Check if marked as deleted in DB
-			local dbEntry = BetterFriendlistDB.GlobalFriends[faction][friendUID]
+			local dbEntry = GetStoredFriend(faction, friendUID)
 			if dbEntry and dbEntry.deleted then
 				table.insert(friendsToRemove, info.name)
 			end
@@ -963,7 +821,7 @@ function GlobalSync:SyncDeletions(faction, currentRealm)
 end
 
 function GlobalSync:ProcessAddQueue(queue)
-	if self.processingQueue then
+	if not self:IsAvailable() or self.processingQueue then
 		return
 	end
 	self.processingQueue = true
@@ -979,7 +837,7 @@ function GlobalSync:ProcessAddQueue(queue)
 	local generation = self.storageGeneration or 0
 	self.addQueueTicker = C_Timer.NewTicker(0.5, function(timer)
 		if generation ~= (self.storageGeneration or 0) then timer:Cancel(); return end
-		local legacyMode = self:UsesTitleFriends() == false
+		local legacyMode = self:IsAvailable()
 		if not BetterFriendlistDB.enableGlobalSync or not legacyMode or not CanChangeFriends() then
 			self.syncDeferred = BetterFriendlistDB.enableGlobalSync and legacyMode
 			timer:Cancel()
@@ -1000,7 +858,7 @@ function GlobalSync:ProcessAddQueue(queue)
 			local entry = queue[index]
 			local friends = BetterFriendlistDB.GlobalFriends[entry.faction]
 			local stored = friends and friends[entry.key]
-			if stored and not stored.deleted and TryFriendAction(BFL.AddFriend, entry.name) then
+			if self:IsLegacyRecord(stored) and not stored.deleted and TryFriendAction(BFL.AddFriend, entry.name) then
 				-- AddFriend has no server acknowledgement. A later update may retry
 				-- a still-missing friend after the cooldown, with a per-session cap.
 				local attempt = self.attemptedAdds[entry.key]

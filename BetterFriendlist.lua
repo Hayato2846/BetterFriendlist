@@ -399,26 +399,48 @@ function BFL:RefreshMainTabVisualState()
 	self:RefreshBottomTabVisualState()
 end
 
+local function ResolveLegacyTabFont(db)
+	local defaultName, defaultSize = GameFontNormalSmall:GetFont()
+	local size = db.fontSizeTabText or defaultSize
+	if BFL.IsClassic then
+		size = math.min(size, 19)
+	end
+	local path = BFL.FontManager:ResolveFontPath(db.fontTabText or defaultName)
+	return path, size, GetFontFlags(db.fontOutlineTabText or "NORMAL"), defaultSize
+end
+
+local function ApplyLegacyTabFont(fontString, path, size, flags)
+	SafeSetFont(fontString, path, size, flags)
+	fontString:SetShadowOffset(0, 0)
+end
+
+function BFL:ApplyLegacyTabSampleFont(tab, selected, maxWidth)
+	self:ApplyTabVisualState(tab, selected, false)
+	local fontString = tab.Text or tab:GetFontString()
+	local path, size, flags, defaultSize = ResolveLegacyTabFont(BetterFriendlistDB)
+	ApplyLegacyTabFont(fontString, path, size, flags)
+	fontString:SetWordWrap(false)
+	PanelTemplates_TabResize(tab, 20, nil, nil, maxWidth)
+	if not BFL.IsClassic then
+		local height = fontString:GetStringHeight()
+		tab:SetHeight(math.max(32, height + 20))
+		if not (self.UsesFlatTheme and self:UsesFlatTheme()) then
+			local y = math.floor(math.max(0, height - (defaultSize or 12)) * 0.5 + 0.5)
+			fontString:ClearAllPoints()
+			fontString:SetPoint("CENTER", tab, "CENTER", 0, y)
+		end
+	end
+end
+
 function BFL:ApplyTabFonts()
 	local db = BetterFriendlistDB
 	if not db then
 		return
 	end
+	local fontPath, fontSize, outlineValue, defaultFontSize = ResolveLegacyTabFont(db)
 
 	-- Classic: Simple font application - just set font and let tabs auto-size
 	if BFL.IsClassic then
-		local defaultFontName, defaultFontSize = _G.GameFontNormalSmall:GetFont()
-		local fontName = db.fontTabText or defaultFontName
-		local fontSize = db.fontSizeTabText or defaultFontSize
-		if fontSize > 19 then
-			fontSize = 19
-		end -- Classic max: prevent tabs from overflowing
-		local fontOutline = db.fontOutlineTabText or "NORMAL"
-
-		local outlineValue = GetFontFlags(fontOutline)
-
-		local fontPath = BFL.FontManager:ResolveFontPath(fontName)
-
 		local padding = 20
 		local allTabs = {
 			_G.BetterFriendsFrameBottomTab1,
@@ -432,8 +454,7 @@ function BFL:ApplyTabFonts()
 			if tab then
 				local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
 				if fs then
-					SafeSetFont(fs, fontPath, fontSize, outlineValue)
-					fs:SetShadowOffset(0, 0)
+					ApplyLegacyTabFont(fs, fontPath, fontSize, outlineValue)
 					-- Measure text and size tab accordingly
 					fs:SetWidth(0)
 					fs:SetWordWrap(false)
@@ -486,32 +507,15 @@ function BFL:ApplyTabFonts()
 
 	local frame = BetterFriendsFrame
 
-	-- Determine default font props from game standard
-	local defaultFontName, defaultFontSize, defaultFontOutline = _G.GameFontNormalSmall:GetFont()
-
-	-- Default values: Fallback to standard game font if not set
-	local fontName = db.fontTabText or defaultFontName
-	local fontSize = db.fontSizeTabText or defaultFontSize
-	local fontOutline = db.fontOutlineTabText or "NORMAL"
-
-	-- Map outline values to API strings
-	local outlineValue = GetFontFlags(fontOutline)
-
-	-- Resolve font path using FontManager (locale-aware fallback)
-	local fontPath = BFL.FontManager:ResolveFontPath(fontName)
-
 	-- Update tab-only font objects (do not touch shared small fonts)
 	if _G.BetterFriendlistTabFontNormal then
-		SafeSetFont(_G.BetterFriendlistTabFontNormal, fontPath, fontSize, outlineValue)
-		_G.BetterFriendlistTabFontNormal:SetShadowOffset(0, 0)
+		ApplyLegacyTabFont(_G.BetterFriendlistTabFontNormal, fontPath, fontSize, outlineValue)
 	end
 	if _G.BetterFriendlistTabFontHighlight then
-		SafeSetFont(_G.BetterFriendlistTabFontHighlight, fontPath, fontSize, outlineValue)
-		_G.BetterFriendlistTabFontHighlight:SetShadowOffset(0, 0)
+		ApplyLegacyTabFont(_G.BetterFriendlistTabFontHighlight, fontPath, fontSize, outlineValue)
 	end
 	if _G.BetterFriendlistTabFontDisable then
-		SafeSetFont(_G.BetterFriendlistTabFontDisable, fontPath, fontSize, outlineValue)
-		_G.BetterFriendlistTabFontDisable:SetShadowOffset(0, 0)
+		ApplyLegacyTabFont(_G.BetterFriendlistTabFontDisable, fontPath, fontSize, outlineValue)
 	end
 
 	local bottomTabs = {
@@ -639,8 +643,7 @@ function BFL:ApplyTabFonts()
 			if tab and tab:IsShown() then
 				local fs = tab.Text or (tab.GetFontString and tab:GetFontString())
 				if fs then
-					SafeSetFont(fs, fontPath, fontSize, outlineValue)
-					fs:SetShadowOffset(0, 0)
+					ApplyLegacyTabFont(fs, fontPath, fontSize, outlineValue)
 					tabList[#tabList + 1] = { tab = tab, fs = fs }
 				end
 			end
@@ -1557,6 +1560,7 @@ local function SetSearchBoxTextSilently(searchBox, text)
 end
 
 local function ClearTopTabSearchState(frame, tabIndex)
+	if BFL.NativeFriendsSearch then BFL.NativeFriendsSearch:ReleaseInput() end
 	CancelSearchDebounceTimer()
 	searchText = ""
 
@@ -1586,6 +1590,7 @@ local function ClearTopTabSearchState(frame, tabIndex)
 end
 
 function BFL:ClearFriendsListSearch()
+	if self.NativeFriendsSearch then self.NativeFriendsSearch:UseLocalSearch() end
 	local friends = GetFriendsList()
 	if friends then friends:SetSearchText("", true) end
 	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
@@ -1596,34 +1601,37 @@ function BFL:ClearFriendsListSearch()
 	end
 end
 
--- Handle search box text changes (called from XML)
--- Routes search to the correct module based on active top tab
-function BetterFriendsFrame_OnSearchTextChanged(editBox)
-	if BFL.suppressSearchTextChanged then
-		return
-	end
+function BetterFriendsFrame_OnSearchFocusGained()
+	local native = BFL.NativeFriendsSearch
+	if native then native:UseLocalSearch() end
+end
 
-	local text = editBox:GetText()
+function BetterFriendsFrame_OnSearchHide()
+	local native = BFL.NativeFriendsSearch
+	if native then native:OnFrameHide() end
+end
+
+local function QueueSearchText(text, topTab, session)
 	-- Convert to lowercase, handle empty string as well
 	local newSearchText = (text and text ~= "") and text:lower() or ""
 
 	-- Cancel pending search update
 	CancelSearchDebounceTimer()
 
-	-- Debounce: Wait 0.3s after last keystroke before updating
-	local newTimer = C_Timer.NewTimer(0.3, function()
+	local function ApplySearchText()
+		if session and not BFL.NativeFriendsSearch:IsInputSession(session, newSearchText) then return end
 		searchText = newSearchText
-		BFL.searchDebounceTimer = nil
 
 		-- Determine which top tab is active
 		local frame = BetterFriendsFrame
-		local activeTopTab = 1
-		if frame and frame.FriendsTabHeader then
+		local activeTopTab = topTab or 1
+		if not topTab and frame and frame.FriendsTabHeader then
 			activeTopTab = PanelTemplates_GetSelectedTab(frame.FriendsTabHeader) or 1
 		end
 
 		if activeTopTab == 1 then
 			-- Tab 1: Friends
+			BFL.appliedNativeFriendsSearch = newSearchText ~= "" and session or nil
 			local FriendsList = GetFriendsList()
 			if FriendsList then
 				FriendsList:SetSearchText(searchText)
@@ -1647,8 +1655,41 @@ function BetterFriendsFrame_OnSearchTextChanged(editBox)
 				GuildFrame:SetSearchText(searchText)
 			end
 		end
+	end
+
+	if newSearchText == "" then
+		ApplySearchText()
+		return
+	end
+
+	-- Wait for typing to settle, but remove an empty filter immediately.
+	BFL.searchDebounceTimer = C_Timer.NewTimer(0.3, function()
+		BFL.searchDebounceTimer = nil
+		ApplySearchText()
 	end)
-	BFL.searchDebounceTimer = newTimer
+end
+
+function BetterFriendsFrame_OnSearchTextChanged(editBox, userInput)
+	if BFL.suppressSearchTextChanged then return end
+	local native = BFL.NativeFriendsSearch
+	if native and native:IsInputHosted(editBox) then return end
+	if native and userInput then native:UseLocalSearch() end
+	QueueSearchText(editBox:GetText())
+end
+
+function BFL:SetNativeFriendsSearchText(text, session)
+	QueueSearchText(text, 1, session)
+end
+
+function BFL:ClearNativeFriendsSearchText(session)
+	if self.appliedNativeFriendsSearch ~= session then return end
+	self.appliedNativeFriendsSearch = nil
+	searchText = ""
+	local friends = GetFriendsList()
+	if friends then
+		friends:SetSearchText("", true)
+		self:ScheduleFriendsListRefresh("native-friend-search-release", 0.05)
+	end
 end
 
 local function SuspendBetterFriendsFrameUIPanelForCombat()
@@ -2660,7 +2701,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 				end
 
-				if contextUID and BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[contextUID] then
+				local DB = BFL:GetModule("DB")
+				if contextUID and DB and #DB:GetFriendGroups(contextUID) > 0 then
 					contextUID = tostring(contextUID)
 				else
 					contextUID = nil
@@ -2843,8 +2885,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local friendCurrentGroups = {}
-				if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-					for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
+				if DB then
+					for _, gid in ipairs(DB:GetFriendGroups(friendUID)) do
 						friendCurrentGroups[gid] = true
 					end
 				end
@@ -3067,14 +3109,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						local checkbox = groupsButton:CreateCheckbox(
 							group.data.name,
 							function() -- Read state dynamically from DB each time checkbox is rendered
-								if BetterFriendlistDB.friendGroups and BetterFriendlistDB.friendGroups[friendUID] then
-									for _, gid in ipairs(BetterFriendlistDB.friendGroups[friendUID]) do
-										if gid == groupId then
-											return true
-										end
-									end
-								end
-								return false
+								return DB and DB:IsFriendInGroup(friendUID, groupId) or false
 							end,
 							function()
 								local Groups = GetGroups()
@@ -3418,6 +3453,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			local function BFL_AddSetNoteButton(rootDescription, contextData, isBNet)
 				if isBNet and contextData.bnetIDAccount then
 					rootDescription:CreateButton(SET_NOTE or "Set Note", function()
+						local titleNotes = BFL.TitleFriendNotes
+						local account = titleNotes and titleNotes:IsEnabled() and BFL_GetBNetAccountInfo(contextData)
+						if titleNotes and account and BFL.IsTitleFriend(account)
+							and titleNotes:ShowEditor(contextData.bnetIDAccount, BFL_GetContextDisplayName(contextData, true)) then
+							return
+						end
 						if not FriendsFrame and C_AddOns and C_AddOns.LoadAddOn then
 							pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
 						end
@@ -4100,6 +4141,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					or elements[TRAVEL_PASS_INVITE_CROSS_FACTION] or elements[TRAVEL_PASS_INVITE] or elements[INVITE]
 				if isBNet or not invite then
 					BFL_AddInviteButton(root, context, isBNet, context.isOffline, invite, friend)
+				end
+
+				local titleNotes = BFL.TitleFriendNotes
+				local noteButton = elements[SET_NOTE]
+				if noteButton and titleNotes and titleNotes:IsEnabled() and BFL.IsTitleFriend(context.accountInfo) then
+					noteButton:SetResponder(function()
+						titleNotes:ShowEditor(context.bnetIDAccount, BFL_GetContextDisplayName(context, true))
+					end)
 				end
 
 				-- Blizzard omits list-only entries from player-link menus. Reuse the BFL
@@ -4974,18 +5023,43 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 	-- USE BLIZZARD LOGIC (Retail)
 	-- Fixes "Join" button not working (Request vs Invite) and Cross-Faction logic
-	if FriendsFrame_InviteOrRequestToJoin then
+	local allowAccountIDFallback = BFL.IsRetail and not BFL.IsForever
+	local inviteOrRequest = FriendsFrame_InviteOrRequestToJoin
+		or (allowAccountIDFallback and FriendsListUtil and FriendsListUtil.InviteOrRequestToJoin)
+	if inviteOrRequest then
 		-- Check Valid Game Accounts (Ported from FriendsFrame.lua)
 		local numGameAccounts = C_BattleNet.GetFriendNumGameAccounts(actualIndex)
-		local numValidGameAccounts = 0
+		if BFL:IsSecret(numGameAccounts) or type(numGameAccounts) ~= "number"
+			or numGameAccounts < 0 or numGameAccounts >= math.huge or numGameAccounts % 1 ~= 0
+		then return end
+		local accountFields = {
+			"isOnline", "clientProgram", "wowProjectID", "realmID", "isInCurrentRegion",
+			"factionName", "classID", "playerGuid", "gameAccountID",
+		}
 		local validGameAccounts = {}
 		local lastGameAccountID, lastGameAccountGUID
+		local fallbackGameAccountID
+		local fallbackIsUnambiguous = allowAccountIDFallback
 		local playerFactionGroup = UnitFactionGroup("player")
 		local playerRealmID = (GetNativeRealmID and GetNativeRealmID()) or (GetRealmID and GetRealmID())
+		if BFL:IsSecret(playerFactionGroup) or BFL:IsSecret(playerRealmID) then return end
 		local WOW_PROJECT_ID = WOW_PROJECT_ID
 
 		for i = 1, numGameAccounts do
 			local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
+			-- An unavailable account prevents guessing a target for a direct invite.
+			if BFL.IsReadableGameAccountInfo(gameAccountInfo) then
+				for _, field in ipairs(accountFields) do
+					if BFL:IsSecret(gameAccountInfo[field]) then
+						gameAccountInfo = nil
+						break
+					end
+				end
+			else
+				gameAccountInfo = nil
+			end
+			if not gameAccountInfo then fallbackIsUnambiguous = false end
+
 			if BFL.IsForever then
 				local allowed, reason, current = BFL.ValidateForeverInviteTarget(gameAccountInfo)
 				local list = GetFriendsList()
@@ -5004,7 +5078,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 				and gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0
 				and not BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID)
 				and gameAccountInfo.isInCurrentRegion
-				and gameAccountInfo.playerGuid and gameAccountInfo.gameAccountID
+				and gameAccountInfo.gameAccountID
 
 			-- Cross-faction checks
 			if isValid and gameAccountInfo.factionName and playerFactionGroup
@@ -5027,23 +5101,35 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			end
 
 			if isValid then
-				local candidate = {}
-				for key, value in pairs(gameAccountInfo) do candidate[key] = value end
-				candidate.bflIsInvitable = true
-				validGameAccounts[#validGameAccounts + 1] = candidate
-				numValidGameAccounts = numValidGameAccounts + 1
-				lastGameAccountID = gameAccountInfo.gameAccountID
-				lastGameAccountGUID = gameAccountInfo.playerGuid
+				local guid, id = gameAccountInfo.playerGuid, gameAccountInfo.gameAccountID
+				if type(guid) == "string" and guid ~= "" then
+					local candidate = {}
+					for key, value in pairs(gameAccountInfo) do candidate[key] = value end
+					candidate.bflIsInvitable = true
+					validGameAccounts[#validGameAccounts + 1] = candidate
+					lastGameAccountID, lastGameAccountGUID = id, guid
+				elseif fallbackIsUnambiguous and (guid == nil or guid == "") then
+					if not fallbackGameAccountID
+						and gameAccountInfo.isOnline == true
+						and type(id) == "number" and id > 0 and id < math.huge and id % 1 == 0
+					then
+						fallbackGameAccountID = id
+					else
+						fallbackIsUnambiguous = false
+					end
+				end
 			end
 		end
 
-		if numValidGameAccounts == 1 then
+		if #validGameAccounts == 1 then
 			-- Single valid account: Auto-Invite or Request Join
-			FriendsFrame_InviteOrRequestToJoin(lastGameAccountGUID, lastGameAccountID)
-		elseif numValidGameAccounts > 1 then
+			inviteOrRequest(lastGameAccountGUID, lastGameAccountID)
+		elseif #validGameAccounts > 1 then
 			-- The native dropdown relies on hidden FriendsFrame faction/realm locals.
 			-- Our existing picker uses the accounts validated against live data above.
 			ShowMultiAccountInvitePicker(validGameAccounts, self)
+		elseif fallbackIsUnambiguous and fallbackGameAccountID then
+			BFL.BNInviteFriend(fallbackGameAccountID)
 		end
 		return
 	end
@@ -5682,21 +5768,63 @@ if not _G.BFL_ActiveContactsMenus then
 	_G.BFL_ActiveContactsMenus = {}
 end
 
+local function DisableContactsMenuDecorationInput(frame)
+	frame:SetScript("OnMouseDown", nil)
+	frame:EnableMouse(false)
+end
+
+local function AddContactsMenuDecoration(rootDescription, title)
+	if not (BFL.IsForever and rootDescription.CreateFrame and MenuVariants
+		and MenuVariants.CreateFontString and MenuVariants.CreateDivider) then
+		if title then
+			rootDescription:CreateTitle(title)
+		else
+			rootDescription:CreateDivider()
+		end
+		return
+	end
+
+	-- Forever's native title and divider write protected Smart Navigation data.
+	-- Keep their native regions on a layout row that cannot receive input.
+	local row = rootDescription:CreateFrame()
+	row:AddInitializer(function(frame)
+		if title then
+			frame.fontString = MenuVariants.CreateFontString(frame)
+			frame.fontString:SetTextToFit(title)
+			frame.fontString:SetTextColor(NORMAL_FONT_COLOR:GetRGBA())
+		else
+			frame.divider = MenuVariants.CreateDivider(frame)
+		end
+
+		-- Blizzard assigns a shared mouse handler after the initializer, then
+		-- widens each row to the common menu width before showing the menu.
+		frame:SetScript("OnSizeChanged", DisableContactsMenuDecorationInput)
+		frame:SetScript("OnShow", DisableContactsMenuDecorationInput)
+	end)
+	row:AddResetter(function(frame)
+		frame:SetScript("OnSizeChanged", nil)
+		frame:SetScript("OnShow", nil)
+	end)
+end
+
 -- Contacts Menu (11.2.5 - replaces broadcast button, includes ignore list)
 -- Uses MenuUtil like Blizzard's ContactsMenuMixin
 function BetterFriendsFrame_ShowContactsMenu(button)
 	local generator = function(ownerRegion, rootDescription)
 		rootDescription:SetTag("BFL_CONTACTS_MENU")
 
-		-- Add BetterFriendList title
-		rootDescription:CreateTitle(L.MENU_TITLE)
+		AddContactsMenuDecoration(rootDescription, L.MENU_TITLE)
 
-		-- Settings option
-		rootDescription:CreateButton(L.MENU_SETTINGS, function()
+		local settingsText = L.MENU_SETTINGS
+		local Changelog = BFL:GetModule("Changelog")
+		if Changelog and Changelog:HasUnreadVersions() then
+			settingsText = settingsText .. "  " .. Changelog:GetNewBadge()
+		end
+		rootDescription:CreateButton(settingsText, function()
 			BetterFriendlistSettings_Show()
 		end)
 
-		rootDescription:CreateDivider()
+		AddContactsMenuDecoration(rootDescription)
 
 		-- Simple Mode ONLY: Include "Quick Filter" and "Sort" menus here
 		local DB = GetDB()
@@ -5736,45 +5864,10 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 				FriendsList:PopulateSortMenu(secondarySort, "secondary")
 			end
 
-			rootDescription:CreateDivider()
-		end
-
-		-- Changelog option (Simple Mode OR Classic+ElvUI)
-		local DB = GetDB()
-		local simpleMode = DB and DB:Get("simpleMode", false) or false
-		local isElvUIActive = BFL.IsClassic
-			and _G.ElvUI
-			and BFL.IsElvUISkinActive
-			and BFL:IsElvUISkinActive()
-		if simpleMode or isElvUIActive then
-			local changelogText = L.MENU_CHANGELOG or "Changelog"
-			local Changelog = BFL:GetModule("Changelog")
-			if Changelog and Changelog:IsNewVersion() then
-				if BFL.IsClassic then
-					local newIcon = BFL.GetAtlasOrTextureMarkup
-						and BFL.GetAtlasOrTextureMarkup("communities-icon-invitemail", nil, 48, 64)
-						or ""
-					changelogText = string.format("%s %s", newIcon, changelogText)
-				else
-					-- Retail: Use "NewCharacter-Alliance" (56x29) positioned after text
-					-- Height: 29, Width: 56
-					local newIcon = BFL.GetAtlasOrTextureMarkup
-						and BFL.GetAtlasOrTextureMarkup("NewCharacter-Alliance", nil, 29, 56)
-						or ""
-					changelogText = string.format("%s%s", changelogText, newIcon)
-				end
-			end
-
-			rootDescription:CreateButton(changelogText, function()
-				local Changelog = BFL:GetModule("Changelog")
-				if Changelog then
-					Changelog:Show()
-				end
-			end)
+			AddContactsMenuDecoration(rootDescription)
 		end
 
 		-- Show Blizzard's Friendlist option (conditional based on setting)
-		local DB = GetDB()
 		if modern or (DB and DB:Get("showBlizzardOption", false)) then
 			-- Check combat state
 			local inCombat = InCombatLockdown()
@@ -5830,7 +5923,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP")
 		end)
 
-		rootDescription:CreateDivider()
+		AddContactsMenuDecoration(rootDescription)
 
 		-- Broadcast option (only if BNet is connected)
 		local canUseBroadCastFrame = BNFeaturesEnabled() and BNConnected()

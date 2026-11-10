@@ -8,6 +8,8 @@ local Codec = {
 		knownCharacters = true,
 		appearanceOnboardingVersion = true,
 		appearanceOnboardingResume = true,
+		settingsRedesignHintSeen = true,
+		settingsSearchSelections = true,
 		socialKeybindMigrated = true,
 		socialKeybindMigrationVersion = true,
 		socialKeybindMigratedKeys = true,
@@ -16,6 +18,7 @@ local Codec = {
 		noteSyncPendingWrites = true,
 	},
 	FLAVOR_KEYS = {
+		titleFriendNotes = true,
 		GlobalFriends = true,
 		globalFriendsMigrated = true,
 		enableGlobalSync = true,

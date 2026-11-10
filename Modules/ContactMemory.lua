@@ -398,11 +398,14 @@ function ContactMemory:CanDisplayPrivateData()
 		return false
 	end
 
-	if self:GetSetting("hideInStreamerMode", true) and BFL.StreamerMode and BFL.StreamerMode.IsActive and BFL.StreamerMode:IsActive() then
-		return false
-	end
+	local hideInStreamerMode = self:GetSetting("hideInStreamerMode", true)
+	local streamer = BFL.StreamerMode
+	local active = hideInStreamerMode and streamer and streamer.IsActive and streamer:IsActive()
+	return self:IsPrivateNoteVisible(hideInStreamerMode, active)
+end
 
-	return true
+function ContactMemory:IsPrivateNoteVisible(hideInStreamerMode, streamerActive)
+	return not (hideInStreamerMode and streamerActive)
 end
 
 function ContactMemory:GetContactKeyFromBattleTag(battleTag)

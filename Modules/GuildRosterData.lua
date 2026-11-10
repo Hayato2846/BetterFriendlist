@@ -525,6 +525,11 @@ function GuildRosterData:RequestRosterUpdate()
 	return ok == true
 end
 
+function GuildRosterData:ResolveRosterRowLimit(requested, total)
+	local limit = SafeNumber(requested, total)
+	return limit > 0 and math.min(limit, total) or total
+end
+
 function GuildRosterData:CollectRoster(options)
 	options = options or {}
 
@@ -532,10 +537,7 @@ function GuildRosterData:CollectRoster(options)
 	if previewData then
 		local members = previewData.guildRosterMembers
 		local online, total = self:GetCounts()
-		local maxRows = SafeNumber(options.maxRows, total)
-		if maxRows <= 0 or maxRows > total then
-			maxRows = total
-		end
+		local maxRows = self:ResolveRosterRowLimit(options.maxRows, total)
 		if maxRows == total then
 			return members, { online = online, total = total }
 		end
@@ -558,10 +560,7 @@ function GuildRosterData:CollectRoster(options)
 	total = SafeNumber(total, 0)
 	online = SafeNumber(online, 0)
 
-	local maxRows = SafeNumber(options.maxRows, total)
-	if maxRows <= 0 or maxRows > total then
-		maxRows = total
-	end
+	local maxRows = self:ResolveRosterRowLimit(options.maxRows, total)
 
 	local members = {}
 	for i = 1, maxRows do

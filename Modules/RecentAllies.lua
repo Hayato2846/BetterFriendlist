@@ -351,6 +351,7 @@ end
 -- Recent Allies List Events
 local RecentAlliesListEvents = {
 	"RECENT_ALLIES_CACHE_UPDATE",
+	"RECENT_ALLIES_DATA_READY",
 }
 
 -- Current search text for filtering
@@ -435,13 +436,168 @@ function RecentAllies:IsSystemEnabled()
 	return ok and not BFL:IsSecret(enabled) and enabled == true
 end
 
-function RecentAllies:IsDataReady()
+local function GetDataReadiness()
 	local evaluator = C_RecentAllies and C_RecentAllies.IsRecentAllyDataReady
-	if type(evaluator) ~= "function" then
-		return false
+	if type(evaluator) == "function" then
+		local ok, ready = pcall(evaluator)
+		if ok then
+			return SafeValue(ready, "boolean")
+		end
 	end
-	local ok, ready = pcall(evaluator)
-	return ok and not BFL:IsSecret(ready) and ready == true
+end
+
+function RecentAllies:IsDataReady()
+	return GetDataReadiness() == true
+end
+
+local function TraceNativeLoad(...)
+	BFL:DebugPrint("[BFL-RA]", ...)
+end
+
+function RecentAllies:HideNativeLoadProxy()
+	self.nativeLoadTab = nil
+	if self.nativeLoadProxy and not InCombatLockdown() then
+		self.nativeLoadProxy:Hide()
+	end
+end
+
+function RecentAllies:HideNativeLoadView()
+	if self.nativeLoadTimer then
+		self.nativeLoadTimer:Cancel()
+		self.nativeLoadTimer = nil
+	end
+	if self.nativeLoadHost and not InCombatLockdown() then
+		self.nativeLoadHost:Hide()
+	end
+end
+
+function RecentAllies:CreateNativeLoadProxy()
+	C_AddOns.LoadAddOn("Blizzard_RecentAllies")
+	local host = CreateFrame("Frame", nil, UIParent, "SecureFrameTemplate")
+	host:Hide()
+	host:SetAlpha(0)
+	host:SetSize(300, 260)
+	host:SetPoint("BOTTOMRIGHT", UIParent, "TOPLEFT", -64, 64)
+	local view = CreateFrame("Frame", nil, host, "RecentAlliesListTemplate")
+	if not view:GetScript("OnShow") then
+		return
+	end
+	view:SetAllPoints()
+
+	local proxy = CreateFrame("Button", nil, UIParent, "SecureHandlerClickTemplate,SecureHandlerStateTemplate")
+	proxy:Hide()
+	proxy:EnableMouse(true)
+	proxy:SetPropagateMouseMotion(true)
+	proxy:SetFrameStrata("TOOLTIP")
+	proxy:SetFrameLevel(10000)
+	proxy:RegisterForClicks("LeftButtonUp")
+	proxy:SetFrameRef("viewHost", host)
+	-- The native list requests data in OnShow. Its own host avoids the
+	-- sounds and panel management of Blizzard's full friends window.
+	proxy:SetAttribute("_onclick", [[
+		if button == "LeftButton" and not down then
+			local host = self:GetFrameRef("viewHost")
+			host:Hide(true)
+			host:Show(true)
+		end
+	]])
+	proxy:SetAttribute("_onstate-combat", [[
+		if newstate == "combat" then
+			self:Hide()
+			self:GetFrameRef("viewHost"):Hide(true)
+		end
+	]])
+	RegisterStateDriver(proxy, "combat", "[combat] combat; nocombat")
+	proxy:SetScript("OnLeave", function()
+		self:HideNativeLoadProxy()
+	end)
+	proxy:SetScript("PostClick", function()
+		local tab = self.nativeLoadTab
+		self:HideNativeLoadProxy()
+		if not tab or not tab:IsVisible() or not tab:IsEnabled() then
+			self:HideNativeLoadView()
+			return
+		end
+		TraceNativeLoad("Isolated Blizzard view visible", view:IsVisible())
+		if self.nativeLoadTimer then
+			self.nativeLoadTimer:Cancel()
+		end
+		self.nativeLoadTimer = C_Timer.NewTimer(5, function()
+			self.nativeLoadTimer = nil
+			self:HideNativeLoadView()
+		end)
+		-- The overlay receives the mouse release instead of the side tab.
+		-- Its original handler plays the click sound and selects the section.
+		local onMouseUp = tab.SetCustomOnMouseUpHandler and tab:GetScript("OnMouseUp")
+		if onMouseUp then
+			onMouseUp(tab, "LeftButton", true)
+		else
+			BFL:GetModule("FriendsUI"):SelectSection("recent_allies")
+		end
+	end)
+	self.nativeLoadHost, self.nativeLoadProxy = host, proxy
+end
+
+function RecentAllies:ShowNativeLoadProxy(tab)
+	if InCombatLockdown() or not tab:IsVisible() or not tab:IsEnabled() or not self:IsSystemEnabled()
+		or GetDataReadiness() == nil
+	then
+		return
+	end
+	local left, bottom, width, height = tab:GetScaledRect()
+	if not left or not bottom or not width or not height or width <= 0 or height <= 0 then
+		return
+	end
+	if not self.nativeLoadProxy and not self.nativeLoadSetupFailed then
+		local ok, err = pcall(self.CreateNativeLoadProxy, self)
+		self.nativeLoadSetupFailed = not self.nativeLoadProxy
+		if self.nativeLoadSetupFailed then
+			TraceNativeLoad("Isolated Blizzard view unavailable", not ok and err or nil)
+		end
+	end
+	local proxy = self.nativeLoadProxy
+	if not proxy then
+		return
+	end
+	local scale = UIParent:GetEffectiveScale()
+	proxy:ClearAllPoints()
+	proxy:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left / scale, bottom / scale)
+	proxy:SetSize(width / scale, height / scale)
+	self.nativeLoadTab = tab
+	proxy:Show()
+end
+
+function RecentAllies:BindNativeLoadTab(tab)
+	if not self.nativeLoadEnabled or not tab or tab.bflNativeRecentAlliesLoad then
+		return
+	end
+	tab.bflNativeRecentAlliesLoad = true
+	tab:HookScript("OnEnter", function(button) self:ShowNativeLoadProxy(button) end)
+	tab:HookScript("OnHide", function(button)
+		if self.nativeLoadTab == button then
+			self:HideNativeLoadProxy()
+		end
+	end)
+end
+
+function RecentAllies:InitializeNativeLoad()
+	if not BFL.IsRetail or BFL.IsForever or self.nativeLoadEnabled then
+		return
+	end
+	self.nativeLoadEnabled = true
+	BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function()
+		self:HideNativeLoadProxy()
+		self:HideNativeLoadView()
+	end, 20)
+
+	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
+	self:BindNativeLoadTab(header and header.Tab2)
+	local friendsUI = BFL:GetModule("FriendsUI")
+	for _, tab in ipairs(friendsUI.sideTabs or {}) do
+		if tab.sectionID == "recent_allies" then
+			self:BindNativeLoadTab(tab)
+		end
+	end
 end
 
 -- ========================================
@@ -458,6 +614,7 @@ function RecentAllies:Initialize()
 	BFL:RegisterEventCallback("RECENT_ALLIES_SYSTEM_STATUS_UPDATED", function()
 		self:OnSystemStatusUpdated()
 	end, 20)
+	self:InitializeNativeLoad()
 end
 
 function RecentAllies:OnTextScaleUpdated()
@@ -468,6 +625,8 @@ function RecentAllies:OnTextScaleUpdated()
 end
 
 function RecentAllies:OnSystemStatusUpdated()
+	self:HideNativeLoadProxy()
+	self:HideNativeLoadView()
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if InCombatLockdown and InCombatLockdown() then
 		if FriendsUI then FriendsUI.pendingNavigationRefresh = true end
@@ -609,6 +768,7 @@ end
 
 -- Hide Recent Allies Frame (RecentAlliesListMixin:OnHide)
 function RecentAllies:OnHide(frame)
+	self:HideNativeLoadView()
 	if self.activityFrame then self.activityFrame:Hide() end
 	if frame.selectedEntry then
 		frame.selectedEntry:UnlockHighlight()
@@ -621,8 +781,17 @@ end
 
 -- Event handler (RecentAlliesListMixin:OnEvent)
 function RecentAllies:OnEvent(frame, event, ...)
-	if BFL.HasRecentAllies and event == "RECENT_ALLIES_CACHE_UPDATE" then
+	if BFL.HasRecentAllies and (event == "RECENT_ALLIES_CACHE_UPDATE" or event == "RECENT_ALLIES_DATA_READY") then
 		self:Refresh(frame, ScrollBoxConstants.RetainScrollPosition)
+		local timer = self.nativeLoadTimer
+		if timer and self:IsDataReady() then
+			TraceNativeLoad(event)
+			C_Timer.After(0, function()
+				if self.nativeLoadTimer == timer then
+					self:HideNativeLoadView()
+				end
+			end)
+		end
 	end
 end
 

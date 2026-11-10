@@ -150,9 +150,10 @@ end
 -- ========================================
 -- HEADERS
 -- ========================================
-function Components:CreateHeader(parent, text)
+function Components:CreateHeader(parent, text, sectionKey)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder.BFL_SettingsSectionHeader = true
+	holder.BFL_LegacySectionKey = sectionKey
 	holder:SetPoint("LEFT", 5, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 	holder.text = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormalLarge")
@@ -185,6 +186,7 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 		callback = function() end
 	end
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { labelText }
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -197,6 +199,7 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 
 	-- Checkbox dynamic positioning (RIGHT ALIGNED)
 	local checkBox = CreateFrame("CheckButton", nil, holder, template)
+	checkBox.BFL_SettingsCheckboxBorderInset = CHECKBOX_X_OFFSET
 	-- Default size for these templates is usually 26x26 or 30x29
 	-- We anchor it to the RIGHT to ensure alignment across all indented items
 	checkBox:SetPoint("RIGHT", holder, "RIGHT", CHECKBOX_X_OFFSET, 0)
@@ -234,6 +237,7 @@ function Components:CreateCheckbox(parent, labelText, initialValue, callback)
 	checkBox:SetScript("OnLeave", function() end)
 
 	holder.SetTooltip = function(_, title, desc)
+		holder.BFL_SettingDescriptions = { desc or title }
 		checkBox:SetScript("OnEnter", function(self)
 			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 			BFL_Tooltip:SetText(title, 1, 1, 1)
@@ -277,7 +281,9 @@ function Components:CreateSlider(parent, labelText, min, max, initialValue, form
 	formatter = formatter or tostring
 
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { labelText }
 	holder.ControlWidth = controlWidth
+	holder.BFL_ComparisonRange = { min, max, formatter }
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -605,6 +611,10 @@ end
 
 function Components:CreateDropdown(parent, labelText, entries, isSelectedCallback, onSelectionCallback, controlWidth)
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { labelText }
+	holder.BFL_SettingChoices = entries and entries.labels
+	holder.BFL_ComparisonChoices = entries
+	holder.BFL_ComparisonIsSelected = isSelectedCallback
 	holder.ControlWidth = controlWidth
 	holder:SetHeight(COMPONENT_HEIGHT + 8) -- Dropdowns are taller
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
@@ -764,6 +774,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 	end
 
 	holder.SetTooltip = function(_, title, desc)
+		holder.BFL_SettingDescriptions = { desc or title }
 		dropdown:SetScript("OnEnter", function(self)
 			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 			BFL_Tooltip:SetText(title, 1, 1, 1)
@@ -786,6 +797,9 @@ end
 function Components:CreateColorPicker(parent, labelText, initialColor, callback, opts)
 	opts = opts or {}
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { labelText }
+	holder.BFL_SettingDescriptions = opts.tooltipDesc and { opts.tooltipDesc }
+
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -802,9 +816,11 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
-		-- Anchor ColorButton to RIGHT edge
+		-- Match the visual center of the neighboring checkbox column.
+		local checkboxWidth = BFL.IsClassic and 26 or 30
+		local offset = CHECKBOX_X_OFFSET + (COLOR_SWATCH_BUTTON_SIZE - checkboxWidth) / 2
 		colorButton:ClearAllPoints()
-		colorButton:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+		colorButton:SetPoint("RIGHT", self, "RIGHT", offset, 0)
 
 		-- Anchor Label Left and Right (to ColorButton)
 		label:ClearAllPoints()
@@ -907,6 +923,7 @@ function Components:CreateSliderWithColorPicker(
 	colorCallback
 )
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { labelText }
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -1119,31 +1136,48 @@ end
 -- ========================================
 -- ROW WITH TWO BUTTONS (For Arrow Up/Down controls)
 -- ========================================
+function Components:GetActionButtonTemplate(legacyTemplate)
+	local friendsUI = BFL.IsMainline and BFL:GetModule("FriendsUI")
+	if friendsUI and friendsUI:IsModernActive() then
+		return "SharedButtonTemplate"
+	end
+	return legacyTemplate or "UIPanelButtonTemplate"
+end
+
+local function ResizeActionButton(button, template)
+	if template == "UIPanelDynamicResizeButtonTemplate" then
+		DynamicResizeButton_Resize(button)
+	else
+		button:SetSize(math.max(72, button:GetFontString():GetStringWidth() + 26), 24)
+	end
+end
+
 function Components:CreateButtonRow(parent, leftText, rightText, leftCallback, rightCallback)
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { leftText, rightText }
 	holder:SetHeight(COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 
-	-- Left Button
-	local leftButton = CreateFrame("Button", nil, holder, "UIPanelDynamicResizeButtonTemplate")
+	local template = self:GetActionButtonTemplate("UIPanelDynamicResizeButtonTemplate")
+	local leftButton = CreateFrame("Button", nil, holder, template)
 	leftButton:SetText(leftText)
 	leftButton:SetNormalFontObject("BetterFriendlistFontNormalSmall")
 	leftButton:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
 	leftButton:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
-	DynamicResizeButton_Resize(leftButton)
+	ResizeActionButton(leftButton, template)
 	leftButton:SetPoint("LEFT", 20, 0)
 	leftButton:SetScript("OnClick", leftCallback)
 	holder.LeftButton = leftButton
 
 	-- Right Button (if provided)
 	if rightText and rightCallback then
-		local rightButton = CreateFrame("Button", nil, holder, "UIPanelDynamicResizeButtonTemplate")
+		local rightButton = CreateFrame("Button", nil, holder, template)
 		rightButton:SetText(rightText)
 		rightButton:SetNormalFontObject("BetterFriendlistFontNormalSmall")
 		rightButton:SetHighlightFontObject("BetterFriendlistFontHighlightSmall")
 		rightButton:SetDisabledFontObject("BetterFriendlistFontDisableSmall")
-		DynamicResizeButton_Resize(rightButton)
+		ResizeActionButton(rightButton, template)
 		rightButton:SetPoint("LEFT", leftButton, "RIGHT", 10, 0)
 		rightButton:SetScript("OnClick", rightCallback)
 		holder.RightButton = rightButton
@@ -1207,7 +1241,9 @@ function Components:CreateListItem(
 
 	-- Use a Button for better click/drag handling
 	local holder = CreateFrame("Button", nil, parent)
-	holder:SetHeight(40)
+	local review = BFL:GetModule("LegacySettingsReview")
+	local modernReview = review and review.active and self:GetActionButtonTemplate() == "SharedButtonTemplate"
+	holder:SetHeight(modernReview and 34 or 40)
 	-- Use negative padding to maximize width further
 	holder:SetPoint("LEFT", -2, 0)
 	holder:SetPoint("RIGHT", 5, 0)
@@ -1280,7 +1316,23 @@ function Components:CreateListItem(
 	-- Background
 	holder.bg = holder:CreateTexture(nil, "BACKGROUND")
 	holder.bg:SetAllPoints()
-	holder.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+	if onColor then
+		function holder:SetGroupOrderHighlight(highlighted)
+			if modernReview then
+				self.bg:SetColorTexture(1, 1, 1, highlighted and 0.13 or 0.035)
+			elseif highlighted then
+				self.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
+			else
+				self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+			end
+		end
+		holder:SetGroupOrderHighlight(false)
+	elseif modernReview then
+		BFL.SetTextureOrAtlas(holder.bg, "friends-frame-infobg")
+		holder.bg:SetAlpha(0.65)
+	else
+		holder.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
+	end
 
 	-- Drag Handle (:::)
 	holder.dragHandle = holder:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontNormal")
@@ -1301,13 +1353,18 @@ function Components:CreateListItem(
 	holder.nameText:SetPoint("LEFT", holder.orderText, "RIGHT", 10, 0)
 	holder.nameText:SetJustifyH("LEFT")
 	holder.nameText:SetText(itemText)
-	holder.nameText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+	if modernReview then
+		holder.nameText:SetFontObject(BetterFriendlistFontHighlight)
+	else
+		holder.nameText:SetTextColor(GetAccentColor(1, 0.82, 0, 1))
+	end
 
 	local rightOffset = -10
 
 	-- Delete button (optional)
 	if onDelete then
-		holder.deleteButton = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
+		holder.deleteButton = CreateFrame("Button", nil, holder, self:GetActionButtonTemplate())
+		holder.deleteButton.BFL_GroupOrderAction = true
 		holder.deleteButton:SetSize(28, 28)
 		holder.deleteButton:SetPoint("RIGHT", rightOffset, 0)
 
@@ -1358,7 +1415,8 @@ function Components:CreateListItem(
 
 	-- Rename button (optional)
 	if onRename then
-		holder.renameButton = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
+		holder.renameButton = CreateFrame("Button", nil, holder, self:GetActionButtonTemplate())
+		holder.renameButton.BFL_GroupOrderAction = true
 		holder.renameButton:SetSize(28, 28)
 		holder.renameButton:SetPoint("RIGHT", rightOffset, 0)
 		rightOffset = rightOffset - 35 -- Extra gap
@@ -1408,6 +1466,7 @@ function Components:CreateListItem(
 	-- Arrow Color Button (New)
 	if onArrowColor then
 		holder.arrowColorButton = CreateFrame("Button", nil, holder)
+		holder.arrowColorButton.BFL_DarkNoButtonChrome = true
 		holder.arrowColorButton:SetSize(28, 28)
 		holder.arrowColorButton:SetPoint("RIGHT", rightOffset, 0)
 		rightOffset = rightOffset - 35
@@ -1502,6 +1561,7 @@ function Components:CreateListItem(
 	-- Count Color Button (New)
 	if onCountColor then
 		holder.countColorButton = CreateFrame("Button", nil, holder)
+		holder.countColorButton.BFL_DarkNoButtonChrome = true
 		holder.countColorButton:SetSize(28, 28)
 		holder.countColorButton:SetPoint("RIGHT", rightOffset, 0)
 		rightOffset = rightOffset - 35 -- Gap
@@ -1561,7 +1621,11 @@ function Components:CreateListItem(
 
 		-- Text overlay "123"
 		local text = holder.countColorButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-		text:SetPoint("CENTER")
+		-- Compensate for the visible glyphs sitting left of the font's measured center.
+		text:SetPoint("CENTER", holder.countColorSwatch, "CENTER", 0.5, 0)
+		text:SetJustifyH("CENTER")
+		text:SetJustifyV("MIDDLE")
+		text:SetWordWrap(false)
 		text:SetText("123")
 
 		-- Use White text with Outline for universal readability on any color background
@@ -1572,6 +1636,7 @@ function Components:CreateListItem(
 
 	-- Color button (Main Group Color)
 	holder.colorButton = CreateFrame("Button", nil, holder)
+	holder.colorButton.BFL_DarkNoButtonChrome = true
 	holder.colorButton:SetSize(28, 28)
 	holder.colorButton:SetPoint("RIGHT", rightOffset, 0)
 	rightOffset = rightOffset - 35
@@ -1604,12 +1669,16 @@ function Components:CreateListItem(
 
 	-- Text overlay "Abc" (Group Name)
 	local nameIcon = holder.colorButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	nameIcon:SetPoint("CENTER")
+	nameIcon:SetPoint("CENTER", holder.colorSwatch, "CENTER", 1.5, 0)
+	nameIcon:SetJustifyH("CENTER")
+	nameIcon:SetJustifyV("MIDDLE")
+	nameIcon:SetWordWrap(false)
 	nameIcon:SetText("Abc")
 
-	-- Use White text with Outline for universal readability on any color background
-	local font, size, flags = nameIcon:GetFont()
-	SafeSetFont(nameIcon, font, size, GetResolvedFontFlags("OUTLINE"))
+	-- Leave room for the outline and remove the inherited offset shadow.
+	local font, size = nameIcon:GetFont()
+	SafeSetFont(nameIcon, font, size - 1, GetResolvedFontFlags("OUTLINE"))
+	nameIcon:SetShadowColor(0, 0, 0, 0)
 	nameIcon:SetTextColor(1, 1, 1)
 
 	-- Store order index
@@ -1621,6 +1690,11 @@ function Components:CreateListItem(
 		holder.orderText:SetText(newIndex)
 	end
 
+	if modernReview then
+		holder.nameText:SetPoint("RIGHT", holder.colorButton, "LEFT", -8, 0)
+		holder.nameText:SetWordWrap(false)
+	end
+
 	return holder
 end
 
@@ -1628,9 +1702,10 @@ end
 -- CreateButton
 -- ========================================
 function Components:CreateButton(parent, text, onClick, tooltip)
-	local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+	local button = CreateFrame("Button", nil, parent, self:GetActionButtonTemplate())
 	button:SetSize(FIELD_WIDTH, 24)
 	button:SetText(text)
+	button.BFL_SettingDescriptions = tooltip and { tooltip }
 
 	-- Apply BetterFriendlist styling
 	button:SetNormalFontObject("BetterFriendlistFontNormal")
@@ -1660,7 +1735,13 @@ end
 -- ========================================
 function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetHeight(COMPONENT_HEIGHT)
+	holder.BFL_SearchLabels = { leftData and leftData.label, rightData and rightData.label }
+	holder.BFL_SettingSlotCount = 2
+	holder.BFL_SettingDescriptions = { leftData and leftData.tooltipDesc, rightData and rightData.tooltipDesc }
+
+	local review = BFL:GetModule("LegacySettingsReview")
+	local wrap = review and review.active
+	holder:SetHeight(wrap and 33 or COMPONENT_HEIGHT)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 
@@ -1674,6 +1755,7 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 	if leftData then
 		leftLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 		leftLabel:SetJustifyH("LEFT")
+		if wrap then leftLabel:SetWordWrap(true) end
 		leftLabel:SetText(leftData.label)
 
 		leftCheck = CreateFrame("CheckButton", nil, holder, template)
@@ -1717,6 +1799,7 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 	if rightData then
 		rightLabel = holder:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 		rightLabel:SetJustifyH("LEFT")
+		if wrap then rightLabel:SetWordWrap(true) end
 		rightLabel:SetText(rightData.label)
 
 		rightCheck = CreateFrame("CheckButton", nil, holder, template)
@@ -1758,12 +1841,15 @@ function Components:CreateDoubleCheckbox(parent, leftData, rightData)
 	-- The dark skin draws one border for each checkbox in this grid.
 	if leftCheck then
 		leftCheck.BFL_SettingsGridCheck = true
+		leftCheck.BFL_SettingsCheckboxBorderInset = CHECKBOX_X_OFFSET
 	end
 	if rightCheck then
 		rightCheck.BFL_SettingsGridCheck = true
+		rightCheck.BFL_SettingsCheckboxBorderInset = CHECKBOX_X_OFFSET
 	end
 	holder.LeftCheckbox = leftCheck
 	holder.RightCheckbox = rightCheck
+	holder.BFL_SettingGridLabels = { leftLabel, rightLabel }
 
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
@@ -1808,6 +1894,10 @@ end
 -- ========================================
 function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 	local holder = CreateFrame("Frame", nil, parent)
+	holder.BFL_SearchLabels = { checkboxData and checkboxData.label, dropdownData and dropdownData.label }
+	holder.BFL_SettingSlotCount = 2
+	holder.BFL_SettingDescriptions = { checkboxData and checkboxData.tooltipDesc, dropdownData and dropdownData.tooltipDesc }
+
 	holder:SetHeight(COMPONENT_HEIGHT + 8)
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
@@ -1825,6 +1915,7 @@ function Components:CreateCheckboxDropdown(parent, checkboxData, dropdownData)
 		leftLabel:SetText(checkboxData.label)
 
 		leftCheck = CreateFrame("CheckButton", nil, holder, template)
+		leftCheck.BFL_SettingsCheckboxBorderInset = CHECKBOX_X_OFFSET
 		if leftCheck.Text then
 			leftCheck.Text:SetText("")
 		end
@@ -2029,9 +2120,10 @@ end
 -- ========================================
 -- INPUT BOX (Label Left, EditBox Right - Grid Aligned)
 -- ========================================
-function Components:CreateInput(parent, labelText, initialValue, callback, inputWidth)
+function Components:CreateInput(parent, labelText, initialValue, callback, inputWidth, action)
 	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetHeight(COMPONENT_HEIGHT + 6) -- Input boxes need a bit more height
+	holder.BFL_SearchLabels = { labelText }
+	holder:SetHeight(COMPONENT_HEIGHT + 6 + (action and 28 or 0))
 	holder:SetPoint("LEFT", PADDING_LEFT, 0)
 	holder:SetPoint("RIGHT", -PADDING_RIGHT, 0)
 
@@ -2047,6 +2139,13 @@ function Components:CreateInput(parent, labelText, initialValue, callback, input
 	inputBox:SetAutoFocus(false)
 	inputBox:SetFontObject("BetterFriendlistFontHighlight")
 
+	if action then
+		local button = self:CreateButton(holder, action.label, action.onClick)
+		ResizeActionButton(button)
+		button:SetPoint("TOPRIGHT", inputBox, "BOTTOMRIGHT", 0, -5)
+	end
+	local inputOffset = action and 14 or 0
+
 	-- Store custom width for use in resize handler
 	local customInputWidth = inputWidth
 
@@ -2056,11 +2155,11 @@ function Components:CreateInput(parent, labelText, initialValue, callback, input
 		local inputWidth = customInputWidth or FIXED_CONTROL_WIDTH
 
 		inputBox:ClearAllPoints()
-		inputBox:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+		inputBox:SetPoint("RIGHT", self, "RIGHT", 0, inputOffset)
 		inputBox:SetWidth(inputWidth)
 
 		label:ClearAllPoints()
-		label:SetPoint("LEFT", self, "LEFT", 0, 0)
+		label:SetPoint("LEFT", self, "LEFT", 0, inputOffset)
 		label:SetPoint("RIGHT", inputBox, "LEFT", -CONTROL_GAP, 0)
 	end)
 
@@ -2093,6 +2192,7 @@ function Components:CreateInput(parent, labelText, initialValue, callback, input
 	holder.Input = inputBox
 
 	holder.SetTooltip = function(_, title, desc)
+		holder.BFL_SettingDescriptions = { desc or title }
 		inputBox:SetScript("OnEnter", function(self)
 			BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 			BFL_Tooltip:SetText(title, 1, 1, 1)

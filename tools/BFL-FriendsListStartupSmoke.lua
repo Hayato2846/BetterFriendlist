@@ -60,6 +60,7 @@ local function setup(accounts, options)
 		GetInfoFormatString = function() return "%zone%" end,
 		IsInfoDisabled = function() return false end,
 		GetNickname = function() return "" end,
+		GetFriendGroups = function() return {} end,
 	}
 	local shown = true
 	local frame = { IsShown = function() return shown end, GetWidth = function() return 440 end,
@@ -106,6 +107,7 @@ local function setup(accounts, options)
 	execute(read("Locales/enUS.lua"), "Locales/enUS.lua")
 	execute(read("Data/ClassColors.lua"), "Data/ClassColors.lua")
 	execute(read("Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
+	execute(read("Utils/FriendNotes.lua"), "Utils/FriendNotes.lua")
 	execute(read("Modules/KnownCharacters.lua"), "Modules/KnownCharacters.lua")
 	execute(read("Utils/ClassUtils.lua"), "Utils/ClassUtils.lua")
 	execute(read("Modules/FilterSortRegistry.lua"), "Modules/FilterSortRegistry.lua")
@@ -127,6 +129,22 @@ local function setup(accounts, options)
 		setShown = function(value) shown = value end, paints = function() return paints end,
 		rows = function() return options.modern and list.scrollBox:GetDataProvider().rows or list.classicDisplayList end,
 	}
+end
+do
+	local context = setup({})
+	context.BFL.modules.DB.GetNickname = function(_, uid)
+		if uid == "bnet_43" then return "Shared keyword" end
+	end
+	context.BFL.NativeFriendsSearch = {
+		Matches = function(_, friend, text)
+			return friend.bnetAccountID == 42 and text == "shared keyword"
+		end,
+	}
+	context.list:SetSearchText("shared keyword", true)
+	check(context.list:PassesFilters({ type = "bnet", bnetAccountID = 42 }), "A Blizzard-only match is included")
+	check(context.list:PassesFilters({ type = "bnet", bnetAccountID = 43, uid = "bnet_43" }), "A BFL nickname match is included")
+	check(context.list:PassesFilters({ type = "bnet", bnetAccountID = 44, note = "Shared keyword" }), "A BFL note match is included")
+	check(not context.list:PassesFilters({ type = "bnet", bnetAccountID = 45 }), "A friend matching neither search is filtered")
 end
 -- A layout switch replaces the view without rebinding the animated scroll pair.
 for _, preference in ipairs({ {}, { value = false }, { value = true } }) do
@@ -213,6 +231,35 @@ for _, modern in ipairs({ false, true }) do
 		for _, row in ipairs(context.rows()) do
 			if row.friend then equal(row.friend.displayName, fixture.expected, "The UI backend receives the nonduplicated Title display name") end
 		end
+	end
+end
+for _, modern in ipairs({ false, true }) do
+	local account = title()
+	local context = setup({ account }, { modern = modern, showFactionIcons = true })
+	local seasonIcon = "|TTimerunningIcon:12:12|t"
+	context.env.TimerunningUtil = { AddSmallIcon = function(name) return seasonIcon .. name end }
+	context.list:UpdateFriendsList()
+	local friend = context.list.friendsList[1]
+	local initial = context.list:GetDisplayName(friend)
+	check(initial:find("PlusManz-", 1, true) and not initial:find("(", 1, true), "The default Title name keeps its faction icon without parentheses")
+	friend.timerunningSeasonID = 1
+	equal(context.list:GetDisplayName(friend), initial:gsub("Ada Lovelace", seasonIcon .. "Ada Lovelace"),
+		"The Title name cache updates when the character gains a Timerunning icon")
+	friend.timerunningSeasonID = nil
+	equal(context.list:GetDisplayName(friend), initial, "The Title name cache drops the old Timerunning icon")
+end
+for _, modern in ipairs({ false, true }) do
+	local account = title()
+	account.accountName = "Raizor Spellweaver"
+	account.gameAccountInfo.characterName = account.accountName
+	for _, format in ipairs({ "%nickname% (%character%)", "%battletag% (%character%)" }) do
+		local context = setup({ account }, { modern = modern, nameFormat = format, showFactionIcons = true, colorClassNames = true })
+		context.list:UpdateFriendsList()
+		local line = context.list:GetFormattedButtonText(context.list.friendsList[1])
+		check(line:find("PlusManz-", 1, true), "The Title character keeps its faction icon in the rendered row")
+		check(line:find("|cffc79c6e", 1, true), "The Title character keeps its class color in the rendered row")
+		local _, occurrences = line:gsub("Raizor Spellweaver", "")
+		check(occurrences == 1 and not line:find("(", 1, true), "A missing nickname or BattleTag must not repeat a Title character: " .. line)
 	end
 end
 for _, modern in ipairs({ false, true }) do
@@ -408,4 +455,76 @@ for _, classic in ipairs({ false, true }) do
 	equal(#entries, 1, "The actual Retail/Classic collection path passes its native account snapshot to KnownCharacters")
 	equal(entries[1].source, "observed", "Production collection stores an observed, not guessed, association")
 end
+-- These are the same fixture situations used by the settings comparisons.
+for _, classic in ipairs({ false, true }) do
+	local context = setup({}, { classic = classic })
+	local list, project = context.list, context.env.WOW_PROJECT_ID
+	local function Match(program, mode, projectID)
+		return list:IsFriendInGameForGroup({ type = "bnet", connected = true,
+			gameAccountInfo = { isOnline = true, clientProgram = program, wowProjectID = projectID } }, mode)
+	end
+	check(list:IsFriendInGameForGroup({ type = "wow", connected = true }, "same_game"), "online character friend belongs to In-Game")
+	check(not list:IsFriendInGameForGroup({ type = "wow", connected = false }, "any_game"), "offline character friend stays out of In-Game")
+	check(Match("WoW", "same_game", project), "same WoW flavor appears in WoW Only")
+	check(not Match("WoW", "same_game", project + 1), "different WoW flavor stays out of WoW Only")
+	check(not Match("WTCG", "same_game", project) and Match("WTCG", "any_game"), "other games appear only in Any Game")
+	check(not Match("App", "any_game") and not Match("BSAp", "any_game"), "Battle.net desktop and mobile app stay out of Any Game")
+
+	local mappings = { a = "tag:a", b = "tag:b" }
+	local groups = { ["tag:a"] = {}, ["tag:b"] = {} }
+	local tags = { { id = "b" }, { id = "a" } }
+	local matched, prioritized = {}, {}
+	list:AppendDynamicTagGroups(tags, mappings, groups, {}, matched, false)
+	list:AppendDynamicTagGroups(tags, mappings, groups, {}, prioritized, true)
+	equal(table.concat(matched, ","), "tag:b,tag:a", "multiple matches follow the supplied tag order")
+	equal(table.concat(prioritized, ","), "tag:b", "the first matching group wins when prioritized")
+end
+
+do
+	local context = setup({}, { modern = true })
+	local list, env, BFL = context.list, context.env, context.BFL
+	local groupId = "tag:test"
+	local first, second = { name = "First" }, { name = "Second" }
+	local header = { buttonType = 2, groupId = groupId, collapsed = true, count = 2 }
+	local nextHeader = { buttonType = 2, groupId = "tag:next" }
+	local createProvider = env.CreateDataProvider
+	env.CreateDataProvider = function()
+		local provider = createProvider()
+		function provider:Enumerate() return ipairs(self.rows) end
+		return provider
+	end
+	local provider = env.CreateDataProvider()
+	provider:Insert(header)
+	provider:Insert(nextHeader)
+	list.scrollBox:SetDataProvider(provider)
+	list.groupedFriends = { [groupId] = { first, second } }
+	env.BetterFriendlistDB.groupStates = { [groupId] = true }
+	BFL.SettingsVersion = 5
+	BFL.ForceRefreshFriendsList = function() error("Toggling a tag group must not reload friends") end
+	local function Toggle()
+		list:ToggleGroup(groupId)
+		return context.rows()
+	end
+	local rows = Toggle()
+	equal(#rows, 4, "Expanding inserts only the displayed members")
+	equal(rows[2].friend, first, "Expanding preserves the filtered sort order")
+	equal(rows[3].friend, second, "The second filtered friend follows the first")
+	equal(rows[4], nextHeader, "Expanding preserves the next group")
+	equal(header.collapsed, false, "Expanding updates the header")
+	rows = Toggle()
+	equal(#rows, 2, "Collapsing removes the tag group's rows")
+	equal(rows[2], nextHeader, "Collapsing leaves the next group untouched")
+	equal(env.BetterFriendlistDB.groupStates[groupId], true, "The collapsed state persists")
+	equal(#Toggle(), 4, "Repeated toggles keep the member cache usable")
+	equal(BFL.SettingsVersion, 5, "A display-only toggle does not invalidate settings")
+	list.scrollBox = nil
+	local rendered = false
+	list.RenderDisplay = function(self)
+		check(self.lastBuildSignature == nil, "The fallback invalidates the display cache")
+		rendered = true
+	end
+	list:ToggleGroup(groupId)
+	check(rendered, "The fallback redraws without reloading friends")
+end
+
 io.write("[OK] FriendsList startup smoke: " .. assertions .. " assertions (complete production module; mocked C APIs/widgets)\n")

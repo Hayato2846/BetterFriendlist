@@ -105,7 +105,35 @@ io.write(string.format("Toggle roundtrips: %d passed, %d mismatches, %d callback
 assert(failures == 0 and errors == 0, "toggle persistence regressed")
 
 -- Supply only addon-owned frame geometry for size/scale persistence.
-BFL.MainFrame = { SetSize = function() end, SetScale = function() end }
+local uiScale, frameScale = 1, 1
+env.UIParent = { GetEffectiveScale = function() return uiScale end }
+env.InCombatLockdown = function() return false end
+BFL.MainFrame = {
+	SetSize = function() end,
+	GetScale = function() return frameScale end,
+	SetScale = function(_, scale) frameScale = scale end,
+}
+
+local scheduled
+local timerAfter = env.C_Timer.After
+env.C_Timer.After = function(_, callback) scheduled = callback end
+local FrameSettings = BFL.modules.FrameSettings
+FrameSettings:OnPlayerLogin()
+scheduled()
+FrameSettings:ApplyScale(1.25)
+uiScale = 0.75
+events.DISPLAY_SIZE_CHANGED[1][1]()
+events.UI_SCALE_CHANGED[1][1]()
+scheduled()
+equal(uiScale * frameScale, 1.25, "display changes preserve the effective window scale")
+equal(env.BetterFriendlistDB.windowScale, 1.25, "display changes preserve the saved window scale")
+
+uiScale = 0.5
+events.CVAR_UPDATE[1][1]("uiScale")
+events.UI_SCALE_CHANGED[1][1]()
+scheduled()
+equal(frameScale, 1.25, "explicit WoW UI scaling resets the scale reference")
+env.C_Timer.After = timerAfter
 local valuePasses, valueFailures, valueErrors = 0, 0, 0
 for _, control in ipairs(controls) do
 	local values

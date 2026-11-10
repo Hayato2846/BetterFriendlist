@@ -294,6 +294,9 @@ local function GetFriendUID(friend)
 end
 
 local function GetNickname(friend)
+	if friend and friend.settingsSample then
+		return friend.sampleNickname
+	end
 	local DB = GetDB()
 	local uid = GetFriendUID(friend)
 	if DB and DB.GetNickname and uid then
@@ -303,14 +306,18 @@ local function GetNickname(friend)
 end
 
 local function GetFriendGroups(friend)
-	local uid = GetFriendUID(friend)
-	if not uid or not BetterFriendlistDB or type(BetterFriendlistDB.friendGroups) ~= "table" then
-		return nil
+	if friend and friend.settingsSample then
+		return friend.sampleGroupIDs
 	end
-	return BetterFriendlistDB.friendGroups[uid]
+	local uid = GetFriendUID(friend)
+	local DB = BFL:GetModule("DB")
+	return uid and DB and DB:GetFriendGroups(uid)
 end
 
 local function GetRecentlyAddedAgeDays(friend)
+	if friend and friend.settingsSample then
+		return friend.sampleRecentlyAdded
+	end
 	local uid = GetFriendUID(friend)
 	if not uid or not BetterFriendlistDB or type(BetterFriendlistDB.recentlyAddedTimestamps) ~= "table" then
 		return nil
@@ -469,15 +476,19 @@ local function GetFieldValue(friend, field)
 	elseif field == "accountCount" then
 		return friend.numGameAccounts or (friend.gameAccounts and #friend.gameAccounts) or 0
 	elseif field == "tag" then
+		if friend.settingsSample then return friend.sampleTagText or "" end
 		local FriendTags = BFL:GetModule("FriendTags")
 		return FriendTags and FriendTags.GetSearchText and FriendTags:GetSearchText(friend) or ""
 	elseif field == "tagSource" then
+		if friend.settingsSample then return friend.sampleTagSource or "" end
 		local FriendTags = BFL:GetModule("FriendTags")
 		return FriendTags and FriendTags.GetTagSourceText and FriendTags:GetTagSourceText(friend) or ""
 	elseif field == "tagCount" then
+		if friend.settingsSample then return friend.sampleTagCount or 0 end
 		local FriendTags = BFL:GetModule("FriendTags")
 		return FriendTags and FriendTags.GetTagCount and FriendTags:GetTagCount(friend) or 0
 	elseif field == "hasTag" then
+		if friend.settingsSample then return (friend.sampleTagCount or 0) > 0 end
 		local FriendTags = BFL:GetModule("FriendTags")
 		return FriendTags and FriendTags.GetTagCount and FriendTags:GetTagCount(friend) > 0 or false
 	elseif field == "displayName" or field == "name" then
@@ -1549,6 +1560,9 @@ function Registry:RefreshNativeQueueFilter(id)
 end
 
 function Registry:EvaluateNativeQueueFilter(id, friend)
+	if friend and friend.settingsSample then
+		return friend.type == "bnet" and friend.sampleQueueStatus == id
+	end
 	local state = self.nativeQueueFilterState
 	if not state or state.id ~= id or state.valid ~= true then
 		-- Restricted/nil native results must never blank BFL's list.
@@ -1560,10 +1574,20 @@ function Registry:EvaluateNativeQueueFilter(id, friend)
 	return state.matches[friend.index] == true
 end
 
+function Registry:EvaluateSettingsFilterAST(ast, friend)
+	return EvaluateAST(ast, friend)
+end
+
 function Registry:EvaluateQuickFilter(id, friend)
 	local cacheKey = tostring(id or self.FALLBACK_FILTER)
 	if cacheKey == self.FALLBACK_FILTER then
 		return true
+	end
+	if type(friend) == "table" and friend.settingsSample then
+		local entry, custom = ResolveQuickFilterEntry(self, id, false)
+		if custom then return EvaluateAST(entry.ast, friend) end
+		local evaluator = (entry and entry.evaluator) or BuiltinQuickFilter_All
+		return evaluator(friend)
 	end
 
 	local useFriendCache = type(friend) == "table"
@@ -1734,14 +1758,21 @@ end
 
 local NAME_FALLBACK_SORT_STEP = { field = "name", direction = "asc", empty = "last" }
 
-function Registry:CreateSortPlan(primaryId, secondaryId)
-	local primary = ResolveSorterEntry(self, primaryId, true, self.FALLBACK_PRIMARY_SORT)
+function Registry:CreateSortPlan(primaryId, secondaryId, includeHidden)
+	local primary = ResolveSorterEntry(self, primaryId, not includeHidden, self.FALLBACK_PRIMARY_SORT)
 	local secondary = ResolveSorterEntry(self, secondaryId, true, self.FALLBACK_SECONDARY_SORT)
 	return {
 		primary = primary,
 		secondary = secondary,
 		primaryContainsFavorite = primary and ChainContainsField(primary.chain, "favorite") or false,
 	}
+end
+
+function Registry:CreateSettingsSortPlan(chain, secondaryID)
+	local plan = self:CreateSortPlan(nil, secondaryID)
+	plan.primary = { chain = NormalizeSorterChain(chain) }
+	plan.primaryContainsFavorite = ChainContainsField(plan.primary.chain, "favorite")
+	return plan
 end
 
 function Registry:CompareFriendsWithSortPlan(a, b, plan)
@@ -1961,6 +1992,25 @@ local function GetBuiltinFilterAST(id)
 	return NewCustomFilterAST()
 end
 
+local function GetFilterTemplateAST(template, db)
+	if template and template.isCustom and db and db.customQuickFilters[template.id] then
+		return DeepCopy(db.customQuickFilters[template.id].ast)
+	end
+	if template and BUILTIN_QUICK_FILTER_MAP[template.id] then
+		return GetBuiltinFilterAST(template.id)
+	end
+	return NewCustomFilterAST()
+end
+
+function Registry:GetSettingsTemplateRules(kind, templateId)
+	if kind == "sorter" then
+		local template = templateId and self:ResolveSorter(templateId, false, self.FALLBACK_PRIMARY_SORT)
+		return nil, NormalizeSorterChain(template and template.chain)
+	end
+	local template = templateId and self:ResolveQuickFilter(templateId, false)
+	return NormalizeGroup(GetFilterTemplateAST(template, self:EnsureDB()))
+end
+
 function Registry:CreateCustomQuickFilter(templateId)
 	local db = self:EnsureDB()
 	if not db then
@@ -1971,24 +2021,21 @@ function Registry:CreateCustomQuickFilter(templateId)
 	db.nextCustomQuickFilterId = nextId + 1
 
 	local template = templateId and self:ResolveQuickFilter(templateId, false) or nil
-	local ast = NewCustomFilterAST()
 	local name = GetLocale("FILTER_BUILDER_NEW_FILTER", "Custom Filter")
 	local icon = BFL_ICON_PREFIX .. "filter-all"
 	if template and template.isCustom and db.customQuickFilters[template.id] then
-		ast = DeepCopy(db.customQuickFilters[template.id].ast)
 		name = template.name
 		icon = template.icon
 	elseif template and BUILTIN_QUICK_FILTER_MAP[template.id] then
 		name = template.name .. " " .. GetLocale("FILTER_BUILDER_COPY_SUFFIX", "Copy")
 		icon = template.icon
-		ast = GetBuiltinFilterAST(template.id)
 	end
 
 	db.customQuickFilters[id] = {
 		id = id,
 		name = name,
 		icon = icon,
-		ast = NormalizeGroup(ast),
+		ast = NormalizeGroup(GetFilterTemplateAST(template, db)),
 	}
 	AddUnique(db.quickFilterOrder, id)
 	self:InvalidateCaches()
