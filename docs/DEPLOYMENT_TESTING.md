@@ -269,21 +269,69 @@ Back up Retail SavedVariables:
 
 ## Release Candidate Flow
 
-1. Merge feature branches into `main`.
+1. Identify the authorized version and the refs to publish. Merge the intended changes into
+   `main` locally. Keep `codex/*` branches local.
 2. Create a release-candidate worktree from `main`.
-3. Run `.\tools\BFL-PackageCheck.ps1`; it also verifies that tracked internal files are excluded by `.pkgmeta`.
-4. Deploy the candidate with `CleanCopy` to Retail and the relevant Classic clients.
-5. Test with clean and migrated SavedVariables profiles.
-6. Update `CHANGELOG.md` and the `.toc` version when doing release work.
-7. Create the tag through the local release gate. It validates full locale coverage, English leakage,
-   placeholder/markup parity, translation freshness, and runtime switching through all locales before a tag exists:
-   `.\tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z`. Add `-Push` only when publication is intended.
-   Do not create or push release tags with raw git commands. GitHub Actions packages and publishes
-   only the already validated tag.
-   Discord release notes are sent only for newly created stable or beta release tags, not for
-   force-pushed tag corrections. Beta release notes use a distinct embed color and include
-   a beta-version notice.
-8. Download/install the generated ZIP with `BFL-InstallRelease.ps1` and do one exact-package smoke test.
+3. Update both TOC versions and date the version entry in `CHANGELOG.md`. Run
+   `.\tools\BFL-PackageCheck.ps1` to sync `Modules/Changelog.lua` and verify package exclusions.
+4. **Review the exact public copy.** Read the entire version entry through its last line and
+   compare it with the in-game entry. Inspect every slash command, including text carried forward
+   from the draft. Remove test, debug, diagnostic, and internal recovery commands. Describe the
+   player-visible result and leave storage and implementation details in technical documentation.
+   Review the entry as it will appear on download sites and Discord.
+5. Deploy the candidate with `CleanCopy` to Retail and the relevant Classic clients. Test with
+   clean and migrated SavedVariables profiles.
+6. Commit the reviewed candidate and run
+   `.\tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z -ValidateOnly`. The gate checks locale
+   coverage, English leakage, placeholder and markup parity, translation freshness, runtime
+   locale switching, and package readiness.
+7. Publish the agreed `main` commit with `git push origin refs/heads/main:refs/heads/main`.
+   Confirm that `origin/main` points at the reviewed commit. Use
+   `.\tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z -Push` only for the authorized version.
+8. Check the release run against the tag and commit. Verify the version and embedded changelog
+   in the published ZIP, check the upload result for each download site, and check the Discord
+   step separately. Use `BFL-InstallRelease.ps1` for an exact-package smoke test.
+
+### Correcting a published release
+
+- Establish whether the correction affects the package, public release text, Discord, or several
+  of them. Keep the requested version. Get explicit authorization before publishing a different
+  version or replacing a published tag.
+- For an authorized same-version rebuild, fix and review the release entry on `main`, keep both
+  TOC versions, and rerun the release checks. Compare the existing annotated tag object from
+  `git rev-parse refs/tags/vX.Y.Z` with
+  `git ls-remote --refs origin refs/tags/vX.Y.Z`. Use the tag object's SHA, which is the
+  unpeeled ref. After pushing the corrected `main`, run the guarded replacement.
+
+  ```powershell
+  .\tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z -ReplaceTagObject <existing-tag-object-sha> -Push
+  ```
+
+  If the ref changed or the release gate fails, stop and recheck the target. Verify the updated
+  tag, published ZIP, and each upload separately.
+- A tag replacement skips the automatic Discord announcement. To fix the existing message, open
+  **Actions → Package and Release → Run workflow** on `main`, enter `release_tag` and
+  `discord_message_link`, then verify the edit in the job log. This mode updates one existing
+  webhook message using the changelog from the named tag. It skips packaging and requires the
+  full entry to fit in one Discord message. For a release split across multiple messages, plan
+  the edits for the affected posts before changing any of them.
+- If an unintended tag starts a run, check its status and cancel it while possible. Record which
+  destinations already received files or messages. GitHub refs, the GitHub release, download sites,
+  and Discord are separate destinations. Verify cleanup at each affected destination before
+  reporting it complete.
+
+### Lessons from 3.1.0
+
+- A broad push published a local `codex/*` branch. Release pushes now use an explicit destination
+  for `main` and the release helper for the authorized tag.
+- The final changelog bullet exposed an internal command and a storage detail. The pre-tag review
+  now covers the full public entry, including its final line and any commands inherited from drafts.
+- The correction first went out under a new version. That run reached download sites and
+  Discord before it could be canceled. The approved correction replaced `v3.1.0` and the existing
+  Discord announcement was edited in a separate manual run.
+  [Unintended release run](https://github.com/Hayato2846/BetterFriendlist/actions/runs/42845500061) ·
+  [Same-tag rebuild](https://github.com/Hayato2846/BetterFriendlist/actions/runs/42846120617) ·
+  [Discord edit](https://github.com/Hayato2846/BetterFriendlist/actions/runs/42847559252)
 
 ## Review Automation
 

@@ -12,6 +12,7 @@
 - Use one branch and one worktree per feature, issue, or parallel Codex thread.
 - Prefer names that describe the top-level goal. For GitHub issues, prefix both branch and worktree with `issue-NNN-`.
 - Avoid overlapping edits to the same file regions from multiple threads. If overlap is possible, refresh `git status` and inspect the diff before patching.
+- Keep `codex/*` branches local. For releases, merge the feature locally, push the authorized `main` commit with an explicit refspec, and publish only the authorized tag.
 - Use `tools\BFL-Worktree.ps1` for worktree creation, listing, and workspace regeneration.
 
 ## Implementation Rules
@@ -33,11 +34,19 @@
 - Use `tools\BFL-ReviewCheck.ps1` for focused review diagnostics when `ReadyForQA` is too broad.
 - Keep `.pkgmeta` aligned with ignored internal files so release packages do not include Codex, docs, tools, logs, backups, or workspace metadata.
 
+## Public Changelog
+
+- Keep test commands out of the changelog, including drafts. The same rule covers debug, diagnostic, and internal recovery commands, even if the maintainer used them during testing.
+- Write what players can do or what they will notice. Describe internal storage, IDs, and implementation details only in technical documentation. Mention a slash command in release notes only if it is a supported player-facing entry point and helps players use the change.
+- Before publishing, read the full version entry line by line, including previously reviewed bullets and the last bullet. Check the synchronized in-game changelog and verify that every command in the release entry is meant for players. The same entry reaches the package and Discord.
+
 ## Release Tags
 
 - Never create or push a release tag with raw `git tag` or `git push ... vX.Y.Z` commands.
 - Use `tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z` for local validation and tag creation. Add `-Push` only when publication was explicitly requested.
+- Keep the authorized version throughout a correction. Replacing an existing tag requires explicit authorization for that tag. A different version requires its own authorization.
 - The tag gate must pass the full localization contract, translation-freshness check, and Lua locale-switching runtime smoke before a tag exists. Do not bypass, weaken, or move these checks into `.github\workflows\release.yml`.
+- Follow the [release checklist and correction procedure](docs/DEPLOYMENT_TESTING.md#release-candidate-flow). Verify publication in GitHub Actions and check each destination separately after a correction.
 
 ## VSCode And Codex
 
