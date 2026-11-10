@@ -138,14 +138,33 @@ foreach ($captureVariant in $variants) {
         $process.ArgumentList.Add($argument)
     }
 
-    Write-Host "[BFL UI] Rendering $captureVariant"
-    $capture = [Diagnostics.Process]::Start($process)
+    $captureLock = [Threading.Mutex]::new($false, 'Local\BFLWoWUISimulator')
+    $hasCaptureLock = $false
+    $capture = $null
     try {
+        try {
+            $hasCaptureLock = $captureLock.WaitOne(0)
+        } catch [Threading.AbandonedMutexException] {
+            $hasCaptureLock = $true
+        }
+        if (-not $hasCaptureLock) {
+            throw 'A BFL simulator capture is already running in this Windows session.'
+        }
+
+        # A manually started simulator or a survivor of an interrupted run may
+        # not own the capture lock. Leave it alone and skip this capture.
+        $running = @(Get-Process -Name 'wow-sim', 'wow-ui-sim' -ErrorAction SilentlyContinue)
+        if ($running.Count) {
+            throw "A WoW UI Simulator is already running (PID $($running.Id -join ', '))."
+        }
+
+        Write-Host "[BFL UI] Rendering $captureVariant"
+        $capture = [Diagnostics.Process]::Start($process)
         $stdout = $capture.StandardOutput.ReadToEndAsync()
         $stderr = $capture.StandardError.ReadToEndAsync()
         $finished = $capture.WaitForExit(180000)
         if (-not $finished) {
-            $capture.Kill()
+            $capture.Kill($true)
             $capture.WaitForExit()
         }
         [IO.File]::WriteAllText($log, "$($stderr.GetAwaiter().GetResult())`n$($stdout.GetAwaiter().GetResult())")
@@ -160,6 +179,20 @@ foreach ($captureVariant in $variants) {
         Write-Host "[BFL UI] $($frame.Line.Trim())"
         Write-Host "[BFL UI] $png"
     } finally {
-        $capture.Dispose()
+        try {
+            if ($capture) {
+                try {
+                    if (-not $capture.HasExited) {
+                        $capture.Kill($true)
+                        $capture.WaitForExit()
+                    }
+                } finally {
+                    $capture.Dispose()
+                }
+            }
+        } finally {
+            if ($hasCaptureLock) { $captureLock.ReleaseMutex() }
+            $captureLock.Dispose()
+        }
     }
 }

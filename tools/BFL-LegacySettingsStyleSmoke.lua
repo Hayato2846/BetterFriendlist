@@ -100,7 +100,10 @@ local function region(parent)
 		-- The native scrollbar dispatches even when the percentage is unchanged.
 		if self.callback then self.callback(self.callbackOwner, self.percentage) end
 	end
-	function r:SetVisibleExtentPercentage(value) self.visibleExtent = value end
+	function r:SetVisibleExtentPercentage(value)
+		self.visibleExtent = value
+		if self.hideIfUnscrollable then self:SetShown(value < 1) end
+	end
 	function r:SetPanExtentPercentage(value) self.panExtent = value end
 	function r:ScrollStepInDirection(direction) self:SetScrollPercentage((self.percentage or 0) + direction * self.panExtent) end
 	return r
@@ -120,13 +123,7 @@ local function window()
 	scroll:SetHeight(400)
 	scroll.Content = region(scroll)
 	scroll.Content:SetHeight(2000)
-	scroll.ScrollBar = region(scroll)
-	scroll.ScrollBar:SetHeight(368)
-	scroll.ScrollBar.ScrollUpButton, scroll.ScrollBar.ScrollDownButton, scroll.ScrollBar.ThumbTexture = region(), region(), region()
-	scroll.ScrollBar:SetScript("OnValueChanged", UIPanelScrollBar_OnValueChanged)
-	scroll:SetScript("OnVerticalScroll", ScrollFrame_OnVerticalScroll)
-	scroll:SetScript("OnScrollRangeChanged", ScrollFrame_OnScrollRangeChanged)
-	scroll:SetScript("OnMouseWheel", ScrollFrameTemplate_OnMouseWheel)
+
 	return frame
 end
 BetterFriendlistSettingsFrame = window()
@@ -152,6 +149,13 @@ function hooksecurefunc(owner, method, callback)
 		return table.unpack(results, 1, results.n)
 	end
 end
+local settingsFile = assert(io.open(root .. "/Modules/Settings.lua", "rb"))
+local settingsSource = settingsFile:read("*a"); settingsFile:close()
+local helperFirst = assert(settingsSource:find("local function HasSettingsScrollOverflow(", 1, true))
+local helperLast = assert(settingsSource:find("local function SetDeleteIconTexture(", helperFirst, true))
+local settingsEnv = setmetatable({ Settings = {} }, { __index = _G })
+assert(load(settingsSource:sub(helperFirst, helperLast - 1), "@production settings scrollbar visibility", "t", settingsEnv))()
+modules.Settings = settingsEnv.Settings
 assert(loadfile(root .. "/Modules/LegacySettingsStyle.lua"))("BetterFriendlist", BFL)
 local style = modules.LegacySettingsStyle
 local frame = BetterFriendlistSettingsFrame
@@ -170,17 +174,10 @@ check(not frame.ButtonSeparator.shown, "no extra bottom rim splits the Modern su
 check(surfaces.navigationDivider.shown and surfaces.navigationDivider.width == 1, "navigation has a subtle vertical separation")
 check(surfaces.navigationDivider.points.TOPLEFT[1] == frame.CategoryList, "vertical separation follows dynamic sidebar width")
 local scroll = frame.ContentScrollFrame
-local scrollbar = frame.BFL_ModernSettingsScrollBar
-check(scrollbar.template == "MinimalScrollBar" and not scroll.ScrollBar.shown and scrollbar.shown,
-	"Modern uses the native minimal scrollbar and keeps the old slider hidden")
-local settingsFile = assert(io.open(root .. "/Modules/Settings.lua", "rb"))
-local settingsSource = settingsFile:read("*a"); settingsFile:close()
-local helperFirst = assert(settingsSource:find("local function GetLegacySettingsScrollBar(", 1, true))
-local helperLast = assert(settingsSource:find("local function SetDeleteIconTexture(", helperFirst, true))
-local settingsEnv = setmetatable({ Settings = {} }, { __index = _G })
-assert(load(settingsSource:sub(helperFirst, helperLast - 1), "@production settings scrollbar visibility", "t", settingsEnv))()
-settingsEnv.Settings:UpdateLegacySettingsScrollbar(scroll)
-check(not scroll.ScrollBar.shown and scrollbar.shown, "existing settings visibility helper preserves the active modern scrollbar")
+local scrollbar = scroll.ScrollBar
+check(scrollbar.template == "MinimalScrollBar" and scrollbar.shown, "settings use the native minimal scrollbar")
+modules.Settings:UpdateLegacySettingsScrollbar(scroll)
+check(scroll.ScrollBar == scrollbar, "refreshing keeps the original minimal scrollbar")
 scrollbar:SetScrollPercentage(.75)
 check(scroll:GetVerticalScroll() == 1200, "dragging the modern thumb scrolls the existing content")
 scroll:RunScript("OnMouseWheel", 1)
@@ -191,11 +188,9 @@ scroll:RunScript("OnScrollRangeChanged", 0, scroll:GetVerticalScrollRange())
 scrollbar:SetScrollPercentage(.37123456789)
 check(math.abs(scroll:GetVerticalScroll() / scroll:GetVerticalScrollRange() - scrollbar.percentage) < .000001,
 	"fractional scroll measurements converge without callback recursion")
-scroll.ScrollBar:SetShown(true)
-check(not scroll.ScrollBar.shown, "legacy visibility updates cannot revive the old scrollbar")
 scroll.Content:SetHeight(scroll:GetHeight())
 scroll:RunScript("OnScrollRangeChanged", 0, 0)
-check(not scrollbar.shown and not scroll.ScrollBar.shown, "short categories have no scrollbar")
+check(not scrollbar.shown, "short categories have no scrollbar")
 scroll.Content:SetHeight(2000)
 scroll:RunScript("OnScrollRangeChanged", 0, scroll:GetVerticalScrollRange())
 check(scrollbar.shown, "switching to a longer category restores the modern scrollbar")
@@ -227,20 +222,15 @@ check(modules.ThemeManager:ApplyCurrentTheme(), "original theme result is preser
 check(themeCalls == 1 and frame.Bg.shown and frame.MainInset.border[4] == .8, "live Legacy switch restores native texture and rim")
 check(not surfaces.body.shown and not surfaces.topFade.shown and frame.ButtonSeparator.shown, "Legacy restores all affected surfaces")
 check(not surfaces.navigationDivider.shown and not header2.BFL_SectionDivider.shown, "Legacy hides both modern divider types")
-check(scroll.ScrollBar.shown and not scrollbar.shown, "Legacy restores its own scrollbar")
-scroll.ScrollBar:SetValue(200)
-check(scroll:GetVerticalScroll() == 200, "legacy thumb still works after switching back")
+check(scroll.ScrollBar == scrollbar and scrollbar.shown, "Legacy keeps the same minimal scrollbar")
+scrollbar:SetScrollPercentage(.25)
+local oldOffset = scroll:GetVerticalScroll()
 scroll:RunScript("OnMouseWheel", -1)
-check(scroll:GetVerticalScroll() > 200, "legacy wheel handlers are restored")
-scroll.ScrollBar:SetValue(1000)
+check(scroll:GetVerticalScroll() > oldOffset, "mouse wheel works after switching layouts")
+scroll:SetVerticalScroll(400)
 modern = true
 style:Refresh()
-scroll.Content:SetHeight(scroll:GetHeight() + 500)
-scroll:SetVerticalScroll(400)
-scroll:RunScript("OnScrollRangeChanged", 0, scroll:GetVerticalScrollRange())
-modern = false
-style:Refresh()
-check(scroll:GetVerticalScroll() == 400, "switching back preserves the current offset when the legacy slider has a stale larger value")
+check(scroll:GetVerticalScroll() == 400, "switching layouts preserves the current offset")
 modern, theme = true, "dark"
 modules.DarkTheme:SkinSettingsFrame()
 check(skinCalls == 1 and surfaces.body.shown and surfaces.body.alpha == 1, "deferred skinning cannot dim the Modern surface")
@@ -274,13 +264,96 @@ fallbackPage.parent = region()
 style:Refresh()
 check(not originalDivider.shown, "reparented sections do not carry legacy decoration into another window")
 BetterFriendlistSettingsFrame = window()
-BFL.HasModernScrollBox = false
+local nativeScrollUtil = ScrollUtil
+ScrollUtil = nil
 style:Refresh()
-check(not BetterFriendlistSettingsFrame.BFL_ModernSettingsScrollBar, "clients without modern scrolling capabilities retain their native scrollbar")
+local fallbackScroll = BetterFriendlistSettingsFrame.ContentScrollFrame
+check(not fallbackScroll.ScrollBar, "clients without the native scrollbar still use the mouse wheel")
+fallbackScroll:RunScript("OnMouseWheel", -1)
+check(fallbackScroll:GetVerticalScroll() == 30, "wheel fallback moves content")
+ScrollUtil = nativeScrollUtil
 BetterFriendlistSettingsFrame = window()
 BFL.IsMainline = false
 modules.FriendsUI = nil
 style:Refresh()
 check(#BetterFriendlistSettingsFrame.textures == 0 and BetterFriendlistSettingsFrame.Bg.shown,
 	"Classic without FriendsUI keeps its existing Legacy settings window")
+local comparison = {}
+local calls = {}
+local flatActive = true
+modules.SkinEngine = { IsActive = function() return flatActive end }
+function modules.DarkTheme:SkinSettingsComparison(engine, review)
+	check(engine == modules.SkinEngine and review == comparison, "flat themes pass the current comparison to the shared skin")
+	calls[#calls + 1] = "flat"
+end
+modules.ElvUISkin = { SkinSettingsComparison = function(_, review)
+	check(review == comparison, "ElvUI receives the active comparison")
+	calls[#calls + 1] = "elvui"
+end }
+modules.EllesmereUISkin = { SkinSettingsComparison = function(_, review)
+	check(review == comparison, "EllesmereUI receives the active comparison")
+	calls[#calls + 1] = "ellesmereui"
+end }
+theme = "dark"
+style:SkinComparison(comparison)
+theme = "custom"
+style:SkinComparison(comparison)
+flatActive = false
+for _, selection in ipairs({ "elvui", "ellesmereui", "blizzard" }) do
+	theme = selection
+	style:SkinComparison(comparison)
+end
+check(table.concat(calls, ",") == "flat,flat,elvui,ellesmereui", "only the current skin touches the comparison")
+-- Exercise the adapters with the real skin modules and instrumented widgets.
+function BFL.IsModernDropdown(widget) return widget.modernDropdown == true end
+local picker, input, scrollBar = region(), region(), region()
+function input:GetObjectType() return "EditBox" end
+function input:IsObjectType(kind) return kind == "EditBox" end
+function picker:GetObjectType() return self.modernDropdown and "DropdownButton" or "Frame" end
+local fakeComparison = {
+	comparisonPicker = picker, comparisonEditor = input,
+	hoverHelp = { scroll = { ScrollBar = scrollBar } },
+}
+
+assert(loadfile(root .. "/Modules/EllesmereUISkin.lua"))("BetterFriendlist", BFL)
+local eui = modules.EllesmereUISkin
+function eui:IsSkinEnabled() return true end
+picker.modernDropdown = true
+local euiPicker, euiInput, euiScroll
+eui.facade = {
+	Dropdown = function(widget) euiPicker = widget end,
+	EditBox = function(widget) euiInput = widget end,
+	ScrollBar = function(widget, keepSteppers) if keepSteppers then euiScroll = widget end end,
+}
+eui:SkinSettingsComparison(fakeComparison)
+check(euiPicker == picker and euiInput == input and euiScroll == scrollBar,
+	"EllesmereUI skins the live comparison selector, editor and scrollbar with steppers")
+
+assert(loadfile(root .. "/Modules/ElvUISkin.lua"))("BetterFriendlist", BFL)
+local elv = modules.ElvUISkin
+function elv:IsSkinEnabled() return true end
+function elv:IsModernFriendsUIActive() return false end
+local elvModern, elvClassic, elvInput
+function elv:SkinModernDropdown(_, widget) elvModern = widget end
+function elv:SkinModernEditBox(_, widget) elvInput = widget end
+elv.ElvUISkinProxy = { HandleDropDownBox = function(_, widget) elvClassic = widget end }
+elv:SkinSettingsComparison(fakeComparison)
+picker.modernDropdown = false
+elv:SkinSettingsComparison(fakeComparison)
+check(elvModern == picker and elvClassic == picker and elvInput == input,
+	"ElvUI skins both Modern and Classic comparison dropdowns and the input")
+
+assert(loadfile(root .. "/Modules/DarkTheme.lua"))("BetterFriendlist", BFL)
+local dark = modules.DarkTheme
+local laneRow, hiddenRow = region(), region()
+hiddenRow:Hide()
+fakeComparison.comparisonLanes = { region() }
+fakeComparison.comparisonLanes[1].widgets = { laneRow, hiddenRow }
+local darkControls, darkRows = {}, {}
+dark:SkinSettingsComparison({
+	SkinControl = function(_, widget) darkControls[widget] = true end,
+	SkinRow = function(_, widget) darkRows[widget] = true end,
+}, fakeComparison)
+check(darkControls[picker] and darkControls[input] and darkRows[laneRow] and not darkRows[hiddenRow],
+	"Dark and Custom skin active controls and visible samples")
 io.write("PASS: legacy settings appearance, theme restoration, missing atlases and Classic fallback (" .. checks .. " checks)\n")

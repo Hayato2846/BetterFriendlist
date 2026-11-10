@@ -336,7 +336,12 @@ function Known:GetTooltipLines(friend)
 	local entries = self:GetEntries(friend)
 	if #entries == 0 then return nil end
 	local store = self:GetStore(false)
-	local limit = math.min(10, Number(store.maxTooltipCharacters) or 3)
+	return self:FormatTooltipLines(entries, store.maxTooltipCharacters)
+end
+
+
+function Known:FormatTooltipLines(entries, count)
+	local limit = math.min(10, Number(count) or 3)
 	local lines = { BFL.L.KC_TITLE }
 	for i = 1, math.min(limit, #entries) do
 		local entry = entries[i]
@@ -451,7 +456,7 @@ end
 function Known:RegisterLegacyControls(parent, components, frames)
 	local store = self:GetStore(false)
 	table.insert(frames, components:CreateSpacer(parent))
-	table.insert(frames, components:CreateHeader(parent, BFL.L.KC_TITLE))
+	table.insert(frames, components:CreateHeader(parent, BFL.L.KC_TITLE, "KC_TITLE"))
 	for _, info in ipairs({ { "enabled", "KC_ENABLE", "KC_DESC" }, { "observeBattleNet", "KC_AUTO", "KC_AUTO_DESC" } }) do
 		local key = info[1]
 		table.insert(frames, components:CreateCheckbox(parent, {
@@ -465,8 +470,10 @@ function Known:RegisterLegacyControls(parent, components, frames)
 		function(value) Known:SetSetting("maxTooltipCharacters", value) end)
 	slider:SetStep(1)
 	table.insert(frames, slider)
-	table.insert(frames, components:CreateButton(parent, BFL.L.KC_CLEAR_ALL,
-		function() Known:ShowDialog(nil, true) end, BFL.L.KC_CLEAR_CONFIRM))
+	local clear = components:CreateButton(parent, BFL.L.KC_CLEAR_ALL,
+		function() Known:ShowDialog(nil, true) end, BFL.L.KC_CLEAR_CONFIRM)
+	clear:SetWidth(math.max(clear:GetWidth(), clear:GetFontString():GetStringWidth() + 24))
+	table.insert(frames, clear)
 end
 
 function Known:RegisterSettingsDesignerControls(app)

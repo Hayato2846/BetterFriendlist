@@ -859,8 +859,8 @@ local function ConstrainDropdownText(dropdown, leftInset, rightInset, fontReduct
 	end
 end
 
-local function ConstrainModernDropdownText(dropdown, fontReduction, defaultLeftInset)
-	local _, themed = FriendsUI:GetModernThemeColors()
+function FriendsUI:ConstrainModernDropdownText(dropdown, fontReduction, defaultLeftInset)
+	local _, themed = self:GetModernThemeColors()
 	local leftInset = defaultLeftInset or 5
 	ConstrainDropdownText(
 		dropdown,
@@ -1534,6 +1534,30 @@ function FriendsUI:RestoreLegacyActionButtonTemplates()
 	end
 end
 
+local function CreateNativeBattleTagCopyButton(bar)
+	if not (BFL.IsMainline and C_XMLUtil and C_XMLUtil.GetTemplateInfo) then
+		return
+	end
+
+	local template = "SocialUICopyBattleTagToClipboardButtonTemplate"
+	if not C_XMLUtil.GetTemplateInfo(template) and C_AddOns and C_AddOns.LoadAddOn then
+		pcall(C_AddOns.LoadAddOn, "Blizzard_SocialUI")
+	end
+	if not C_XMLUtil.GetTemplateInfo(template) then
+		return
+	end
+
+	local button = CreateFrame("Button", nil, bar, template)
+	button:Hide()
+	if not button:GetScript("OnClick") then
+		return
+	end
+
+	-- Let the hardware click reach the inherited Blizzard script directly.
+	button:SetAllPoints(bar.CopyBattleTagButton)
+	return button
+end
+
 function FriendsUI:CreateModernRoot()
 	if self.root or not BetterFriendsFrame or not BFL.IsRetail then
 		return self.root
@@ -1544,30 +1568,6 @@ function FriendsUI:CreateModernRoot()
 	root.PortraitOverlay:SetFrameLevel(root:GetFrameLevel() + 20)
 	root:Hide()
 	self.root = root
-	local portraitButton = root.PortraitOverlay.HitButton
-	portraitButton.BFL_DarkInvisibleOverlayButton = true
-	portraitButton.Glow = root.PortraitOverlay.Glow
-	portraitButton:EnableMouse(true)
-	portraitButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	portraitButton:SetScript("OnClick", function()
-		local Changelog = BFL:GetModule("Changelog")
-		if Changelog and Changelog.ToggleChangelog then
-			Changelog:ToggleChangelog()
-		end
-	end)
-	portraitButton:SetScript("OnEnter", function(button)
-		local Changelog = BFL:GetModule("Changelog")
-		if Changelog and Changelog.OnPortraitEnter then
-			Changelog:OnPortraitEnter(button)
-		end
-	end)
-	portraitButton:SetScript("OnLeave", function()
-		BFL_Tooltip:Hide()
-	end)
-	local Changelog = BFL:GetModule("Changelog")
-	if Changelog and Changelog.CheckVersion then
-		Changelog:CheckVersion()
-	end
 
 	if root.FilterBar.SortButton.SetupMenu then
 		root.FilterBar.SortButton:SetupMenu(function(_, rootDescription)
@@ -1664,6 +1664,7 @@ function FriendsUI:CreateModernRoot()
 		GameTooltip:Show()
 	end)
 	copyBattleTagButton:SetScript("OnLeave", GameTooltip_Hide)
+	root.BattleNetBar.NativeCopyBattleTagButton = CreateNativeBattleTagCopyButton(root.BattleNetBar)
 
 	self:CreateNavigationTabs()
 	self:InitializeRequestsScrollBox()
@@ -1718,6 +1719,12 @@ function FriendsUI:CreateNavigationTabs()
 		end)
 		self.sideTabs[index] = tab
 		definition.tab = tab
+		if definition.id == "recent_allies" then
+			local recentAllies = BFL:GetModule("RecentAllies")
+			if recentAllies and recentAllies.BindNativeLoadTab then
+				recentAllies:BindNativeLoadTab(tab)
+			end
+		end
 	end
 end
 
@@ -1851,6 +1858,50 @@ function FriendsUI:LayoutNavigationTabs(sectionIDs, themed)
 	end
 end
 
+function FriendsUI:UpdateSideTabContents(tab, definition, count, selected, skinSideTabs)
+	if tab.SelectedTexture then
+		tab.SelectedTexture:SetShown(selected)
+	end
+	local icon = tab.Icon or tab.icon
+	ApplySectionIcon(icon, definition, selected)
+	if icon then
+		icon:SetAlpha(tab:IsEnabled() and 1 or 0.5)
+	end
+	if tab.Count then
+		tab.Count:SetShown(count > 0)
+		tab.Count:SetText(count > 0 and count or "")
+		if tab.Icon then
+			local offsetX, offsetY = 0, count > 0 and 5 or 0
+			if not skinSideTabs then
+				offsetX, offsetY = self:GetSideTabIconAnchorOffsets(tab, definition, count > 0)
+			end
+			tab.Icon:ClearAllPoints()
+			tab.Icon:SetPoint("CENTER", tab, "CENTER", offsetX, offsetY)
+		end
+	end
+end
+
+function FriendsUI:RenderSettingsNavigationTab(tab, sectionID, count, selected)
+	local definition = SECTION_BY_ID[sectionID]
+	local palette, themed = self:GetModernThemeColors()
+	local skinSideTabs = themed and not palette.preserveNativeSideTabs
+	self:UpdateSideTabContents(tab, definition, count, selected, skinSideTabs)
+	tab.BFL_RequestGlowActive = sectionID == "friend_requests" and count > 0 and not selected
+	ApplyModernSideTabTheme(tab, skinSideTabs and palette or MODERN_BLIZZARD_THEME_COLORS, skinSideTabs, selected)
+	-- The themed button renderer can hide regions it considers chrome.
+	-- Paint the preview icon above the tab shell using the same section art.
+	local icon = tab.Icon or tab.icon
+	if icon then
+		ApplySectionIcon(icon, definition, selected)
+		icon:SetDrawLayer("OVERLAY", 4)
+		icon:Show()
+	end
+	ApplyThemedFontColor(tab, tab.Count, palette.accent, skinSideTabs)
+	if tab.HighlightTexture then
+		tab.HighlightTexture:Hide()
+	end
+end
+
 function FriendsUI:RefreshNavigation()
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
 		self.navigationDirty = true
@@ -1890,29 +1941,10 @@ function FriendsUI:RefreshNavigation()
 		tab:SetEnabled(enabled)
 		tab:SetShown(available)
 		local selected = enabled and self.selectedSection == definition.id
-		if tab.SelectedTexture then
-			tab.SelectedTexture:SetShown(selected)
-		end
+		self:UpdateSideTabContents(tab, definition, counts[definition.id] or 0, selected, skinSideTabs)
 		local icon = tab.Icon or tab.icon
-		ApplySectionIcon(icon, definition, selected)
-		if icon then
-			icon:SetAlpha(enabled and 1 or 0.5)
-			if disabledByStoryRaid then
-				icon:SetDesaturated(true)
-			end
-		end
-		if tab.Count then
-			local count = counts[definition.id] or 0
-			tab.Count:SetShown(count > 0)
-			tab.Count:SetText(count > 0 and count or "")
-			if tab.Icon then
-				local iconOffsetX, iconOffsetY = 0, count > 0 and 5 or 0
-				if not skinSideTabs then
-					iconOffsetX, iconOffsetY = self:GetSideTabIconAnchorOffsets(tab, definition, count > 0)
-				end
-				tab.Icon:ClearAllPoints()
-				tab.Icon:SetPoint("CENTER", tab, "CENTER", iconOffsetX, iconOffsetY)
-			end
+		if icon and disabledByStoryRaid then
+			icon:SetDesaturated(true)
 		end
 	end
 	self:LayoutNavigationTabs(availableSections, skinSideTabs)
@@ -2019,6 +2051,16 @@ function FriendsUI:StopRequestGlow()
 	end
 end
 
+function FriendsUI:FormatBattleTagDisplay(battleTag, streamerActive, streamerHeader)
+	local _, themed = self:GetModernThemeColors()
+	local display = streamerActive and streamerHeader or battleTag
+	local marker = not (themed or streamerActive) and display:find("#", 1, true)
+	if marker then
+		return display:sub(1, marker - 1) .. "|cff416380" .. display:sub(marker) .. "|r"
+	end
+	return display
+end
+
 function FriendsUI:RefreshBattleTag()
 	if not (self.root and BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader) then
 		return
@@ -2032,35 +2074,29 @@ function FriendsUI:RefreshBattleTag()
 	local bnetFrame = header.BattlenetFrame
 	if bnetFrame and bnetFrame.Tag then
 		local PreviewMode = BFL:GetModule("PreviewMode")
-		local battleTag = PreviewMode
+		local previewBattleTag = PreviewMode
 			and PreviewMode.GetPreviewBattleTag
 			and PreviewMode:GetPreviewBattleTag()
+		local bar = self.root.BattleNetBar
+		if bar.NativeCopyBattleTagButton then
+			local useNativeButton = not previewBattleTag and BNConnected()
+			SafeShow(bar.NativeCopyBattleTagButton, useNativeButton)
+			SafeShow(bar.CopyBattleTagButton, not useNativeButton)
+		end
+
+		local battleTag = previewBattleTag
 		if not battleTag and BNGetInfo then
 			local ok, _, realBattleTag = pcall(BNGetInfo)
-			battleTag = ok and realBattleTag or nil
+			if ok and not BFL:IsSecret(realBattleTag) then
+				battleTag = realBattleTag
+			end
 		end
+		self.battleTag = battleTag
 		if battleTag then
-			self.battleTag = battleTag
-			local _, themed = self:GetModernThemeColors()
 			local StreamerMode = BFL.StreamerMode or BFL:GetModule("StreamerMode")
 			local streamerActive = StreamerMode and StreamerMode.IsActive and StreamerMode:IsActive()
-			local displayBattleTag = streamerActive
-				and BetterFriendlistDB
-				and BetterFriendlistDB.streamerModeHeaderText
-				or battleTag
-			local marker = not streamerActive and displayBattleTag:find("#", 1, true)
-			local display = themed and displayBattleTag
-				or (
-					marker
-						and (
-							displayBattleTag:sub(1, marker - 1)
-							.. "|cff416380"
-							.. displayBattleTag:sub(marker)
-							.. "|r"
-						)
-						or displayBattleTag
-				)
-			bnetFrame.Tag:SetText(display)
+			local streamerHeader = BetterFriendlistDB and BetterFriendlistDB.streamerModeHeaderText
+			bnetFrame.Tag:SetText(self:FormatBattleTagDisplay(battleTag, streamerActive, streamerHeader))
 		end
 	end
 end
@@ -2099,47 +2135,78 @@ function FriendsUI:RefreshSortButtonText()
 	elseif button.SetText then
 		button:SetText(text)
 	end
-	ConstrainModernDropdownText(button, 1)
+	self:ConstrainModernDropdownText(button, 1)
 end
 
-function FriendsUI:LayoutBattleTagActions()
-	local root = self.root
-	local frame = BetterFriendsFrame
-	local header = frame and frame.FriendsTabHeader
+function FriendsUI:LayoutBattleTagActions(bar, header, streamerButton)
+	if not bar then
+		local frame = BetterFriendsFrame
+		bar = self.root and self.root.BattleNetBar
+		header = frame and frame.FriendsTabHeader
+		streamerButton = frame and frame.StreamerModeButton
+	end
 	local bnetFrame = header and header.BattlenetFrame
 	local tag = bnetFrame and bnetFrame.Tag
-	if not (root and tag) then
-		return
-	end
-	local headerControlOffsetY = self:GetModernHeaderControlOffsetY()
+	if not (bar and tag) then return end
 
-	if header.StatusDropdown then
-		header.StatusDropdown:ClearAllPoints()
-		header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
-	end
-	if root.BattleNetBar.MenuButton then
-		root.BattleNetBar.MenuButton:ClearAllPoints()
-		root.BattleNetBar.MenuButton:SetPoint("RIGHT", root.BattleNetBar, "RIGHT", -8, headerControlOffsetY)
+	local offsetY = self:GetModernHeaderControlOffsetY()
+	local _, themed = self:GetModernThemeColors()
+	local menu = bar.MenuButton
+	local menuSize = themed and MODERN_THEMED_MENU_BUTTON_SIZE or 34
+	menu:SetSize(menuSize, menuSize)
+	menu:ClearAllPoints()
+	menu:SetPoint("RIGHT", bar, "RIGHT", -8, offsetY)
+
+	bnetFrame:ClearAllPoints()
+	bnetFrame:SetPoint("LEFT", bar, "LEFT", 65, offsetY)
+	bnetFrame:SetPoint("RIGHT", menu, "LEFT", -7, offsetY)
+	local status = header.StatusDropdown
+	if status then
+		status:ClearAllPoints()
+		status:SetPoint("LEFT", bar, "LEFT", 65, offsetY)
+		status:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
+		status:SetFrameLevel(bnetFrame:GetFrameLevel() + 1)
+		self:ConstrainModernDropdownText(status, nil, 4)
 	end
 
-	local copyButton = root.BattleNetBar.CopyBattleTagButton
+	local copyButton = bar.CopyBattleTagButton
 	copyButton:ClearAllPoints()
 	copyButton:SetPoint("LEFT", tag, "RIGHT", 8, 0)
-	copyButton:SetFrameLevel(root.BattleNetBar:GetFrameLevel() + 4)
+	copyButton:SetFrameLevel(bar:GetFrameLevel() + 4)
+	if bar.NativeCopyBattleTagButton then
+		bar.NativeCopyBattleTagButton:SetFrameLevel(copyButton:GetFrameLevel())
+	end
 
-	local streamerButton = frame.StreamerModeButton
 	if streamerButton then
-		streamerButton:SetParent(root.BattleNetBar)
+		streamerButton:SetParent(bar)
 		streamerButton:ClearAllPoints()
 		streamerButton:SetPoint("RIGHT", bnetFrame, "RIGHT", -7, 0)
 		streamerButton:SetSize(20, 20)
-		streamerButton:SetFrameLevel(root.BattleNetBar:GetFrameLevel() + 4)
+		streamerButton:SetFrameLevel(bar:GetFrameLevel() + 4)
 	end
-	if bnetFrame then
-		bnetFrame:ClearAllPoints()
-		bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
-		bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, headerControlOffsetY)
+end
+
+function FriendsUI:ApplyBattleNetHeaderTheme(bar, tagFrame, status, palette, themed)
+	ApplyModernAtlasColor(bar.Background, palette.surface, themed)
+	SafeShow(bar.Background, not themed)
+	ApplyModernAtlasColor(tagFrame.Background, palette.control, themed)
+	SafeShow(tagFrame.Background, not (themed and palette.transparentBattleNetBar))
+	ApplyModernControlTheme(status, palette, themed)
+	ApplyModernControlTheme(bar.MenuButton, palette, themed)
+	ApplyModernOwnedSurface(tagFrame, palette.control, themed and not palette.externalControls)
+	local engine = themed and not palette.externalControls and BFL:GetModule("SkinEngine")
+	if engine and engine.StyleBackdrop then
+		engine:StyleBackdrop(tagFrame, palette.control, palette.border)
 	end
+	local copyColor = themed and MODERN_WHITE or MODERN_BLIZZARD_THEME_COLORS.control
+	for _, button in ipairs({ bar.CopyBattleTagButton, bar.NativeCopyBattleTagButton }) do
+		for _, texture in ipairs({ button.Icon, button.HighlightTexture or button:GetHighlightTexture() }) do
+			SetTextureDesaturated(texture, themed)
+			ApplyTextureColor(texture, copyColor)
+		end
+	end
+	SetTextureDesaturated(bar.MenuButton.Icon, themed)
+	ApplyTextureColor(bar.MenuButton.Icon, themed and OpaqueThemeColor(palette.accent) or MODERN_BLIZZARD_THEME_COLORS.control)
 end
 
 function FriendsUI:GetSortMenuItems()
@@ -2606,6 +2673,22 @@ function FriendsUI:DoesSimpleModeHideFilterBar(sectionID)
 	return self:IsSimpleModeContactSection(sectionID) and not self:ShouldShowSimpleModeSearch(sectionID)
 end
 
+function FriendsUI:LayoutModernContactSearch(searchBox, filterBar, rightControl, fullWidth)
+	searchBox:SetParent(filterBar)
+	searchBox:ClearAllPoints()
+	searchBox:SetPoint("LEFT", filterBar, "LEFT", 15, 0)
+	if fullWidth then
+		searchBox:SetPoint("RIGHT", filterBar, "RIGHT", -7, 0)
+	else
+		searchBox:SetPoint("RIGHT", rightControl, "LEFT", -7, 0)
+	end
+	searchBox:SetHeight(MODERN_TOP_CONTROL_HEIGHT)
+	ApplyModernSearchBoxVisual(searchBox)
+	if searchBox.Instructions then
+		searchBox.Instructions:SetText(SOCIAL_UI_SEARCH_BOX_INSTRUCTIONS or SEARCH or "Search")
+	end
+end
+
 function FriendsUI:PerformContactAction()
 	local chrome = self:GetContactChrome(self.selectedSection or "friends")
 	if chrome.action == "quick_join" then
@@ -2629,6 +2712,7 @@ function FriendsUI:ShouldReserveModernActionFooter(sectionID, chrome)
 end
 
 function FriendsUI:ApplyContactChrome(sectionID, header)
+	if BFL.NativeFriendsSearch then BFL.NativeFriendsSearch:QueueLayout() end
 	if not self.root then
 		return self:GetContactChrome(sectionID)
 	end
@@ -2685,10 +2769,6 @@ function FriendsUI:ApplyContactChrome(sectionID, header)
 			local GuildFrame = BFL:GetModule("GuildFrame")
 			actionButton:SetEnabled(not GuildFrame or not GuildFrame.IsInGuild or GuildFrame:IsInGuild())
 		end
-	end
-	local GlobalSync = BFL:GetModule("GlobalSync")
-	if GlobalSync and GlobalSync.RefreshTitleFriendUI then
-		GlobalSync:RefreshTitleFriendUI()
 	end
 	return chrome, showFilterBar
 end
@@ -2767,6 +2847,11 @@ local function ApplyModernDirectoryHeaderVisual(button)
 	SafeShow(button.BFL_DarkBackdrop, false)
 end
 
+function FriendsUI:StyleModernWhoHeader(button)
+	SetModernHeaderHeight(button, MODERN_DIRECTORY_HEADER_HEIGHT)
+	ApplyModernDirectoryHeaderVisual(button)
+end
+
 function FriendsUI:ApplyModernDirectoryGeometry(sectionID)
 	local frame = BetterFriendsFrame
 	local root = self.root
@@ -2786,7 +2871,7 @@ function FriendsUI:ApplyModernDirectoryGeometry(sectionID)
 				guild.SortDropdown:ClearAllPoints()
 				guild.SortDropdown:SetPoint("RIGHT", root.FilterBar, "RIGHT", -7, 0)
 				guild.SortDropdown:SetSize(92, MODERN_TOP_CONTROL_HEIGHT)
-				ConstrainModernDropdownText(guild.SortDropdown, 1)
+				self:ConstrainModernDropdownText(guild.SortDropdown, 1)
 			end
 			if guild.FilterDropdown then
 				guild.FilterDropdown:ClearAllPoints()
@@ -2798,7 +2883,7 @@ function FriendsUI:ApplyModernDirectoryGeometry(sectionID)
 					0
 				)
 				guild.FilterDropdown:SetSize(92, MODERN_TOP_CONTROL_HEIGHT)
-				ConstrainModernDropdownText(guild.FilterDropdown, 1)
+				self:ConstrainModernDropdownText(guild.FilterDropdown, 1)
 			end
 			if guild.SearchBox then
 				guild.SearchBox:ClearAllPoints()
@@ -2859,20 +2944,16 @@ function FriendsUI:ApplyModernDirectoryGeometry(sectionID)
 			local builderOffset = who.BFL_ModernBuilderHeight or 0
 			who.NameHeader:ClearAllPoints()
 			who.NameHeader:SetPoint("TOPLEFT", who.ListInset, "TOPLEFT", 4, -2 - builderOffset)
-			SetModernHeaderHeight(who.NameHeader, MODERN_DIRECTORY_HEADER_HEIGHT)
-			ApplyModernDirectoryHeaderVisual(who.NameHeader)
+			self:StyleModernWhoHeader(who.NameHeader)
 			who.ColumnDropdown:ClearAllPoints()
 			who.ColumnDropdown:SetPoint("TOPLEFT", who.NameHeader, "TOPRIGHT", -1, 0)
-			SetModernHeaderHeight(who.ColumnDropdown, MODERN_DIRECTORY_HEADER_HEIGHT)
-			ApplyModernDirectoryHeaderVisual(who.ColumnDropdown)
+			self:StyleModernWhoHeader(who.ColumnDropdown)
 			who.LevelHeader:ClearAllPoints()
 			who.LevelHeader:SetPoint("TOPLEFT", who.ColumnDropdown, "TOPRIGHT", -1, 0)
-			SetModernHeaderHeight(who.LevelHeader, MODERN_DIRECTORY_HEADER_HEIGHT)
-			ApplyModernDirectoryHeaderVisual(who.LevelHeader)
+			self:StyleModernWhoHeader(who.LevelHeader)
 			who.ClassHeader:ClearAllPoints()
 			who.ClassHeader:SetPoint("TOPLEFT", who.LevelHeader, "TOPRIGHT", -1, 0)
-			SetModernHeaderHeight(who.ClassHeader, MODERN_DIRECTORY_HEADER_HEIGHT)
-			ApplyModernDirectoryHeaderVisual(who.ClassHeader)
+			self:StyleModernWhoHeader(who.ClassHeader)
 
 			who.ListInset.Totals:ClearAllPoints()
 			who.ListInset.Totals:SetPoint("BOTTOMLEFT", who.ListInset, "BOTTOMLEFT", 8, 6)
@@ -3617,9 +3698,8 @@ function FriendsUI:ApplyModernScrollBarGeometry()
 			-MODERN_SCROLL_BOX_RIGHT_INSET,
 			24
 		)
-		-- The header, totals and search builder change the Who viewport.
-		-- Use the shared content rail to keep both scrollbar ends stationary.
-		AnchorModernScrollBar(who.ScrollBar, frame.ScrollFrame, nil, nil, referenceWidth)
+		-- The scrollbar belongs below the Search Builder and above the totals.
+		AnchorModernScrollBar(who.ScrollBar, who.ScrollBox, nil, nil, referenceWidth)
 	end
 
 	local guild = frame.GuildFrame
@@ -3873,12 +3953,7 @@ function FriendsUI:RestoreLegacyMainInsetLayout()
 	end
 end
 
-function FriendsUI:SynchronizeModernBottomFade()
-	if not BFL.IsRetail then
-		return false
-	end
-	local root = self.root
-	local frame = BetterFriendsFrame
+function FriendsUI:LayoutModernContactBottomFade(root, frame)
 	local background = frame and (frame.Bg or frame)
 	local topFade = root and root.TopFade
 	local bottomFade = root and root.BottomFade
@@ -3900,6 +3975,10 @@ function FriendsUI:SynchronizeModernBottomFade()
 	return true
 end
 
+function FriendsUI:SynchronizeModernBottomFade()
+	return BFL.IsRetail and self:LayoutModernContactBottomFade(self.root, BetterFriendsFrame) or false
+end
+
 function FriendsUI:QueueModernBottomFadeSync()
 	local root = self.root
 	if not (root and C_Timer and C_Timer.After) or root._bottomFadeSyncPending then
@@ -3912,6 +3991,21 @@ function FriendsUI:QueueModernBottomFadeSync()
 			self:SynchronizeModernBottomFade()
 		end
 	end)
+end
+
+function FriendsUI:LayoutModernContactTopSurface(surface, frame, bar, filterBar)
+	surface.ContentBackground:ClearAllPoints()
+	surface.ContentBackground:SetPoint("TOP", bar, "BOTTOM", 0, 5)
+	surface.ContentBackground:SetPoint("LEFT", frame, "LEFT", 4, 0)
+	surface.ContentBackground:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
+	surface.ContentBackground:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4)
+
+	surface.TopFade:ClearAllPoints()
+	surface.TopFade:SetPoint("TOP", bar, "BOTTOM", 0, 5)
+
+	filterBar:ClearAllPoints()
+	filterBar:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, 5)
+	filterBar:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, 5)
 end
 
 function FriendsUI:ApplyModernRootGeometry()
@@ -3932,11 +4026,7 @@ function FriendsUI:ApplyModernRootGeometry()
 	root.BattleNetBar.MenuButton:ClearAllPoints()
 	root.BattleNetBar.MenuButton:SetPoint("RIGHT", root.BattleNetBar, "RIGHT", -8, headerControlOffsetY)
 
-	root.ContentBackground:ClearAllPoints()
-	root.ContentBackground:SetPoint("TOP", root.BattleNetBar, "BOTTOM", 0, 5)
-	root.ContentBackground:SetPoint("LEFT", frame, "LEFT", 4, 0)
-	root.ContentBackground:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
-	root.ContentBackground:SetPoint("BOTTOM", frame, "BOTTOM", 0, 4)
+	self:LayoutModernContactTopSurface(root, frame, root.BattleNetBar, root.FilterBar)
 	root.FadeMask:ClearAllPoints()
 	-- Both native fades use this exact mask. This is the actual region clipping
 	-- mechanism; SetClipsChildren does not clip textures in a frame's own layer.
@@ -3945,16 +4035,11 @@ function FriendsUI:ApplyModernRootGeometry()
 
 	-- Keep Blizzard's native top fade centered. Bottom follows its rendered
 	-- width, shares its mask, and uses Blizzard's Bg-relative anchor.
-	root.TopFade:ClearAllPoints()
-	root.TopFade:SetPoint("TOP", root.BattleNetBar, "BOTTOM", 0, 5)
 	self:SynchronizeModernBottomFade()
 	-- Anchors resolve after the current layout pass. Repeat once so a newly
 	-- created root never retains the bottom atlas' wider native width.
 	self:QueueModernBottomFadeSync()
 
-	root.FilterBar:ClearAllPoints()
-	root.FilterBar:SetPoint("TOPLEFT", root.BattleNetBar, "BOTTOMLEFT", 0, 5)
-	root.FilterBar:SetPoint("TOPRIGHT", root.BattleNetBar, "BOTTOMRIGHT", 0, 5)
 	root.FilterBar.SortButton:ClearAllPoints()
 	root.FilterBar.SortButton:SetPoint("RIGHT", root.FilterBar, "RIGHT", -7, 0)
 	root.FilterBar.SortButton:SetSize(92, MODERN_TOP_CONTROL_HEIGHT)
@@ -3963,11 +4048,11 @@ function FriendsUI:ApplyModernRootGeometry()
 	root.FilterBar.FilterDropdown:SetSize(92, MODERN_TOP_CONTROL_HEIGHT)
 	-- The dropdown arrow is baked into the native background atlas, so the
 	-- one-pixel shorter control reduces it together with the text and icon.
-	ConstrainModernDropdownText(root.FilterBar.FilterDropdown, 1)
+	self:ConstrainModernDropdownText(root.FilterBar.FilterDropdown, 1)
 	root.FilterBar.RecentFilterDropdown:ClearAllPoints()
 	root.FilterBar.RecentFilterDropdown:SetPoint("RIGHT", root.FilterBar, "RIGHT", -7, 0)
 	root.FilterBar.RecentFilterDropdown:SetSize(92, MODERN_TOP_CONTROL_HEIGHT)
-	ConstrainModernDropdownText(root.FilterBar.RecentFilterDropdown, 1)
+	self:ConstrainModernDropdownText(root.FilterBar.RecentFilterDropdown, 1)
 	self:RefreshSortButtonText()
 
 	root.BottomActionBar:ClearAllPoints()
@@ -3987,13 +4072,15 @@ function FriendsUI:ApplyModernRootGeometry()
 	root.RequestsFrame:SetPoint("BOTTOMRIGHT", background, "BOTTOMRIGHT", -8, 8)
 end
 
-function FriendsUI:ApplyModernPortrait()
-	local frame = BetterFriendsFrame
+function FriendsUI:ApplyModernPortrait(frame, root, sampleSimpleMode)
+	frame = frame or BetterFriendsFrame
+	root = root or self.root
 	if not frame then
 		return
 	end
 	local db = GetDB()
-	local simpleMode = db and db.simpleMode == true
+	local simpleMode = sampleSimpleMode
+	if simpleMode == nil then simpleMode = db and db.simpleMode == true end
 	local palette, themed = self:GetModernThemeColors()
 	local flatTheme = BFL.UsesFlatTheme and BFL:UsesFlatTheme() == true
 	local showNativePortraitChrome = not simpleMode and not flatTheme
@@ -4035,10 +4122,7 @@ function FriendsUI:ApplyModernPortrait()
 	SafeShow(frame.portrait, false)
 	SafeShow(frame.PortraitIcon, false)
 	SafeShow(frame.PortraitMask, false)
-	-- The visible Modern portrait is the interactive changelog button. Keeping
-	-- the legacy button active underneath creates a second, differently placed
-	-- hit rect (especially for EUI's lower logo offset) and makes only parts of
-	-- the artwork clickable.
+	-- The Modern overlay supplies the portrait artwork.
 	SafeShow(frame.PortraitButton, false)
 	-- External flat skins own a compact BFL logo and must not inherit the
 	-- high-level PortraitFrame container restored by Blizzard's OnShow path.
@@ -4048,7 +4132,7 @@ function FriendsUI:ApplyModernPortrait()
 			frame.PortraitContainer:SetAlpha(showNativePortraitChrome and 1 or 0)
 		end
 	end
-	local portrait = self.root and self.root.PortraitOverlay
+	local portrait = root and root.PortraitOverlay
 	if portrait then
 		portrait:ClearAllPoints()
 		if themed then
@@ -4076,7 +4160,7 @@ function FriendsUI:ApplyModernPortrait()
 			SafeShow(portrait.Mask, false)
 			portrait.BFL_ModernSquarePortrait = true
 		else
-			portrait:SetPoint("TOPLEFT", self.root, "TOPLEFT", -5, 7)
+			portrait:SetPoint("TOPLEFT", root, "TOPLEFT", -5, 7)
 			portrait:SetSize(MODERN_PORTRAIT_SIZE, MODERN_PORTRAIT_SIZE)
 			if portrait.Icon then
 				portrait.Icon:SetSize(MODERN_PORTRAIT_SIZE, MODERN_PORTRAIT_SIZE)
@@ -4117,7 +4201,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 			header.StatusDropdown:ClearAllPoints()
 			header.StatusDropdown:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
 			header.StatusDropdown:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
-			ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
+			self:ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
 		end
 		local bnetFrame = header.BattlenetFrame
 		if bnetFrame then
@@ -4145,19 +4229,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 		if header.SearchBox and (sectionID == "friends" or sectionID == "recent_allies") then
 			local simpleModeSearch = self:ShouldShowSimpleModeSearch(sectionID)
 			local searchRightControl = sectionID == "recent_allies" and self.root.FilterBar.RecentFilterDropdown or filterDropdown
-			header.SearchBox:SetParent(self.root.FilterBar)
-			header.SearchBox:ClearAllPoints()
-			header.SearchBox:SetPoint("LEFT", self.root.FilterBar, "LEFT", 15, 0)
-			if simpleModeSearch then
-				header.SearchBox:SetPoint("RIGHT", self.root.FilterBar, "RIGHT", -7, 0)
-			else
-				header.SearchBox:SetPoint("RIGHT", searchRightControl, "LEFT", -7, 0)
-			end
-			header.SearchBox:SetHeight(MODERN_TOP_CONTROL_HEIGHT)
-			ApplyModernSearchBoxVisual(header.SearchBox)
-			if header.SearchBox.Instructions then
-				header.SearchBox.Instructions:SetText(SOCIAL_UI_SEARCH_BOX_INSTRUCTIONS or SEARCH or "Search")
-			end
+			self:LayoutModernContactSearch(header.SearchBox, self.root.FilterBar, searchRightControl, simpleModeSearch)
 		end
 	end
 	local chrome, showFilter = self:ApplyContactChrome(sectionID, header)
@@ -4306,7 +4378,7 @@ function FriendsUI:ApplyModernLayout()
 			header.StatusDropdown:ClearAllPoints()
 			header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
 			header.StatusDropdown:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
-			ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
+			self:ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
 			header.StatusDropdown:Show()
 		end
 		if header.BattlenetFrame then
@@ -4799,6 +4871,7 @@ function FriendsUI:ApplyEffectiveStyle(reason)
 	end
 	local selected = self:GetSelectedSection()
 	if self.appliedStyle and self.appliedStyle ~= effective then
+		if BFL.NativeFriendsSearch then BFL.NativeFriendsSearch:ReleaseInput() end
 		local previousFrameSettings = BFL:GetModule("FrameSettings")
 		if previousFrameSettings and previousFrameSettings.SavePosition then
 			previousFrameSettings:SavePosition()
@@ -5036,8 +5109,13 @@ function FriendsUI:OpenBlizzardSocialUI(sectionID)
 	if not _G.SocialUIFrame and C_AddOns and C_AddOns.LoadAddOn then
 		pcall(C_AddOns.LoadAddOn, "Blizzard_SocialUI")
 	end
+	if BFL.NativeFriendsSearch then BFL.NativeFriendsSearch:Observe(_G.SocialUIFrame) end
 	local tabType = self:GetBlizzardSocialTab(sectionID or self:GetSelectedSection())
 	return self:OpenLoadedBlizzardSocialUI(_G.SocialUIFrame, tabType)
+end
+
+local function HasInitializedScrollBox(scrollBox)
+	return scrollBox and scrollBox.ForEachFrame and scrollBox.GetView and scrollBox:GetView()
 end
 
 function FriendsUI:RefreshModernThemeRows()
@@ -5046,7 +5124,7 @@ function FriendsUI:RefreshModernThemeRows()
 	end
 
 	local FriendsList = BFL:GetModule("FriendsList")
-	if FriendsList and FriendsList.scrollBox and FriendsList.scrollBox.ForEachFrame then
+	if FriendsList and HasInitializedScrollBox(FriendsList.scrollBox) then
 		FriendsList.scrollBox:ForEachFrame(function(row)
 			if row.CardBackground then
 				self:StyleFriendCard(row)
@@ -5057,7 +5135,7 @@ function FriendsUI:RefreshModernThemeRows()
 	end
 
 	local requests = self.root and self.root.RequestsFrame
-	if requests and requests.ScrollBox and requests.ScrollBox.ForEachFrame then
+	if requests and HasInitializedScrollBox(requests.ScrollBox) then
 		requests.ScrollBox:ForEachFrame(function(row)
 			if row.Background then
 				self:StyleRequestCard(row)
@@ -5068,7 +5146,7 @@ function FriendsUI:RefreshModernThemeRows()
 	end
 
 	local recent = BetterFriendsFrame and BetterFriendsFrame.RecentAlliesFrame
-	if recent and recent.ScrollBox and recent.ScrollBox.ForEachFrame then
+	if recent and HasInitializedScrollBox(recent.ScrollBox) then
 		local _, themed = self:GetModernThemeColors()
 		local SkinEngine = BFL:GetModule("SkinEngine")
 		recent.ScrollBox:ForEachFrame(function(row)
@@ -5090,7 +5168,7 @@ function FriendsUI:RefreshModernThemeRows()
 	local quickJoinScrollBox = quickJoin
 		and quickJoin.ContentInset
 		and quickJoin.ContentInset.ScrollBox
-	if quickJoinScrollBox and quickJoinScrollBox.ForEachFrame then
+	if HasInitializedScrollBox(quickJoinScrollBox) then
 		quickJoinScrollBox:ForEachFrame(function(row)
 			self:StyleQuickJoinCard(row)
 		end)
@@ -5242,6 +5320,21 @@ function FriendsUI:ApplyModernVisibleControlTheme(palette, themed)
 	end
 end
 
+function FriendsUI:ApplyModernContactSurfaceTheme(surface, palette, themed)
+	ApplyTextureColor(surface.ContentBackground, palette.background)
+	if themed then
+		ApplySolidTextureColor(surface.TopFade, palette.surface)
+		ApplySolidTextureColor(surface.BottomFade, palette.surface)
+	else
+		ApplyAtlasTexture(surface.TopFade, "friends-frame-toptexbg")
+		SetTextureDesaturated(surface.TopFade, false)
+		ApplyTextureColor(surface.TopFade, MODERN_BLIZZARD_THEME_COLORS.control)
+		ApplyAtlasTexture(surface.BottomFade, "friends-frame-bottomtexbg")
+		SetTextureDesaturated(surface.BottomFade, false)
+		ApplyTextureColor(surface.BottomFade, MODERN_BLIZZARD_THEME_COLORS.control)
+	end
+end
+
 function FriendsUI:ApplyTheme(theme)
 	if not self.root then
 		return
@@ -5257,7 +5350,7 @@ function FriendsUI:ApplyTheme(theme)
 		SkinEngine:StyleBackdrop(frame, palette.background, palette.border)
 	end
 
-	ApplyTextureColor(self.root.ContentBackground, palette.background)
+	self:ApplyModernContactSurfaceTheme(self.root, palette, themed)
 	local contentInsetTint = self.root.ContentInsetTint
 	if not contentInsetTint then
 		contentInsetTint = self.root:CreateTexture(nil, "BACKGROUND", nil, 1)
@@ -5274,24 +5367,8 @@ function FriendsUI:ApplyTheme(theme)
 		ApplySolidTextureColor(self.root.FilterBar.Background, palette.surface)
 		SafeShow(self.root.FilterBar.Background, themed)
 	end
-	if self.root.BattleNetBar and self.root.BattleNetBar.Background then
-		ApplyModernAtlasColor(self.root.BattleNetBar.Background, palette.surface, themed)
-		SafeShow(self.root.BattleNetBar.Background, not themed)
-	end
-	if battleNetDisplay and battleNetDisplay.Background then
-		ApplyModernAtlasColor(battleNetDisplay.Background, palette.control, modernActive and themed)
-		SafeShow(battleNetDisplay.Background, not (modernActive and themed and palette.transparentBattleNetBar))
-	end
-	if themed then
-		ApplySolidTextureColor(self.root.TopFade, palette.surface)
-		ApplySolidTextureColor(self.root.BottomFade, palette.surface)
-	else
-		ApplyAtlasTexture(self.root.TopFade, "friends-frame-toptexbg")
-		ApplyAtlasTexture(self.root.BottomFade, "friends-frame-bottomtexbg")
-		SetTextureDesaturated(self.root.TopFade, false)
-		SetTextureDesaturated(self.root.BottomFade, false)
-		ApplyTextureColor(self.root.TopFade, MODERN_BLIZZARD_THEME_COLORS.control)
-		ApplyTextureColor(self.root.BottomFade, MODERN_BLIZZARD_THEME_COLORS.control)
+	if battleNetDisplay then
+		self:ApplyBattleNetHeaderTheme(self.root.BattleNetBar, battleNetDisplay, header and header.StatusDropdown, palette, modernActive and themed)
 	end
 	ApplyTextureColor(self.root.TopDivider, themed and palette.border or MODERN_BLIZZARD_THEME_COLORS.border)
 	ApplyTextureColor(self.root.BottomDivider, themed and palette.border or MODERN_BLIZZARD_THEME_COLORS.border)
@@ -5299,18 +5376,12 @@ function FriendsUI:ApplyTheme(theme)
 	if modernActive then
 		ApplyModernOwnedSurface(self.root.BattleNetBar, palette.surface, false)
 		SafeShow(self.root.BattleNetBar.BFL_DarkBackdrop, false)
-		ApplyModernOwnedSurface(battleNetDisplay, palette.control, themed and not palette.externalControls)
-		ApplyModernControlTheme(header and header.StatusDropdown, palette, themed)
 		ApplyModernControlTheme(header and header.SearchBox, palette, themed)
-		if themed and not palette.externalControls and SkinEngine and SkinEngine.StyleBackdrop then
-			SkinEngine:StyleBackdrop(battleNetDisplay, palette.control, palette.border)
-		end
 	end
 	ApplyModernControlTheme(self.root.FilterBar and self.root.FilterBar.FilterDropdown, palette, themed)
 	ApplyModernControlTheme(self.root.FilterBar and self.root.FilterBar.RecentFilterDropdown, palette, themed)
 	ApplyModernControlTheme(self.root.FilterBar and self.root.FilterBar.SortButton, palette, themed)
 	ApplyModernControlTheme(self.root.BottomActionBar and self.root.BottomActionBar.AddFriendButton, palette, themed)
-	ApplyModernControlTheme(self.root.BattleNetBar and self.root.BattleNetBar.MenuButton, palette, themed)
 	ApplyModernControlTheme(
 		self.root.RequestsFrame and self.root.RequestsFrame.RealIDWarning and self.root.RequestsFrame.RealIDWarning.ContinueButton,
 		palette,
@@ -5345,18 +5416,7 @@ function FriendsUI:ApplyTheme(theme)
 		header and header.SearchBox and header.SearchBox.searchIcon,
 		modernActive and themed and OpaqueThemeColor(palette.accent) or MODERN_BLIZZARD_THEME_COLORS.control
 	)
-	local menuIcon = self.root.BattleNetBar and self.root.BattleNetBar.MenuButton and self.root.BattleNetBar.MenuButton.Icon
-	SetTextureDesaturated(menuIcon, themed)
-	ApplyTextureColor(menuIcon, themed and OpaqueThemeColor(palette.accent) or MODERN_BLIZZARD_THEME_COLORS.control)
-	local copyButton = self.root.BattleNetBar and self.root.BattleNetBar.CopyBattleTagButton
-	local copyColor = themed and MODERN_WHITE or MODERN_BLIZZARD_THEME_COLORS.control
-	for _, texture in ipairs({
-		copyButton and copyButton.Icon,
-		copyButton and (copyButton.HighlightTexture or (copyButton.GetHighlightTexture and copyButton:GetHighlightTexture())),
-	}) do
-		SetTextureDesaturated(texture, themed)
-		ApplyTextureColor(texture, copyColor)
-	end
+
 	local StreamerMode = BFL.StreamerMode or BFL:GetModule("StreamerMode")
 	if modernActive and StreamerMode and StreamerMode.ApplyToggleButtonVisualState then
 		StreamerMode:ApplyToggleButtonVisualState()
@@ -5424,12 +5484,12 @@ function FriendsUI:GetFriendCardActionIconSize(actionSize)
 	return math.min(24, math.max(1, actionSize - 4))
 end
 
-function FriendsUI:StyleFriendCard(button)
+function FriendsUI:StyleFriendCard(button, settings)
 	if not self:IsModernActive() or not button then
 		return
 	end
 	local friend = button.friendData
-	local db = GetDB()
+	local db = settings or GetDB()
 	local palette, themed = self:GetModernThemeColors()
 	local faction = friend and (friend.factionName or (friend.gameAccountInfo and friend.gameAccountInfo.factionName))
 	local factionTint
@@ -5683,8 +5743,56 @@ function FriendsUI:StyleQuickJoinCard(button)
 	SafeShow(button.BFL_DarkBackdrop, false)
 end
 
+local GROUP_HEADER_ATLAS = "common-button-list-collapseExpand"
+local TAG_HEADER_NEUTRAL_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Textures\\Skinning\\tag-group-header-neutral.tga"
+local TAG_HEADER_ART_INSET = 2
+
+local function ApplyTagHeaderArt(button, texture, useNeutral)
+	if not texture then return end
+	if not useNeutral then
+		if texture._bflNeutralTagHeader then
+			BFL.SetTextureOrAtlas(texture, GROUP_HEADER_ATLAS, nil, false)
+			texture:ClearAllPoints()
+			texture:SetAllPoints(button)
+			texture._bflNeutralTagHeader = nil
+		end
+		return
+	end
+	if texture._bflNeutralTagHeader or texture:GetAtlas() ~= GROUP_HEADER_ATLAS then return end
+
+	if not texture.SetTextureSliceMargins then return end
+	local atlas = BFL.GetAtlasInfo(GROUP_HEADER_ATLAS)
+	local slice = atlas and atlas.sliceData
+	if texture:SetTexture(TAG_HEADER_NEUTRAL_TEXTURE) == false then
+		BFL.SetTextureOrAtlas(texture, GROUP_HEADER_ATLAS, nil, false)
+		return
+	end
+	-- Keep the original alpha and bevels. The uniform center is expanded for
+	-- renderers that stretch the texture, and the bottom of the file is padding.
+	texture:SetTexCoord(0, 1, 0, 22 / 32)
+	if slice then
+		texture:SetTextureSliceMargins(slice.marginLeft, slice.marginTop, slice.marginRight, slice.marginBottom)
+		if slice.sliceMode ~= nil then texture:SetTextureSliceMode(slice.sliceMode) end
+	else
+		-- The imported art still needs fixed-width edges if atlas metadata is unavailable.
+		texture:SetTextureSliceMargins(6, 4, 6, 4)
+	end
+	-- The atlas leaves a gutter inside the header's hit area. A standalone
+	-- texture fills the whole area unless its visible bounds are inset.
+	texture:ClearAllPoints()
+	texture:SetPoint("TOPLEFT", button, "TOPLEFT", TAG_HEADER_ART_INSET, -TAG_HEADER_ART_INSET)
+	texture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -TAG_HEADER_ART_INSET, TAG_HEADER_ART_INSET)
+	texture._bflNeutralTagHeader = true
+end
+
 function FriendsUI:StyleGroupHeader(button)
-	if not self:IsModernActive() or not button then
+	if not button then return end
+	local tint = button._bflTagHeaderColor
+	if not self:IsModernActive() then
+		if button.BG and (tint or button._bflTagHeaderTinted) then
+			ApplyTextureColor(button.BG, tint or MODERN_BLIZZARD_THEME_COLORS.control)
+			button._bflTagHeaderTinted = tint ~= nil
+		end
 		return
 	end
 	button:SetHeight(24)
@@ -5705,25 +5813,26 @@ function FriendsUI:StyleGroupHeader(button)
 	-- Text geometry is resolved once by FriendsList. Re-anchoring CountText to
 	-- both HeaderText and CollapseButton here would recreate the constrained
 	-- FontFamily layout that can hang Retail 12.1 with many group headers.
-	-- Preserve Blizzard's complete collapse/expand atlas, but multiply it into
-	-- the restrained dark tone used before the flat replacement. Dark/Custom
-	-- suppresses only the gold click highlight; the normal texture stays visible.
-	local nativeTone = skinGroupHeader and GetAtlasTint(palette.surface) or MODERN_BLIZZARD_THEME_COLORS.control
+	-- Tint a neutral copy of the native art without adding a layer.
+	local nativeTone = tint or (skinGroupHeader and GetAtlasTint(palette.surface)) or MODERN_BLIZZARD_THEME_COLORS.control
+	local desaturate = skinGroupHeader and not tint
 	local normal = button:GetNormalTexture()
+	local pushed = button:GetPushedTexture()
+	ApplyTagHeaderArt(button, normal, tint ~= nil)
+	ApplyTagHeaderArt(button, pushed, tint ~= nil)
 	if normal then
-		normal:SetDesaturated(skinGroupHeader)
+		normal:SetDesaturated(desaturate)
 		ApplyTextureColor(normal, nativeTone)
 		normal:SetAlpha(1)
 	end
 	local highlight = button:GetHighlightTexture()
 	if highlight then
 		highlight:SetDesaturated(false)
-		highlight:SetVertexColor(1, 1, 1, 1)
+		ApplyTextureColor(highlight, MODERN_BLIZZARD_THEME_COLORS.control)
 		highlight:SetAlpha(skinGroupHeader and 0 or 0.4)
 	end
-	local pushed = button:GetPushedTexture()
 	if pushed then
-		pushed:SetDesaturated(skinGroupHeader)
+		pushed:SetDesaturated(desaturate)
 		ApplyTextureColor(pushed, nativeTone)
 		pushed:SetAlpha(1)
 	end
@@ -6395,7 +6504,7 @@ function FriendsUI:RegisterTests()
 				if BetterFriendsFrame.WhoFrame then
 					anchoredScrollBars[#anchoredScrollBars + 1] = {
 						BetterFriendsFrame.WhoFrame.ScrollBar,
-						BetterFriendsFrame.ScrollFrame,
+						BetterFriendsFrame.WhoFrame.ScrollBox,
 						"Who",
 					}
 				end
@@ -6608,16 +6717,12 @@ function FriendsUI:RegisterTests()
 				end
 				db.simpleMode = false
 				self:ApplyModernPortrait()
-				V:AssertEqual(
-					self.root.PortraitOverlay.HitButton:GetObjectType(),
-					"Button",
-					"Every Modern theme uses the visible portrait as its interaction target"
-				)
-				V:Assert(self.root.PortraitOverlay.HitButton:IsMouseEnabled(), "Modern portrait accepts mouse input")
-				V:Assert(self.root.PortraitOverlay.HitButton:GetScript("OnClick") ~= nil, "Modern portrait opens the changelog")
+				V:Assert(self.root.PortraitOverlay:IsShown(), "Standard Mode shows the Modern portrait")
+				V:Assert(not self.root.PortraitOverlay:IsMouseEnabled(), "Modern portrait is decorative")
+				V:Assert(not self.root.PortraitOverlay.HitButton, "Modern portrait has no hit target")
 				V:Assert(
 					not frame.PortraitButton or not frame.PortraitButton:IsShown(),
-					"Modern hides the differently positioned legacy portrait hit rect"
+					"Modern hides the legacy portrait"
 				)
 				if BFL.UsesFlatTheme and BFL:UsesFlatTheme() then
 					local point, relativeTo, relativePoint, x, y = self.root.PortraitOverlay:GetPoint(1)
@@ -7811,7 +7916,41 @@ function FriendsUI:RegisterTests()
 	})
 end
 
+local function HideCoveredMapQuestTooltip(tooltip)
+	local frame = BetterFriendsFrame
+	local map = WorldMapFrame
+	if not (frame and frame:IsVisible() and map and map:IsVisible()) then
+		return
+	end
+
+	local owner = tooltip:GetOwner()
+	if BFL:IsSecret(owner) or not owner or (owner.IsForbidden and owner:IsForbidden()) then
+		return
+	end
+	if owner.owningMap ~= map or owner.pinTemplate ~= "QuestBlobPinTemplate" then
+		return
+	end
+
+	-- Quest areas refresh their tooltip from map coordinates, even if another
+	-- window has mouse focus. Use the foremost focus so the map still works on top.
+	local focus = GetMouseFoci()[1]
+	while not BFL:IsSecret(focus) and focus do
+		if focus == frame then
+			tooltip:Hide()
+			return
+		end
+		if focus.IsForbidden and focus:IsForbidden() then
+			return
+		end
+		focus = focus:GetParent()
+	end
+end
+
 function FriendsUI:Initialize()
+	if GameTooltip and GetMouseFoci then
+		-- The map calls Show again even for a tooltip that is already visible.
+		hooksecurefunc(GameTooltip, "Show", HideCoveredMapQuestTooltip)
+	end
 	if not BFL.IsMainline then
 		self.appliedStyle = STYLE_LEGACY
 		return
@@ -7879,9 +8018,11 @@ function FriendsUI:Initialize()
 	BFL:RegisterEventCallback("BN_FRIEND_INVITE_REMOVED", function()
 		self:ScheduleRequestsRefresh(false)
 	end, 20)
-	BFL:RegisterEventCallback("BN_INFO_CHANGED", function()
-		self:RefreshBattleTag()
-	end, 20)
+	for _, event in ipairs({ "BN_INFO_CHANGED", "BN_CONNECTED", "BN_DISCONNECTED" }) do
+		BFL:RegisterEventCallback(event, function()
+			self:RefreshBattleTag()
+		end, 20)
+	end
 	BFL:RegisterEventCallback("GROUP_ROSTER_UPDATE", function()
 		self:RefreshStoryRaidTabState()
 	end, 80)

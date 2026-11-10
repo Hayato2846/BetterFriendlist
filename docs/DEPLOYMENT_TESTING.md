@@ -146,6 +146,25 @@ inspect the taint log for the right-click and Whisper path.
 - Enter combat while hovering a member and verify the old click target is
   cleared. Check the native menu again after combat.
 
+## Native friend search
+
+- In Retail and Forever, start in BFL and type the name of an offline Title Friend.
+  Check that the BFL field stays visible before focusing, while typing, and
+  after clearing it. Try a BFL nickname, note and tag as well.
+- Enter combat with both windows closed, then open BFL for the first time
+  and look up a friend whose name matches only through Blizzard's search.
+  Repeat with Social UI already loaded and with it still unloaded, and in
+  Modern and Legacy. Also enter combat while the native field is active.
+- Open Blizzard Social UI while the native field is embedded in BFL.
+  Verify the native field and list return to Blizzard and BFL's local
+  search remains usable. Close Blizzard Social UI and reopen BFL in combat.
+- Clear the search with its X, apply a BFL Quick Filter, then switch to
+  Recent Allies and back. Repeat in both BFL interface styles and Simple Mode.
+- Verify that both lists keep their own search field visible and editable.
+  In a context that restricts friend results, verify the local search remains
+  usable and previous native matches disappear. Check the taint log and
+  `ADDON_ACTION_BLOCKED` for the search and layout paths.
+
 ## Modes
 
 - `CleanCopy`: mirrors a repo or worktree into the active client AddOn folder when that folder already exists as a normal non-git directory. If the client path is missing or already linked, it uses the deployment slot/link layout.

@@ -132,6 +132,41 @@ function FrameSettings:Initialize()
 	end
 end
 
+function FrameSettings:OnPlayerLogin()
+	local function RefreshScale()
+		self:QueueScaleRefresh()
+	end
+
+	BFL:RegisterEventCallback("DISPLAY_SIZE_CHANGED", RefreshScale)
+	BFL:RegisterEventCallback("UI_SCALE_CHANGED", RefreshScale)
+	BFL:RegisterEventCallback("CVAR_UPDATE", function(name)
+		if type(name) ~= "string" or BFL:IsSecret(name) then return end
+		name = name:lower()
+		if name == "uiscale" or name == "useuiscale" then
+			self:QueueScaleRefresh(true)
+		end
+	end)
+	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		if self.scaleRefreshAfterCombat then self:ApplyScale() end
+	end)
+	self:QueueScaleRefresh(true)
+end
+
+function FrameSettings:QueueScaleRefresh(resetReference)
+	self.resetScaleReference = self.resetScaleReference or resetReference
+	if self.scaleRefreshPending then return end
+
+	self.scaleRefreshPending = true
+	C_Timer.After(0, function()
+		self.scaleRefreshPending = nil
+		if self.resetScaleReference then
+			self.referenceUIScale = UIParent:GetEffectiveScale()
+			self.resetScaleReference = nil
+		end
+		self:ApplyScale()
+	end)
+end
+
 function FrameSettings:ApplySettings()
 	if not BFL.MainFrame then
 		return
@@ -238,8 +273,33 @@ function FrameSettings:ApplyScale(scale)
 		self.db.windowScale = newScale
 	end
 
-	frame:SetScale(newScale)
-	-- BFL:DebugPrint("FrameSettings: Applied scale " .. newScale)
+	local uiScale = UIParent:GetEffectiveScale()
+	local relativeScale = newScale * (self.referenceUIScale or uiScale) / uiScale
+	if frame:GetScale() ~= relativeScale then
+		if InCombatLockdown() and frame:IsProtected() then
+			self.scaleRefreshAfterCombat = true
+			return
+		end
+		frame:SetScale(relativeScale)
+	end
+	self.scaleRefreshAfterCombat = nil
+
+	local settings = BFL:GetModule("SettingsDesigner")
+	self:ApplyAuxiliaryScale(settings and settings.GetFrame and settings:GetFrame())
+	local tagEditor = BFL:GetModule("FriendTagEditor")
+	self:ApplyAuxiliaryScale(tagEditor and tagEditor.frame)
+end
+
+function FrameSettings:ApplyAuxiliaryScale(window)
+	if not (window and BFL.MainFrame) then return end
+
+	-- Legacy Settings already inherits the main frame's scale. Keep the
+	-- independent windows in step while allowing them to fit smaller screens.
+	local fit = math.min(
+		UIParent:GetWidth() / math.max(1, window:GetWidth()),
+		UIParent:GetHeight() / math.max(1, window:GetHeight())
+	)
+	window:SetScale(math.min(BFL.MainFrame:GetScale(), fit))
 end
 
 function FrameSettings:ApplyPosition()

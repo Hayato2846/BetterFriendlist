@@ -148,7 +148,7 @@ local function check(name, project, list, expected, count)
 	env.WOW_PROJECT_ID = project
 	local interfaces = { [18] = 16001, [1] = 120105, [2] = 11509, [5] = 20506, [11] = 30405, [14] = 40402, [19] = 50504 }
 	local flavor = BFL.ResolveClientFlavor(interfaces[project], project, 1, 2, 18)
-	BFL.IsClassic, BFL.IsForever, BFL.IsMainline = flavor.isClassic, flavor.isForever, flavor.isMainline
+	BFL.IsClassic, BFL.IsForever, BFL.IsMainline, BFL.IsRetail = flavor.isClassic, flavor.isForever, flavor.isMainline, flavor.isMainline
 	friend = { type = "bnet", bnetAccountID = 42, connected = true }
 	updateStatus(friend, { gameAccountInfo = accounts[1] }, 1)
 	V:AssertEqual(friend.canInvite, expected, name .. " enabled state")
@@ -176,6 +176,56 @@ end
 check("Forever cross realm, single login", 18, { account() }, true, 1)
 check("Forever same realm", 18, { account({ realmID = 100 }) }, true, 1)
 check("Retail cross realm", 1, { account({ wowProjectID = 1 }) }, true, 1)
+do
+	local function retailWithoutGUID(overrides)
+		local gameAccount = account({ wowProjectID = 1 })
+		gameAccount.playerGuid = nil
+		for key, value in pairs(overrides or {}) do gameAccount[key] = value end
+		return gameAccount
+	end
+	local function click(liveAccounts)
+		accounts, calls = liveAccounts, {}
+		env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+	end
+	env.C_BattleNet.InviteFriend = function(id) calls[#calls + 1] = { id = id, direct = true } end
+	click({ retailWithoutGUID() })
+	V:AssertEqual(#calls, 1, "An unambiguous Retail account with no GUID sends exactly one invite")
+	V:Assert(calls[1].direct and calls[1].id == 99, "Retail sends the live game-account ID directly")
+	click({ retailWithoutGUID({ gameAccountID = 100, playerGuid = "" }), account({ clientProgram = "App" }) })
+	V:Assert(calls[1] and calls[1].direct and calls[1].id == 100, "An app account does not make a WoW target ambiguous")
+	click({ retailWithoutGUID(), retailWithoutGUID({ gameAccountID = 100 }) })
+	V:AssertEqual(#calls, 0, "Two eligible GUID-less accounts cannot trigger an automatic invite")
+	click({ retailWithoutGUID(), account({ wowProjectID = 1, gameAccountID = 100 }) })
+	V:Assert(calls[1] and not calls[1].direct and calls[1].id == 100, "The existing GUID-based route takes precedence")
+	click({ account({ wowProjectID = 1 }), account({ wowProjectID = 1, gameAccountID = 100 }) })
+	V:Assert(#calls == 1 and calls[1].picker, "Multiple Retail accounts with GUIDs still show the picker")
+	click({ retailWithoutGUID(), false })
+	V:AssertEqual(#calls, 0, "An unreadable second account cannot establish a unique target")
+	for _, changes in ipairs({
+		{ isOnline = false }, { gameAccountID = 0 }, { wowProjectID = 18 },
+		{ factionName = "Horde" }, { realmID = 0 }, { isInCurrentRegion = false }, { classID = 14 },
+	}) do
+		click({ retailWithoutGUID(changes) })
+		V:AssertEqual(#calls, 0, "A missing GUID does not bypass the remaining eligibility checks")
+	end
+	local secret = {}
+	function BFL:IsSecret(value) return value == secret end
+	click({ retailWithoutGUID({ playerGuid = secret }) })
+	V:AssertEqual(#calls, 0, "A restricted GUID is not a missing GUID")
+	click({ retailWithoutGUID({ gameAccountID = secret }) })
+	V:AssertEqual(#calls, 0, "A restricted game-account ID never reaches the invite API")
+	function BFL:IsSecret() return false end
+	local legacyDispatcher = env.FriendsFrame_InviteOrRequestToJoin
+	env.FriendsFrame_InviteOrRequestToJoin = nil
+	env.FriendsListUtil = { InviteOrRequestToJoin = legacyDispatcher }
+	click({ retailWithoutGUID() })
+	V:Assert(calls[1] and calls[1].direct, "The fallback also works with the modern Retail dispatcher")
+	env.FriendsFrame_InviteOrRequestToJoin, env.FriendsListUtil = legacyDispatcher, nil
+	env.WOW_PROJECT_ID, BFL.IsForever = 18, true
+	click({ retailWithoutGUID({ wowProjectID = 18 }) })
+	V:AssertEqual(#calls, 0, "Forever still requires a GUID")
+	env.C_BattleNet.InviteFriend = nil
+end
 for _, classic in ipairs({ { "Era", 2 }, { "TBC", 5 }, { "Wrath", 11 }, { "Cata", 14 }, { "Mists", 19 } }) do
 	check(classic[1] .. " cross realm", classic[2], { account({ wowProjectID = classic[2] }) }, false, 0)
 	check(classic[1] .. " same realm", classic[2], { account({ wowProjectID = classic[2], realmID = 100 }) }, true, 1)

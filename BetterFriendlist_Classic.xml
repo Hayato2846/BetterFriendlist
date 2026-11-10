@@ -85,6 +85,8 @@
 		<Color color="NORMAL_FONT_COLOR"/>
 	</Font>
 	
+	<Font name="BetterFriendlistFontLarge" inherits="BetterFriendlistFontNormalMed3" virtual="true"/>
+
 	<!-- Large (16pt) -->
 	<Font name="BetterFriendlistFontNormalLarge" font="Fonts\FRIZQT__.TTF" virtual="true">
 		<FontHeight><AbsValue val="16"/></FontHeight>
@@ -498,7 +500,21 @@
 	     RAID FRAME TEMPLATES
 	     ======================================== -->
 	
-	<Button name="BetterRaidMemberButtonTemplate" inherits="InsecureActionButtonTemplate" virtual="true">
+	<Button name="BetterRaidReadyCheckVisualTemplate" inherits="UIPanelButtonTemplate" virtual="true">
+	<Size x="22" y="22"/>
+	<Layers>
+		<Layer level="OVERLAY">
+			<Texture parentKey="Icon" file="Interface\RaidFrame\ReadyCheck-Ready">
+				<Size x="14" y="14"/>
+				<Anchors>
+					<Anchor point="CENTER"/>
+				</Anchors>
+			</Texture>
+		</Layer>
+	</Layers>
+	</Button>
+
+	<Button name="BetterRaidMemberVisualTemplate" virtual="true">
 		<Size x="150" y="14"/>
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -591,6 +607,9 @@
 				</Texture>
 			</Layer>
 		</Layers>
+	</Button>
+
+	<Button name="BetterRaidMemberButtonTemplate" inherits="InsecureActionButtonTemplate,BetterRaidMemberVisualTemplate" virtual="true">
 		<Scripts>
 			<OnLoad>
 				BetterRaidMemberButton_OnLoad(self);
@@ -620,7 +639,7 @@
 		<HighlightTexture parentKey="Highlight" alphaMode="ADD" file="Interface\QuestFrame\UI-QuestTitleHighlight"/>
 	</Button>
 	
-	<Frame name="BetterRaidGroupTemplate" virtual="true">
+	<Frame name="BetterRaidGroupSurfaceTemplate" virtual="true">
 		<Size x="150" y="85"/>
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -636,6 +655,9 @@
 				</FontString>
 			</Layer>
 		</Layers>
+	</Frame>
+
+	<Frame name="BetterRaidGroupTemplate" inherits="BetterRaidGroupSurfaceTemplate" virtual="true">
 		<Frames>
 			<Button parentKey="Slot1" inherits="BetterRaidMemberButtonTemplate" id="1">
 				<Anchors>
@@ -669,6 +691,45 @@
 	     MAIN FRIENDS FRAME
 	     ======================================== -->
 	
+	<Frame name="BFLBattleNetTagVisualTemplate" virtual="true">
+		<Size x="160" y="29"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" file="Interface\FriendsFrame\battlenet-friends-main" setAllPoints="true">
+					<TexCoords left="0.00390625" right="0.74609375" top="0.00195313" bottom="0.05859375"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Tag" inherits="BetterFriendlistFontNormal">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<Color r="0.345" g="0.667" b="0.867" />
+				</FontString>
+				<FontString parentKey="UnavailableLabel" inherits="BetterFriendlistFriendsFontNormal" text="BATTLENET_UNAVAILABLE" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<Color r="1" g="0.82" b="0"/>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Button name="BFLStreamerModeButtonVisualTemplate" virtual="true">
+		<Size x="24" y="24"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\twitch.blp">
+					<Size x="18" y="18"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
 	<Frame name="BetterFriendsFrame" parent="UIParent" inherits="ButtonFrameTemplate" toplevel="true" movable="true" enableMouse="true" hidden="true">
 		<Size x="338" y="424"/>
 		<Anchors>
@@ -682,32 +743,10 @@
 				</KeyValues>
 				<Frames>
 					<!-- Replicate Blizzard's FriendsFrameBattlenetFrame structure -->
-					<Frame parentKey="BattlenetFrame">
-						<Size x="160" y="29"/>
+					<Frame parentKey="BattlenetFrame" inherits="BFLBattleNetTagVisualTemplate">
 						<Anchors>
 							<Anchor point="TOP" relativeKey="$parent.$parent.TitleContainer" x="0" y="-26"/>
 						</Anchors>
-						<Layers>
-							<Layer level="BACKGROUND">
-								<Texture parentKey="Background" file="Interface\FriendsFrame\battlenet-friends-main" setAllPoints="true">
-									<TexCoords left="0.00390625" right="0.74609375" top="0.00195313" bottom="0.05859375"/>
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK">
-								<FontString parentKey="Tag" inherits="BetterFriendlistFontNormal">
-									<Anchors>
-										<Anchor point="CENTER"/>
-									</Anchors>
-									<Color r="0.345" g="0.667" b="0.867" />
-								</FontString>
-								<FontString parentKey="UnavailableLabel" inherits="BetterFriendlistFriendsFontNormal" text="BATTLENET_UNAVAILABLE" hidden="true">
-									<Anchors>
-										<Anchor point="CENTER"/>
-									</Anchors>
-									<Color r="1" g="0.82" b="0"/>
-								</FontString>
-							</Layer>
-						</Layers>
 						<Frames>
 							<!-- Contacts Menu Button (Classic: Simple Button) -->
 							<Button parentKey="ContactsMenuButton" inherits="UIPanelButtonTemplate">
@@ -1364,21 +1403,10 @@
 									</OnLeave>
 								</Scripts>
 							</Button>
-							<Button parentKey="ReadyCheckButton" inherits="UIPanelButtonTemplate" hidden="true">
-								<Size x="22" y="22"/>
+							<Button parentKey="ReadyCheckButton" inherits="BetterRaidReadyCheckVisualTemplate" hidden="true">
 								<Anchors>
 									<Anchor point="RIGHT" relativeKey="$parent.RaidInfoButton" relativePoint="LEFT" x="-5" y="0"/>
 								</Anchors>
-								<Layers>
-									<Layer level="OVERLAY">
-										<Texture parentKey="Icon" file="Interface\RaidFrame\ReadyCheck-Ready">
-											<Size x="14" y="14"/>
-											<Anchors>
-												<Anchor point="CENTER"/>
-											</Anchors>
-										</Texture>
-									</Layer>
-								</Layers>
 								<Scripts>
 									<OnLoad>
 										self:SetText("");
@@ -1630,21 +1658,10 @@
 			</Frame>
 			
 			<!-- Streamer Mode Button -->
-			<Button parentKey="StreamerModeButton" hidden="false" frameStrata="HIGH" frameLevel="10">
-				<Size x="24" y="24"/>
+			<Button parentKey="StreamerModeButton" inherits="BFLStreamerModeButtonVisualTemplate" hidden="false" frameStrata="HIGH" frameLevel="10">
 				<Anchors>
 					<Anchor point="RIGHT" relativeKey="$parent.CloseButton" relativePoint="LEFT" x="-4" y="0"/>
 				</Anchors>
-				<Layers>
-					<Layer level="OVERLAY">
-						<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Icons\twitch.blp">
-							<Size x="18" y="18"/>
-							<Anchors>
-								<Anchor point="CENTER"/>
-							</Anchors>
-						</Texture>
-					</Layer>
-				</Layers>
 				<Scripts>
 					<OnShow>
 						local StreamerMode = BFL and BFL:GetModule("StreamerMode")

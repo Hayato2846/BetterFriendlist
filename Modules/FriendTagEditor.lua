@@ -7,6 +7,7 @@ local FriendTagEditor = BFL:RegisterModule("FriendTagEditor", { drafts = {} })
 local FRAME_NAME = "BetterFriendlistFriendTagEditorFrame"
 local ROW_HEIGHT = 42
 local ROW_GAP = 4
+local SECTION_HEADER_HEIGHT = 24
 local LEFT_WIDTH = 230
 local EDITOR_WIDTH = 800
 local EDITOR_HEIGHT = 550
@@ -279,6 +280,7 @@ local function CopyIconProfile(source)
 		texture = texture,
 		texCoord = CopyTexCoord(source.texCoord),
 		iconZoom = NormalizeIconZoom(source.iconZoom),
+		iconColor = source.iconColor,
 	}
 end
 
@@ -298,6 +300,86 @@ local function GetPopupEditBox(dialog)
 end
 
 function FriendTagEditor:Initialize()
+	local function DeleteTag(_, data)
+		local tags = GetFriendTags()
+		if not (tags and data and data.tagId) then return end
+		FriendTagEditor:CancelColorEdit()
+		local function Refresh()
+			FriendTagEditor:RefreshAfterDefinitionChange("delete")
+		end
+		if data.blizzard then
+			tags:SetBlizzardTagRemoved(data.tagId, true, Refresh)
+		else
+			tags:DeleteCustomTag(data.tagId, Refresh)
+		end
+	end
+
+	local function SaveSection(editBox)
+		local tags = GetFriendTags()
+		if not (tags and editBox) then return end
+		local id, reason = tags:CreateTagSection(editBox:GetText(), function()
+			FriendTagEditor:Refresh()
+		end)
+		if id then
+			for _, row in ipairs(FriendTagEditor.frame.sectionRows or {}) do
+				if row.section.id == id then
+					FriendTagEditor:ScrollRowIntoView(row)
+					break
+				end
+			end
+			return
+		end
+		if UIErrorsFrame and UIErrorsFrame.AddMessage then
+			local text = reason == "exists"
+				and L("FRIEND_TAGS_EDITOR_SECTION_EXISTS", "A section already uses this name.")
+				or L("FRIEND_TAGS_EDITOR_SECTION_PROMPT", "Enter a name for the new section.")
+			UIErrorsFrame:AddMessage(text, 1, 0.2, 0.2, 1)
+		end
+		return true
+	end
+
+	StaticPopupDialogs["BFL_FRIEND_TAG_EDITOR_CREATE_SECTION"] = {
+		text = L("FRIEND_TAGS_EDITOR_SECTION_PROMPT", "Enter a name for the new section."),
+		button1 = ACCEPT or "Accept",
+		button2 = CANCEL or "Cancel",
+		hasEditBox = true,
+		editBoxWidth = 220,
+		OnShow = function(dialog)
+			local editBox = GetPopupEditBox(dialog)
+			if editBox then
+				editBox:SetText("")
+				editBox:SetMaxLetters(32)
+				editBox:SetFocus()
+			end
+		end,
+		OnHide = function(dialog)
+			local editBox = GetPopupEditBox(dialog)
+			if editBox then editBox:SetMaxLetters(0) end
+		end,
+		OnAccept = function(dialog) return SaveSection(GetPopupEditBox(dialog)) end,
+		EditBoxOnEnterPressed = function(editBox)
+			if not SaveSection(editBox) then editBox:GetParent():Hide() end
+		end,
+		EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+
+	StaticPopupDialogs["BFL_FRIEND_TAG_EDITOR_DELETE_SECTION"] = {
+		text = L("FRIEND_TAGS_EDITOR_SECTION_DELETE_PROMPT", "Delete section '%s'? If you keep the tags, they move to No Section. Deleting the tags removes custom tags permanently. Built-in tags can be restored."),
+		button1 = L("FRIEND_TAGS_EDITOR_SECTION_KEEP_TAGS", "Keep Tags"),
+		button2 = CANCEL or "Cancel",
+		button3 = L("FRIEND_TAGS_EDITOR_SECTION_DELETE_TAGS", "Delete Tags"),
+		OnAccept = function(_, id) FriendTagEditor:DeleteSection(id, false) end,
+		OnAlt = function(_, id) FriendTagEditor:DeleteSection(id, true) end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+
 	StaticPopupDialogs["BFL_FRIEND_TAG_EDITOR_CREATE_CUSTOM"] = {
 		text = L("FRIEND_TAGS_EDITOR_CREATE_PROMPT", "Create a new custom friend tag:"),
 		button1 = ACCEPT or "Accept",
@@ -354,18 +436,18 @@ function FriendTagEditor:Initialize()
 		text = L("FRIEND_TAGS_EDITOR_DELETE_PROMPT", "Permanently delete custom tag '%s'?\n\n%s"),
 		button1 = L("FRIEND_TAGS_EDITOR_DELETE", "Delete Tag"),
 		button2 = CANCEL or "Cancel",
-		OnAccept = function(_, data)
-			local FriendTags = GetFriendTags()
-			if FriendTags and data and data.tagId then
-				FriendTags:DeleteCustomTag(data.tagId, function()
-					FriendTagEditor.drafts[data.tagId] = nil
-					if FriendTagEditor.selectedTagId == data.tagId then
-						FriendTagEditor.selectedTagId = nil
-					end
-					FriendTagEditor:RefreshAfterDefinitionChange("delete")
-				end)
-			end
-		end,
+		OnAccept = DeleteTag,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+
+	StaticPopupDialogs["BFL_FRIEND_TAG_EDITOR_REMOVE_BLIZZARD"] = {
+		text = L("FRIEND_TAGS_EDITOR_REMOVE_BLIZZARD_PROMPT", "Remove '%s' from BetterFriendlist? Its assignments are kept, and you can restore it later."),
+		button1 = L("FRIEND_TAGS_EDITOR_REMOVE_BLIZZARD", "Remove Tag"),
+		button2 = CANCEL or "Cancel",
+		OnAccept = DeleteTag,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -410,6 +492,10 @@ function FriendTagEditor:EnsureFrame()
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame:HookScript("OnHide", function()
+		self:CancelColorEdit()
+		self:CancelDrag()
+	end)
 	frame:Hide()
 
 	if not BFL.IsClassic then
@@ -455,10 +541,11 @@ function FriendTagEditor:EnsureFrame()
 
 	frame.listScroll = CreateFrame("ScrollFrame", nil, frame.leftPane, "UIPanelScrollFrameTemplate")
 	frame.listScroll:SetPoint("TOPLEFT", frame.leftPane, "TOPLEFT", 6, -8)
-	frame.listScroll:SetPoint("BOTTOMRIGHT", frame.leftPane, "BOTTOMRIGHT", -26, 54)
+	frame.listScroll:SetPoint("BOTTOMRIGHT", frame.leftPane, "BOTTOMRIGHT", -26, 83)
 	frame.listContent = CreateFrame("Frame", nil, frame.listScroll)
 	frame.listContent:SetSize(LEFT_WIDTH - 38, 1)
 	frame.listScroll:SetScrollChild(frame.listContent)
+	frame.sectionHeaders = {}
 
 	frame.editorContent = CreateFrame("Frame", nil, frame.rightPane)
 	frame.editorContent:SetPoint("TOPLEFT", frame.rightPane, "TOPLEFT", 14, -14)
@@ -469,8 +556,18 @@ function FriendTagEditor:EnsureFrame()
 	end)
 	createButton:SetPoint("BOTTOM", frame.leftPane, "BOTTOM", 0, 14)
 	frame.createButton = createButton
+	local createSectionButton = CreateSmallButton(frame.leftPane, L("FRIEND_TAGS_EDITOR_SECTION_CREATE", "Create Section"), LEFT_WIDTH - 20, function()
+		StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_CREATE_SECTION")
+	end)
+	createSectionButton:SetPoint("BOTTOM", createButton, "TOP", 0, 3)
+	local restoreButton = CreateSmallButton(frame.leftPane, L("FRIEND_TAGS_EDITOR_RESTORE", "Restore Tags") .. "…", LEFT_WIDTH - 20, function(button)
+		self:OpenRestoreMenu(button)
+	end)
+	restoreButton:SetPoint("BOTTOM", createSectionButton, "TOP", 0, 3)
+	restoreButton:Hide()
+	frame.restoreButton = restoreButton
 
-	frame.dragMarker = frame.leftPane:CreateTexture(nil, "OVERLAY")
+	frame.dragMarker = frame.listContent:CreateTexture(nil, "OVERLAY")
 	frame.dragMarker:SetColorTexture(1, 0.76, 0.18, 1)
 	frame.dragMarker:SetHeight(2)
 	frame.dragMarker:Hide()
@@ -484,6 +581,7 @@ function FriendTagEditor:EnsureFrame()
 end
 
 function FriendTagEditor:RequestClose()
+	self:CancelColorEdit()
 	if next(self.drafts) then
 		StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_UNSAVED_CLOSE")
 	else
@@ -498,21 +596,22 @@ end
 
 function FriendTagEditor:Show(tagId)
 	local frame = self:EnsureFrame()
-	local FriendsUI = BFL:GetModule("FriendsUI")
-	if _G.BetterFriendsFrame and _G.BetterFriendsFrame:IsShown() and FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
-		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
-	else
-		frame:ClearAllPoints()
-		frame:SetPoint("CENTER")
+	if not frame:IsShown() then
+		local FrameSettings = BFL:GetModule("FrameSettings")
+		if FrameSettings then FrameSettings:ApplyAuxiliaryScale(frame) end
+		local FriendsUI = BFL:GetModule("FriendsUI")
+		if _G.BetterFriendsFrame and _G.BetterFriendsFrame:IsShown() and FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
+			FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+		else
+			frame:ClearAllPoints()
+			frame:SetPoint("CENTER")
+		end
 	end
 	self.selectedTagId = tagId or self.selectedTagId
-	if not self.selectedTagId then
-		local definitions = self:GetDefinitions()
-		self.selectedTagId = definitions[1] and definitions[1].id or nil
-	end
 	self:Refresh()
 	frame:Show()
 	frame:Raise()
+	if tagId then self:ScrollTagIntoView(tagId) end
 end
 
 function FriendTagEditor:Refresh()
@@ -522,14 +621,20 @@ function FriendTagEditor:Refresh()
 		if not tags or not tags:GetTagDefinition(id) then self.drafts[id] = nil end
 	end
 	if not self:GetSelectedDefinition() then
-		local definitions = self:GetDefinitions()
-		self.selectedTagId = definitions[1] and definitions[1].id or nil
+		self.selectedTagId = nil
+		for _, group in ipairs(tags and tags:GroupTagDefinitions(self:GetDefinitions()) or {}) do
+			if not group.hidden and group.tags[1] then
+				self.selectedTagId = group.tags[1].id
+				break
+			end
+		end
 	end
 	self:RefreshList()
 	self:RefreshEditor()
 end
 
 function FriendTagEditor:OnDatabaseImported()
+	self:CancelColorEdit()
 	self.drafts = {}
 	self.editState, self.savedState = nil, nil
 	if self.frame and self.frame:IsShown() then self:Refresh() end
@@ -544,93 +649,240 @@ function FriendTagEditor:RefreshAfterDefinitionChange(reason)
 	self:Refresh()
 end
 
+function FriendTagEditor:OpenRestoreMenu(owner)
+	local tags = GetFriendTags()
+	if not (tags and BFL.OpenSimpleContextMenu) then return end
+	local items = {}
+	for _, tag in ipairs(tags:GetRemovedBlizzardTags()) do
+		local tagId = tag.id
+		items[#items + 1] = {
+			text = tag.name,
+			func = function()
+				tags:SetBlizzardTagRemoved(tagId, false, function()
+					self.selectedTagId = tagId
+					self:RefreshAfterDefinitionChange("restore")
+				end)
+			end,
+		}
+	end
+	if #items > 0 then BFL.OpenSimpleContextMenu(owner, "BFLFriendTagRestoreMenu", items) end
+end
+
+function FriendTagEditor:OpenSectionMenu(owner, section)
+	local tags = GetFriendTags()
+	if not (tags and BFL.OpenSimpleContextMenu) then return end
+	BFL.OpenSimpleContextMenu(owner, "BFLFriendTagSectionMenu", {
+		{
+			text = section.hidden and L("FRIEND_TAGS_EDITOR_SECTION_SHOW", "Show Section")
+				or L("FRIEND_TAGS_EDITOR_SECTION_HIDE", "Hide Section"),
+			func = function()
+				tags:SetTagSectionHidden(section.id, not section.hidden, function()
+					local selected = self:GetSelectedDefinition()
+					if not section.hidden and selected and selected.chipProfile.section == section.id then
+						self.selectedTagId = nil
+					end
+					self:Refresh()
+				end)
+			end,
+		},
+		{
+			text = L("FRIEND_TAGS_EDITOR_SECTION_DELETE", "Delete Section"),
+			func = function()
+				StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_DELETE_SECTION", section.name, nil, section.id)
+			end,
+		},
+	})
+end
+
+function FriendTagEditor:DeleteSection(id, deleteTags)
+	local tags = GetFriendTags()
+	if not tags then return end
+	self:CancelColorEdit()
+	tags:DeleteTagSection(id, deleteTags, function()
+		for tagId, draft in pairs(self.drafts) do
+			if draft.section == id then
+				local def = tags:GetTagDefinition(tagId)
+				if def then
+					draft.section = def.chipProfile.section
+					if not self:HasDraftChanges(def, draft) then self.drafts[tagId] = nil end
+				end
+			end
+		end
+		self:RefreshAfterDefinitionChange("delete-section")
+	end)
+end
+
 function FriendTagEditor:RefreshList()
 	local frame = self:EnsureFrame()
+	self:CancelDrag()
 	ClearChildren(frame.listContent)
 
 	local definitions = self:GetDefinitions()
 	local FriendTags = GetFriendTags()
+	local hasRemovedTags = FriendTags and #FriendTags:GetRemovedBlizzardTags() > 0
+	frame.restoreButton:SetShown(hasRemovedTags == true)
+	frame.listScroll:SetPoint("BOTTOMRIGHT", frame.leftPane, "BOTTOMRIGHT", -26, hasRemovedTags and 112 or 83)
 	frame.tagRows = {}
+	frame.sectionRows = {}
 
-	for index, def in ipairs(definitions) do
-		local row = CreateFrame("Button", nil, frame.listContent, "BackdropTemplate")
-		row:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 0, -((index - 1) * (ROW_HEIGHT + ROW_GAP)))
-		row:SetPoint("RIGHT", frame.listContent, "RIGHT", -2, 0)
-		row:SetHeight(ROW_HEIGHT)
+	local groups = FriendTags and FriendTags:GroupTagDefinitions(definitions) or {}
+	local y = 0
+	for index, group in ipairs(groups) do
+		local header = self:CreateSectionRow(frame, group, index, y)
+		y = y + SECTION_HEADER_HEIGHT
+		if not group.hidden then
+			local first = #frame.tagRows + 1
+			local last = first + #group.tags - 1
+			for _, def in ipairs(group.tags) do
+				self:CreateTagRow(frame, def, y, first, last)
+				y = y + ROW_HEIGHT + ROW_GAP
+			end
+			if last >= first then header.sectionBottom = frame.tagRows[last] end
+		end
+	end
+
+	frame.listContent:SetHeight(math.max(1, y))
+end
+
+function FriendTagEditor:CreateSectionRow(frame, section, index, y)
+	local row = frame.sectionHeaders[index]
+	if not row then
+		row = CreateFrame("Button", nil, frame.listContent)
+		row:SetHeight(SECTION_HEADER_HEIGHT)
 		row:RegisterForDrag("LeftButton")
-		row.tagId = def.id
-		row.orderIndex = index
-		BFL.SetOwnedBackdrop(row, {
-			bgFile = "Interface\\Buttons\\WHITE8X8",
-			edgeFile = "Interface\\Buttons\\WHITE8X8",
-			edgeSize = 1,
-		})
-		local selected = self.selectedTagId == def.id
-		row:SetBackdropColor(selected and 0.15 or 0.05, selected and 0.13 or 0.05, selected and 0.09 or 0.06, selected and 0.86 or 0.42)
-		row:SetBackdropBorderColor(selected and 0.95 or 0.22, selected and 0.72 or 0.22, selected and 0.30 or 0.24, selected and 0.82 or 0.48)
-		row:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
-		local highlight = row:GetHighlightTexture()
-		if highlight then
-			highlight:SetVertexColor(1, 0.76, 0.18, 0.08)
-		end
-
-		local dragHandle = row:CreateTexture(nil, "ARTWORK")
-		dragHandle:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\move")
-		dragHandle:SetSize(13, 13)
-		dragHandle:SetPoint("LEFT", row, "LEFT", 5, 0)
-		dragHandle:SetVertexColor(0.55, 0.55, 0.58, 0.9)
-
-		local profile = FriendTags and FriendTags:GetChipProfile(def)
-		local icon = row:CreateTexture(nil, "ARTWORK")
-		icon:SetSize(18, 18)
-		icon:SetPoint("LEFT", row, "LEFT", 23, 0)
-		if not ApplyIcon(icon, profile) then
-			icon:Hide()
-		end
-		row.icon = icon
-
-		local name = CreateFont(row, "BetterFriendlistFontHighlightSmall")
-		name:SetPoint("LEFT", icon, "RIGHT", 6, 7)
-		name:SetPoint("RIGHT", row, "RIGHT", -18, 7)
-		name:SetHeight(15)
-		name:SetJustifyH("LEFT")
-		name:SetJustifyV("MIDDLE")
-		name:SetText(def.name or def.id)
-
-		local source = CreateFont(row, "BetterFriendlistFontDisableSmall")
-		source:SetPoint("LEFT", icon, "RIGHT", 6, -9)
-		source:SetPoint("RIGHT", row, "RIGHT", -6, -9)
-		source:SetHeight(13)
-		source:SetJustifyH("LEFT")
-		source:SetJustifyV("MIDDLE")
-		source:SetText(def.source == "custom" and L("FRIEND_TAGS_SOURCE_CUSTOM", "Custom") or L("FRIEND_TAGS_SOURCE_BLIZZARD", "Blizzard"))
-		local marker = row:CreateTexture(nil, "OVERLAY")
-		marker:SetSize(6, 6)
-		marker:SetPoint("RIGHT", row, "RIGHT", -7, 7)
-		marker:SetColorTexture(1, 0.76, 0.18, 1)
-		marker:SetShown(self.drafts[def.id] ~= nil)
-		row.draftMarker = marker
-
-		row:SetScript("OnClick", function()
-			self.selectedTagId = def.id
-			self:Refresh()
+		row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		row:SetScript("OnClick", function(button) self:OpenSectionMenu(button, button.section) end)
+		row:SetScript("OnDragStart", function(button)
+			self:BeginDrag(button, frame.sectionRows, 1, #frame.sectionRows, true)
 		end)
-		row:SetScript("OnDragStart", function()
-			self:BeginTagDrag(row)
-		end)
-		row:SetScript("OnDragStop", function()
-			self:EndTagDrag(row)
-		end)
-		frame.tagRows[index] = row
+		row:SetScript("OnDragStop", function(button) self:EndDrag(button) end)
+
+		row.handle = row:CreateTexture(nil, "ARTWORK")
+		row.handle:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\move")
+		row.handle:SetSize(13, 13)
+		row.handle:SetPoint("LEFT", 5, 0)
+		row.handle:SetVertexColor(0.55, 0.55, 0.58, 0.9)
+
+		row.label = CreateFont(row, "BetterFriendlistFontNormalSmall")
+		row.label:SetJustifyH("LEFT")
+		row.label:SetWordWrap(false)
+		row.options = CreateFont(row, "BetterFriendlistFontNormalSmall")
+		row.options:SetPoint("RIGHT", -6, 0)
+		row.options:SetText("…")
+		frame.sectionHeaders[index] = row
+	end
+	local named = section.id ~= ""
+	row:SetParent(frame.listContent)
+	row:ClearAllPoints()
+	row:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 0, -y)
+	row:SetPoint("RIGHT", frame.listContent, "RIGHT", -2, 0)
+	row.section, row.sectionBottom = section, row
+	row.orderIndex = index
+	row.listOffset = y
+	row:EnableMouse(named)
+	row.handle:SetShown(named)
+	row.options:SetShown(named)
+	row.label:ClearAllPoints()
+	row.label:SetPoint("LEFT", named and 23 or 5, 0)
+	row.label:SetPoint("RIGHT", row.options, "LEFT", -6, 0)
+	row.label:SetFontObject(section.hidden and "BetterFriendlistFontDisableSmall" or "BetterFriendlistFontNormalSmall")
+	row.label:SetText(named and section.name or L("FRIEND_TAGS_EDITOR_NO_SECTION", "No Section"))
+	row:Show()
+	if named then frame.sectionRows[index] = row end
+	return row
+end
+
+function FriendTagEditor:CreateTagRow(frame, def, y, first, last)
+	local index = #frame.tagRows + 1
+	local row = CreateFrame("Button", nil, frame.listContent, "BackdropTemplate")
+	row:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 0, -y)
+	row:SetPoint("RIGHT", frame.listContent, "RIGHT", -2, 0)
+	row:SetHeight(ROW_HEIGHT)
+	row:RegisterForDrag("LeftButton")
+	row.tagId = def.id
+	row.orderIndex = index
+	row.listOffset = y
+	row.sectionFirst = first
+	row.sectionLast = last
+	BFL.SetOwnedBackdrop(row, {
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	local selected = self.selectedTagId == def.id
+	row:SetBackdropColor(selected and 0.15 or 0.05, selected and 0.13 or 0.05, selected and 0.09 or 0.06, selected and 0.86 or 0.42)
+	row:SetBackdropBorderColor(selected and 0.95 or 0.22, selected and 0.72 or 0.22, selected and 0.30 or 0.24, selected and 0.82 or 0.48)
+	row:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
+	local highlight = row:GetHighlightTexture()
+	if highlight then
+		highlight:SetVertexColor(1, 0.76, 0.18, 0.08)
 	end
 
-	if #definitions == 0 then
-		local empty = CreateFont(frame.listContent, "BetterFriendlistFontDisableSmall")
-		empty:SetPoint("TOPLEFT", frame.listContent, "TOPLEFT", 8, -8)
-		empty:SetText(L("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"))
-	end
+	local dragHandle = row:CreateTexture(nil, "ARTWORK")
+	dragHandle:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\move")
+	dragHandle:SetSize(13, 13)
+	dragHandle:SetPoint("LEFT", row, "LEFT", 5, 0)
+	dragHandle:SetVertexColor(0.55, 0.55, 0.58, 0.9)
 
-	frame.listContent:SetHeight(math.max(1, (#definitions * (ROW_HEIGHT + ROW_GAP)) - ROW_GAP))
+	local profile = def.chipProfile
+	local icon = row:CreateTexture(nil, "ARTWORK")
+	icon:SetSize(18, 18)
+	icon:SetPoint("LEFT", row, "LEFT", 23, 0)
+	if not ApplyIcon(icon, profile) then
+		icon:Hide()
+	end
+	row.icon = icon
+
+	local name = CreateFont(row, "BetterFriendlistFontHighlightSmall")
+	name:SetPoint("LEFT", icon, "RIGHT", 6, 7)
+	name:SetPoint("RIGHT", row, "RIGHT", -18, 7)
+	name:SetHeight(15)
+	name:SetJustifyH("LEFT")
+	name:SetJustifyV("MIDDLE")
+	name:SetText(def.name or def.id)
+
+	local source = CreateFont(row, "BetterFriendlistFontDisableSmall")
+	source:SetPoint("LEFT", icon, "RIGHT", 6, -9)
+	source:SetPoint("RIGHT", row, "RIGHT", -6, -9)
+	source:SetHeight(13)
+	source:SetJustifyH("LEFT")
+	source:SetJustifyV("MIDDLE")
+	source:SetText(def.source == "custom" and L("FRIEND_TAGS_SOURCE_CUSTOM", "Custom") or L("FRIEND_TAGS_SOURCE_BLIZZARD", "Blizzard"))
+	local marker = row:CreateTexture(nil, "OVERLAY")
+	marker:SetSize(6, 6)
+	marker:SetPoint("RIGHT", row, "RIGHT", -7, 7)
+	marker:SetColorTexture(1, 0.76, 0.18, 1)
+	marker:SetShown(self.drafts[def.id] ~= nil)
+	row.draftMarker = marker
+
+	row:SetScript("OnClick", function()
+		self.selectedTagId = def.id
+		self:Refresh()
+	end)
+	row:SetScript("OnDragStart", function()
+		self:BeginDrag(row, frame.tagRows, row.sectionFirst, row.sectionLast)
+	end)
+	row:SetScript("OnDragStop", function()
+		self:EndDrag(row)
+	end)
+	frame.tagRows[index] = row
+end
+
+function FriendTagEditor:ScrollRowIntoView(row)
+	local scroll = self.frame.listScroll
+	local offset, height = scroll:GetVerticalScroll(), scroll:GetHeight()
+	local rowBottom = row.listOffset + row:GetHeight()
+	local target = math.min(row.listOffset, math.max(offset, rowBottom - height))
+	if target ~= offset then scroll:SetVerticalScroll(target) end
+end
+
+function FriendTagEditor:ScrollTagIntoView(tagId)
+	for _, row in ipairs(self.frame and self.frame.tagRows or {}) do
+		if row.tagId == tagId then
+			self:ScrollRowIntoView(row)
+			return
+		end
+	end
 end
 
 function FriendTagEditor:RefreshListRowIcon(tagId)
@@ -653,97 +905,127 @@ function FriendTagEditor:RefreshListRowIcon(tagId)
 	return false
 end
 
-function FriendTagEditor:BeginTagDrag(row)
+function FriendTagEditor:BeginDrag(row, rows, first, last, isSection)
 	local frame = self:EnsureFrame()
-	if not (row and row.orderIndex and frame.tagRows) then
-		return
-	end
-	self.dragState = { fromIndex = row.orderIndex, targetIndex = row.orderIndex, row = row }
+	if first >= last then return end
+	self:CancelDrag()
+	self.dragState = {
+		fromIndex = row.orderIndex,
+		targetIndex = row.orderIndex,
+		row = row,
+		rows = rows,
+		first = first,
+		last = last,
+		isSection = isSection,
+	}
 	row:SetAlpha(0.42)
-	frame:SetScript("OnUpdate", function()
-		self:UpdateTagDrag()
+	frame:SetScript("OnUpdate", function(_, elapsed)
+		self:UpdateDrag(elapsed)
 	end)
-	self:UpdateTagDrag()
+	self:UpdateDrag(0)
 end
 
-function FriendTagEditor:UpdateTagDrag()
+function FriendTagEditor:UpdateDrag(elapsed)
 	local frame = self.frame
 	local drag = self.dragState
-	if not (frame and drag and frame.tagRows and #frame.tagRows > 0) then
-		return
-	end
+	if not (frame and drag) then return end
 	local _, cursorY = GetCursorPosition()
-	cursorY = cursorY / UIParent:GetEffectiveScale()
-	local targetIndex = #frame.tagRows + 1
-	for index, row in ipairs(frame.tagRows) do
-		local top, bottom = row:GetTop(), row:GetBottom()
-		if top and bottom and cursorY >= ((top + bottom) / 2) then
+	cursorY = cursorY / frame:GetEffectiveScale()
+	local scroll = frame.listScroll
+	local top, bottom = scroll:GetTop(), scroll:GetBottom()
+	if top and bottom then
+		local direction = cursorY > top - 20 and -1 or (cursorY < bottom + 20 and 1 or 0)
+		if direction ~= 0 then
+			local offset = scroll:GetVerticalScroll() + direction * elapsed * 240
+			scroll:SetVerticalScroll(math.max(0, math.min(offset, scroll:GetVerticalScrollRange())))
+		end
+	end
+	local last = drag.last
+	local targetIndex = last + 1
+	for index = drag.first, last do
+		local row = drag.rows[index]
+		local rowTop, rowBottom = row:GetTop(), (row.sectionBottom or row):GetBottom()
+		if rowTop and rowBottom and cursorY >= (rowTop + rowBottom) / 2 then
 			targetIndex = index
 			break
 		end
 	end
 	drag.targetIndex = targetIndex
 	frame.dragMarker:ClearAllPoints()
-	local target = frame.tagRows[targetIndex]
+	local target = drag.rows[targetIndex]
+	if targetIndex > last then target = nil end
 	if target then
 		frame.dragMarker:SetPoint("TOPLEFT", target, "TOPLEFT", 0, 2)
 		frame.dragMarker:SetPoint("TOPRIGHT", target, "TOPRIGHT", 0, 2)
 	else
-		local lastRow = frame.tagRows[#frame.tagRows]
+		local lastRow = drag.rows[last].sectionBottom or drag.rows[last]
 		frame.dragMarker:SetPoint("BOTTOMLEFT", lastRow, "BOTTOMLEFT", 0, -2)
 		frame.dragMarker:SetPoint("BOTTOMRIGHT", lastRow, "BOTTOMRIGHT", 0, -2)
 	end
 	frame.dragMarker:Show()
 end
 
-function FriendTagEditor:EndTagDrag(row)
+function FriendTagEditor:CancelDrag()
 	local frame = self.frame
 	local drag = self.dragState
-	if frame then
-		frame:SetScript("OnUpdate", nil)
-		frame.dragMarker:Hide()
-	end
-	if row then
-		row:SetAlpha(1)
-	end
+	if not drag then return end
+	frame:SetScript("OnUpdate", nil)
+	frame.dragMarker:Hide()
+	drag.row:SetAlpha(1)
 	self.dragState = nil
-	if not drag then
-		return
-	end
+end
 
-	local definitions = {}
-	for index, def in ipairs(self:GetDefinitions()) do
-		definitions[index] = def
-	end
-	local moved = table.remove(definitions, drag.fromIndex)
-	if not moved then
-		return
-	end
+function FriendTagEditor:EndDrag(row)
+	local drag = self.dragState
+	if not drag or drag.row ~= row then return end
+	self:CancelDrag()
 	local insertIndex = drag.targetIndex
 	if insertIndex > drag.fromIndex then
 		insertIndex = insertIndex - 1
 	end
-	insertIndex = math.max(1, math.min(insertIndex, #definitions + 1))
 	if insertIndex == drag.fromIndex then
 		return
 	end
-	table.insert(definitions, insertIndex, moved)
+
+	local tags = GetFriendTags()
+	if not tags then return end
+	local function Refresh()
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0, function() self:RefreshAfterDefinitionChange("order") end)
+		else
+			self:RefreshAfterDefinitionChange("order")
+		end
+	end
+	if drag.isSection then
+		local ids = {}
+		for _, sectionRow in ipairs(drag.rows) do ids[#ids + 1] = sectionRow.section.id end
+		table.insert(ids, insertIndex, table.remove(ids, drag.fromIndex))
+		tags:SetTagSectionOrder(ids, Refresh)
+		return
+	end
+
+	local first, last = drag.first, drag.last
+	local sectionOrder, sectionMembers = {}, {}
+	for index = first, last do
+		local tagId = drag.rows[index].tagId
+		sectionOrder[#sectionOrder + 1] = tagId
+		sectionMembers[tagId] = true
+	end
+	local moved = table.remove(sectionOrder, drag.fromIndex - first + 1)
+	table.insert(sectionOrder, insertIndex - first + 1, moved)
+
+	-- Keep positions occupied by other sections in the underlying chip order.
 	local tagIds = {}
-	for _, def in ipairs(definitions) do
-		tagIds[#tagIds + 1] = def.id
+	local sectionIndex = 1
+	for _, def in ipairs(self:GetDefinitions()) do
+		local tagId = def.id
+		if sectionMembers[tagId] then
+			tagId = sectionOrder[sectionIndex]
+			sectionIndex = sectionIndex + 1
+		end
+		tagIds[#tagIds + 1] = tagId
 	end
-	local FriendTags = GetFriendTags()
-	if FriendTags and FriendTags.SetTagOrder then
-		FriendTags:SetTagOrder(tagIds, function()
-			if C_Timer and C_Timer.After then
-				C_Timer.After(0, function()
-					self:RefreshAfterDefinitionChange("order")
-				end)
-			else
-				self:RefreshAfterDefinitionChange("order")
-			end
-		end)
-	end
+	tags:SetTagOrder(tagIds, Refresh)
 end
 
 local function BuildState(def, useDefaults)
@@ -789,6 +1071,8 @@ local function BuildState(def, useDefaults)
 		iconOnlyChip = profile.iconOnlyChip == true,
 		color = CopyColor(profile.color),
 		textColor = CopyColor(profile.textColor, { r = 1, g = 1, b = 1, a = 1 }),
+		iconColor = profile.iconColor and CopyColor(profile.iconColor),
+		section = profile.section,
 		visible = profile.visible ~= false,
 		rowVisible = profile.rowVisible ~= false,
 		tooltipVisible = profile.tooltipVisible ~= false,
@@ -807,6 +1091,7 @@ function FriendTagEditor:GetSelectedDefinition()
 end
 
 function FriendTagEditor:RefreshEditor()
+	self:CancelColorEdit()
 	local frame = self:EnsureFrame()
 	local editorHost = frame.editorContent
 	ClearChildren(editorHost)
@@ -820,7 +1105,7 @@ function FriendTagEditor:RefreshEditor()
 		self.editState, self.savedState = nil, nil
 		local empty = CreateFont(content, "BetterFriendlistFontHighlight")
 		empty:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -4)
-		empty:SetText(L("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"))
+		empty:SetText(L("FRIEND_TAGS_EDITOR_SELECT_TAG", "Select a tag to edit."))
 		return
 	end
 
@@ -858,9 +1143,11 @@ function FriendTagEditor:RefreshEditor()
 	y = y - self:CreateIconControls(content, y)
 
 	self:CreateColorControl(content, y, "color", L("FRIEND_TAGS_EDITOR_COLOR", "Chip Color"), "colorButton")
+	self:CreateSectionControl(content, y, state)
 	y = y - 38
 
 	self:CreateColorControl(content, y, "textColor", L("FRIEND_TAGS_EDITOR_TEXT_COLOR", "Chip Font Color"), "textColorButton")
+	self:CreateColorControl(content, y, "iconColor", L("FRIEND_TAGS_EDITOR_ICON_COLOR", "Icon Color"), "iconColorButton", 224)
 	y = y - 38
 
 	self:CreateVisibilityControls(content, y)
@@ -1008,6 +1295,7 @@ function FriendTagEditor:GetPreviewChipProfile()
 	local profile = self:GetPreviewIconProfile() or { iconType = "none" }
 	profile.color = CopyColor(state.color)
 	profile.textColor = CopyColor(state.textColor, { r = 1, g = 1, b = 1, a = 1 })
+	profile.iconColor = state.iconColor
 	profile.iconOnlyChip = state.iconOnlyChip == true
 	return profile
 end
@@ -1039,17 +1327,39 @@ function FriendTagEditor:RefreshPreview()
 	end
 end
 
-function FriendTagEditor:CreateLabeledInput(parent, label, value, y, width, maxLetters)
+function FriendTagEditor:CreateLabeledInput(parent, label, value, y, width, maxLetters, x)
+	x = x or 0
 	local text = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
-	text:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 4)
+	text:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 4)
 	text:SetWidth(108)
 	text:SetJustifyH("LEFT")
 	text:SetText(label)
 
 	local editBox = CreateInput(parent, width, maxLetters)
-	editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
+	editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", x + 118, y)
 	SetEditBoxText(editBox, value)
 	return editBox
+end
+
+function FriendTagEditor:CreateSectionControl(parent, y, state)
+	local label = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
+	label:SetPoint("TOPLEFT", parent, "TOPLEFT", 224, y - 4)
+	label:SetText(L("FRIEND_TAGS_EDITOR_SECTION", "Section"))
+
+	local options = { labels = { L("FRIEND_TAGS_EDITOR_NO_SECTION", "No Section") }, values = { "" } }
+	for _, section in ipairs(GetFriendTags():GetTagSections()) do
+		options.labels[#options.labels + 1] = section.name
+		options.values[#options.values + 1] = section.id
+	end
+	local dropdown = BFL.CreateDropdown(parent, nil, 164)
+	local modern = not BFL.ShouldUseLegacyDropdown(dropdown)
+	dropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", modern and 342 or 324, y + (modern and 0 or 3))
+	BFL.InitializeDropdown(dropdown, options, function(id)
+		return (state.section or "") == id
+	end, function(id)
+		state.section = id ~= "" and id or nil
+		self:MarkDraft()
+	end, 240)
 end
 
 function FriendTagEditor:SetIconMode(mode)
@@ -1154,19 +1464,21 @@ function FriendTagEditor:UpdateIconControls()
 	end
 end
 
-function FriendTagEditor:CreateColorControl(parent, y, stateKey, labelText, buttonField)
+function FriendTagEditor:CreateColorControl(parent, y, stateKey, labelText, buttonField, x)
 	local state = self.editState
 	stateKey = stateKey or "color"
 	labelText = labelText or L("FRIEND_TAGS_EDITOR_COLOR", "Chip Color")
 	buttonField = buttonField or "colorButton"
-	local fallback = stateKey == "textColor" and { r = 1, g = 1, b = 1, a = 1 } or nil
+	x = x or 0
+	local isIconColor = stateKey == "iconColor"
+	local fallback = (stateKey == "textColor" or isIconColor) and { r = 1, g = 1, b = 1, a = 1 } or nil
 	local label = CreateFont(parent, "BetterFriendlistFontHighlightSmall")
-	label:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 4)
+	label:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 4)
 	label:SetWidth(108)
 	label:SetText(labelText)
 
 	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
-	button:SetPoint("TOPLEFT", parent, "TOPLEFT", 118, y)
+	button:SetPoint("TOPLEFT", parent, "TOPLEFT", x + 118, y)
 	button:SetSize(28, 24)
 	BFL.SetOwnedBackdrop(button, {
 		bgFile = "Interface\\Buttons\\WHITE8X8",
@@ -1175,27 +1487,78 @@ function FriendTagEditor:CreateColorControl(parent, y, stateKey, labelText, butt
 	})
 	self[buttonField] = button
 
+	local resetButton
 	local function UpdateSwatch()
 		local color = CopyColor(state[stateKey], fallback)
 		button:SetBackdropColor(color.r, color.g, color.b, color.a or 1)
 		button:SetBackdropBorderColor(0, 0, 0, 1)
+		if resetButton then resetButton:SetEnabled(state[stateKey] ~= nil) end
+	end
+
+	local function UpdateColor(value)
+		state[stateKey] = value
+		UpdateSwatch()
+		self:UpdateIconControls()
+		self:RefreshPreview()
+		self:MarkDraft()
+	end
+
+	if isIconColor then
+		resetButton = CreateTextAction(parent, L("FRIEND_TAGS_EDITOR_RESET", "Reset"), function()
+			self:CancelColorEdit()
+			UpdateColor(nil)
+		end)
+		resetButton:SetPoint("LEFT", button, "RIGHT", 8, 0)
 	end
 	UpdateSwatch()
 
 	button:SetScript("OnClick", function()
-		local color = CopyColor(state[stateKey], fallback)
-		if BFL.ShowColorPicker then
-			local function ChangeColor(r, g, b, a)
-				if self.editState ~= state or self[buttonField] ~= button or not self.frame:IsShown() then return end
-				state[stateKey] = { r = r, g = g, b = b, a = a or 1 }
-				UpdateSwatch()
-				self:UpdateIconControls()
-				self:RefreshPreview()
-				self:MarkDraft()
-			end
-			BFL.ShowColorPicker(color.r, color.g, color.b, color.a or 1, ChangeColor, ChangeColor)
+		local picker = ColorPickerFrame
+		if not (picker and BFL.ShowColorPicker) or self.colorEdit then return end
+
+		local original = state[stateKey]
+		local color = CopyColor(original, fallback)
+		local edit = {}
+		self.colorEdit = edit
+		local function PreviewColor(value)
+			if self.colorEdit ~= edit or self.editState ~= state then return end
+			UpdateColor(value)
 		end
+		edit.restore = function() PreviewColor(original) end
+
+		if not self.colorPickerHooked then
+			self.colorPickerHooked = true
+			picker:HookScript("OnHide", function()
+				local closingEdit = self.colorEdit
+				if not closingEdit then return end
+				-- Classic can call Cancel after hiding the picker. Keep Apply
+				-- disabled through that callback and Retail's outside click.
+				C_Timer.After(0, function()
+					if self.colorEdit ~= closingEdit then return end
+					self.colorEdit = nil
+					self:UpdateDraftControls()
+				end)
+			end)
+		end
+		BFL.ShowColorPicker(color.r, color.g, color.b, color.a or 1, function(r, g, b, a)
+			PreviewColor({ r = r, g = g, b = b, a = a or 1 })
+		end, edit.restore)
+		edit.cancelFunc = picker.cancelFunc
+		self:UpdateDraftControls()
 	end)
+end
+
+function FriendTagEditor:CancelColorEdit()
+	local edit = self.colorEdit
+	if not edit then return end
+	-- A hidden picker has already accepted the preview or restored the old color.
+	local picker = ColorPickerFrame
+	if picker and picker:IsShown() and picker.cancelFunc == edit.cancelFunc then
+		edit.restore()
+		picker:Hide()
+	end
+	self.colorEdit = nil
+	self:UpdateDraftControls()
 end
 
 function FriendTagEditor:CreateVisibilityControls(parent, y)
@@ -1285,8 +1648,10 @@ function FriendTagEditor:CreateActionButtons(parent)
 	self.draftStatus:SetJustifyH("LEFT")
 
 	local def = self:GetSelectedDefinition()
-	if def and def.source == "custom" then
-		local deleteButton = CreateFooterButton(L("FRIEND_TAGS_EDITOR_DELETE", "Delete Tag") .. "…", function()
+	if def then
+		local label = def.source == "custom" and L("FRIEND_TAGS_EDITOR_DELETE", "Delete Tag")
+			or L("FRIEND_TAGS_EDITOR_REMOVE_BLIZZARD", "Remove Tag")
+		local deleteButton = CreateFooterButton(label .. "…", function()
 			self:ConfirmDelete()
 		end)
 		deleteButton:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
@@ -1300,8 +1665,11 @@ end
 function FriendTagEditor:ConfirmDelete()
 	local def = self:GetSelectedDefinition()
 	local FriendTags = GetFriendTags()
-	if not (def and def.source == "custom" and FriendTags) then
+	if not (def and FriendTags) then
 		return
+	end
+	if def.source == "blizzard" then
+		return StaticPopup_Show("BFL_FRIEND_TAG_EDITOR_REMOVE_BLIZZARD", def.name or def.id, nil, { tagId = def.id, blizzard = true })
 	end
 
 	local count = FriendTags:GetCustomTagAssignmentCount(def.id)
@@ -1328,9 +1696,13 @@ local function SameState(left, right)
 	return true
 end
 
+function FriendTagEditor:HasDraftChanges(def, state)
+	return not SameState(state, BuildState(def))
+end
+
 function FriendTagEditor:UpdateDraftControls()
 	local dirty = self.drafts[self.selectedTagId] ~= nil
-	if self.applyButton then self.applyButton:SetEnabled(dirty) end
+	if self.applyButton then self.applyButton:SetEnabled(dirty and not self.colorEdit) end
 	if self.discardButton then self.discardButton:SetEnabled(dirty) end
 	if self.draftStatus then
 		self.draftStatus:SetText(dirty and L("FRIEND_TAGS_EDITOR_UNSAVED", "Unapplied changes") or "")
@@ -1352,6 +1724,7 @@ function FriendTagEditor:MarkDraft()
 end
 
 function FriendTagEditor:DiscardDraft()
+	self:CancelColorEdit()
 	self.drafts[self.selectedTagId] = nil
 	self:Refresh()
 end
@@ -1369,6 +1742,8 @@ local function BuildDraftPatch(self, def, state)
 	local name = def.source == "custom" and state.name ~= def.name and state.name or nil
 	local customLabel = state.labelMode == "custom" and state.labelValue ~= ""
 	local chipLabel = state.labelMode == "icon_only" and "" or (customLabel and state.labelValue or false)
+	local section
+	if state.section ~= def.chipProfile.section then section = state.section or false end
 
 	local iconType, iconValue, icon, atlas, fallbackAtlas, texture, texCoord, iconZoom
 	if state.iconMode == "none" then
@@ -1409,6 +1784,8 @@ local function BuildDraftPatch(self, def, state)
 		iconOnlyChip = state.iconOnlyChip,
 		color = state.color,
 		textColor = state.textColor,
+		iconColor = state.iconColor or false,
+		section = section,
 		visible = state.visible,
 		rowVisible = state.rowVisible,
 		tooltipVisible = state.tooltipVisible,
@@ -1423,6 +1800,7 @@ local function GetDraftSaveError(reason)
 end
 
 function FriendTagEditor:CommitState()
+	if self.colorEdit then return false end
 	local FriendTags = GetFriendTags()
 	local def = self:GetSelectedDefinition()
 	local state = self.editState
@@ -1438,6 +1816,7 @@ function FriendTagEditor:CommitState()
 	local saved, reason = FriendTags:SetChipProfile(def.id, patch, function()
 		self.drafts[def.id] = nil
 		self:RefreshAfterDefinitionChange("apply")
+		self:ScrollTagIntoView(def.id)
 	end)
 	if not saved then
 		self:ShowDraftError(GetDraftSaveError(reason))
@@ -1446,6 +1825,7 @@ function FriendTagEditor:CommitState()
 end
 
 function FriendTagEditor:CommitAllDrafts()
+	if self.colorEdit then return false end
 	local FriendTags = GetFriendTags()
 	if not FriendTags then return false end
 	local patches = {}
@@ -1480,10 +1860,12 @@ function FriendTagEditor:CommitAllDrafts()
 end
 
 function FriendTagEditor:Reset()
+	self:CancelColorEdit()
 	local def = self:GetSelectedDefinition()
 	if def and self.editState then
 		local defaults = BuildState(def, true)
 		defaults.name = self.editState.name
+		defaults.section = self.editState.section
 		self.editState = defaults
 		self:MarkDraft()
 		self:RefreshEditor()

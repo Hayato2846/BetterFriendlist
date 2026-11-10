@@ -292,7 +292,14 @@ local components = {
 			formatter = formatter, callback = callback, SetStep = function(self, step) self.step = step end })
 	end,
 	CreateButton = function(_, host, text, callback, tooltip)
-		return component("button", host, { label = text, callback = callback, tooltip = tooltip })
+		return component("button", host, {
+			label = text, callback = callback, tooltip = tooltip, width = 136,
+			GetWidth = function(self) return self.width end,
+			SetWidth = function(self, value) self.width = value end,
+			GetFontString = function()
+				return { GetStringWidth = function() return 180 end }
+			end,
+		})
 	end,
 }
 local oldReads, oldCreates = reads, creates
@@ -305,6 +312,7 @@ equal(legacy[3].initialValue, false, "Legacy master reflects opt-in state")
 equal(legacy[4].initialValue, false, "Legacy observation remains independently opt-in")
 equal(legacy[5].step, 1, "Legacy tooltip limits use integer steps")
 equal(legacy[5].initialValue, 3, "Legacy tooltip limit starts at three")
+equal(legacy[6].width, 204, "Legacy destructive action accommodates a long localized label")
 local originalRefresh = BFL.ForceRefreshFriendsList
 BFL.ForceRefreshFriendsList = function() error("Local settings must not trigger protected/layout refreshes") end
 combat = true

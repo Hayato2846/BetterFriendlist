@@ -2265,20 +2265,15 @@ local function RegisterBuiltInTests()
 		end,
 	})
 
-	TS:RegisterTest("ui", "Changelog_Toggle", {
-		description = "Changelog frame can be opened and closed",
+	TS:RegisterTest("ui", "Changelog_Settings", {
+		description = "Changelog opens in settings",
 		action = function(V)
-			local Changelog = BFL:GetModule("Changelog")
-			V:AssertNotNil(Changelog, "Changelog module should exist")
-
-			Changelog:Show()
-			-- Changelog creates global frame BetterFriendlistChangelogFrame on first show
-			local frame = _G["BetterFriendlistChangelogFrame"]
-			V:Assert(frame and frame:IsShown(), "Changelog should be visible")
-
-			-- Toggle again to hide (Changelog:Show calls ToggleChangelog)
-			Changelog:Show()
-			V:Assert(not frame:IsShown(), "Changelog should be hidden after toggle")
+			local Settings = BFL:GetModule("Settings")
+			local review = BFL:GetModule("LegacySettingsReview")
+			local designer = BFL:GetModule("SettingsDesigner")
+			Settings:ShowChangelog()
+			V:Assert((review.active and review.home:IsShown()) or designer:IsShown(), "Settings should show the changelog")
+			Settings:Hide()
 		end,
 	})
 
@@ -6330,7 +6325,7 @@ local function RegisterBuiltInTests()
 				end
 				V:Assert(palette.externalShell == true, "EUI palette should preserve the public EUI shell")
 				V:Assert(palette.externalControls == true, "EUI palette should delegate controls to the public EUI API")
-				V:Assert(palette.skinFriendCardSurface == true, "EUI palette should request EUIFriends-style friend-card surfaces")
+				V:Assert(palette.skinFriendCardSurface == true, "External theme palette should request themed friend-card surfaces")
 				V:Assert(palette.preserveNativeSideTabs == true, "EUI palette should preserve Blizzard side-tab chrome")
 				V:Assert(palette.preserveNativeGroupHeaders == true, "EUI palette should preserve Blizzard group headers")
 				V:Assert(palette.preserveNativeInviteButtons == true, "EUI palette should preserve Blizzard invite buttons")

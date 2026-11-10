@@ -37,9 +37,25 @@ local function EnsureErrorLabel(dialog)
 	return dialog.BFL_ErrorLabel
 end
 
+local function EndGroupValidation(dialog)
+	local color = dialog.BFL_GroupEditBoxColor
+	if color then
+		dialog.BFL_GroupEditBoxColor = nil
+		dialog.EditBox:SetTextColor(unpack(color))
+	end
+	if dialog.BFL_ErrorLabel then
+		dialog.BFL_ErrorLabel:SetText("")
+	end
+end
+
 -- Shared validation logic
 local function ValidateDialogInput(editBox, isRename)
 	local dialog = editBox:GetParent()
+	local color = dialog.BFL_GroupEditBoxColor
+	-- StaticPopup clears the edit box after OnHide and may dispatch a text change.
+	if not color then
+		return
+	end
 	local text = editBox:GetText()
 	local Groups = BFL:GetModule("Groups")
 	local errorLabel = EnsureErrorLabel(dialog)
@@ -88,8 +104,7 @@ local function ValidateDialogInput(editBox, isRename)
 		end
 		if errorLabel then
 			errorLabel:SetText("")
-			-- Reset text color if needed, typically standard
-			editBox:SetTextColor(1, 1, 1)
+			editBox:SetTextColor(unpack(color))
 		end
 	else
 		if button1 then
@@ -100,6 +115,11 @@ local function ValidateDialogInput(editBox, isRename)
 			editBox:SetTextColor(1, 0.5, 0.5) -- Reddish text to indicate error
 		end
 	end
+end
+
+local function StartGroupValidation(dialog, isRename)
+	dialog.BFL_GroupEditBoxColor = { dialog.EditBox:GetTextColor() }
+	ValidateDialogInput(dialog.EditBox, isRename)
 end
 
 local function CreateGroupFromDialog(editBox, friendUID)
@@ -132,8 +152,9 @@ function Dialogs:RegisterDialogs()
 		end,
 		OnShow = function(self)
 			self.EditBox:SetFocus()
-			ValidateDialogInput(self.EditBox, false) -- Validate initial state
+			StartGroupValidation(self, false)
 		end,
+		OnHide = EndGroupValidation,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -161,8 +182,9 @@ function Dialogs:RegisterDialogs()
 		end,
 		OnShow = function(self)
 			self.EditBox:SetFocus()
-			ValidateDialogInput(self.EditBox, false) -- Validate initial state
+			StartGroupValidation(self, false)
 		end,
+		OnHide = EndGroupValidation,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -235,8 +257,9 @@ function Dialogs:RegisterDialogs()
 			self.EditBox:SetText(groupName)
 			self.EditBox:SetFocus()
 			self.EditBox:HighlightText()
-			ValidateDialogInput(self.EditBox, true) -- Validate initial state
+			StartGroupValidation(self, true)
 		end,
+		OnHide = EndGroupValidation,
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,

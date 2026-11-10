@@ -12,8 +12,8 @@ end
 -- Duration Calculation
 -- ========================================
 
-function RecentlyAdded:GetDurationSeconds()
-	local DB = GetDB()
+function RecentlyAdded:GetDurationSeconds(settings)
+	local DB = settings or GetDB()
 	if not DB then
 		return 604800 -- 7 days fallback
 	end
@@ -33,6 +33,10 @@ end
 -- Query API
 -- ========================================
 
+function RecentlyAdded:IsWithinDuration(age, duration)
+	return age < duration
+end
+
 function RecentlyAdded:IsFriendRecentlyAdded(friendUID)
 	if not friendUID then
 		return false
@@ -41,7 +45,7 @@ function RecentlyAdded:IsFriendRecentlyAdded(friendUID)
 	if PreviewMode and PreviewMode.GetMockRecentlyAddedTimestamp then
 		local timestamp = PreviewMode:GetMockRecentlyAddedTimestamp(friendUID)
 		if timestamp then
-			return (time() - timestamp) < self:GetDurationSeconds()
+			return self:IsWithinDuration(time() - timestamp, self:GetDurationSeconds())
 		end
 	end
 	if not BetterFriendlistDB then
@@ -55,7 +59,7 @@ function RecentlyAdded:IsFriendRecentlyAdded(friendUID)
 	if not ts then
 		return false
 	end
-	return (time() - ts) < self:GetDurationSeconds()
+	return self:IsWithinDuration(time() - ts, self:GetDurationSeconds())
 end
 
 function RecentlyAdded:GetAllRecentFriendUIDs()

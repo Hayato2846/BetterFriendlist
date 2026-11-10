@@ -22,7 +22,13 @@ for _, migrated in ipairs({ false, true }) do
 	tags:Initialize()
 	execute("Modules/FriendTagEditor.lua")
 	local editor = BFL.modules.FriendTagEditor
-	local frame = { Show = function() end, Raise = function() end, ClearAllPoints = function() end, SetPoint = function() end }
+	local frame = {
+		IsShown = function(self) return self.shown == true end,
+		Show = function(self) self.shown = true end,
+		Raise = function() end,
+		ClearAllPoints = function(self) self.point = nil end,
+		SetPoint = function(self, point) self.point = point end,
+	}
 	editor.EnsureFrame = function() return frame end
 	editor.RefreshList = function() end
 	editor.RefreshEditor = function(self) self:LoadState(tags:GetTagDefinition(self.selectedTagId)) end
@@ -31,6 +37,7 @@ for _, migrated in ipairs({ false, true }) do
 	local state = editor.editState
 	state.name = "Personal name"
 	state.color = { r = .13, g = .77, b = .46, a = .9 }
+	state.iconColor = { r = .8, g = .2, b = .7, a = 1 }
 	state.iconMode, state.iconOptionID = "selected", nil
 	state.iconType, state.iconValue, state.icon, state.texture = "texture", 1234567, 1234567, 1234567
 	state.labelMode, state.labelValue = "custom", "Personal label"
@@ -39,6 +46,7 @@ for _, migrated in ipairs({ false, true }) do
 	equal(editor:GetPreviewLabel(), "Personal label", "the preview uses the draft")
 	assert(editor:CommitState())
 	equal(tags:GetChipProfile(id).iconValue, 1234567, "first icon save")
+	equal(tags:GetChipProfile(id).iconColor.b, .7, "icon color is saved independently from the chip color")
 	equal(tags:GetTagDefinition(id).name, "Personal name", "custom name save")
 	for _ = 1, 3 do
 		tags:ClearCaches()
@@ -75,7 +83,9 @@ for _, migrated in ipairs({ false, true }) do
 	editor:MarkDraft()
 	local third = assert(tags:CreateCustomTag("Third", function() editor:Refresh() end))
 	equal(tags:GetTagDefinition(second).name, "Second", "creating a tag does not apply other drafts")
+	frame:SetPoint("TOPLEFT")
 	editor:Show(third)
+	equal(frame.point, "TOPLEFT", "creating a tag keeps the open editor in place")
 	equal(editor:GetPreviewLabel(), "Third", "a new tag has its own preview")
 	editor:Show(id)
 	equal(editor.editState.color.r, .7, "returning to the first tag restores its draft")
@@ -87,6 +97,15 @@ for _, migrated in ipairs({ false, true }) do
 	equal(editor:GetPreviewLabel(), "Learner", "Tag Name follows the name draft")
 	editor:SetLabelMode("icon_only")
 	assert(tags:SetTagOrder({ third, second, id }))
+	tags:ClearCaches()
+	local menu = tags:GetMenuItems({ type = "bnet", uid = "bnet_Student#1234", battleTag = "Student#1234" })
+	local customNames = {}
+	for _, item in ipairs(menu) do
+		if item.type == "checkbox" and (item.text == "Third" or item.text == "Second" or item.text == "Personal name") then
+			customNames[#customNames + 1] = item.text
+		end
+	end
+	equal(table.concat(customNames, ","), "Third,Second,Personal name", "the friend menu uses the editor order on a cold cache")
 	local order = tags:GetChipProfile(id).order
 	assert(editor:CommitState())
 	equal(tags:GetChipProfile(id).order, order, "applying the draft keeps a newer tag order")
@@ -168,6 +187,10 @@ for _, migrated in ipairs({ false, true }) do
 	restored:Initialize()
 	equal(restored:GetChipProfile(id).iconValue, 1234567, "fresh session retains the selected custom icon")
 	equal(restored:GetChipProfile(id).color.r, .7, "fresh session retains the custom color")
+	equal(restored:GetChipProfile(id).iconColor.g, .2, "fresh session retains the icon color")
+	assert(restored:SetChipProfile(id, { iconColor = false }))
+	equal(restored:GetChipProfile(id).iconColor, nil, "clearing the icon color restores the original icon")
+	equal(restored:GetChipProfile(id).color.r, .7, "clearing the icon color preserves the chip color")
 	equal(restored:GetTagDefinition(id).name, "Learner", "fresh session retains the renamed tag")
 	equal(restored:GetChipProfile(id).chipLabel, "", "fresh session retains Icon Only")
 	equal(restored:GetChipProfile(second).chipLabel, "Helper :)", "fresh session preserves the other tag independently")
@@ -257,6 +280,7 @@ do
 	local editor = BFL.modules.FriendTagEditor
 	local frame = {
 		shown = false,
+		IsShown = function(self) return self.shown end,
 		Show = function(self) self.shown = true end,
 		Hide = function(self) self.shown = false end,
 		Raise = function() end,
@@ -434,6 +458,161 @@ do
 	local popup = env.StaticPopupDialogs.BFL_FRIEND_TAGS_CREATE_CUSTOM_TAG
 	popup.OnAccept({ EditBox = { GetText = function() return "New assigned tag" end } }, { friend = friend })
 	assert(hint and hint.entries[1], "creating and assigning a hidden tag uses the same hint")
+end
+
+-- The editor and menu share named sections. Removing a built-in tag preserves
+-- both its presentation and its assignments through bulk actions and reload.
+do
+	local BFL, env, execute = make()
+	local tags = BFL.modules.FriendTags
+	tags:Initialize()
+	local raidTag, pvpTag = "blizzard:raiding", "blizzard:pvp"
+	local friend = { type = "bnet", uid = "bnet_Test#1234", battleTag = "Test#1234" }
+	assert(tags:SetBlizzardTagsForFriend(friend, { [raidTag] = true, [pvpTag] = true }))
+	local mythic = assert(tags:CreateCustomTag("Mythic"))
+	local normal = assert(tags:CreateCustomTag("Normal"))
+	equal(tags:GetChipProfile(raidTag).section, "|interests", "built-in interest defaults to its menu section")
+	equal(tags:GetChipProfile("blizzard:healer").section, "|roles", "built-in role defaults to its menu section")
+	equal(tags:GetChipProfile(mythic).section, "|custom", "custom tags default to their menu section")
+	assert(tags:SetChipProfiles({
+		[raidTag] = { section = "Raid Nights", iconColor = { r = .8, g = .2, b = .7 } },
+		[mythic] = { section = "  Raid Nights  " },
+		[normal] = { section = "Raid Nights" },
+	}))
+	assert(tags:SetTagOrder({ mythic, raidTag, normal }))
+	local groups = tags:GroupTagDefinitions(tags:GetAllTagDefinitions())
+	equal(groups[1].id, "|interests", "the editor uses the menu's default sections")
+	equal(groups[4].name, "Raid Nights", "section names are trimmed")
+	equal(groups[4].tags[2].id, raidTag, "a section mixes built-in and custom tags in saved order")
+	local function MenuSection()
+		local section, collecting = {}
+		for _, item in ipairs(tags:GetMenuItems(friend)) do
+			if item.type == "title" then collecting = item.text == "Raid Nights"
+			elseif collecting and item.type == "checkbox" then section[#section + 1] = item.text end
+		end
+		return table.concat(section, ",")
+	end
+	local raidLabel = tags:GetBlizzardTagLabel(raidTag)
+	equal(MenuSection(), "Mythic," .. raidLabel .. ",Normal", "the friend menu uses the same section order")
+	assert(tags:SetBlizzardTagRemoved(raidTag, true))
+	equal(tags:GetTagDefinition(raidTag), nil, "a removed built-in tag disappears from the editor")
+	equal(MenuSection(), "Mythic,Normal", "a removed built-in tag disappears from the menu")
+	local assigned = tags:GetTagIdsForFriend(friend, "row")
+	equal(table.concat(assigned, ","), pvpTag, "removed tags are excluded from friend chips")
+	for _, item in ipairs(tags:GetMenuItems(friend)) do
+		if item.text == BFL.L.FRIEND_TAGS_CLEAR_ALL then item.func(); break end
+	end
+	assigned = tags:GetBlizzardTagIdSetForFriend(friend)
+	equal(assigned[raidTag], true, "bulk clear preserves an assignment for a removed built-in tag")
+	equal(assigned[pvpTag], nil, "bulk clear clears an available built-in tag")
+	local payload = tags:BuildSupportedBlizzardTagPayload(assigned)
+	equal(payload[raidTag], true, "native updates retain the removed tag in their payload")
+
+	local backup = env.CopyTable(env.BetterFriendlistDB)
+	backup.exportVersion = 3
+	local imported = assert(BFL.modules.DB:PrepareImportedProfile(backup))
+	equal(imported.friendTagSettings.removedBlizzardTags[raidTag], true, "profile import retains removed built-in tags")
+	equal(imported.friendTagProfiles[mythic].section, "Raid Nights", "profile import retains section membership")
+	env.BetterFriendlistDB = imported
+	execute("Modules/FriendTags.lua")
+	tags = BFL.modules.FriendTags
+	tags:Initialize()
+	equal(tags:GetRemovedBlizzardTags()[1].id, raidTag, "removed tags stay removed after reload")
+	assert(tags:SetBlizzardTagRemoved(raidTag, false))
+	equal(tags:GetChipProfile(raidTag).section, "Raid Nights", "restoring a built-in tag retains its section")
+	equal(tags:GetChipProfile(raidTag).iconColor.b, .7, "restoring a built-in tag retains its tint")
+	equal(table.concat(tags:GetTagIdsForFriend(friend, "row"), ","), raidTag, "restoring a built-in tag restores its chip")
+	assert(tags:SetChipProfile(raidTag, { section = false }))
+	equal(tags:GetChipProfile(raidTag).section, nil, "a section can be cleared")
+end
+
+-- Section changes preserve assignments unless the user explicitly deletes custom tags.
+do
+	local BFL, env, execute = make()
+	local tags = BFL.modules.FriendTags
+	local raidTag = "blizzard:raiding"
+	env.BetterFriendlistDB.friendTagProfiles = { [raidTag] = { section = "Old Raid" } }
+	tags:Initialize()
+	local friend = { type = "bnet", uid = "bnet_Test#1234", battleTag = "Test#1234" }
+	local custom = assert(tags:CreateCustomTag("Custom raid tag"))
+	local empty = assert(tags:CreateTagSection("Empty"))
+	equal(tags:CreateTagSection(" Empty "), nil, "duplicate sections are rejected after trimming")
+	equal(tags:GetTagSections()[5].id, "Old Raid", "legacy sections migrate from tag profiles")
+	assert(tags:SetChipProfile(custom, { section = "Old Raid" }))
+	assert(tags:SetTagSectionOrder({ "Old Raid", "|roles", "|custom", "|interests", empty }))
+	assert(tags:SetBlizzardTagsForFriend(friend, { [raidTag] = true }))
+	assert(tags:SetCustomTagForFriend(friend, custom, true))
+
+	local function GetMenuEntry(text)
+		for _, item in ipairs(tags:GetMenuItems(friend)) do
+			if item.text == text then return item end
+		end
+	end
+	local menu = tags:GetMenuItems(friend)
+	equal(menu[4].text, "Old Raid", "the menu uses the saved section order")
+	assert(tags:SetTagSectionHidden("Old Raid", true))
+	equal(GetMenuEntry("Old Raid"), nil, "the hidden section title is omitted")
+	equal(GetMenuEntry("Custom raid tag"), nil, "the hidden section tags are omitted")
+	GetMenuEntry(BFL.L.FRIEND_TAGS_CLEAR_ALL).func()
+	equal(tags:GetBlizzardTagIdSetForFriend(friend)[raidTag], true, "clear all preserves hidden built-in tags")
+	equal(tags:GetCustomTagIdSetForFriend(friend)[custom], true, "clear all preserves hidden custom tags")
+	assert(tags:SetCustomTagForFriend(friend, custom, false))
+	GetMenuEntry(BFL.L.FRIEND_TAGS_SELECT_ALL).func()
+	equal(tags:GetCustomTagIdSetForFriend(friend)[custom], nil, "select all skips hidden custom tags")
+	assert(tags:SetCustomTagForFriend(friend, custom, true))
+
+	local backup = env.CopyTable(env.BetterFriendlistDB)
+	backup.exportVersion = 3
+	env.BetterFriendlistDB = assert(BFL.modules.DB:PrepareImportedProfile(backup))
+	execute("Modules/FriendTags.lua")
+	tags = BFL.modules.FriendTags
+	tags:Initialize()
+	local sections = tags:GetTagSections()
+	equal(sections[1].id, "Old Raid", "section order survives import and reload")
+	equal(sections[1].hidden, true, "section visibility survives import and reload")
+	equal(sections[5].id, empty, "empty sections survive import and reload")
+	assert(tags:SetTagSectionHidden("Old Raid", false))
+	assert(GetMenuEntry("Custom raid tag"), "showing the section restores menu entries")
+
+	assert(tags:DeleteTagSection("Old Raid", false))
+	equal(tags:GetChipProfile(raidTag).section, nil, "keeping a built-in tag leaves it unassigned")
+	equal(tags:GetChipProfile(custom).section, nil, "keeping a custom tag leaves it unassigned")
+	equal(tags:GetCustomTagIdSetForFriend(friend)[custom], true, "keeping tags preserves assignments")
+	local groups = tags:GroupTagDefinitions(tags:GetAllTagDefinitions())
+	equal(groups[#groups].id, "", "unassigned tags have their own editor block")
+	assert(tags:DeleteTagSection("|interests", true))
+	equal(tags:GetTagDefinition(raidTag).id, raidTag, "deleting the default section skips an explicitly unassigned tag")
+	assert(tags:SetChipProfiles({ [raidTag] = { section = empty }, [custom] = { section = empty } }))
+	assert(tags:DeleteTagSection(empty, true))
+	equal(tags:GetTagDefinition(custom), nil, "deleting the section deletes its custom tags")
+	equal(tags:GetCustomTagIdSetForFriend(friend)[custom], nil, "deleting custom tags clears their assignments")
+	equal(tags:GetTagDefinition(raidTag), nil, "deleting the section removes its built-in tags")
+	equal(tags:GetBlizzardTagIdSetForFriend(friend)[raidTag], true, "built-in assignments remain restorable")
+	assert(tags:SetBlizzardTagRemoved(raidTag, false))
+	equal(tags:GetChipProfile(raidTag).section, nil, "restoring a tag does not restore its deleted section")
+end
+
+-- The comparison surface formats its own inputs without saving the alternate.
+do
+	local BFL = make()
+	local tags = BFL.modules.FriendTags
+	local fixture = tags:CreateSettingsTagExamples("Example", true)
+	local settings = { enabled = true, maxTooltipChips = 1 }
+	local savedLimit = tags:GetSetting("maxTooltipChips")
+	equal(#fixture, 21, "the fixture can demonstrate the full tooltip limit")
+	equal(tags:GetSettingsSampleTagText("tooltip", settings, fixture), fixture[1].name .. ", +20",
+		"the compare tooltip uses the production overflow format")
+	settings.showTooltipChips = false
+	equal(tags:GetSettingsSampleTagText("tooltip", settings, fixture), nil, "disabling tooltip chips hides them")
+	equal(tags:GetSettingsSampleTagText("broker", settings, fixture), fixture[1].name .. ", +20",
+		"tooltip chip visibility does not hide chips from the Broker")
+	settings.showBrokerChips = false
+	equal(tags:GetSettingsSampleTagText("broker", settings, fixture), nil, "the Broker has its own chip visibility")
+	settings.includeCustomTagsInSearch = false
+	equal(tags:GetSettingsSampleTagText("search", settings, { fixture[#fixture] }), nil, "custom tags can be excluded from search")
+	equal(tags:GetSettingsSampleTagText("search", settings, { fixture[1] }), fixture[1].name,
+		"Blizzard tags stay searchable when custom tags are excluded")
+	equal(tags:GetSetting("maxTooltipChips"), savedLimit, "trying a different tooltip limit does not change its saved value")
 end
 
 -- Keep existing model/migration contracts in the offline regression gate too.

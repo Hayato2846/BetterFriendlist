@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.0]        - 2026-11-10
+
+### All WoW Versions
+
+#### Added
+- **New Settings** - Open Settings from the friends list or type /bfl settings to browse by category or search for an option. Search puts matching pages and results you often choose near the top. Hover over a setting to see what it does, or click its row to keep it highlighted and pin the help and any comparison. The main preview shows your saved setup.
+- **Friend Tags** - Use Icon Color to tint any tag icon, including Blizzard icons and custom paths. In Icon Only mode, you can show the tinted icon on its own.
+- **Tag Sections** - Choose a section for each tag, including Blizzard tags, or create your own. Drag sections and the tags inside them to set their order in the editor and friend menu. You can hide sections or delete them with or without their tags.
+- **Dynamic Tag Groups** - Show each friend in their highest matching tag group. Choose a standard header, a colored title, or Tag Chip to tint the header and show the tag icon beside the title.
+- **Blizzard Tags** - Remove built-in tags from BetterFriendlist and bring them back with Restore Tags. Their assignments are kept.
+
+#### Improved
+- **Global Friend Sync** - Global Sync is available on flavors that still use WoW's old friends list. Its settings and invite shortcuts are hidden on flavors that use Title Friends.
+
+#### Fixed
+- **Nickname Dialog** - Canceling the new group window no longer leaves red text or a group-name error in the nickname box.
+- **World Map Tooltips** - Quest tooltips from the world map no longer pop up through the friends list.
+- **Friend Requests** - Fixed missing pop-ups for Battle.net and Title Friend requests. The pop-ups still follow your WoW notification settings.
+- **Raid Tab** - Raid members listed as Unknown now show their name as soon as WoW has it. You can right-click them once the name appears.
+- **Window Scale** - The friends list keeps its scale when you switch between fullscreen and windowed mode. Settings and Friend Tags follow the friends list scale and fit on smaller screens.
+- **Friend Tags** - Creating a tag keeps the editor where you placed it. Confirm or cancel the color picker before applying changes to a tag. Custom tags in the friend menu follow the order you set in the editor.
+- **Settings** - The active category stays highlighted when you adjust Control Opacity.
+
+### Retail Midnight & WoW Forever
+
+#### Improved
+- **Friend Search** - Find Title Friends even when they're offline, or search by Battle.net account name, including Real ID names.
+- **Copy BattleTag** - In the Modern friends list, the icon next to your BattleTag now copies it straight to your clipboard when WoW supports it.
+
+#### Fixed
+- **Who Search Builder** - The Who results scrollbar no longer overlaps the search builder's close button in the Modern layout.
+- **Title Friends** - Character names appear once in the friends list and Friends Broker, with class colors and icons.
+
+### Retail Midnight
+
+#### Fixed
+- **Friend Invites** - The invite button now works for Battle.net friends with one character you can invite, even when WoW leaves out some character details.
+- **Recent Allies** - The tab shows the last known list right away and updates it in the background.
+
+### WoW Forever
+
+#### Fixed
+- **Who Searches** - Shift-left-clicking a character name in chat runs the lookup without opening BetterFriendlist's Who tab by default. You can turn automatic opening on under Who settings.
+- **Title Friends** - Title Friends keep their groups and friend notes when they go offline, switch characters, or you log back in. BFL stores the note text in the addon and uses a short ID in the Blizzard note. To move the text back to Blizzard, type `/bfl titlefriendnotes off`.
+
+---
+
 ## [3.0.3]        - 2026-11-09
 
 ### All WoW Versions
@@ -301,23 +348,3 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 - **Large Friend Lists** - BetterFriendlist has received further optimizations for larger friend lists and is now less likely to run into errors when loading them.
 
 ---
-
-## [2.8.6]        - 2026-08-24
-
-### Improved
-- **Background Performance** - BetterFriendlist now avoids more work while the Friendlist, guild list, raid tools, and Broker tooltips are closed.
-- **Large Friend Lists** - Friend and tag updates are now smoother, especially for players with many Battle.net friends.
-- **Taint-Free Whisper** - On Retail, the optional whisper box now opens where you normally type chat messages.
-- **Ready Check** - Party leaders can now start a Ready Check from the Raid tab without converting the group to a raid.
-
-### Fixed
-- **Guild Message of the Day** - Fixed a Retail chat error that could occur when the guild message of the day was displayed.
-- **Raid Tab** - Long raid information now stays inside the window, and the Legacy controls no longer overlap.
-- **Interface Switching** - Raid Roster Help and Streamer Mode now reappear immediately after switching from Modern to Legacy.
-- **Modern Ready Check** - Removed a small visual artifact from the Ready Check button.
-
----
-
----
-
-*Older versions archived. Full history available in git.*

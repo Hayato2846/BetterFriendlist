@@ -668,6 +668,23 @@ local function GetChangelogInfoEntries()
 	}
 end
 
+function SettingsDesigner:RefreshChangelogBadges(state, page, Changelog)
+	local unread = Changelog:GetUnreadVersions()
+	local byTitle = {}
+	for _, entry in ipairs(page.content[1].entries) do
+		if entry.bflChangelogVersion then byTitle[entry.title] = entry end
+	end
+	for _, frame in ipairs(state.contentFrames) do
+		for _, header in ipairs({ frame:GetChildren() }) do
+			local entry = header.RightText and header.Text and byTitle[header.Text:GetText()]
+			if entry then
+				local badge = unread[entry.bflChangelogVersion] and Changelog:GetNewBadge(true) .. "  " or ""
+				header.RightText:SetText(badge .. entry.rightText)
+			end
+		end
+	end
+end
+
 local function GetSupportLinks()
 	local fallbackLinks = {
 		{ id = "discord", url = "https://discord.gg/dpaV8vh3w3" },
@@ -1693,7 +1710,13 @@ local function RefreshVisibleSettingsCenter()
 		local frame = ConfigUI and ConfigUI.GetFrame and ConfigUI:GetFrame(APP_ID)
 		local state = frame and frame._LibSettingsDesignerState
 		if frame and frame:IsShown() and state and state.RenderContent then
-			state:RenderContent()
+			if state.view == "page" and state.selectedPageID == "broker.sync.database"
+				and not BFL.GlobalSync:IsAvailable() and state.SetPage
+			then
+				state:SetPage("broker.sync")
+			else
+				state:RenderContent()
+			end
 		end
 	end)
 end
@@ -2603,6 +2626,10 @@ local function GetFilterSortManagerSettingCount()
 	local filterCount = #(Registry:GetQuickFilters(true) or {})
 	local sorterCount = #(Registry:GetSorters(true) or {})
 	return filterCount + sorterCount
+end
+
+function SettingsDesigner.IsGlobalSyncAvailable()
+	return BFL.GlobalSync:IsAvailable()
 end
 
 local function RenderGlobalSyncCustomPage(parent, _, _, state, focusID)
@@ -3997,6 +4024,43 @@ local function RegisterFriendTagsControls()
 		end,
 	})
 
+	AddToggle("groups.friendtags", {
+		id = "friendTags.prioritizeDynamicTagGroups",
+		group = "groups",
+		label = T("FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS", "Only Highest Matching Tag Group"),
+		desc = T("FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS_DESC", "Place each friend in the first matching dynamic tag group in tag order."),
+		default = false,
+		order = 330,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("prioritizeDynamicTagGroups", false) == true
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("prioritizeDynamicTagGroups", value == true)
+		end,
+	})
+	AddDropdown("groups.friendtags", {
+		id = "friendTags.dynamicTagGroupHeaderStyle",
+		group = "groups",
+		label = T("FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE", "Group Header Style"),
+		desc = T("FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE_DESC", "Choose how dynamic tag group headers display their tag."),
+		list = {
+			standard = T("FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STANDARD", "Default"),
+			text_color = T("FRIEND_TAGS_DYNAMIC_GROUP_HEADER_TEXT_COLOR", "Tag Text Color"),
+			chip = T("FRIEND_TAGS_DYNAMIC_GROUP_HEADER_CHIP", "Tag Chip"),
+		},
+		orderList = { "standard", "text_color", "chip" },
+		default = "standard",
+		order = 340,
+		parentCheck = IsFriendTagsEnabled,
+		getValue = function()
+			return GetFriendTagSetting("dynamicTagGroupHeaderStyle", "standard")
+		end,
+		setValue = function(value)
+			SetFriendTagSetting("dynamicTagGroupHeaderStyle", value)
+		end,
+	})
+
 	AddGroup("groups.friendtags", "editor", T("FRIEND_TAGS_SETTINGS_EDITOR", "Tag Editor"), 400)
 	AddButton("groups.friendtags", {
 		id = "friendTags.openEditor",
@@ -4123,6 +4187,17 @@ local function RegisterSocialPages()
 	AddToggle("social.who", { key = "whoZebraStripes", group = "who", label = T("SETTINGS_WHO_ZEBRA_STRIPES", "Alternating Rows"), default = true, order = 130, after = RefreshWho, refreshOnChange = true })
 	AddSlider("social.who", { key = "whoZebraStripeStrength", group = "who", label = T("SETTINGS_WHO_ZEBRA_STRIPE_STRENGTH", "Alternating Row Strength"), min = 0, max = 1, step = 0.01, default = 0.3, formatter = PercentFormatter, order = 140, parentCheck = function() return GetDB("whoZebraStripes", true) == true end, after = RefreshWho })
 	AddDropdown("social.who", { key = "whoDoubleClickAction", group = "who", label = T("SETTINGS_WHO_DOUBLE_CLICK_ACTION", "Double-Click Action"), list = { whisper = WHISPER or "Whisper", invite = INVITE or "Invite" }, orderList = { "whisper", "invite" }, default = "whisper", order = 150, getValue = function() return GetDB("whoDoubleClickAction", "whisper") == "invite" and "invite" or "whisper" end })
+
+	if BFL.IsForever then
+		AddToggle("social.who", {
+			key = "whoOpenOnChatShiftClick",
+			group = "who",
+			label = T("WHO_SETTINGS_OPEN_ON_CHAT_SHIFT_CLICK", "Open Who on Chat Shift-Click"),
+			desc = T("WHO_SETTINGS_OPEN_ON_CHAT_SHIFT_CLICK_DESC", "Open BetterFriendlist's Who tab when you Shift-left-click a character name in chat."),
+			default = false,
+			order = 160,
+		})
+	end
 
 	RegisterPage({ id = "social.raid", category = "social", title = T("SETTINGS_CENTER_PAGE_SOCIAL_RAID", "Raid"), iconKey = "bfl-social-raid", mainToggleID = "enableReadyCheckButton", order = 110 })
 	AddGroup("social.raid", "raid", T("SETTINGS_RAID_SHORTCUTS_TITLE", "Raid Shortcuts"), 100)
@@ -4309,21 +4384,15 @@ local function RegisterBrokerPages()
 
 	RegisterPage({ id = "broker.sync", category = "broker", title = T("SETTINGS_CENTER_PAGE_SYNC", "Sync"), iconKey = "bfl-broker-sync-page", mainToggleID = "enableGlobalSync", order = 120, newTagID = "broker.sync" })
 	AddGroup("broker.sync", "global", T("SETTINGS_TAB_GLOBAL_SYNC", "Global Friend Sync"), 100)
-	local function UsesTitleFriends()
-		local GlobalSync = BFL:GetModule("GlobalSync")
-		return GlobalSync and GlobalSync:UsesTitleFriends() == true
-	end
-	local function ShowLegacySyncControls()
-		return not UsesTitleFriends()
-	end
-	AddInlineHint("broker.sync", "global", "titleFriendsSync", L.SETTINGS_GLOBAL_SYNC_TITLE_FRIENDS, 90, nil, UsesTitleFriends)
-	AddToggle("broker.sync", { key = "enableGlobalSync", group = "global", label = T("SETTINGS_GLOBAL_SYNC_ENABLE", "Enable Global Friend Sync"), desc = T("SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP", "Automatically sync friends from other realms to this character."), default = false, order = 100, visibleWhen = ShowLegacySyncControls, after = function(value) local GlobalSync = BFL:GetModule("GlobalSync"); if value and GlobalSync and GlobalSync.OnFriendListUpdate then GlobalSync:OnFriendListUpdate() end end, refreshOnChange = true })
-	AddToggle("broker.sync", { key = "enableGlobalSyncDeletion", group = "global", label = T("SETTINGS_GLOBAL_SYNC_DELETION", "Enable Deletion"), desc = T("SETTINGS_GLOBAL_SYNC_DELETION_DESC", "Allow Global Sync to remove friends marked as deleted."), default = false, order = 110, visibleWhen = ShowLegacySyncControls, parentCheck = function() return GetDB("enableGlobalSync", false) end })
+	AddInlineHint("broker.sync", "global", "legacyFriendsSync", L.SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP, 90, nil, SettingsDesigner.IsGlobalSyncAvailable)
+	AddToggle("broker.sync", { key = "enableGlobalSync", group = "global", label = T("SETTINGS_GLOBAL_SYNC_ENABLE", "Enable Global Friend Sync"), default = false, order = 100, visibleWhen = SettingsDesigner.IsGlobalSyncAvailable, after = function(value) local GlobalSync = BFL:GetModule("GlobalSync"); if value and GlobalSync then GlobalSync:OnFriendListUpdate() end end, refreshOnChange = true })
+	AddToggle("broker.sync", { key = "enableGlobalSyncDeletion", group = "global", label = T("SETTINGS_GLOBAL_SYNC_DELETION", "Enable Deletion"), desc = T("SETTINGS_GLOBAL_SYNC_DELETION_DESC", "Allow Global Sync to remove friends marked as deleted."), default = false, order = 110, visibleWhen = SettingsDesigner.IsGlobalSyncAvailable, parentCheck = function() return GetDB("enableGlobalSync", false) end })
 	AddGroup("broker.sync", "notes", T("SETTINGS_SYNC_GROUPS_HEADER", "Group Note Sync"), 200)
 	AddToggle("broker.sync", { key = "syncGroupsToNote", group = "notes", label = T("SETTINGS_SYNC_GROUPS_NOTE", "Sync Groups to Friend Note"), desc = T("SETTINGS_SYNC_GROUPS_NOTE_DESC", "Write group assignments into friend notes using FriendGroups format."), default = false, order = 200, newTagID = "syncGroupsToNote", method = "OnSyncGroupsToNoteChanged" })
 	RegisterPage({
 		id = "broker.sync.database",
 		category = "broker",
+		visibleWhen = SettingsDesigner.IsGlobalSyncAvailable,
 		title = T("SETTINGS_CENTER_PAGE_SYNC_DATABASE", "Synced Friends Database"),
 		description = T("SETTINGS_CENTER_GLOBAL_SYNC_DATABASE_DESC", "Inspect, restore, remove, and edit synced friend records."),
 		layout = "custom",
@@ -4361,7 +4430,7 @@ local function RegisterAdvancedPages()
 	AddButton("advanced.tools", { id = "migration.friendgroups", group = "migration", label = T("SETTINGS_MIGRATE_BTN", "Migrate FriendGroups"), desc = T("SETTINGS_MIGRATE_TOOLTIP", "Import groups from the FriendGroups addon."), buttonText = T("SETTINGS_MIGRATE_BTN", "Migrate"), order = 100, onClick = function() CallSettings("ShowMigrationDialog") end })
 	AddGroup("advanced.tools", "importexport", T("SETTINGS_EXPORT_HEADER", "Export / Import Settings"), 200)
 	AddInlineHint("advanced.tools", "importexport", "importexport.fullBackup", L.SETTINGS_EXPORT_WARNING, 190)
-	AddInlineHint("advanced.tools", "importexport", "importexport.globalSyncFlavor", L.SETTINGS_IMPORT_GLOBAL_SYNC_INFO, 195)
+	AddInlineHint("advanced.tools", "importexport", "importexport.globalSyncFlavor", L.SETTINGS_IMPORT_GLOBAL_SYNC_INFO, 195, nil, SettingsDesigner.IsGlobalSyncAvailable)
 	AddButton("advanced.tools", { id = "export.settings", group = "importexport", label = T("BUTTON_EXPORT", "Export"), desc = T("SETTINGS_EXPORT_TOOLTIP", "Export your groups and friend assignments."), buttonText = T("BUTTON_EXPORT", "Export"), order = 200, onClick = function() CallSettingsDialog("ShowExportDialog", "exportFrame", "BetterFriendlistExportFrame") end })
 	AddButton("advanced.tools", { id = "import.settings", group = "importexport", label = T("SETTINGS_IMPORT_BTN", "Import"), desc = T("SETTINGS_IMPORT_TOOLTIP", "Import groups and friend assignments."), buttonText = T("SETTINGS_IMPORT_BTN", "Import"), order = 210, onClick = function() CallSettingsDialog("ShowImportDialog", "importFrame", "BetterFriendlistImportFrame") end })
 	AddGroup("advanced.tools", "cleanup", T("WIZARD_HEADER", "Note Cleanup"), 300, 1)
@@ -4489,7 +4558,7 @@ local function RegisterHelpPages()
 			title = T("SETTINGS_CENTER_HELP_SLASH_COMMANDS", "Slash Commands"),
 			entries = {
 				{ type = "command", commands = { "/bfl settings" }, desc = T("SETTINGS_CENTER_HELP_COMMAND_SETTINGS", "Open the settings center.") },
-				{ type = "command", commands = { "/bfl changelog" }, desc = T("SETTINGS_CENTER_HELP_COMMAND_CHANGELOG", "Open the standalone changelog window.") },
+				{ type = "command", commands = { "/bfl changelog" }, desc = T("SETTINGS_CENTER_HELP_COMMAND_CHANGELOG", "Open the changelog in Settings.") },
 				{ type = "command", commands = { "/bfl discord" }, desc = T("SETTINGS_CENTER_HELP_COMMAND_DISCORD", "Show the Discord invite URL.") },
 			},
 		},
@@ -4685,6 +4754,16 @@ function SettingsDesigner:Register()
 			for _, frame in ipairs(state.contentFrames) do
 				Changelog:ApplyContentFonts(frame)
 			end
+			self:RefreshChangelogBadges(state, page, Changelog)
+		end)
+		hooksecurefunc(ConfigUI, "ToggleInfoPageEntry", function(state, entry, path)
+			if state.app ~= app or not entry.bflChangelogVersion
+				or not ConfigUI.IsInfoPageEntryExpanded(state, entry, path) then return end
+			local Changelog = GetChangelogModule()
+			if Changelog then
+				Changelog:MarkVersionRead(entry.bflChangelogVersion)
+				self:RefreshChangelogBadges(state, app.pagesByID["help.changelog"], Changelog)
+			end
 		end)
 	end
 
@@ -4703,6 +4782,8 @@ function SettingsDesigner:Show(pageID, focusControlID)
 		return nil
 	end
 	local frame = ConfigUI:Open(registeredApp, pageID, focusControlID)
+	local FrameSettings = BFL:GetModule("FrameSettings")
+	if FrameSettings then FrameSettings:ApplyAuxiliaryScale(frame) end
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if frame and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.AnchorAuxiliaryWindow then
 		FriendsUI:AnchorAuxiliaryWindow(frame, 0)

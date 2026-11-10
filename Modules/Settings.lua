@@ -42,75 +42,50 @@ local function SafeResetVerticalScroll(scrollFrame)
 	return ok
 end
 
-local function GetLegacySettingsScrollBar(scrollFrame)
-	if not scrollFrame then
-		return nil
-	end
-	if scrollFrame.ScrollBar then
-		return scrollFrame.ScrollBar
-	end
-	local name = scrollFrame.GetName and scrollFrame:GetName()
-	if name and _G[name .. "ScrollBar"] then
-		return _G[name .. "ScrollBar"]
-	end
-	for _, child in ipairs({ scrollFrame:GetChildren() }) do
-		if child.IsObjectType and child:IsObjectType("Slider") then
-			return child
-		end
-	end
-	return nil
-end
-
-local function GetLegacySettingsScrollRange(scrollFrame, scrollBar)
-	local range
-	if scrollFrame and scrollFrame.GetVerticalScrollRange then
-		local ok, value = pcall(scrollFrame.GetVerticalScrollRange, scrollFrame)
-		if ok then
-			range = tonumber(value)
-		end
-	end
-	if range == nil and scrollBar and scrollBar.GetMinMaxValues then
-		local ok, minimum, maximum = pcall(scrollBar.GetMinMaxValues, scrollBar)
-		if ok then
-			range = (tonumber(maximum) or 0) - (tonumber(minimum) or 0)
-		end
-	end
-	return range
+local function HasSettingsScrollOverflow(scrollFrame)
+	local height = scrollFrame.BFL_SettingsContentHeight
+	if height then return height - scrollFrame:GetHeight() > 0.5 end
+	return scrollFrame:GetVerticalScrollRange() > 0.5
 end
 
 local function UpdateLegacySettingsScrollbar(scrollFrame)
-	local scrollBar = GetLegacySettingsScrollBar(scrollFrame)
-	if not scrollBar then
-		return
+	if not scrollFrame then return end
+	if not scrollFrame.BFL_SettingsScrollInitialized then
+		scrollFrame.BFL_SettingsScrollInitialized = true
+		scrollFrame:EnableMouseWheel(true)
+		if ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
+			local bar = CreateFrame("EventFrame", nil, scrollFrame:GetParent(), "MinimalScrollBar")
+			bar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 5, 0)
+			bar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 5, 0)
+			bar:SetHideIfUnscrollable(true)
+			scrollFrame.ScrollBar = bar
+			ScrollUtil.InitScrollFrameWithScrollBar(scrollFrame, bar)
+			scrollFrame:GetScript("OnScrollRangeChanged")(scrollFrame, 0, scrollFrame:GetVerticalScrollRange())
+			scrollFrame:HookScript("OnScrollRangeChanged", function(frame)
+				bar:SetShown(HasSettingsScrollOverflow(frame))
+			end)
+			bar:HookScript("OnShow", function()
+				if not HasSettingsScrollOverflow(scrollFrame) then bar:Hide() end
+			end)
+		else
+			scrollFrame:SetScript("OnMouseWheel", function(frame, delta)
+				frame:SetVerticalScroll(math.max(0, math.min(frame:GetVerticalScrollRange(), frame:GetVerticalScroll() - 30 * delta)))
+			end)
+		end
 	end
-	if scrollBar.SetHideIfUnscrollable then
-		pcall(scrollBar.SetHideIfUnscrollable, scrollBar, true)
-	end
-
-	local range = GetLegacySettingsScrollRange(scrollFrame, scrollBar)
-	if range ~= nil then
-		scrollBar:SetShown(range > 0.5)
-	end
-	if not scrollBar._bflHideIfUnscrollableHooked and scrollBar.HookScript then
-		scrollBar._bflHideIfUnscrollableHooked = true
-		scrollBar:HookScript("OnShow", function(bar)
-			local currentRange = GetLegacySettingsScrollRange(scrollFrame, bar)
-			if currentRange ~= nil and currentRange <= 0.5 then
-				bar:Hide()
-			end
-		end)
-	end
-
-	if not scrollFrame._bflScrollbarVisibilityHooked and scrollFrame.HookScript then
-		scrollFrame._bflScrollbarVisibilityHooked = true
-		scrollFrame:HookScript("OnScrollRangeChanged", function(frame)
-			UpdateLegacySettingsScrollbar(frame)
-		end)
+	if scrollFrame.ScrollBar then
+		scrollFrame.ScrollBar:SetShown(HasSettingsScrollOverflow(scrollFrame))
 	end
 end
 
 function Settings:UpdateLegacySettingsScrollbar(scrollFrame)
 	UpdateLegacySettingsScrollbar(scrollFrame)
+end
+
+function Settings:CreateSettingsScrollFrame(parent)
+	local scrollFrame = CreateFrame("ScrollFrame", nil, parent)
+	UpdateLegacySettingsScrollbar(scrollFrame)
+	return scrollFrame
 end
 
 local function SetDeleteIconTexture(texture)
@@ -245,7 +220,7 @@ function Settings:GetGlobalSyncTabHost()
 end
 
 function Settings:RenderGlobalSyncEditor(parent, opts)
-	if not parent then
+	if not parent or not BFL.GlobalSync:IsAvailable() then
 		return nil
 	end
 	opts = opts or {}
@@ -683,11 +658,12 @@ function Settings:OnLoad(frame)
 	-- Setup close button
 	if settingsFrame.CloseButton then
 		settingsFrame.CloseButton:SetScript("OnClick", function()
-			self:Cancel()
+			self:HideLegacyWindow()
 		end)
 	end
 
-	settingsFrame:HookScript("OnHide", function()
+	settingsFrame:HookScript("OnHide", function(owner)
+		if owner:IsShown() then return end
 		self:ClearFilterSortPreview(true)
 		self:HideFilterSortEditorPanel()
 	end)
@@ -714,6 +690,8 @@ function Settings:HideLegacyWindow()
 	if settingsFrame then
 		settingsFrame:Hide()
 	end
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review then review:Deactivate() end
 end
 
 -- Keep an already-open settings window adjacent to the active Friends UI.
@@ -761,8 +739,8 @@ function Settings:OnSettingsCenterBetaChanged(checked)
 	end
 end
 
--- Show the active settings window. Legacy remains the default until the
--- Settings Center beta is explicitly enabled.
+-- The redesigned settings are the default. The separate Settings Center
+-- is available to players who explicitly opt into its beta.
 function Settings:Show(pageID, focusControlID)
 	if self:IsSettingsCenterEnabled() and self:ShowSettingsCenter(pageID, focusControlID) then
 		return
@@ -771,7 +749,65 @@ function Settings:Show(pageID, focusControlID)
 	self:ShowLegacy()
 end
 
--- Show the legacy XML settings window.
+function Settings:ShowRedesignHint(preview)
+	local hints = BFL:GetModule("FeatureHints")
+	local db = GetDB()
+	if not hints or not db then return false end
+	if not preview then
+		local onboarding = BFL:GetModule("AppearanceOnboarding")
+		if db:Get("settingsRedesignHintSeen", false) or (InCombatLockdown and InCombatLockdown())
+			or (onboarding and onboarding.active) then return false end
+	end
+
+	local shown = hints:Show({
+		id = "settings.redesign",
+		title = L.SETTINGS_REDESIGN_HINT_TITLE,
+		entries = {
+			{
+				text = L.SETTINGS_REDESIGN_HINT_BODY,
+				actionText = L.BROKER_ACTION_SETTINGS,
+				onClick = function() self:ShowLegacy() end,
+			},
+		},
+		oncePerSession = not preview,
+		replace = preview,
+	})
+	if shown and not preview then db:Set("settingsRedesignHintSeen", true) end
+	return shown
+end
+
+function Settings:OnPlayerLogin()
+	local db = GetDB()
+	if not db or db:Get("settingsRedesignHintSeen", false) then return end
+	local events = CreateFrame("Frame")
+	events:RegisterEvent("PLAYER_ENTERING_WORLD")
+	events:RegisterEvent("PLAYER_REGEN_ENABLED")
+	local function TryShow()
+		if db:Get("settingsRedesignHintSeen", false) or self:ShowRedesignHint() then
+			events:UnregisterAllEvents()
+		end
+	end
+	events:SetScript("OnEvent", function(_, event)
+		if event == "PLAYER_ENTERING_WORLD" then
+			C_Timer.After(3, TryShow)
+		else
+			TryShow()
+		end
+	end)
+end
+
+function Settings:ShowChangelog()
+	if self:IsSettingsCenterEnabled() and self:ShowSettingsCenter("help.changelog") then
+		return
+	end
+	self:ShowLegacy()
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review and review.active then
+		review:Focus(review.home.releaseTitle)
+	end
+end
+
+-- Open the settings based on the legacy XML window, including old tab links.
 function Settings:ShowLegacy(categoryID, focusSection)
 	local Designer = BFL:GetModule("SettingsDesigner")
 	if Designer and Designer.Hide then
@@ -789,12 +825,15 @@ function Settings:ShowLegacy(categoryID, focusSection)
 			end
 		end
 		self:LoadSettings()
-		self:RefreshCategories() -- Update category visibility based on Beta features
-		local FriendsUI = BFL:GetModule("FriendsUI")
-		if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
-			FriendsUI:AnchorAuxiliaryWindow(settingsFrame, 0)
-		end
 		settingsFrame:Show()
+		local review = BFL:GetModule("LegacySettingsReview")
+		if review then
+			review:Open(settingsFrame, self, categoryID, focusSection)
+			return
+		end
+
+		self:RefreshCategories()
+		self:RefreshVisibleWindowAnchor()
 		self:SelectCategory(categoryID or currentTab or 1) -- Restore or show first category
 		self:ScrollToLegacySection(focusSection)
 	else
@@ -824,9 +863,62 @@ function Settings:ScrollToLegacySection(section)
 	pcall(scrollFrame.SetVerticalScroll, scrollFrame, offset)
 end
 
+local function NotifyLegacyReviewTabBuilt(tab)
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review and review.active then
+		review:OnBuilt(tab)
+	end
+end
+
+local function IsLegacyReviewActive()
+	local review = BFL:GetModule("LegacySettingsReview")
+	return review and review.active
+end
+
+local function DisableLegacyDropdown(row)
+	local dropdown = row.DropDown
+	if BFL.IsModernDropdown(dropdown) then
+		dropdown:SetEnabled(false)
+	elseif dropdown and dropdown.Button then
+		dropdown.Button:SetEnabled(false)
+	end
+end
+
+local function AppendLegacyCheckboxPair(frames, tab, left, right)
+	if IsLegacyReviewActive() then
+		local leftRow = Components:CreateCheckbox(tab, left)
+		local rightRow = Components:CreateCheckbox(tab, right)
+		table.insert(frames, leftRow)
+		table.insert(frames, rightRow)
+		return leftRow, rightRow
+	else
+		table.insert(frames, Components:CreateDoubleCheckbox(tab, left, right))
+	end
+end
+
+local function AppendLegacyCheckboxDropdown(frames, tab, check, dropdown)
+	if not IsLegacyReviewActive() or not dropdown then
+		local row = Components:CreateCheckboxDropdown(tab, check, dropdown)
+		table.insert(frames, row)
+		return row
+	end
+
+	local row = Components:CreateCheckbox(tab, check)
+	table.insert(frames, row)
+	local selectRow = Components:CreateDropdown(tab, dropdown.label, dropdown.entries, dropdown.isSelectedCallback, dropdown.onSelectionCallback)
+	selectRow:SetTooltip(dropdown.tooltipTitle, dropdown.tooltipDesc)
+	if not check.initialValue then
+		DisableLegacyDropdown(selectRow)
+		selectRow:SetTooltip(dropdown.tooltipTitle, dropdown.tooltipDesc .. "\n" .. check.label)
+	end
+	table.insert(frames, selectRow)
+	return row, selectRow
+end
+
 local function RegisterLegacySection(settings, section, anchor)
 	settings.legacySectionAnchors = settings.legacySectionAnchors or {}
 	settings.legacySectionAnchors[section] = anchor
+	anchor.BFL_LegacyAnchor = section
 end
 
 -- ===========================================
@@ -997,6 +1089,9 @@ local function GetFavoriteIconMarkup(style, size)
 end
 
 local function IsTabAvailableForClient(tabDef)
+	if tabDef.id == 6 then
+		return BFL.GlobalSync:IsAvailable()
+	end
 	if tabDef.retailOnly and BFL.IsRetail ~= true then
 		return false
 	end
@@ -1063,7 +1158,30 @@ local function GetBetaTabIds()
 end
 
 -- Refresh category visibility (Beta features toggle)
+function Settings:GetLegacyTabAvailability(tabID)
+	for _, def in ipairs(TAB_DEFINITIONS) do
+		if def.id == tabID and (not def.retailOnly or BFL.IsRetail == true) then
+			if tabID == 6 and not IsTabAvailableForClient(def) then return false, "client" end
+			if IsTabVisible(tabID) then
+				return true
+			end
+			return false, def.beta and "beta" or "modern"
+		end
+	end
+	return false, "client"
+end
+
+function Settings:ShowLegacyReview()
+	self:ShowLegacy()
+end
+
 function Settings:RefreshCategories()
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review and review.active then
+		review:UpdateAvailability()
+		return
+	end
+
 	if not settingsFrame then
 		settingsFrame = BetterFriendlistSettingsFrame
 	end
@@ -1181,6 +1299,15 @@ function Settings:RefreshCategories()
 	end
 end
 
+function Settings:RefreshGlobalSyncAvailability()
+	if not settingsFrame or not settingsFrame:IsShown() then return end
+	self:RefreshCategories()
+	local review = BFL:GetModule("LegacySettingsReview")
+	if currentTab == 6 and not (review and review.active) and not IsTabVisible(6) then
+		self:SelectCategory(1)
+	end
+end
+
 -- Hide the settings window
 function Settings:Hide()
 	local Designer = BFL:GetModule("SettingsDesigner")
@@ -1188,11 +1315,7 @@ function Settings:Hide()
 		Designer:Hide()
 	end
 
-	self:ClearFilterSortPreview(true)
-	self:HideFilterSortEditorPanel()
-	if settingsFrame then
-		settingsFrame:Hide()
-	end
+	self:HideLegacyWindow()
 end
 
 function Settings:RefreshCategoryVisualState()
@@ -1609,9 +1732,9 @@ function Settings:DoReset()
 	self:LoadSettings()
 
 	-- Reset window scale to 100%
-	local MainFrameEditMode = BFL.Modules and BFL.Modules.MainFrameEditMode
-	if MainFrameEditMode and MainFrameEditMode.ApplyScale then
-		MainFrameEditMode:ApplyScale()
+	local FrameSettings = BFL:GetModule("FrameSettings")
+	if FrameSettings then
+		FrameSettings:ApplyScale()
 	elseif BetterFriendsFrame then
 		BetterFriendsFrame:SetScale(1.0)
 	end
@@ -1749,7 +1872,15 @@ function Settings:SaveGroupOrder()
 end
 
 -- Show color picker for a group
+local function PreviewEditedGroup(groupId)
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review then
+		review:PreviewGroup(groupId)
+	end
+end
+
 function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isReset)
+	PreviewEditedGroup(groupId)
 	local DB = GetDB()
 	if not DB then
 		return
@@ -1877,6 +2008,7 @@ function Settings:ShowGroupCountColorPicker(groupId, groupName, colorSwatch, isR
 end
 
 function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isReset)
+	PreviewEditedGroup(groupId)
 	local DB = GetDB()
 	if not DB then
 		return
@@ -2002,6 +2134,7 @@ function Settings:ShowGroupArrowColorPicker(groupId, groupName, colorSwatch, isR
 end
 
 function Settings:ShowColorPicker(groupId, groupName, colorSwatch)
+	PreviewEditedGroup(groupId)
 	local DB = GetDB()
 	if not DB then
 		return
@@ -2178,7 +2311,8 @@ function Settings:MigrateFriendGroups(cleanupNotes, force)
 
 	for i = 1, numBNetFriends do
 		local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
-		if accountInfo then
+		-- This legacy importer matches and cleans notes by BattleTag.
+		if accountInfo and (not BFL.IsTitleFriend or not BFL.IsTitleFriend(accountInfo)) then
 			local battleTag = accountInfo.battleTag
 			local noteText = accountInfo.note
 
@@ -2752,7 +2886,7 @@ function Settings:CreateExportFrame()
 	frame.info:SetText(L.SETTINGS_EXPORT_INFO)
 
 	-- Scroll frame with edit box
-	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+	local scrollFrame = self:CreateSettingsScrollFrame(frame)
 	scrollFrame:SetPoint("TOPLEFT", UI.SPACING_MEDIUM, -60)
 	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
 	frame.scrollFrame = scrollFrame
@@ -2777,7 +2911,7 @@ function Settings:CreateExportFrame()
 	scrollFrame.editBox = editBox
 
 	-- Copy All button
-	local copyButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	local copyButton = CreateFrame("Button", nil, frame, Components:GetActionButtonTemplate("GameMenuButtonTemplate"))
 	copyButton:SetPoint("BOTTOM", 0, 15)
 	copyButton:SetSize(120, 25)
 	copyButton:SetText(L.SETTINGS_EXPORT_BTN)
@@ -2818,7 +2952,7 @@ function Settings:CreateImportFrame()
 	frame.info:SetText(L.SETTINGS_IMPORT_INFO)
 
 	-- Scroll frame with edit box
-	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+	local scrollFrame = self:CreateSettingsScrollFrame(frame)
 	scrollFrame:SetPoint("TOPLEFT", UI.SPACING_MEDIUM, -80)
 	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
 	frame.scrollFrame = scrollFrame
@@ -2838,7 +2972,7 @@ function Settings:CreateImportFrame()
 	scrollFrame.editBox = editBox
 
 	-- Import button
-	local importButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	local importButton = CreateFrame("Button", nil, frame, Components:GetActionButtonTemplate("GameMenuButtonTemplate"))
 	importButton:SetPoint("BOTTOM", -65, 15)
 	importButton:SetSize(120, 25)
 	importButton:SetText(L.SETTINGS_IMPORT_BTN)
@@ -2867,7 +3001,7 @@ function Settings:CreateImportFrame()
 	end)
 
 	-- Cancel button
-	local cancelButton = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
+	local cancelButton = CreateFrame("Button", nil, frame, Components:GetActionButtonTemplate("GameMenuButtonTemplate"))
 	cancelButton:SetPoint("BOTTOM", 65, 15)
 	cancelButton:SetSize(120, 25)
 	cancelButton:SetText(L.SETTINGS_IMPORT_CANCEL)
@@ -3591,7 +3725,7 @@ function Settings:RefreshThemeTab()
 	tab.components = {}
 
 	local allFrames = {}
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_HEADER or "Theme"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_HEADER or "Theme", "SETTINGS_THEME_HEADER"))
 
 	local labels = {}
 	local values = {}
@@ -3629,6 +3763,9 @@ function Settings:RefreshThemeTab()
 		L.SETTINGS_THEME_DROPDOWN_DESC
 			or "Choose the visual style for BetterFriendlist. ElvUI and EllesmereUI require a UI reload."
 	)
+	if IsLegacyReviewActive() then
+		themeDropdown.BFL_Comparison = { { "theme", theme = true } }
+	end
 	table.insert(allFrames, themeDropdown)
 
 	local simpleMode = DB:Get("simpleMode", false)
@@ -3707,6 +3844,9 @@ function Settings:RefreshThemeTab()
 		if slider.SetTooltip then
 			slider:SetTooltip(label, tooltip)
 		end
+		if IsLegacyReviewActive() then
+			slider.BFL_Comparison = { { key, theme = theme, paletteSettings = true } }
+		end
 		table.insert(allFrames, slider)
 	end
 
@@ -3757,13 +3897,16 @@ function Settings:RefreshThemeTab()
 		AddAvatarSlider(theme)
 	end
 
-	local function AddThemeColor(label, initialColor, callback, resetCallback, tooltip)
+	local function AddThemeColor(label, initialColor, callback, resetCallback, tooltip, key, custom)
 		local picker = Components:CreateColorPicker(tab, label, initialColor, callback, {
 			tooltipTitle = label,
 			tooltipDesc = tooltip,
 			resetCallback = resetCallback,
 			resetTooltip = L.SETTINGS_THEME_RESET_COLOR_TOOLTIP or "Right-click to inherit this color from the Dark theme.",
 		})
+		if IsLegacyReviewActive() then
+			picker.BFL_Comparison = { { key, theme = currentTheme, paletteSettings = not custom, paletteColors = custom } }
+		end
 		table.insert(allFrames, picker)
 	end
 
@@ -3798,7 +3941,7 @@ function Settings:RefreshThemeTab()
 		initialColor.a = initialOpacity
 
 		table.insert(allFrames, Components:CreateSpacer(tab))
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_BROKER_TOOLTIP_HEADER or "Broker Tooltips"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_BROKER_TOOLTIP_HEADER or "Broker Tooltips", "SETTINGS_THEME_BROKER_TOOLTIP_HEADER"))
 
 		local brokerBackgroundPicker = Components:CreateColorPicker(
 			tab,
@@ -3813,6 +3956,9 @@ function Settings:RefreshThemeTab()
 					or "Overrides the background color for Friends and Guild Data Broker tooltips in the selected theme.",
 			}
 		)
+		if IsLegacyReviewActive() then
+			brokerBackgroundPicker.BFL_Comparison = { { "backgroundColor", theme = theme, brokerBackground = true } }
+		end
 		table.insert(allFrames, brokerBackgroundPicker)
 
 		local brokerOpacitySlider = Components:CreateSlider(
@@ -3836,6 +3982,9 @@ function Settings:RefreshThemeTab()
 					or "Overrides the background opacity for Friends and Guild Data Broker tooltips in the selected theme."
 			)
 		end
+		if IsLegacyReviewActive() then
+			brokerOpacitySlider.BFL_Comparison = { { "opacity", theme = theme, brokerBackground = true } }
+		end
 		table.insert(allFrames, brokerOpacitySlider)
 
 		table.insert(
@@ -3849,7 +3998,7 @@ function Settings:RefreshThemeTab()
 	if currentTheme == "dark" then
 		local darkSettings = GetThemeSettings("dark")
 		table.insert(allFrames, Components:CreateSpacer(tab))
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_DARK_HEADER or "Dark Theme Settings"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_DARK_HEADER or "Dark Theme Settings", "SETTINGS_THEME_DARK_HEADER"))
 		AddThemeColor(
 			L.SETTINGS_THEME_ACCENT_COLOR or "Accent Color",
 			darkSettings.accentColor,
@@ -3857,7 +4006,8 @@ function Settings:RefreshThemeTab()
 				SetThemeSetting("dark", "accentColor", { r = r, g = g, b = b, a = a })
 			end,
 			nil,
-			L.SETTINGS_THEME_ACCENT_COLOR_DESC or "Controls selected, hover, slider, and icon accents."
+			L.SETTINGS_THEME_ACCENT_COLOR_DESC or "Controls selected, hover, slider, and icon accents.",
+			"accentColor"
 		)
 		AddCommonSkinSliders("dark")
 		table.insert(
@@ -3954,7 +4104,7 @@ function Settings:RefreshThemeTab()
 		}
 
 		table.insert(allFrames, Components:CreateSpacer(tab))
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_CUSTOM_HEADER or "Custom Theme"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_CUSTOM_HEADER or "Custom Theme", "SETTINGS_THEME_CUSTOM_HEADER"))
 		AddCommonSkinSliders("custom")
 		for _, definition in ipairs(customMap) do
 			local fallback = resolvedColors[definition.token] or (SkinEngine and SkinEngine.defaultColors and SkinEngine.defaultColors[definition.token])
@@ -3963,7 +4113,7 @@ function Settings:RefreshThemeTab()
 				SetCustomColor(definition.key, r, g, b, a)
 			end, function()
 				ResetCustomColor(definition.key)
-			end, definition.desc)
+			end, definition.desc, definition.key, true)
 		end
 		table.insert(
 			allFrames,
@@ -3980,10 +4130,30 @@ function Settings:RefreshThemeTab()
 		)
 	end
 
-	AddBrokerTooltipSection(currentTheme)
+	if IsLegacyReviewActive() and currentTheme ~= "dark" and currentTheme ~= "custom" then
+		table.insert(allFrames, Components:CreateSpacer(tab))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_BROKER_TOOLTIP_HEADER, "SETTINGS_THEME_BROKER_TOOLTIP_HEADER"))
+		local requirement = L.SETTINGS_LEGACY_NEEDS_THEME:format(L.SETTINGS_THEME_DARK .. " / " .. L.SETTINGS_THEME_CUSTOM)
+		local note = Components:CreateLabel(tab, requirement)
+		note.BFL_SearchLabels = { L.SETTINGS_THEME_BROKER_TOOLTIP_BACKGROUND, L.SETTINGS_THEME_BROKER_TOOLTIP_OPACITY, L.SETTINGS_THEME_BROKER_TOOLTIP_RESET }
+		table.insert(allFrames, note)
+	else
+		AddBrokerTooltipSection(currentTheme)
+	end
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
+end
+
+local function LegacyOrderOptions(entries, key)
+	local order = {}
+	local positions = { labels = {}, values = {} }
+	for index, entry in ipairs(entries) do
+		order[index] = entry[key]
+		positions.labels[index], positions.values[index] = tostring(index), index
+	end
+	return order, { BFL_ComparisonChoices = positions }
 end
 
 function Settings:RefreshFriendTabsTab()
@@ -4004,20 +4174,26 @@ function Settings:RefreshFriendTabsTab()
 
 	local allFrames = {}
 	local entries = FriendsUI:GetFriendTabSettingsEntries()
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIEND_TABS_ORDER or "Tab Order & Visibility"))
+	local review = IsLegacyReviewActive()
+	local order, positionControl
+	if review then order, positionControl = LegacyOrderOptions(entries, "id") end
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIEND_TABS_ORDER or "Tab Order & Visibility", "SETTINGS_FRIEND_TABS_ORDER"))
 
+	local visibleColumnX = -176
+	local conditionalColumnX = -73
 	local columns = CreateFrame("Frame", nil, tab)
 	columns:SetHeight(24)
 	columns:SetPoint("LEFT", 12, 0)
 	columns:SetPoint("RIGHT", -12, 0)
 	columns.Visible = columns:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	columns.Visible:SetPoint("RIGHT", columns, "RIGHT", -178, 0)
+	columns.Visible:SetPoint("CENTER", columns, "RIGHT", visibleColumnX, 0)
 	columns.Visible:SetWidth(72)
 	columns.Visible:SetJustifyH("CENTER")
 	columns.Visible:SetText(SHOW or ENABLE or "Show")
 	columns.Conditional = columns:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-	columns.Conditional:SetPoint("RIGHT", columns, "RIGHT", -8, 0)
-	columns.Conditional:SetWidth(150)
+	columns.Conditional:SetPoint("CENTER", columns, "RIGHT", conditionalColumnX, 0)
+	columns.Conditional:SetWidth(130)
+	columns.Conditional:SetMaxLines(2)
 	columns.Conditional:SetJustifyH("CENTER")
 	columns.Conditional:SetText(L.SETTINGS_FRIEND_TABS_CONDITIONAL or "Conditional Visibility")
 	columns.Divider = columns:CreateTexture(nil, "BACKGROUND")
@@ -4133,6 +4309,7 @@ function Settings:RefreshFriendTabsTab()
 		row:RegisterForDrag("LeftButton")
 		row.sectionID = entry.id
 		row.orderIndex = index
+		row.BFL_SearchLabels = { entry.label }
 
 		row.Highlight = row:CreateTexture(nil, "BACKGROUND")
 		row.Highlight:SetAllPoints()
@@ -4164,13 +4341,13 @@ function Settings:RefreshFriendTabsTab()
 
 		row.Label = row:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlight")
 		row.Label:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
-		row.Label:SetPoint("RIGHT", row, "RIGHT", -268, 0)
+		row.Label:SetPoint("RIGHT", row, "RIGHT", visibleColumnX - 22, 0)
 		row.Label:SetJustifyH("LEFT")
-		row.Label:SetWordWrap(false)
+		row.Label:SetMaxLines(2)
 		row.Label:SetText(entry.label or entry.id)
 
 		row.VisibleCheck = CreateFrame("CheckButton", nil, row, "SettingsCheckboxTemplate")
-		row.VisibleCheck:SetPoint("RIGHT", row, "RIGHT", -196, 0)
+		row.VisibleCheck:SetPoint("CENTER", row, "RIGHT", visibleColumnX, 0)
 		SetCheckButtonText(row.VisibleCheck)
 		row.VisibleCheck:SetChecked(FriendsUI:IsFriendTabVisible(entry.id))
 		row.VisibleCheck:SetScript("OnClick", function(check)
@@ -4190,9 +4367,20 @@ function Settings:RefreshFriendTabsTab()
 
 		local conditional = entry.id == "friend_requests" or entry.id == "quick_join"
 		row.ConditionalCheck = CreateFrame("CheckButton", nil, row, "SettingsCheckboxTemplate")
-		row.ConditionalCheck:SetPoint("RIGHT", row, "RIGHT", -68, 0)
+		row.ConditionalCheck:SetPoint("CENTER", row, "RIGHT", conditionalColumnX, 0)
 		SetCheckButtonText(row.ConditionalCheck)
 		row.ConditionalCheck:SetShown(conditional)
+		if review then
+			row.BFL_SettingSlotCount = conditional and 3 or 2
+			row.BFL_SettingSlotRects = { row.VisibleCheck, row.Label }
+			row.BFL_SettingsExactSlots = true
+			row.BFL_SettingDescriptions = { L.SETTINGS_FRIEND_TABS_VISIBILITY_DESC, L.SETTINGS_FRIEND_TABS_ORDER_DESC }
+			row.BFL_SearchLabels[2] = L.SETTINGS_FRIEND_TABS_ORDER
+			row.BFL_Comparison = {
+				{ "visibility", tab = entry.id, binary = true, social = "friendTabs", identity = entry.id },
+				{ "friendTabOrder", order = order, orderFrom = index, control = positionControl, social = "friendTabs", identity = entry.id },
+			}
+		end
 		if conditional then
 			local visible = FriendsUI:IsFriendTabVisible(entry.id)
 			row.ConditionalCheck:SetChecked(FriendsUI:IsFriendTabPopulatedOnly(entry.id))
@@ -4204,19 +4392,15 @@ function Settings:RefreshFriendTabsTab()
 			local key = entry.id == "friend_requests"
 					and "SETTINGS_FRIEND_TABS_REQUESTS_POPULATED_ONLY"
 				or "SETTINGS_FRIEND_TABS_QUICK_JOIN_POPULATED_ONLY"
+			row.BFL_SearchLabels[#row.BFL_SearchLabels + 1] = L[key]
+			if review then
+				row.BFL_SettingDescriptions[3] = L[key .. "_DESC"]
+				row.BFL_SettingSlotRects[3] = row.ConditionalCheck
+				row.BFL_Comparison[3] = { "conditional", tab = entry.id, binary = true, social = "friendTabs", identity = entry.id }
+			end
 			SetTooltip(row.ConditionalCheck, L[key], L[key .. "_DESC"])
 		end
 
-		row:SetScript("OnEnter", function()
-			if not dragState.fromIndex then
-				row.Highlight:Show()
-			end
-		end)
-		row:SetScript("OnLeave", function()
-			if dragState.dropIndex ~= row.orderIndex then
-				row.Highlight:Hide()
-			end
-		end)
 		row:SetScript("OnDragStart", function()
 			dragState.fromIndex = row.orderIndex
 			dragState.dropIndex = row.orderIndex
@@ -4254,12 +4438,36 @@ function Settings:RefreshFriendTabsTab()
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- Refresh General Tab with new component library
 local function CenterNumericInput(editBox)
 	editBox:SetTextInsets(6, 6, 0, 0)
 	editBox:SetJustifyH("CENTER")
+end
+
+local function GetFormatFieldDescription(isInfo)
+	local description = isInfo and L.SETTINGS_INFO_FORMAT_DESC or L.SETTINGS_NAME_FORMAT_DESC
+	if isInfo then description = description .. "\n" .. L.SETTINGS_FORMAT_MULTI_ACCOUNT_TOKENS end
+	if BFL.IsForever then description = description .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS end
+	return description
+end
+
+local function FormatFieldsAction(isInfo)
+	if not IsLegacyReviewActive() then return end
+	return {
+		label = L.SETTINGS_FORMAT_FIELDS,
+		onClick = function(button)
+			local items = { { type = "title", text = L.SETTINGS_FORMAT_FIELDS } }
+			for line in GetFormatFieldDescription(isInfo):gmatch("[^\n]+") do
+				if line:find("%%[a-z]+%%") then
+					items[#items + 1] = { type = "title", text = line }
+				end
+			end
+			BFL.Compat.OpenSimpleContextMenu(button, "BetterFriendlistFormatFieldsMenu", items)
+		end,
+	}
 end
 
 function Settings:RefreshGeneralTab()
@@ -4293,7 +4501,7 @@ function Settings:RefreshGeneralTab()
 	-- Keep the Retail 12.1 / Legacy UI choice as the first General setting.
 	if BFL.IsRetail then
 		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIENDS_UI_STYLE_HEADER or "Friendlist UI"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIENDS_UI_STYLE_HEADER or "Friendlist UI", "SETTINGS_FRIENDS_UI_STYLE_HEADER"))
 		local styleDropdown = Components:CreateDropdown(
 			tab,
 			L.SETTINGS_FRIENDS_UI_STYLE or "Interface Style",
@@ -4338,7 +4546,7 @@ function Settings:RefreshGeneralTab()
 	end
 
 	-- Header: Display Options
-	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_DISPLAY_OPTIONS or "Display Options")
+	local displayHeader = Components:CreateHeader(tab, L.SETTINGS_DISPLAY_OPTIONS or "Display Options", "SETTINGS_DISPLAY_OPTIONS")
 	table.insert(allFrames, displayHeader)
 
 	-- Row 1: Class Colors & Faction Icons
@@ -4360,6 +4568,7 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_SHOW_FACTION_ICONS,
 		tooltipDesc = L.SETTINGS_SHOW_FACTION_ICONS_DESC or "Display Alliance/Horde icons next to character names",
 	})
+	row1.BFL_FriendRowSection = "identity"
 	table.insert(allFrames, row1)
 
 	-- Row 2: Faction BG & Gray Other Faction
@@ -4381,6 +4590,7 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_GRAY_OTHER_FACTION,
 		tooltipDesc = L.SETTINGS_GRAY_OTHER_FACTION_DESC or "Make friends from the opposite faction appear grayed out",
 	})
+	row2.BFL_FriendRowSection = "identity"
 	table.insert(allFrames, row2)
 
 	-- Row 2b: Multi-Account Badge
@@ -4395,6 +4605,7 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE_DESC
 			or "Display a badge on friends with multiple game accounts online.",
 	})
+	row2b.BFL_FriendRowSection = "status"
 	table.insert(allFrames, row2b)
 
 	-- Row 2c: Show Multi-Account Info
@@ -4409,10 +4620,11 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_SHOW_MULTI_ACCOUNT_INFO_DESC
 			or "Add a dedicated line listing other online characters when a friend is logged into multiple accounts.",
 	})
+	row2c.BFL_FriendRowSection = "status"
 	table.insert(allFrames, row2c)
 
 	-- Row 3: Realm Name & Hide Max Level
-	local row3 = Components:CreateDoubleCheckbox(tab, { -- Left
+	local realmRow, maxLevelRow = AppendLegacyCheckboxPair(allFrames, tab, { -- Left
 		label = BFL.IsForever and L.SETTINGS_SHOW_RULESET_NAME or L.SETTINGS_SHOW_REALM_NAME,
 		initialValue = DB:Get("showRealmName", false),
 		callback = function(val)
@@ -4429,10 +4641,13 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_HIDE_MAX_LEVEL,
 		tooltipDesc = L.SETTINGS_HIDE_MAX_LEVEL_DESC or "Don't display level number for characters at max level",
 	})
-	table.insert(allFrames, row3)
+	if realmRow then
+		realmRow.BFL_FriendRowSection = "identity"
+		maxLevelRow.BFL_FriendRowSection = "details"
+	end
 
 	-- Row 4: Mobile Settings
-	local row4 = Components:CreateDoubleCheckbox(tab, { -- Left
+	local mobileAFK, mobileOffline = AppendLegacyCheckboxPair(allFrames, tab, { -- Left
 		label = L.SETTINGS_SHOW_MOBILE_AS_AFK,
 		initialValue = DB:Get("showMobileAsAFK", false),
 		callback = function(val)
@@ -4450,10 +4665,14 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_TREAT_MOBILE_OFFLINE_DESC
 			or "Display friends using the Mobile App in the Offline group",
 	})
-	table.insert(allFrames, row4)
+
+	if mobileAFK then
+		mobileAFK.BFL_FriendRowSection = "status"
+		mobileOffline.BFL_FriendRowSection = "status"
+	end
 
 	-- Row 5: Shared row visuals used by both the Modern and Legacy friend lists
-	local row5 = Components:CreateDoubleCheckbox(tab, {
+	local gameIcon, difficultyColor = AppendLegacyCheckboxPair(allFrames, tab, {
 		label = L.SETTINGS_SHOW_GAME_ICON or "Show Game Icon",
 		initialValue = DB:Get("showGameIcon", true),
 		callback = function(val)
@@ -4473,10 +4692,14 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_COLOR_LEVEL_BY_DIFFICULTY_DESC
 			or "Color level text by difficulty relative to your character.",
 	})
-	table.insert(allFrames, row5)
+
+	if gameIcon then
+		gameIcon.BFL_FriendRowSection = "status"
+		difficultyColor.BFL_FriendRowSection = "details"
+	end
 
 	-- Row 6: Welcome Message & Hide Empty
-	local row6 = Components:CreateDoubleCheckbox(tab, { -- Left
+	local welcome = {
 		label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
 		initialValue = DB:Get("showWelcomeMessage", true),
 		callback = function(val)
@@ -4485,7 +4708,8 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_SHOW_WELCOME_MESSAGE,
 		tooltipDesc = L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC
 			or "Shows the 'BetterFriendlist loaded...' message in chat when you log in or reload.",
-	}, { -- Right
+	}
+	local hideEmpty = {
 		label = L.SETTINGS_HIDE_EMPTY_GROUPS,
 		initialValue = DB:Get("hideEmptyGroups", false),
 		callback = function(val)
@@ -4493,7 +4717,14 @@ function Settings:RefreshGeneralTab()
 		end,
 		tooltipTitle = L.SETTINGS_HIDE_EMPTY_GROUPS,
 		tooltipDesc = L.SETTINGS_HIDE_EMPTY_GROUPS_DESC or "Automatically hides groups that have no online members",
-	})
+	}
+	local row6
+	if IsLegacyReviewActive() then
+		row6 = Components:CreateCheckbox(tab, hideEmpty)
+		row6.BFL_LegacyRoute = "automatic"
+	else
+		row6 = Components:CreateDoubleCheckbox(tab, welcome, hideEmpty)
+	end
 	table.insert(allFrames, row6)
 	RegisterLegacySection(self, "hideEmptyGroups", row6)
 
@@ -4511,7 +4742,7 @@ function Settings:RefreshGeneralTab()
 	}
 
 	local favoriteDropdownData = nil
-	if favoriteIconEnabled and hasBlizzardFavoriteIcon then
+	if hasBlizzardFavoriteIcon and (favoriteIconEnabled or IsLegacyReviewActive()) then
 		favoriteDropdownData = {
 			label = L.SETTINGS_FAVORITE_ICON_STYLE or "Favorite Icon",
 			entries = favoriteEntries,
@@ -4527,7 +4758,7 @@ function Settings:RefreshGeneralTab()
 		}
 	end
 
-	local row7 = Components:CreateCheckboxDropdown(tab, {
+	local row7, favoriteStyle = AppendLegacyCheckboxDropdown(allFrames, tab, {
 		label = L.SETTINGS_ENABLE_FAVORITE_ICON,
 		initialValue = favoriteIconEnabled,
 		callback = function(val)
@@ -4538,7 +4769,10 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_ENABLE_FAVORITE_ICON,
 		tooltipDesc = L.SETTINGS_ENABLE_FAVORITE_ICON_DESC or "Display a star icon on the friend button for favorites.",
 	}, favoriteDropdownData)
-	table.insert(allFrames, row7)
+	row7.BFL_FriendRowSection = "favorites"
+	if favoriteStyle then
+		favoriteStyle.BFL_FriendRowSection = "favorites"
+	end
 	RegisterLegacySection(self, "enableFavoriteIcon", row7)
 
 	-- Row 8: Blizzard Option
@@ -4551,6 +4785,7 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
 		tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu",
 	})
+	row8.BFL_LegacyRoute = "behavior"
 	table.insert(allFrames, row8)
 
 	if ShouldShowLegacyElvUISkinSetting() then
@@ -4564,6 +4799,7 @@ function Settings:RefreshGeneralTab()
 			tooltipDesc = L.SETTINGS_ENABLE_ELVUI_SKIN_DESC
 				or "Enables the ElvUI skin for BetterFriendlist. Requires ElvUI to be installed and enabled.",
 		})
+		elvUISkinToggle.BFL_LegacyRoute = "layout"
 		table.insert(allFrames, elvUISkinToggle)
 	end
 
@@ -4573,7 +4809,7 @@ function Settings:RefreshGeneralTab()
 	-- ========================================
 	-- Header: Name Formatting (Phase 22 - Preset System)
 	-- ========================================
-	local nameFormatHeader = Components:CreateHeader(tab, L.SETTINGS_NAME_FORMAT_HEADER or "Name Formatting")
+	local nameFormatHeader = Components:CreateHeader(tab, L.SETTINGS_NAME_FORMAT_HEADER or "Name Formatting", "SETTINGS_NAME_FORMAT_HEADER")
 	table.insert(allFrames, nameFormatHeader)
 
 	-- FriendListColors warning (if active)
@@ -4615,7 +4851,7 @@ function Settings:RefreshGeneralTab()
 
 	local namePresetDropdown = Components:CreateDropdown(
 		tab,
-		L.SETTINGS_NAME_FORMAT_LABEL or "Preset:",
+		IsLegacyReviewActive() and L.SETTINGS_NAME_FORMAT_HEADER or L.SETTINGS_NAME_FORMAT_LABEL or "Preset:",
 		namePresetEntries,
 		function(val)
 			return DB:Get("nameFormatPreset", "default") == val
@@ -4625,7 +4861,9 @@ function Settings:RefreshGeneralTab()
 			BFL:ForceRefreshFriendsList()
 			-- Show/hide custom input
 			if nameCustomInput then
-				if val == "custom" then
+				if IsLegacyReviewActive() then
+					nameCustomInput.Input:SetEnabled(val == "custom" and not friendListColorsActive)
+				elseif val == "custom" then
 					nameCustomInput:Show()
 				else
 					nameCustomInput:Hide()
@@ -4633,6 +4871,7 @@ function Settings:RefreshGeneralTab()
 			end
 		end
 	)
+	namePresetDropdown.BFL_SettingHelpKey = "SETTINGS_NAME_FORMAT_HEADER"
 	if friendListColorsActive and namePresetDropdown then
 		-- Disable dropdown when FriendListColors is active
 		if namePresetDropdown.Label then
@@ -4644,7 +4883,7 @@ function Settings:RefreshGeneralTab()
 	-- Custom Name Format Input (shown only when preset == "custom")
 	nameCustomInput = Components:CreateInput(
 		tab,
-		L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL or "Custom Format:",
+		IsLegacyReviewActive() and L.SETTINGS_NAME_FORMAT_TOOLTIP or L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL or "Custom Format:",
 		DB:Get("nameFormatCustom", "%name%"),
 		function(text)
 			if text and text ~= "" then
@@ -4652,17 +4891,23 @@ function Settings:RefreshGeneralTab()
 				BFL:ForceRefreshFriendsList()
 			end
 		end,
-		350
+		IsLegacyReviewActive() and 246 or 350,
+		FormatFieldsAction(false)
 	)
+	nameCustomInput.BFL_SettingHelpKey = "SETTINGS_NAME_FORMAT_TOOLTIP"
 	if nameCustomInput.SetTooltip then
 		nameCustomInput:SetTooltip(
 			L.SETTINGS_NAME_FORMAT_TOOLTIP or "Custom Name Format",
-			(L.SETTINGS_NAME_FORMAT_DESC or "") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS
+			GetFormatFieldDescription(false)
 		)
 	end
 	-- Initially show/hide based on current preset
 	if DB:Get("nameFormatPreset", "default") ~= "custom" then
-		nameCustomInput:Hide()
+		if IsLegacyReviewActive() then
+			nameCustomInput.Input:Disable()
+		else
+			nameCustomInput:Hide()
+		end
 	end
 	if friendListColorsActive then
 		if nameCustomInput.Label then
@@ -4681,7 +4926,7 @@ function Settings:RefreshGeneralTab()
 	-- ========================================
 	-- Header: Friend Info Formatting (Phase 22)
 	-- ========================================
-	local infoFormatHeader = Components:CreateHeader(tab, L.SETTINGS_INFO_FORMAT_HEADER or "Friend Info Formatting")
+	local infoFormatHeader = Components:CreateHeader(tab, L.SETTINGS_INFO_FORMAT_HEADER or "Friend Info Formatting", "SETTINGS_INFO_FORMAT_HEADER")
 	RegisterLegacySection(self, "friendInfoFormatting", infoFormatHeader)
 	table.insert(allFrames, infoFormatHeader)
 
@@ -4704,7 +4949,7 @@ function Settings:RefreshGeneralTab()
 
 	local infoPresetDropdown = Components:CreateDropdown(
 		tab,
-		L.SETTINGS_INFO_FORMAT_LABEL or "Preset:",
+		IsLegacyReviewActive() and L.SETTINGS_INFO_FORMAT_HEADER or L.SETTINGS_INFO_FORMAT_LABEL or "Preset:",
 		infoPresetEntries,
 		function(val)
 			return DB:Get("infoFormatPreset", "default") == val
@@ -4714,7 +4959,9 @@ function Settings:RefreshGeneralTab()
 			BFL:ForceRefreshFriendsList()
 			-- Show/hide custom input
 			if infoCustomInput then
-				if val == "custom" then
+				if IsLegacyReviewActive() then
+					infoCustomInput.Input:SetEnabled(val == "custom")
+				elseif val == "custom" then
 					infoCustomInput:Show()
 				else
 					infoCustomInput:Hide()
@@ -4727,7 +4974,7 @@ function Settings:RefreshGeneralTab()
 	-- Custom Info Format Input (shown only when preset == "custom")
 	infoCustomInput = Components:CreateInput(
 		tab,
-		L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL or "Custom Format:",
+		IsLegacyReviewActive() and L.SETTINGS_INFO_FORMAT_TOOLTIP or L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL or "Custom Format:",
 		DB:Get("infoFormatCustom", "%level%, %zone%"),
 		function(text)
 			if text and text ~= "" then
@@ -4735,17 +4982,22 @@ function Settings:RefreshGeneralTab()
 				BFL:ForceRefreshFriendsList()
 			end
 		end,
-		350
+		IsLegacyReviewActive() and 246 or 350,
+		FormatFieldsAction(true)
 	)
 	if infoCustomInput.SetTooltip then
 		infoCustomInput:SetTooltip(
 			L.SETTINGS_INFO_FORMAT_TOOLTIP or "Custom Info Format",
-			(L.SETTINGS_INFO_FORMAT_DESC or "") .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS
+			GetFormatFieldDescription(true)
 		)
 	end
 	-- Initially show/hide based on current preset
 	if DB:Get("infoFormatPreset", "default") ~= "custom" then
-		infoCustomInput:Hide()
+		if IsLegacyReviewActive() then
+			infoCustomInput.Input:Disable()
+		else
+			infoCustomInput:Hide()
+		end
 	end
 	table.insert(allFrames, infoCustomInput)
 
@@ -4753,11 +5005,11 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Header: Behavior
-	local behaviorHeader = Components:CreateHeader(tab, L.SETTINGS_BEHAVIOR_HEADER or "Behavior")
+	local behaviorHeader = Components:CreateHeader(tab, L.SETTINGS_BEHAVIOR_HEADER or "Behavior", "SETTINGS_BEHAVIOR_HEADER")
 	table.insert(allFrames, behaviorHeader)
 
 	-- Behavior Settings Row 1 (Accordion / Compact)
-	local behaviorRow1 = Components:CreateDoubleCheckbox(tab, {
+	local accordion = {
 		label = L.SETTINGS_ACCORDION_GROUPS,
 		initialValue = DB:Get("accordionGroups", false),
 		callback = function(val)
@@ -4766,7 +5018,8 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = L.SETTINGS_ACCORDION_GROUPS,
 		tooltipDesc = L.SETTINGS_ACCORDION_GROUPS_DESC
 			or "Only allow one group to be expanded at a time, automatically collapsing others",
-	}, {
+	}
+	local compact = {
 		label = L.SETTINGS_COMPACT_MODE,
 		initialValue = DB:Get("compactMode", false),
 		callback = function(val)
@@ -4774,8 +5027,18 @@ function Settings:RefreshGeneralTab()
 		end,
 		tooltipTitle = L.SETTINGS_COMPACT_MODE,
 		tooltipDesc = L.SETTINGS_COMPACT_MODE_DESC or "Reduces button height to fit more friends on screen",
-	})
-	table.insert(allFrames, behaviorRow1)
+	}
+	if IsLegacyReviewActive() then
+		local accordionRow = Components:CreateCheckbox(tab, accordion)
+		accordionRow.BFL_LegacyRoute = "automatic"
+		table.insert(allFrames, accordionRow)
+		local compactRow = Components:CreateCheckbox(tab, compact)
+		compactRow.BFL_LegacyRoute = "rows"
+		compactRow.BFL_FriendRowSection = "details"
+		table.insert(allFrames, compactRow)
+	else
+		table.insert(allFrames, Components:CreateDoubleCheckbox(tab, accordion, compact))
+	end
 
 	-- Modern owns a fixed compact Contacts layout. Legacy retains its broader
 	-- compact frame behavior and optional search control.
@@ -4799,24 +5062,30 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_SIMPLE_MODE_DESC
 			or "Hides the player portrait and adds a changelog option to the contacts menu.",
 	})
+	behaviorRow2.BFL_LegacyRoute = "layout"
 	table.insert(allFrames, behaviorRow2)
 
-	if DB:Get("simpleMode", false) then
-		table.insert(allFrames, Components:CreateCheckbox(tab, {
+	local simpleMode = DB:Get("simpleMode", false)
+	if simpleMode or IsLegacyReviewActive() then
+		local simpleSearchRow = Components:CreateCheckbox(tab, {
 			label = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
 			initialValue = DB:Get("simpleModeShowSearch", true),
+			disabled = not simpleMode,
 			callback = function(val)
 				self:OnSimpleModeShowSearchChanged(val)
 			end,
 			tooltipTitle = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH or "Show Search in Simple Mode",
-			tooltipDesc = L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC
-				or "Keep the search field visible while Simple Mode is enabled.",
-		}))
+			tooltipDesc = (L.SETTINGS_SIMPLE_MODE_SHOW_SEARCH_DESC
+				or "Keep the search field visible while Simple Mode is enabled.")
+				.. (simpleMode and "" or ("\n\n" .. L.SETTINGS_SIMPLE_MODE)),
+		})
+		simpleSearchRow.BFL_LegacyRoute = "layout"
+		table.insert(allFrames, simpleSearchRow)
 	end
 
 	local whisperClickEnabled = DB:Get("friendListClickWhisperEnabled", false)
 	local whisperClickDropdown = nil
-	if whisperClickEnabled then
+	if whisperClickEnabled or IsLegacyReviewActive() then
 		whisperClickDropdown = {
 			label = L.SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE or "Whisper Click",
 			entries = {
@@ -4838,7 +5107,7 @@ function Settings:RefreshGeneralTab()
 		}
 	end
 
-	local whisperClickRow = Components:CreateCheckboxDropdown(tab, {
+	AppendLegacyCheckboxDropdown(allFrames, tab, {
 		label = L.SETTINGS_FRIENDLIST_CLICK_WHISPER or "Whisper from Friend List",
 		initialValue = whisperClickEnabled,
 		callback = function(val)
@@ -4848,13 +5117,12 @@ function Settings:RefreshGeneralTab()
 		tooltipDesc = L.SETTINGS_FRIENDLIST_CLICK_WHISPER_DESC
 			or "Start a whisper from the friend list with a left-click action.",
 	}, whisperClickDropdown)
-	table.insert(allFrames, whisperClickRow)
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Header: Group Management
-	local groupHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_MANAGEMENT or "Group Management")
+	local groupHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_MANAGEMENT or "Group Management", "SETTINGS_GROUP_MANAGEMENT")
 	table.insert(allFrames, groupHeader)
 
 	-- Group Management Row (Favorites / In-Game)
@@ -4874,7 +5142,7 @@ function Settings:RefreshGeneralTab()
 	local favoritesLabel = string.format(showGroupFmt, favoritesDisplayName)
 	local inGameLabel = string.format(showGroupFmt, inGameDisplayName)
 
-	local groupRow = Components:CreateDoubleCheckbox(tab, {
+	local groupRow, inGameRow = AppendLegacyCheckboxPair(allFrames, tab, {
 		label = favoritesLabel,
 		initialValue = DB:Get("showFavoritesGroup", true),
 		callback = function(val)
@@ -4891,16 +5159,65 @@ function Settings:RefreshGeneralTab()
 		tooltipTitle = inGameLabel,
 		tooltipDesc = string.format(showGroupDescFmt, inGameDisplayName),
 	})
-	table.insert(allFrames, groupRow)
-	RegisterLegacySection(self, "showFavoritesGroup", groupRow)
+	if groupRow then
+		table.insert(groupRow.BFL_SearchLabels, L.GROUP_FAVORITES)
+		table.insert(inGameRow.BFL_SearchLabels, L.GROUP_INGAME)
+	end
+	RegisterLegacySection(self, "showFavoritesGroup", groupRow or allFrames[#allFrames])
+
+	if IsLegacyReviewActive() then
+		local FriendsList = BFL:GetModule("FriendsList")
+		local Registry = BFL:GetModule("FilterSortRegistry")
+		if FriendsList and Registry then
+			local primary = { labels = {}, values = {} }
+			local secondary = { labels = { L.SORT_NONE }, values = { "none" } }
+			for _, sorter in ipairs(Registry:GetVisibleSorters()) do
+				primary.labels[#primary.labels + 1] = sorter.name
+				primary.values[#primary.values + 1] = sorter.id
+				secondary.labels[#secondary.labels + 1] = sorter.name
+				secondary.values[#secondary.values + 1] = sorter.id
+			end
+			secondary.isOptionEnabled = function(mode) return mode ~= FriendsList.sortMode end
+			local primarySort = Components:CreateDropdown(tab, L.SORT_PRIMARY_LABEL, primary, function(mode)
+				return FriendsList.sortMode == mode
+			end, function(mode)
+				FriendsList:SetSortMode(mode)
+				self:RefreshGeneralTab()
+			end)
+			primarySort:SetTooltip(L.SORT_PRIMARY_LABEL, L.SORT_PRIMARY_DESC)
+			table.insert(allFrames, primarySort)
+
+			local secondarySort = Components:CreateDropdown(tab, L.SORT_SECONDARY_LABEL, secondary, function(mode)
+				return FriendsList.secondarySort == mode
+			end, function(mode)
+				FriendsList:SetSecondarySortMode(mode)
+				self:RefreshGeneralTab()
+			end)
+			secondarySort:SetTooltip(L.SORT_SECONDARY_LABEL, L.SORT_SECONDARY_DESC)
+			table.insert(allFrames, secondarySort)
+
+			local quickFilters = { labels = {}, values = {} }
+			for _, filter in ipairs(Registry:GetVisibleQuickFilters()) do
+				quickFilters.labels[#quickFilters.labels + 1] = filter.name
+				quickFilters.values[#quickFilters.values + 1] = filter.id
+			end
+			local filter = Components:CreateDropdown(tab, L.SETTINGS_QUICK_FILTER, quickFilters, function(mode)
+				return FriendsList.filterMode == mode
+			end, function(mode)
+				FriendsList:SetFilterMode(mode)
+				self:RefreshGeneralTab()
+			end)
+			filter:SetTooltip(L.SETTINGS_QUICK_FILTER, L.SETTINGS_QUICK_FILTER_DESC)
+			table.insert(allFrames, filter)
+		end
+	end
 
 	-- NEW: In-Game Group Mode (Sub-option) - Keep as dedicated row since it's a dropdown
-	if DB:Get("enableInGameGroup", false) then
+	if DB:Get("enableInGameGroup", false) or IsLegacyReviewActive() then
 		local modeOptions = {
 			labels = { L.SETTINGS_INGAME_MODE_WOW or "WoW Only (Same Era)", L.SETTINGS_INGAME_MODE_ANY or "Any Game" },
 			values = { "same_game", "any_game" },
 		}
-		local currentMode = DB:Get("inGameGroupMode", "same_game")
 
 		local modeDropdown = Components:CreateDropdown(
 			tab,
@@ -4913,10 +5230,15 @@ function Settings:RefreshGeneralTab()
 				self:OnInGameGroupModeChanged(val)
 			end
 		)
+		local prerequisite = ""
+		if IsLegacyReviewActive() and not DB:Get("enableInGameGroup", false) then
+			DisableLegacyDropdown(modeDropdown)
+			prerequisite = "\n\n" .. inGameLabel
+		end
 		modeDropdown:SetTooltip(
 			L.SETTINGS_INGAME_MODE_TOOLTIP or "In-Game Group Mode",
-			L.SETTINGS_INGAME_MODE_TOOLTIP_DESC
-				or "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game"
+			(L.SETTINGS_INGAME_MODE_TOOLTIP_DESC
+				or "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game") .. prerequisite
 		)
 		table.insert(allFrames, modeDropdown)
 	end
@@ -4925,19 +5247,21 @@ function Settings:RefreshGeneralTab()
 	local recentlyAddedDisplayName =
 		BuildBuiltinDisplayName("recentlyadded", L.GROUP_RECENTLY_ADDED or "Recently Added")
 	local recentlyAddedLabel = string.format(showGroupFmt, recentlyAddedDisplayName)
+	local recentlyAddedEnabled = DB:Get("enableRecentlyAddedGroup", false)
 	local recentlyAddedCheckbox = Components:CreateCheckbox(tab, {
 		label = recentlyAddedLabel,
-		initialValue = DB:Get("enableRecentlyAddedGroup", false),
+		initialValue = recentlyAddedEnabled,
 		callback = function(val)
 			self:OnEnableRecentlyAddedGroupChanged(val)
 		end,
 		tooltipTitle = recentlyAddedLabel,
 		tooltipDesc = string.format(showGroupDescFmt, recentlyAddedDisplayName),
 	})
+	table.insert(recentlyAddedCheckbox.BFL_SearchLabels, L.GROUP_RECENTLY_ADDED)
 	table.insert(allFrames, recentlyAddedCheckbox)
 
-	-- Recently Added sub-options (only shown when enabled)
-	if DB:Get("enableRecentlyAddedGroup", false) then
+	if recentlyAddedEnabled or IsLegacyReviewActive() then
+		local prerequisite = recentlyAddedEnabled and "" or ("\n\n" .. recentlyAddedLabel)
 		-- Duration Unit dropdown
 		local unitOptions = {
 			labels = {
@@ -4958,10 +5282,11 @@ function Settings:RefreshGeneralTab()
 				self:OnRecentlyAddedDurationUnitChanged(val)
 			end
 		)
+		if not recentlyAddedEnabled then DisableLegacyDropdown(durationDropdown) end
 		durationDropdown:SetTooltip(
 			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP or "Duration Unit",
-			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC
-				or "Choose the time unit for how long friends stay in the Recently Added group."
+			(L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC
+				or "Choose the time unit for how long friends stay in the Recently Added group.") .. prerequisite
 		)
 		table.insert(allFrames, durationDropdown)
 
@@ -4983,10 +5308,14 @@ function Settings:RefreshGeneralTab()
 			end
 		)
 		CenterNumericInput(durationInput.Input)
+		if not recentlyAddedEnabled then
+			durationInput.Input:Disable()
+			durationInput.Input:SetAlpha(0.5)
+		end
 		durationInput:SetTooltip(
 			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP or "Duration Value",
-			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC
-				or "How many days/hours/minutes friends stay in the Recently Added group before being removed."
+			(L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC
+				or "How many days/hours/minutes friends stay in the Recently Added group before being removed.") .. prerequisite
 		)
 		table.insert(allFrames, durationInput)
 	end
@@ -4995,7 +5324,7 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Header: Frame Dimensions
-	local frameHeader = Components:CreateHeader(tab, L.SETTINGS_FRAME_DIMENSIONS_HEADER or "Frame Dimensions")
+	local frameHeader = Components:CreateHeader(tab, L.SETTINGS_FRAME_DIMENSIONS_HEADER or "Frame Dimensions", "SETTINGS_FRAME_DIMENSIONS_HEADER")
 	table.insert(allFrames, frameHeader)
 
 	-- Helper for input validation
@@ -5047,6 +5376,7 @@ function Settings:RefreshGeneralTab()
 		72
 	)
 	CenterNumericInput(widthInput.Input)
+	table.insert(widthInput.BFL_SearchLabels, L.SETTINGS_FRAME_WIDTH)
 	table.insert(allFrames, widthInput)
 
 	-- Frame Height Input
@@ -5071,6 +5401,7 @@ function Settings:RefreshGeneralTab()
 		72
 	)
 	CenterNumericInput(heightInput.Input)
+	table.insert(heightInput.BFL_SearchLabels, L.SETTINGS_FRAME_HEIGHT)
 	table.insert(allFrames, heightInput)
 
 	-- Frame Scale Input
@@ -5091,6 +5422,7 @@ function Settings:RefreshGeneralTab()
 		72
 	)
 	CenterNumericInput(scaleInput.Input)
+	table.insert(scaleInput.BFL_SearchLabels, L.SETTINGS_FRAME_SCALE)
 	table.insert(allFrames, scaleInput)
 
 	-- Lock Window Checkbox
@@ -5116,6 +5448,7 @@ function Settings:RefreshGeneralTab()
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 local function OpenLegacyFriendTagEditor(tagId)
@@ -5163,7 +5496,7 @@ function Settings:RefreshContactMemoryTab()
 		self:RefreshContactMemoryTab()
 	end
 
-	table.insert(allFrames, Components:CreateHeader(tab, L.CONTACT_MEMORY_TITLE or "Private Notes"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.CONTACT_MEMORY_TITLE or "Private Notes", "CONTACT_MEMORY_TITLE"))
 	table.insert(
 		allFrames,
 		Components:CreateLabel(
@@ -5261,6 +5594,17 @@ function Settings:RefreshContactMemoryTab()
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
+end
+
+local function GetLegacyFontOptions()
+	local media = LibStub and LibStub("LibSharedMedia-3.0", true)
+	local names = media and media:List("font") or { "Friz Quadrata TT", "Arial Narrow" }
+	local paths = {}
+	for index, name in ipairs(names) do
+		paths[index] = BFL.FontManager:ResolveFontPath(name)
+	end
+	return { labels = names, values = names, fontPaths = paths, useCheckboxes = true }
 end
 
 function Settings:RefreshFriendTagsTab()
@@ -5289,6 +5633,7 @@ function Settings:RefreshFriendTagsTab()
 	tab.components = {}
 
 	local allFrames = {}
+	local reviewingTags = IsLegacyReviewActive()
 	local function RefreshFriendTagRuntime()
 		if BFL.ScheduleFriendsListRefresh then
 			BFL:ScheduleFriendsListRefresh("friend-tag-settings", 0.05)
@@ -5300,13 +5645,7 @@ function Settings:RefreshFriendTagsTab()
 		RefreshFriendTagRuntime()
 		self:RefreshFriendTagsTab()
 	end
-	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
-	local fontPaths = {}
-	for index, fontName in ipairs(fontList) do
-		fontPaths[index] = BFL.FontManager:ResolveFontPath(fontName)
-	end
-	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
+	local fontOptions = GetLegacyFontOptions()
 	local friendTagSettingsAdapter = {
 		Get = function(_, key, default)
 			return FriendTags:GetSetting(key, default)
@@ -5316,7 +5655,7 @@ function Settings:RefreshFriendTagsTab()
 		end,
 	}
 
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FRIEND_TAGS or "Friend Tags", "SETTINGS_TAB_FRIEND_TAGS"))
 	table.insert(
 		allFrames,
 		Components:CreateLabel(
@@ -5328,6 +5667,9 @@ function Settings:RefreshFriendTagsTab()
 		)
 	)
 
+	if reviewingTags then
+		table.insert(allFrames, Components:CreateSpacer(tab, 6))
+	end
 	local enableTags = Components:CreateCheckbox(tab, {
 		label = L.FRIEND_TAGS_ENABLE or "Enable Friend Tags",
 		initialValue = FriendTags:GetSetting("enabled", true) ~= false,
@@ -5338,14 +5680,20 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_ENABLE_DESC or "Adds Blizzard-compatible and custom tags for friends.",
 	})
 	table.insert(allFrames, enableTags)
+	if reviewingTags then
+		table.insert(allFrames, Components:CreateSpacer(tab, 6))
+	end
 	local editorButton = Components:CreateButton(tab, L.FRIEND_TAGS_EDITOR_OPEN or "Open Tag Editor", function()
 		OpenLegacyFriendTagEditor()
 	end, L.FRIEND_TAGS_EDITOR_DESC or "Customize labels, icons, colors, visibility, and custom tags.")
 	editorButton:SetWidth(260)
+	if reviewingTags then
+		editorButton:SetHeight(30)
+	end
 	table.insert(allFrames, editorButton)
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	local visibilityHeader = Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_VISIBILITY or "Visibility")
+	local visibilityHeader = Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_VISIBILITY or "Visibility", "FRIEND_TAGS_SETTINGS_VISIBILITY")
 	RegisterLegacySection(self, "friendTagsVisibility", visibilityHeader)
 	table.insert(allFrames, visibilityHeader)
 
@@ -5491,7 +5839,7 @@ function Settings:RefreshFriendTagsTab()
 		end))
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_SEARCH or "Search & Menus"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_SEARCH or "Search & Menus", "FRIEND_TAGS_SETTINGS_SEARCH"))
 	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
 		label = L.FRIEND_TAGS_SEARCH_BLIZZARD or "Search Blizzard Tags",
 		initialValue = FriendTags:GetSetting("includeBlizzardTagsInSearch", true) ~= false,
@@ -5521,7 +5869,7 @@ function Settings:RefreshFriendTagsTab()
 	}, nil))
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_GROUPS or "Dynamic Tag Groups"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.FRIEND_TAGS_SETTINGS_GROUPS or "Dynamic Tag Groups", "FRIEND_TAGS_SETTINGS_GROUPS"))
 	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
 		label = L.FRIEND_TAGS_SETTINGS_DYNAMIC_GROUPS or "Show Dynamic Tag Groups",
 		initialValue = FriendTags:GetSetting("enableDynamicTagGroups", false) == true,
@@ -5551,6 +5899,41 @@ function Settings:RefreshFriendTagsTab()
 		tooltipDesc = L.FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS_DESC
 			or "Hide every tag chip on rows inside dynamic tag groups.",
 	}, nil))
+	table.insert(allFrames, Components:CreateDoubleCheckbox(tab, {
+		label = L.FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS,
+		initialValue = FriendTags:GetSetting("prioritizeDynamicTagGroups", false) == true,
+		callback = function(val)
+			FriendTags:SetSetting("prioritizeDynamicTagGroups", val == true, RefreshFriendTagsSettings)
+		end,
+		tooltipTitle = L.FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS,
+		tooltipDesc = L.FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS_DESC,
+	}, nil))
+
+	local headerStyleDropdown = Components:CreateDropdown(
+		tab,
+		L.FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE,
+		{
+			labels = {
+				L.FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STANDARD,
+				L.FRIEND_TAGS_DYNAMIC_GROUP_HEADER_TEXT_COLOR,
+				L.FRIEND_TAGS_DYNAMIC_GROUP_HEADER_CHIP,
+			},
+			values = { "standard", "text_color", "chip" },
+		},
+		function(value)
+			return FriendTags:GetSetting("dynamicTagGroupHeaderStyle", "standard") == value
+		end,
+		function(value)
+			FriendTags:SetSetting("dynamicTagGroupHeaderStyle", value, RefreshFriendTagsSettings)
+		end
+	)
+	if headerStyleDropdown.SetTooltip then
+		headerStyleDropdown:SetTooltip(
+			L.FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE,
+			L.FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE_DESC
+		)
+	end
+	table.insert(allFrames, headerStyleDropdown)
 
 	local pendingAssignments = FriendTags:GetLocalBlizzardTagAssignmentCount()
 	if FriendTags:AreBlizzardTagsEnabled() and pendingAssignments > 0 then
@@ -5587,6 +5970,7 @@ function Settings:RefreshFriendTagsTab()
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 function Settings:RefreshGuildTab()
@@ -5637,7 +6021,7 @@ function Settings:RefreshGuildTab()
 		end
 	end
 
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_GUILD or GUILD or "Guild"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_GUILD or GUILD or "Guild", "SETTINGS_TAB_GUILD"))
 	table.insert(
 		allFrames,
 		Components:CreateLabel(
@@ -5663,7 +6047,7 @@ function Settings:RefreshGuildTab()
 	table.insert(allFrames, enableGuildTab)
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_GUILD_ROSTER_HEADER or "Roster Defaults"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_GUILD_ROSTER_HEADER or "Roster Defaults", "SETTINGS_GUILD_ROSTER_HEADER"))
 
 	local filterOptions = {
 		labels = {
@@ -5748,6 +6132,7 @@ function Settings:RefreshGuildTab()
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 function Settings:RefreshFontsTab()
@@ -5776,13 +6161,7 @@ function Settings:RefreshFontsTab()
 	local allFrames = {}
 
 	-- Font Library
-	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
-	local fontPaths = {}
-	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = BFL.FontManager:ResolveFontPath(fontName)
-	end
-	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
+	local fontOptions = GetLegacyFontOptions()
 
 	local function RefreshAllConfiguredFonts()
 		local FriendsList = BFL:GetModule("FriendsList")
@@ -5811,7 +6190,7 @@ function Settings:RefreshFontsTab()
 
 	-- -------------------------------------------------------------------------
 	-- Friend Name Settings
-	local nameFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_NAME_SETTINGS or "Friend Name Settings")
+	local nameFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_NAME_SETTINGS or "Friend Name Settings", "SETTINGS_FRIEND_NAME_SETTINGS")
 	table.insert(allFrames, nameFontHeader)
 
 	-- Name Font Face
@@ -5821,7 +6200,7 @@ function Settings:RefreshFontsTab()
 	local nameFontDropdown
 	nameFontDropdown = Components:CreateDropdown(
 		tab,
-		"Font:", -- Use generic label as per request to move code
+		L.SETTINGS_FONT,
 		fontOptions,
 		function(val)
 			return val == currentNameFont
@@ -5893,7 +6272,7 @@ function Settings:RefreshFontsTab()
 	-- Friend Info Settings
 	-- -------------------------------------------------------------------------
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	local infoFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_INFO_SETTINGS or "Friend Info Settings")
+	local infoFontHeader = Components:CreateHeader(tab, L.SETTINGS_FRIEND_INFO_SETTINGS or "Friend Info Settings", "SETTINGS_FRIEND_INFO_SETTINGS")
 	table.insert(allFrames, infoFontHeader)
 
 	-- Info Font Face
@@ -5903,7 +6282,7 @@ function Settings:RefreshFontsTab()
 	local infoFontDropdown
 	infoFontDropdown = Components:CreateDropdown(
 		tab,
-		"Font:", -- Changed from "Font Face:" (User Request)
+		L.SETTINGS_FONT,
 		fontOptions,
 		function(val)
 			return val == currentInfoFont
@@ -5980,7 +6359,7 @@ function Settings:RefreshFontsTab()
 	local modernFriendsUI = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 	if not modernFriendsUI then
 		table.insert(allFrames, Components:CreateSpacer(tab))
-		local tabsFontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_TABS_TITLE or "Tabs Text")
+		local tabsFontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_TABS_TITLE or "Tabs Text", "SETTINGS_FONT_TABS_TITLE")
 		table.insert(allFrames, tabsFontHeader)
 
 		-- Determine defaults
@@ -5990,7 +6369,7 @@ function Settings:RefreshFontsTab()
 		local currentTabFont = DB:Get("fontTabText", "Friz Quadrata TT")
 		local currentTabSize = DB:Get("fontSizeTabText", defaultTabSize)
 		local tabFontDropdown
-		tabFontDropdown = Components:CreateDropdown(tab, "Font:", fontOptions, function(val)
+		tabFontDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT, fontOptions, function(val)
 		return val == currentTabFont
 	end, function(val)
 		DB:Set("fontTabText", val)
@@ -6039,7 +6418,7 @@ function Settings:RefreshFontsTab()
 	-- Raid Name Settings
 	-- -------------------------------------------------------------------------
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	local raidFontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_RAID_TITLE or "Raid Name Text")
+	local raidFontHeader = Components:CreateHeader(tab, L.SETTINGS_FONT_RAID_TITLE or "Raid Name Text", "SETTINGS_FONT_RAID_TITLE")
 	table.insert(allFrames, raidFontHeader)
 
 	-- Determine defaults for Raid (consistent with Tabs)
@@ -6050,7 +6429,7 @@ function Settings:RefreshFontsTab()
 	local currentRaidFont = DB:Get("fontRaidName", "Friz Quadrata TT")
 	local currentRaidSize = DB:Get("fontSizeRaidName", defaultRaidSize)
 	local raidFontDropdown
-	raidFontDropdown = Components:CreateDropdown(tab, "Font:", fontOptions, function(val)
+	raidFontDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT, fontOptions, function(val)
 		return val == currentRaidFont
 	end, function(val)
 		DB:Set("fontRaidName", val)
@@ -6108,6 +6487,7 @@ function Settings:RefreshFontsTab()
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- Refresh Groups Tab with new component library
@@ -6140,22 +6520,16 @@ function Settings:RefreshGroupsTab()
 	local allFrames = {}
 
 	-- Common Font Options
-	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
-	local fontPaths = {}
-	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = BFL.FontManager:ResolveFontPath(fontName)
-	end
-	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
+	local fontOptions = GetLegacyFontOptions()
 
 	-- ===========================================
 	-- MOVED SETTINGS (From General)
 	-- ===========================================
 	local headerSettingsHeader =
-		Components:CreateHeader(tab, L.SETTINGS_GROUP_HEADER_SETTINGS or "Group Header Settings")
+		Components:CreateHeader(tab, L.SETTINGS_GROUP_HEADER_SETTINGS or "Group Header Settings", "SETTINGS_GROUP_HEADER_SETTINGS")
 	table.insert(allFrames, headerSettingsHeader)
+	local reviewControlWidth = IsLegacyReviewActive() and 220 or nil
 
-	-- Row 1: Group Header Count Format & Group Arrow
 	local headerCountFormatOptions = {
 		labels = { L.SETTINGS_HEADER_COUNT_VISIBLE, L.SETTINGS_HEADER_COUNT_ONLINE, L.SETTINGS_HEADER_COUNT_BOTH },
 		values = { "visible", "online", "both" },
@@ -6172,10 +6546,11 @@ function Settings:RefreshGroupsTab()
 			DB:Set("headerCountFormat", val)
 			BFL:ForceRefreshFriendsList()
 			self:RefreshGroupsTab() -- Self refresh to update visible state if needed
-		end
+		end,
+		reviewControlWidth
 	)
 	-- Shift dropdown to prevent clipping
-	if headerCountDropdown.DropDown then
+	if not reviewControlWidth and headerCountDropdown.DropDown then
 		local point, relativeTo, relativePoint, xOfs, yOfs = headerCountDropdown.DropDown:GetPoint(1)
 		if point then
 			headerCountDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
@@ -6199,10 +6574,11 @@ function Settings:RefreshGroupsTab()
 			DB:Set("groupHeaderAlign", val)
 			BFL:ForceRefreshFriendsList()
 			self:RefreshGroupsTab()
-		end
+		end,
+		reviewControlWidth
 	)
 	-- Shift dropdown to prevent clipping
-	if groupHeaderAlignDropdown.DropDown then
+	if not reviewControlWidth and groupHeaderAlignDropdown.DropDown then
 		local point, relativeTo, relativePoint, xOfs, yOfs = groupHeaderAlignDropdown.DropDown:GetPoint(1)
 		if point then
 			groupHeaderAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
@@ -6226,10 +6602,11 @@ function Settings:RefreshGroupsTab()
 			DB:Set("groupArrowAlign", val)
 			BFL:ForceRefreshFriendsList()
 			self:RefreshGroupsTab()
-		end
+		end,
+		reviewControlWidth
 	)
 	-- Shift dropdown to prevent clipping
-	if groupArrowAlignDropdown.DropDown then
+	if not reviewControlWidth and groupArrowAlignDropdown.DropDown then
 		local point, relativeTo, relativePoint, xOfs, yOfs = groupArrowAlignDropdown.DropDown:GetPoint(1)
 		if point then
 			groupArrowAlignDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
@@ -6253,6 +6630,9 @@ function Settings:RefreshGroupsTab()
 			self:RefreshGroupsTab()
 		end
 	)
+	if reviewControlWidth and Components:IsModernDropdown(groupArrowAlignDropdown.DropDown) then
+		showArrowCheckbox.checkBox:SetPoint("RIGHT", showArrowCheckbox, "RIGHT", 0, 0)
+	end
 	table.insert(allFrames, showArrowCheckbox)
 
 	-- Spacer
@@ -6261,13 +6641,13 @@ function Settings:RefreshGroupsTab()
 	-- ===========================================
 	-- NEW FONT SETTINGS
 	-- ===========================================
-	local fontHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_FONT_HEADER or "Group Header Font")
+	local fontHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_FONT_HEADER or "Group Header Font", "SETTINGS_GROUP_FONT_HEADER")
 	table.insert(allFrames, fontHeader)
 
 	-- Group Font Dropdown
 	local currentGroupFont = DB:Get("fontGroupHeader", "Friz Quadrata TT")
 	local groupFontDropdown
-	groupFontDropdown = Components:CreateDropdown(tab, "Font:", fontOptions, function(val)
+	groupFontDropdown = Components:CreateDropdown(tab, L.SETTINGS_FONT, fontOptions, function(val)
 		return val == currentGroupFont
 	end, function(val)
 		DB:Set("fontGroupHeader", val)
@@ -6319,7 +6699,7 @@ function Settings:RefreshGroupsTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Header: Group Order
-	local orderHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_ORDER or "Group Order")
+	local orderHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_ORDER or "Group Order", "SETTINGS_GROUP_ORDER")
 	table.insert(allFrames, orderHeader)
 
 	-- Get ordered groups
@@ -6424,11 +6804,7 @@ function Settings:RefreshGroupsTab()
 			btn:SetScript("OnUpdate", function(self)
 				for _, otherItem in ipairs(listItems) do
 					if otherItem ~= self and otherItem:IsVisible() then
-						if BFL:IsRegionMouseOver(otherItem) then
-							otherItem.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
-						else
-							otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
-						end
+						otherItem:SetGroupOrderHighlight(BFL:IsRegionMouseOver(otherItem))
 					end
 				end
 			end)
@@ -6440,7 +6816,7 @@ function Settings:RefreshGroupsTab()
 			local targetIndex = nil
 
 			for _, otherItem in ipairs(listItems) do
-				otherItem.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5) -- Reset
+				otherItem:SetGroupOrderHighlight(false)
 				if otherItem ~= btn and otherItem:IsVisible() then
 					if BFL:IsRegionMouseOver(otherItem) then
 						targetIndex = otherItem.orderIndex
@@ -6545,6 +6921,48 @@ function Settings:RefreshGroupsTab()
 			end)
 		end
 
+		if IsLegacyReviewActive() then
+			local groupID = groupData.id
+			local labels, rects, descriptions, comparisons = {}, {}, {}, {}
+			local function AddSlot(label, rect, description, guide)
+				if not rect then return end
+				local slot = #labels + 1
+				labels[slot], rects[slot], descriptions[slot], comparisons[slot] = label, rect, description, guide
+			end
+			local positions = { labels = {}, values = {} }
+			local groupNames = {}
+			for index, group in ipairs(orderedGroups) do
+				positions.labels[index], positions.values[index] = tostring(index), index
+				groupNames[index] = group.name
+			end
+			local live = Groups:Get(groupID) or groupData
+			local groupColor = live.color or { r = 1, g = 0.82, b = 0, a = 1 }
+			AddSlot(displayName, listItem.nameText, L.SETTINGS_GUIDE_GROUP_ORDER, {
+				"groupOrder", identity = groupID .. "/order", groupOrder = groupNames, read = function() return i end,
+				control = { BFL_ComparisonChoices = positions },
+			})
+			local function AddColor(label, button, key, color, description)
+				AddSlot(label, button, description, {
+					key, identity = groupID .. "/" .. key, groupEditorName = displayName,
+					groupEditorColors = { color = groupColor, countColor = live.countColor or groupColor,
+						arrowColor = live.arrowColor or groupColor },
+					control = { colorButton = button, currentColor = color or groupColor },
+				})
+			end
+			AddColor(L.SETTINGS_GROUP_COLOR, listItem.colorButton, "color", groupColor, L.TOOLTIP_GROUP_COLOR_DESC)
+			AddColor(L.SETTINGS_GROUP_COUNT_COLOR, listItem.countColorButton, "countColor", live.countColor, L.SETTINGS_GROUP_COUNT_COLOR_DESC)
+			AddColor(L.SETTINGS_GROUP_ARROW_COLOR, listItem.arrowColorButton, "arrowColor", live.arrowColor, L.SETTINGS_GROUP_ARROW_COLOR_DESC)
+			AddSlot(L.SETTINGS_RENAME_GROUP, listItem.renameButton, L.TOOLTIP_RENAME_DESC)
+			AddSlot(L.SETTINGS_DELETE_GROUP, listItem.deleteButton, L.TOOLTIP_DELETE_DESC)
+			listItem.BFL_SearchLabels = labels
+			listItem.BFL_SettingDescriptions = descriptions
+			listItem.BFL_SettingSlotRects = rects
+			listItem.BFL_SettingSlotCount = #labels
+			listItem.BFL_SettingsExactSlots = true
+			listItem.BFL_SettingIdentity = groupID
+			listItem.BFL_Comparison = comparisons
+		end
+
 		table.insert(listItems, listItem)
 		table.insert(allFrames, listItem)
 	end
@@ -6554,6 +6972,7 @@ function Settings:RefreshGroupsTab()
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- Both settings surfaces use the same import-before-write activation flow.
@@ -6639,7 +7058,7 @@ function Settings:RefreshAdvancedTab()
 	local allFrames = {}
 
 	-- Title
-	local title = Components:CreateHeader(tab, L.SETTINGS_TAB_ADVANCED or "Advanced Settings")
+	local title = Components:CreateHeader(tab, L.SETTINGS_TAB_ADVANCED or "Advanced Settings", "SETTINGS_TAB_ADVANCED")
 	table.insert(allFrames, title)
 
 	-- Description
@@ -6651,7 +7070,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- FriendGroups Migration Section
 	-- ===========================================
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_MIGRATION_HEADER or "FriendGroups Migration"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_MIGRATION_HEADER or "FriendGroups Migration", "SETTINGS_MIGRATION_HEADER"))
 
 	-- Migration description
 	table.insert(
@@ -6695,7 +7114,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Export / Import Section
 	-- ===========================================
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_EXPORT_HEADER or "Export / Import Settings"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_EXPORT_HEADER or "Export / Import Settings", "SETTINGS_EXPORT_HEADER"))
 
 	-- Export/Import description
 	table.insert(
@@ -6715,10 +7134,14 @@ function Settings:RefreshAdvancedTab()
 		true
 	)
 	table.insert(allFrames, exportWarning)
-	table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_IMPORT_GLOBAL_SYNC_INFO, true))
+	if BFL.GlobalSync:IsAvailable() then
+		table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_IMPORT_GLOBAL_SYNC_INFO, true))
+	end
 
 	-- Export/Import Buttons Row
 	local btnRow = CreateFrame("Frame", nil, tab)
+	btnRow.BFL_SearchLabels = { L.BUTTON_EXPORT, L.SETTINGS_IMPORT_BTN }
+	btnRow.BFL_SettingSlotCount = 2
 	btnRow:SetHeight(30)
 	btnRow:SetPoint("LEFT", 20, 0)
 	btnRow:SetPoint("RIGHT", -20, 0)
@@ -6745,7 +7168,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Group Note Sync Section
 	-- ===========================================
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_SYNC_GROUPS_NOTE_HEADER or "Group Note Sync"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_SYNC_GROUPS_NOTE_HEADER or "Group Note Sync", "SETTINGS_SYNC_GROUPS_NOTE_HEADER"))
 
 	-- Description
 	table.insert(
@@ -6779,7 +7202,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Note Cleanup Section
 	-- ===========================================
-	table.insert(allFrames, Components:CreateHeader(tab, L.WIZARD_HEADER or "Note Cleanup"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.WIZARD_HEADER or "Note Cleanup", "WIZARD_HEADER"))
 
 	-- Note Cleanup description
 	table.insert(
@@ -6811,6 +7234,8 @@ function Settings:RefreshAdvancedTab()
 	viewBackupButton:SetSize(200, 24)
 
 	local cleanupBtnRow = CreateFrame("Frame", nil, tab)
+	cleanupBtnRow.BFL_SearchLabels = { L.WIZARD_BTN, L.WIZARD_VIEW_BACKUP_BTN }
+	cleanupBtnRow.BFL_SettingSlotCount = 2
 	cleanupBtnRow:SetHeight(30)
 	cleanupBtnRow:SetPoint("LEFT", 20, 0)
 	cleanupBtnRow:SetPoint("RIGHT", -20, 0)
@@ -6837,7 +7262,7 @@ function Settings:RefreshAdvancedTab()
 			and MenuBridge.IsCompanionAddOnLoaded
 			and MenuBridge:IsCompanionAddOnLoaded() == true
 
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_EXTERNAL_MENU_BRIDGE or "External AddOn Menu Bridge", "SETTINGS_EXTERNAL_MENU_BRIDGE"))
 		table.insert(
 			allFrames,
 			Components:CreateLabel(
@@ -6890,7 +7315,7 @@ function Settings:RefreshAdvancedTab()
 	-- ===========================================
 	-- Beta Features Section
 	-- ===========================================
-	local betaFeaturesHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r")
+	local betaFeaturesHeader = Components:CreateHeader(tab, "|cffff8800" .. L.SETTINGS_BETA_FEATURES_TITLE .. "|r", "SETTINGS_BETA_FEATURES_TITLE")
 	RegisterLegacySection(self, "betaFeatures", betaFeaturesHeader)
 	table.insert(allFrames, betaFeaturesHeader)
 
@@ -7073,11 +7498,38 @@ function Settings:RefreshAdvancedTab()
 		table.insert(allFrames, listContainer)
 	end
 
+	if IsLegacyReviewActive() then
+		local DB = GetDB()
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_LEGACY_DIAGNOSTICS, "SETTINGS_LEGACY_DIAGNOSTICS"))
+		table.insert(allFrames, Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
+			initialValue = DB:Get("showWelcomeMessage", true),
+			callback = function(val)
+				DB:Set("showWelcomeMessage", val)
+			end,
+			tooltipTitle = L.SETTINGS_SHOW_WELCOME_MESSAGE,
+			tooltipDesc = L.SETTINGS_SHOW_WELCOME_MESSAGE_DESC
+				or "Shows the 'BetterFriendlist loaded...' message in chat when you log in or reload.",
+		}))
+		table.insert(allFrames, Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_DEBUG_PRINT,
+			initialValue = BFL.debugPrintEnabled,
+			callback = function(enabled)
+				if enabled ~= (BFL.debugPrintEnabled == true) then
+					BFL:ToggleDebugPrint()
+				end
+			end,
+			tooltipTitle = L.SETTINGS_DEBUG_PRINT,
+			tooltipDesc = L.SETTINGS_DEBUG_PRINT_DESC,
+		}))
+	end
+
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -15)
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- ===========================================
@@ -7173,20 +7625,24 @@ local function BFL_Settings_GetStackHeight(frames, startY)
 	return height
 end
 
-local function BFL_Settings_ShouldUseBuilderSkin(parent)
+local function BFL_Settings_GetBuilderButtonTemplate(parent)
 	local frame = parent
 	while frame do
 		if frame.BFL_SettingsCenterBuilderSkin then
-			return true
+			return "BackdropTemplate"
+		end
+		if frame.BFL_ModernReviewBuilder then
+			return "SharedButtonTemplate"
 		end
 		frame = frame.GetParent and frame:GetParent() or nil
 	end
-	return false
+	return Components:GetActionButtonTemplate()
 end
 
 local function BFL_Settings_CreateSmallButton(parent, text, width, onClick)
-	local useBuilderSkin = BFL_Settings_ShouldUseBuilderSkin(parent)
-	local button = CreateFrame("Button", nil, parent, useBuilderSkin and "BackdropTemplate" or "UIPanelButtonTemplate")
+	local template = BFL_Settings_GetBuilderButtonTemplate(parent)
+	local useBuilderSkin = template == "BackdropTemplate"
+	local button = CreateFrame("Button", nil, parent, template)
 	button:SetSize(width or 64, 22)
 	button.BFL_SettingsCenterBuilderSkin = useBuilderSkin
 	if useBuilderSkin then
@@ -7237,7 +7693,7 @@ local function BFL_Settings_GetEditorIndent(depth)
 end
 
 local function BFL_Settings_CreateEditorRow(parent, height, leftOffset, rightOffset)
-	local template = BackdropTemplateMixin and "BackdropTemplate" or nil
+	local template = not parent.BFL_ModernReviewBuilder and BackdropTemplateMixin and "BackdropTemplate" or nil
 	local row = CreateFrame("Frame", nil, parent, template)
 	row:SetHeight(height or 30)
 	row:SetPoint("LEFT", leftOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING, 0)
@@ -7383,6 +7839,10 @@ local function BFL_Settings_CreateInlineDropdown(parent, entries, selectedValue,
 		end, 300)
 	end
 
+	if IsLegacyReviewActive() then
+		dropdown.BFL_ComparisonChoices = entries
+		dropdown.BFL_ComparisonIsSelected = function(value) return value == selectedValue end
+	end
 	UpdateText(selectedValue)
 	return dropdown
 end
@@ -7450,7 +7910,7 @@ local function BFL_Settings_GetSorterFieldDefaultDirection(fieldDef)
 	return (fieldDef and fieldDef.defaultDirection) or "asc"
 end
 
-function Settings:EnsureFilterSortEditorPanel()
+function Settings:EnsureFilterSortEditorPanel(reviewTab)
 	local customHost = self.filterSortCustomHost
 	local anchorFrame = customHost and customHost.anchor
 	if not settingsFrame and not anchorFrame then
@@ -7461,15 +7921,13 @@ function Settings:EnsureFilterSortEditorPanel()
 		return nil
 	end
 
-	if customHost and customHost.inlineEditor then
-		local parentFrame = customHost.editorParent or customHost.tab or anchorFrame
+	if reviewTab or (customHost and customHost.inlineEditor) then
+		local parentFrame = reviewTab or customHost.editorParent or customHost.tab or anchorFrame
 		local frame = self.filterSortInlineEditorFrame
 		if not frame then
 			frame = CreateFrame("Frame", nil, parentFrame, "BackdropTemplate")
 			frame:SetHeight(220)
 			frame.components = {}
-			BFL_Settings_ApplyBuilderPanelStyle(frame, { 0.010, 0.010, 0.009, 0.58 }, { 0.50, 0.36, 0.10, 0.62 })
-
 			frame.title = frame:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlight")
 			frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -12)
 			frame.title:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
@@ -7484,11 +7942,13 @@ function Settings:EnsureFilterSortEditorPanel()
 			self.filterSortInlineEditorFrame = frame
 		end
 
-		parentFrame = customHost.editorParent or customHost.tab or anchorFrame
-		frame.BFL_SettingsCenterBuilderSkin = customHost.settingsCenter == true
+		frame.BFL_SettingsCenterBuilderSkin = customHost and customHost.settingsCenter == true or nil
+		frame.BFL_ModernReviewBuilder = reviewTab and reviewTab.BFL_ModernReviewBuilder
+		frame.Content.BFL_ModernReviewBuilder = frame.BFL_ModernReviewBuilder
 		frame:SetParent(parentFrame)
-		frame:SetFrameStrata(BFL.GetSafeFrameStrata(anchorFrame))
-		frame:SetFrameLevel(((anchorFrame.GetFrameLevel and anchorFrame:GetFrameLevel()) or 1) + 4)
+		local layoutParent = reviewTab or anchorFrame
+		frame:SetFrameStrata(BFL.GetSafeFrameStrata(layoutParent))
+		frame:SetFrameLevel(((layoutParent.GetFrameLevel and layoutParent:GetFrameLevel()) or 1) + 4)
 		frame:ClearAllPoints()
 		frame:SetPoint("LEFT", parentFrame, "LEFT", 14, 0)
 		frame:SetPoint("RIGHT", parentFrame, "RIGHT", -14, 0)
@@ -7496,7 +7956,20 @@ function Settings:EnsureFilterSortEditorPanel()
 		if frame.Content then
 			frame.Content:SetWidth(math.max(320, (parentFrame:GetWidth() or BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH) - 28))
 		end
-		BFL_Settings_ApplyBuilderPanelStyle(frame, { 0.010, 0.010, 0.009, 0.58 }, { 0.50, 0.36, 0.10, 0.62 })
+		if frame.BFL_ModernReviewBuilder then
+			frame:ClearBackdrop()
+			if not frame.BFL_ReviewSurface then
+				local surface = frame:CreateTexture(nil, "BACKGROUND")
+				surface:SetAllPoints()
+				frame.BFL_ReviewSurface = surface
+			end
+			local palette = BFL:GetModule("FriendsUI"):GetModernThemeColors()
+			frame.BFL_ReviewSurface:SetColorTexture(unpack(palette.surface))
+			frame.BFL_ReviewSurface:Show()
+		else
+			if frame.BFL_ReviewSurface then frame.BFL_ReviewSurface:Hide() end
+			BFL_Settings_ApplyBuilderPanelStyle(frame, { 0.010, 0.010, 0.009, 0.58 }, { 0.50, 0.36, 0.10, 0.62 })
+		end
 		return frame
 	end
 
@@ -7538,7 +8011,7 @@ function Settings:EnsureFilterSortEditorPanel()
 			frame.title:SetPoint("TOP", 0, -5)
 		end
 
-		frame.ScrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+		frame.ScrollFrame = self:CreateSettingsScrollFrame(frame)
 		frame.ScrollFrame:SetPoint("TOPLEFT", 12, -45)
 		frame.ScrollFrame:SetPoint("BOTTOMRIGHT", -30, 8)
 
@@ -7584,9 +8057,7 @@ function Settings:HideFilterSortEditorPanel()
 	end
 end
 
-function Settings:ClearFilterSortEditorPanel()
-	local customHost = self.filterSortCustomHost
-	local frame = customHost and customHost.inlineEditor and self.filterSortInlineEditorFrame or self.filterSortEditorFrame
+function Settings:ClearFilterSortEditorPanel(frame)
 	if not frame then
 		return
 	end
@@ -7601,13 +8072,11 @@ function Settings:ClearFilterSortEditorPanel()
 	end
 end
 
-function Settings:UpdateFilterSortEditorHeight(frames)
-	local customHost = self.filterSortCustomHost
-	local frame = customHost and customHost.inlineEditor and self.filterSortInlineEditorFrame or self.filterSortEditorFrame
+function Settings:UpdateFilterSortEditorHeight(frames, frame)
 	if not frame or not frame.Content then
 		return
 	end
-	if customHost and customHost.inlineEditor then
+	if frame == self.filterSortInlineEditorFrame then
 		local height = BFL_Settings_GetStackHeight(frames, -5)
 		height = math.max(96, height)
 		frame.Content:SetHeight(height)
@@ -7748,6 +8217,13 @@ function Settings:RefreshFilterSortTab()
 	local filterSortViewMode = self.filterSortCustomHost and self.filterSortCustomHost.viewMode or "legacy"
 	local isSettingsCenterOverview = isSettingsCenterInline and filterSortViewMode == "overview"
 	local isSettingsCenterEditor = isSettingsCenterInline and filterSortViewMode == "editor"
+	local review = IsLegacyReviewActive() and not self.filterSortCustomHost and BFL:GetModule("LegacySettingsReview")
+	local inlineReview = review and review.route == "filters"
+	local menuOrder, menuPositionControl
+	if inlineReview then menuOrder, menuPositionControl = LegacyOrderOptions(allEntries, "id") end
+	local friendsUI = inlineReview and BFL.IsMainline and BFL:GetModule("FriendsUI")
+	local modernReview = friendsUI and friendsUI:IsModernActive()
+	tab.BFL_ModernReviewBuilder = modernReview
 	local filterFields = Registry:GetFilterFieldCatalog()
 	local sortFields = Registry:GetSortFieldCatalog()
 	local fieldById = {}
@@ -7763,14 +8239,17 @@ function Settings:RefreshFilterSortTab()
 	if self.filterSortCustomHost then
 		self.filterSortCustomHost.editorParent = nil
 	end
-	local editorPanel = not isSettingsCenterOverview and self:EnsureFilterSortEditorPanel() or nil
+	if inlineReview and self.filterSortEditorFrame then
+		self.filterSortEditorFrame:Hide()
+	end
+	local editorPanel = not isSettingsCenterOverview and self:EnsureFilterSortEditorPanel(inlineReview and tab) or nil
 	local editorContent = editorPanel and editorPanel.Content
 	local editorFrames = {}
 	if isSettingsCenterOverview then
 		self:HideFilterSortEditorPanel()
 	end
 	if editorPanel then
-		self:ClearFilterSortEditorPanel()
+		self:ClearFilterSortEditorPanel(editorPanel)
 		editorPanel:Show()
 	end
 
@@ -7838,6 +8317,24 @@ function Settings:RefreshFilterSortTab()
 	local entryListItems = {}
 	local draggingEntryRow = nil
 
+	local function GuideSlot(row, rect, label, identity, help, comparison)
+		if not inlineReview then return end
+		local slot = (row.BFL_SettingSlotCount or 0) + 1
+		row.BFL_SettingSlotCount = slot
+		row.BFL_SettingsExactSlots = true
+		row.BFL_SearchLabels = row.BFL_SearchLabels or {}
+		row.BFL_SettingSlotRects = row.BFL_SettingSlotRects or {}
+		row.BFL_SettingDescriptions = row.BFL_SettingDescriptions or {}
+		row.BFL_SettingIdentities = row.BFL_SettingIdentities or {}
+		row.BFL_Comparison = row.BFL_Comparison or {}
+		row.BFL_SearchLabels[slot] = label
+		row.BFL_SettingSlotRects[slot] = rect
+		row.BFL_SettingDescriptions[slot] = help and L[help]
+		row.BFL_SettingIdentities[slot] = identity
+		row.BFL_Comparison[slot] = comparison
+		return comparison
+	end
+
 	local function SetEntryRowBackground(row, isHover)
 		if not row then
 			return
@@ -7848,7 +8345,10 @@ function Settings:RefreshFilterSortTab()
 		if not row.bg then
 			return
 		end
-		if isHover then
+		if modernReview then
+			local selected = row.entryId == selectedId
+			row.bg:SetColorTexture(1, 1, 1, isHover and 0.13 or (selected and 0.09 or 0.025))
+		elseif isHover then
 			row.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 		elseif row.entryId == selectedId then
 			row.bg:SetColorTexture(0.22, 0.18, 0.08, 0.75)
@@ -7880,38 +8380,64 @@ function Settings:RefreshFilterSortTab()
 
 	local function AddModeRow()
 		local row = CreateFrame("Frame", nil, listParent, isSettingsCenterInline and "BackdropTemplate" or nil)
-		row:SetHeight(isSettingsCenterInline and 44 or 28)
+		row:SetHeight(isSettingsCenterInline and 44 or (inlineReview and 39 or 28))
 		row:SetPoint("LEFT", isSettingsCenterInline and 14 or 20, 0)
 		row:SetPoint("RIGHT", isSettingsCenterInline and -14 or -20, 0)
 		if isSettingsCenterInline then
 			BFL_Settings_ApplyBuilderPanelStyle(row, { 0.014, 0.012, 0.010, 0.58 }, { 0.32, 0.24, 0.08, 0.52 })
 		end
 
-		local filterButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_FILTERS or "QuickFilters", 110, function()
+		local function CreateModeButton(text, width, active, onClick)
+			if not inlineReview then
+				return BFL_Settings_CreateSmallButton(row, text, width, onClick)
+			end
+			local button = CreateFrame("Button", nil, row, "PanelTopTabButtonTemplate")
+			button:SetText(text)
+			PanelTemplates_TabResize(button, 24, nil, width)
+			button:SetHeight(28)
+			button:SetScript("OnClick", onClick)
+			if active then
+				PanelTemplates_SelectTab(button)
+			else
+				PanelTemplates_DeselectTab(button)
+			end
+			button.Text:SetPoint("CENTER", button, "CENTER", 0, button.isTopTab and -5 or 0)
+			return button
+		end
+		local filterButton = CreateModeButton(L.FILTER_BUILDER_FILTERS or "QuickFilters", 110, selectedKind == "filter", function()
 			tab.bflBuilderKind = "filter"
 			self.filterSortBuilderKind = "filter"
 			tab.bflFilterSortCreate = nil
 			Refresh()
 		end)
-		filterButton:SetPoint("LEFT", isSettingsCenterInline and 12 or 0, 0)
+		if inlineReview then
+			filterButton:SetPoint("BOTTOMLEFT", 4, -5)
+		else
+			filterButton:SetPoint("LEFT", isSettingsCenterInline and 12 or 0, 0)
+		end
 		if isSettingsCenterInline then
 			filterButton.bflSelected = selectedKind == "filter"
 			BFL_Settings_ApplyBuilderButtonStyle(filterButton, filterButton.bflSelected and "selected" or nil)
-		else
+		elseif not inlineReview then
 			filterButton:SetEnabled(selectedKind ~= "filter")
 		end
 
-		local sorterButton = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_SORTERS or "Sorters", 90, function()
+		local sorterButton = CreateModeButton(L.FILTER_BUILDER_SORTERS or "Sorters", 90, selectedKind == "sorter", function()
 			tab.bflBuilderKind = "sorter"
 			self.filterSortBuilderKind = "sorter"
 			tab.bflFilterSortCreate = nil
 			Refresh()
 		end)
-		sorterButton:SetPoint("LEFT", filterButton, "RIGHT", 8, 0)
+		sorterButton:SetPoint("BOTTOMLEFT", filterButton, "BOTTOMRIGHT", inlineReview and 3 or 8, 0)
+		if inlineReview then
+			local tabWidth = math.max(filterButton:GetWidth(), sorterButton:GetWidth())
+			PanelTemplates_TabResize(filterButton, 24, tabWidth)
+			PanelTemplates_TabResize(sorterButton, 24, tabWidth)
+		end
 		if isSettingsCenterInline then
 			sorterButton.bflSelected = selectedKind == "sorter"
 			BFL_Settings_ApplyBuilderButtonStyle(sorterButton, sorterButton.bflSelected and "selected" or nil)
-		else
+		elseif not inlineReview then
 			sorterButton:SetEnabled(selectedKind ~= "sorter")
 		end
 
@@ -7926,7 +8452,14 @@ function Settings:RefreshFilterSortTab()
 				end
 			end
 		)
-		createButton:SetPoint("RIGHT", isSettingsCenterInline and -12 or 0, 0)
+		if inlineReview then
+			createButton:SetPoint("BOTTOMRIGHT", 0, 1)
+			GuideSlot(row, filterButton, filterButton:GetText(), "show-filters", "SETTINGS_GUIDE_FILTER_MODES")
+			GuideSlot(row, sorterButton, sorterButton:GetText(), "show-sorters", "SETTINGS_GUIDE_FILTER_MODES")
+			GuideSlot(row, createButton, createButton:GetText(), "new-" .. selectedKind, "SETTINGS_COMPARE_EDITOR_NEW")
+		else
+			createButton:SetPoint("RIGHT", isSettingsCenterInline and -12 or 0, 0)
+		end
 		table.insert(listFrames, row)
 	end
 
@@ -8039,6 +8572,25 @@ function Settings:RefreshFilterSortTab()
 			Refresh()
 		end)
 		delete:SetPoint("LEFT", copy, "RIGHT", 4, 0)
+		if inlineReview then
+			local identity = selectedKind .. "/" .. entry.id
+			row.BFL_SettingIdentity = identity
+			row.BFL_SearchLabels = { entry.name, entry.name, copy:GetText(), delete:GetText() }
+			row.BFL_SettingSlotCount = 4
+			row.BFL_SettingSlotRects = { check, name, copy, delete }
+			row.BFL_SettingsExactSlots = true
+			row.BFL_SettingDescriptions = { false, false, L.SETTINGS_COMPARE_FILTER_COPY,
+				entry.isCustom and L.SETTINGS_COMPARE_FILTER_REMOVE or L.SETTINGS_COMPARE_FILTER_RESET }
+			local helpOnly = entry.isCustom and selectedKind == "filter"
+			row.BFL_Comparison = {
+				{ "visible", binary = true, filterEditor = selectedKind, entryID = entry.id,
+					identity = identity .. "/visibility", help = "SETTINGS_COMPARE_RULE_VISIBILITY", entry = entry,
+					helpOnly = helpOnly },
+				{ "menuOrder", order = menuOrder, orderFrom = orderIndex, control = menuPositionControl, menuEntries = allEntries,
+					identity = identity .. "/order", help = "SETTINGS_COMPARE_FILTER_ORDER", outcome = "filterOrder",
+					helpOnly = helpOnly },
+			}
+		end
 		row:SetScript("OnDragStart", function(selfRow)
 			draggingEntryRow = selfRow
 			local ghost = BFL:GetDragGhost()
@@ -8195,6 +8747,15 @@ function Settings:RefreshFilterSortTab()
 			selfBox:ClearFocus()
 		end)
 		nameBox:SetScript("OnEditFocusLost", SaveName)
+		if inlineReview then
+			nameRow.Input = nameBox
+			nameRow.BFL_SearchLabels = { L.FILTER_BUILDER_NAME }
+			nameRow.BFL_Comparison = { {
+				"name", outcome = "filterMenu", entry = entry, identity = entry.id .. "/name",
+				helpOnly = selectedKind == "filter",
+				help = "SETTINGS_COMPARE_FILTER_NAME", examples = { L.SETTINGS_LEGACY_SAMPLE_ZONE, L.FILTER_BUILDER_FILTERS },
+			} }
+		end
 		table.insert(editorFrames, nameRow)
 
 		local iconRow = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_ICON or "Icon")
@@ -8211,6 +8772,16 @@ function Settings:RefreshFilterSortTab()
 			end
 		end)
 		iconButton:SetPoint("RIGHT", iconRow, "RIGHT", -12, 0)
+		if inlineReview then
+			iconRow.BFL_SearchLabels = { L.FILTER_BUILDER_ICON }
+			iconRow.BFL_Comparison = { {
+				"icon", outcome = "filterMenu", entry = entry, identity = entry.id .. "/icon", icon = true,
+				helpOnly = selectedKind == "filter",
+				help = "SETTINGS_COMPARE_FILTER_ICON", read = function() return customTable.icon or entry.icon end,
+				examples = { "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all",
+					"Interface\\AddOns\\BetterFriendlist\\Icons\\sliders" },
+			} }
+		end
 		table.insert(editorFrames, iconRow)
 		return customTable
 	end
@@ -8292,6 +8863,7 @@ function Settings:RefreshFilterSortTab()
 				or "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders")
 		local defaultName = kind == "filter" and (L.FILTER_BUILDER_NEW_FILTER or "Custom Filter")
 			or (L.FILTER_BUILDER_NEW_SORTER or "Custom Sorter")
+		local fallbackName = defaultName
 		if templateEntry then
 			defaultName = templateEntry.name .. " " .. (L.FILTER_BUILDER_COPY_SUFFIX or "Copy")
 		end
@@ -8304,6 +8876,16 @@ function Settings:RefreshFilterSortTab()
 		nameBox:SetText(defaultName)
 		nameBox:SetPoint("LEFT", nameLabel, "RIGHT", 12, 0)
 		nameBox:SetPoint("RIGHT", nameRow, "RIGHT", -12, 0)
+		if inlineReview then
+			nameRow.Input = nameBox
+			local function ReadDraftEntry() return { name = nameBox:GetText(), icon = iconRef } end
+			local draft = "draft/" .. kind
+			GuideSlot(nameRow, nameBox, L.FILTER_BUILDER_NAME, draft .. "/name", "SETTINGS_COMPARE_FILTER_NAME", {
+				"name", outcome = "filterMenu", readEntry = ReadDraftEntry, help = "SETTINGS_COMPARE_FILTER_NAME",
+				helpOnly = kind == "filter",
+				fallbackName = fallbackName, examples = { L.SETTINGS_LEGACY_SAMPLE_ZONE, fallbackName },
+			})
+		end
 		table.insert(editorFrames, nameRow)
 
 		local templateLabels = { L.FILTER_BUILDER_TEMPLATE_BLANK or "Blank" }
@@ -8334,6 +8916,15 @@ function Settings:RefreshFilterSortTab()
 				end
 			end, 230)
 		templateDropdown:SetPoint("LEFT", templateLabel, "RIGHT", 12, 0)
+		GuideSlot(templateRow, templateDropdown, L.FILTER_BUILDER_TEMPLATE, "draft/" .. kind .. "/template",
+			"SETTINGS_COMPARE_EDITOR_TEMPLATE", {
+				"template", control = templateDropdown, filterEditor = kind,
+				helpOnly = kind == "filter",
+				read = function() return selectedTemplate end,
+				patch = function(value)
+					return Registry:GetSettingsTemplateRules(kind, value ~= "__blank" and value or nil)
+				end,
+			})
 		table.insert(editorFrames, templateRow)
 
 		local iconRow = BFL_Settings_CreateEditorFormRow(editorContent, L.FILTER_BUILDER_ICON or "Icon")
@@ -8346,6 +8937,13 @@ function Settings:RefreshFilterSortTab()
 			end
 		end)
 		iconButton:SetPoint("RIGHT", iconRow, "RIGHT", -12, 0)
+		GuideSlot(iconRow, iconButton, L.FILTER_BUILDER_ICON, "draft/" .. kind .. "/icon", "SETTINGS_COMPARE_FILTER_ICON", {
+			"icon", outcome = "filterMenu", icon = true, read = function() return iconRef end,
+			helpOnly = kind == "filter",
+			readEntry = function() return { name = nameBox:GetText(), icon = iconRef } end,
+			fallbackName = fallbackName,
+			examples = { "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all", "Interface\\AddOns\\BetterFriendlist\\Icons\\sliders" },
+		})
 		if editorPanel then
 			editorPanel.iconButton = iconButton
 		end
@@ -8381,19 +8979,39 @@ function Settings:RefreshFilterSortTab()
 			Refresh()
 		end)
 		cancelButton:SetPoint("RIGHT", createButton, "LEFT", -8, 0)
+		GuideSlot(actions, createButton, createButton:GetText(), "draft/" .. kind .. "/save", "SETTINGS_COMPARE_EDITOR_CREATE")
+		GuideSlot(actions, cancelButton, cancelButton:GetText(), "draft/" .. kind .. "/cancel", "SETTINGS_COMPARE_EDITOR_CANCEL")
 		table.insert(editorFrames, actions)
 
 		nameBox:SetFocus()
 		nameBox:HighlightText()
 	end
 
-	local function SaveFilterAST(filter)
+	local function FilterSlot(row, rect, control, label, filter, path, key, help, binary, change)
+		if not inlineReview then return end
+		local identity = selectedId .. "/rule/" .. table.concat(path, ".") .. "/" .. key
+		return GuideSlot(row, rect, label, identity, help, {
+			key, control = control, binary = binary, help = help, filterEditor = "filter",
+			helpOnly = true,
+			identity = identity,
+			patch = function(value)
+				local ast = CopyTable(filter.ast)
+				local node = ast
+				for _, index in ipairs(path) do node = node.children[index] end
+				if change then change(node, value) else node[key] = value end
+				return ast
+			end,
+		})
+	end
+
+	local function SaveFilterAST(filter, structureChanged)
+		if inlineReview and structureChanged then review:InvalidateEditorRuleComparison() end
 		Registry:UpdateCustomQuickFilter(selectedId, { ast = filter.ast })
 		BFL:ForceRefreshFriendsList()
 	end
 
-	local function AddFilterNodeRows(filter, parentNode, depth, ownerChildren, ownerIndex)
-		depth = depth or 0
+	local function AddFilterNodeRows(filter, parentNode, depth, ownerChildren, ownerIndex, path)
+		depth, path = depth or 0, path or {}
 		parentNode.children = parentNode.children or {}
 		local canDeleteGroup = ownerChildren and ownerIndex
 
@@ -8415,31 +9033,39 @@ function Settings:RefreshFilterSortTab()
 			Refresh()
 		end)
 		notButton:SetPoint("TOPRIGHT", groupRow, "TOPRIGHT", -10, -7)
+		FilterSlot(groupRow, opDropdown, opDropdown, L.FILTER_BUILDER_GROUP, filter, path, "op", "SETTINGS_COMPARE_RULE_GROUP")
+		FilterSlot(groupRow, notButton, notButton, NOT or "NOT", filter, path, "negate", "SETTINGS_COMPARE_RULE_NEGATE", true)
 		local addCondition = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_CONDITION or "Add Condition", 112, function()
 			table.insert(parentNode.children, { type = "condition", field = "online", op = "is", value = true })
-			SaveFilterAST(filter)
+			SaveFilterAST(filter, true)
 			Refresh()
 		end)
 		local addGroup = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_ADD_GROUP or "Add Group", 82, function()
 			table.insert(parentNode.children, { type = "group", op = "AND", children = {} })
-			SaveFilterAST(filter)
+			SaveFilterAST(filter, true)
 			Refresh()
 		end)
 		addGroup:SetPoint("BOTTOMRIGHT", groupRow, "BOTTOMRIGHT", -10, 7)
 		addCondition:SetPoint("RIGHT", addGroup, "LEFT", -8, 0)
+		local groupIdentity = selectedId .. "/rule/" .. table.concat(path, ".")
+		GuideSlot(groupRow, addCondition, addCondition:GetText(), groupIdentity .. "/add-condition", "SETTINGS_COMPARE_RULE_ADD_CONDITION")
+		GuideSlot(groupRow, addGroup, addGroup:GetText(), groupIdentity .. "/add-group", "SETTINGS_COMPARE_RULE_ADD_GROUP")
 		if canDeleteGroup then
 			local deleteGroup = BFL_Settings_CreateSmallButton(groupRow, L.FILTER_BUILDER_DELETE or "Delete", 58, function()
 				table.remove(ownerChildren, ownerIndex)
-				SaveFilterAST(filter)
+				SaveFilterAST(filter, true)
 				Refresh()
 			end)
 			deleteGroup:SetPoint("RIGHT", addCondition, "LEFT", -8, 0)
+			GuideSlot(groupRow, deleteGroup, deleteGroup:GetText(), groupIdentity .. "/delete-group", "SETTINGS_COMPARE_RULE_DELETE_GROUP")
 		end
 		table.insert(editorFrames, groupRow)
 
 		for index, node in ipairs(parentNode.children) do
+			local nodePath = { unpack(path) }
+			nodePath[#nodePath + 1] = index
 			if node.type == "group" then
-				AddFilterNodeRows(filter, node, depth + 1, parentNode.children, index)
+				AddFilterNodeRows(filter, node, depth + 1, parentNode.children, index, nodePath)
 			else
 				local row = BFL_Settings_CreateEditorRow(editorContent, 64, BFL_Settings_GetEditorIndent(depth) + 14, BFL_FILTER_SORT_EDITOR_SIDE_PADDING)
 				local fieldDef = fieldById[node.field] or filterFields[1]
@@ -8453,6 +9079,13 @@ function Settings:RefreshFilterSortTab()
 					Refresh()
 				end, 112)
 				fieldDropdown:SetPoint("TOPLEFT", row, "TOPLEFT", 10, -10)
+				FilterSlot(row, fieldDropdown, fieldDropdown, fieldDef.label or L.FILTER_BUILDER_GROUP, filter, nodePath, "field",
+					"SETTINGS_COMPARE_RULE_FIELD", false, function(sample, value)
+						local nextField = fieldById[value] or filterFields[1]
+						sample.field = nextField.id
+						sample.op = Registry:GetOperatorsForField(sample.field)[1]
+						sample.value = BFL_Settings_GetDefaultValueForField(nextField)
+					end)
 				local operatorOptions = BFL_Settings_BuildOperatorOptions(Registry:GetOperatorsForField(node.field))
 				local opDropdown = BFL_Settings_CreateInlineDropdown(row, operatorOptions, node.op or "is", function(value)
 					node.op = value
@@ -8460,6 +9093,7 @@ function Settings:RefreshFilterSortTab()
 					Refresh()
 				end, 88)
 				opDropdown:SetPoint("LEFT", fieldDropdown, "RIGHT", 6, 0)
+				FilterSlot(row, opDropdown, opDropdown, fieldDef.label or L.FILTER_BUILDER_GROUP, filter, nodePath, "op", "SETTINGS_COMPARE_RULE_OPERATOR")
 
 				local valueHolder = CreateFrame("Frame", nil, row)
 				valueHolder:SetSize(106, 24)
@@ -8480,6 +9114,7 @@ function Settings:RefreshFilterSortTab()
 							Refresh()
 						end, 106)
 						valueDropdown:SetPoint("LEFT", 0, 0)
+						FilterSlot(row, valueDropdown, valueDropdown, fieldDef.label or L.FILTER_BUILDER_GROUP, filter, nodePath, "value", "SETTINGS_COMPARE_RULE_VALUE")
 					else
 						local valueBox = CreateFrame("EditBox", nil, valueHolder, "InputBoxTemplate")
 						valueBox:SetSize(106, 20)
@@ -8489,6 +9124,13 @@ function Settings:RefreshFilterSortTab()
 						end
 						valueBox:SetText(BFL_Settings_ValueToText(node.value))
 						valueBox:SetPoint("LEFT", 0, 0)
+						local guide = FilterSlot(row, valueBox, { Input = valueBox }, fieldDef.label or L.FILTER_BUILDER_GROUP,
+							filter, nodePath, "value", "SETTINGS_COMPARE_RULE_VALUE")
+						if guide then
+							guide.read = function() return node.value end
+							guide.examples = fieldDef.type == "number" and { 20, 60 } or { L.SETTINGS_LEGACY_SAMPLE_ONLINE, L.SETTINGS_LEGACY_SAMPLE_ZONE }
+							guide.parse = function(value) return BFL_Settings_ParseFilterValue(fieldDef, node.op, value) end
+						end
 						valueBox:SetScript("OnEnterPressed", function(selfBox)
 							node.value = BFL_Settings_ParseFilterValue(fieldDef, node.op, selfBox:GetText())
 							selfBox:ClearFocus()
@@ -8506,11 +9148,12 @@ function Settings:RefreshFilterSortTab()
 					Refresh()
 				end)
 				notButton:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 10, 8)
+				FilterSlot(row, notButton, notButton, NOT or "NOT", filter, nodePath, "negate", "SETTINGS_COMPARE_RULE_NEGATE", true)
 				local up = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_UP or "Up", 36, function()
 					if index > 1 then
 						parentNode.children[index], parentNode.children[index - 1] =
 							parentNode.children[index - 1], parentNode.children[index]
-						SaveFilterAST(filter)
+						SaveFilterAST(filter, true)
 						Refresh()
 					end
 				end)
@@ -8519,25 +9162,30 @@ function Settings:RefreshFilterSortTab()
 					if index < #parentNode.children then
 						parentNode.children[index], parentNode.children[index + 1] =
 							parentNode.children[index + 1], parentNode.children[index]
-						SaveFilterAST(filter)
+						SaveFilterAST(filter, true)
 						Refresh()
 					end
 				end)
 				down:SetEnabled(index < #parentNode.children)
 				local delete = BFL_Settings_CreateSmallButton(row, "X", 28, function()
 					table.remove(parentNode.children, index)
-					SaveFilterAST(filter)
+					SaveFilterAST(filter, true)
 					Refresh()
 				end)
 				delete:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 8)
 				down:SetPoint("RIGHT", delete, "LEFT", -4, 0)
 				up:SetPoint("RIGHT", down, "LEFT", -4, 0)
+				local identity = selectedId .. "/rule/" .. table.concat(nodePath, ".")
+				GuideSlot(row, up, up:GetText(), identity .. "/up", "SETTINGS_COMPARE_RULE_MOVE")
+				GuideSlot(row, down, down:GetText(), identity .. "/down", "SETTINGS_COMPARE_RULE_MOVE")
+				GuideSlot(row, delete, L.FILTER_BUILDER_DELETE, identity .. "/delete", "SETTINGS_COMPARE_RULE_DELETE_CONDITION")
 				table.insert(editorFrames, row)
 			end
 		end
 	end
 
-	local function SaveSorter(sorter)
+	local function SaveSorter(sorter, structureChanged)
+		if inlineReview and structureChanged then review:InvalidateEditorRuleComparison() end
 		Registry:UpdateCustomSorter(selectedId, { chain = sorter.chain })
 		local FriendsList = BFL:GetModule("FriendsList")
 		if FriendsList and FriendsList.sortMode == selectedId and FriendsList.ApplySort then
@@ -8548,6 +9196,8 @@ function Settings:RefreshFilterSortTab()
 
 	local function AddSorterRows(sorter)
 		sorter.chain = sorter.chain or {}
+		local _, positionControl
+		if inlineReview then _, positionControl = LegacyOrderOptions(sorter.chain, "field") end
 		for index, step in ipairs(sorter.chain) do
 			local row = BFL_Settings_CreateEditorRow(editorContent, 64)
 			local fieldDef = sortFieldById[step.field] or sortFields[1]
@@ -8576,10 +9226,30 @@ function Settings:RefreshFilterSortTab()
 				Refresh()
 			end, 104)
 			emptyDropdown:SetPoint("LEFT", directionDropdown, "RIGHT", 6, 0)
+			if inlineReview then
+				local function SortSlot(control, key, help)
+					local identity = selectedId .. "/step/" .. index .. "/" .. key
+					GuideSlot(row, control, fieldDef.label or L.FILTER_BUILDER_SORTERS, identity, help, {
+						key, control = control, filterEditor = "sorter", help = help,
+						identity = identity,
+						patch = function(value)
+							local chain = CopyTable(sorter.chain)
+							chain[index][key] = value
+							if key == "field" then
+								chain[index].direction = BFL_Settings_GetSorterFieldDefaultDirection(sortFieldById[value] or sortFields[1])
+							end
+							return nil, chain
+						end,
+					})
+				end
+				SortSlot(fieldDropdown, "field", "SETTINGS_COMPARE_SORT_FIELD")
+				SortSlot(directionDropdown, "direction", "SETTINGS_COMPARE_SORT_DIRECTION")
+				SortSlot(emptyDropdown, "empty", "SETTINGS_COMPARE_SORT_EMPTY")
+			end
 			local up = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_UP or "Up", 36, function()
 				if index > 1 then
 					sorter.chain[index], sorter.chain[index - 1] = sorter.chain[index - 1], sorter.chain[index]
-					SaveSorter(sorter)
+					SaveSorter(sorter, true)
 					Refresh()
 				end
 			end)
@@ -8587,34 +9257,56 @@ function Settings:RefreshFilterSortTab()
 			local down = BFL_Settings_CreateSmallButton(row, L.FILTER_BUILDER_DOWN or "Down", 48, function()
 				if index < #sorter.chain then
 					sorter.chain[index], sorter.chain[index + 1] = sorter.chain[index + 1], sorter.chain[index]
-					SaveSorter(sorter)
+					SaveSorter(sorter, true)
 					Refresh()
 				end
 			end)
 			down:SetEnabled(index < #sorter.chain)
 			local delete = BFL_Settings_CreateSmallButton(row, "X", 28, function()
 				table.remove(sorter.chain, index)
-				SaveSorter(sorter)
+				SaveSorter(sorter, true)
 				Refresh()
 			end)
 			delete:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 8)
 			down:SetPoint("RIGHT", delete, "LEFT", -4, 0)
 			up:SetPoint("RIGHT", down, "LEFT", -4, 0)
+			if inlineReview then
+				local identity = selectedId .. "/step/" .. index
+				local function PreviewMove(button, direction)
+					local key = identity .. "/" .. direction
+					local comparison
+					if #sorter.chain > 1 then
+						comparison = {
+							"position", orderFrom = index, control = positionControl, filterEditor = "sorter",
+							identity = key, help = "SETTINGS_COMPARE_SORT_MOVE",
+							patch = function(value)
+								local chain = CopyTable(sorter.chain)
+								table.insert(chain, value, table.remove(chain, index))
+								return nil, chain
+							end,
+						}
+					end
+					GuideSlot(row, button, button:GetText(), key, "SETTINGS_COMPARE_SORT_MOVE", comparison)
+				end
+				PreviewMove(up, "up")
+				PreviewMove(down, "down")
+				GuideSlot(row, delete, L.FILTER_BUILDER_DELETE, identity .. "/delete", "SETTINGS_COMPARE_SORT_DELETE_STEP")
+			end
 			table.insert(editorFrames, row)
 		end
 
 		local addStep = Components:CreateButton(editorContent, L.FILTER_BUILDER_ADD_SORT_STEP or "Add Sort Step", function()
 			if #sorter.chain < Registry.MAX_SORT_STEPS then
 				table.insert(sorter.chain, { field = "name", direction = "asc", empty = "last" })
-				SaveSorter(sorter)
+				SaveSorter(sorter, true)
 				Refresh()
 			end
-		end)
+		end, inlineReview and L.SETTINGS_COMPARE_SORT_ADD_STEP or nil)
 		table.insert(editorFrames, addStep)
 	end
 
 	if not isSettingsCenterInline then
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FILTER_SORT or "QuickFilter & Sorter"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_TAB_FILTER_SORT or "QuickFilter & Sorter", "SETTINGS_TAB_FILTER_SORT"))
 		table.insert(
 			allFrames,
 			Components:CreateLabel(
@@ -8649,11 +9341,13 @@ function Settings:RefreshFilterSortTab()
 			AddCreateEditor(createState.kind, createState.templateId)
 		elseif entry then
 			editorPanel.title:SetText((L.FILTER_BUILDER_EDITOR or "Editor") .. ": " .. entry.name)
-			if selectedKind == "filter" then
-				local matches, total = Registry:CountQuickFilterMatches(entry.id)
-				AddPreviewRow(entry, matches, total)
-			else
-				AddPreviewRow(entry)
+			if not inlineReview then
+				if selectedKind == "filter" then
+					local matches, total = Registry:CountQuickFilterMatches(entry.id)
+					AddPreviewRow(entry, matches, total)
+				else
+					AddPreviewRow(entry)
+				end
 			end
 			if isSettingsCenterEditor then
 				AddEntryActionsRow(entry)
@@ -8674,8 +9368,20 @@ function Settings:RefreshFilterSortTab()
 		if editorPanel:IsShown() then
 			Components:AnchorChain(editorFrames, -5)
 			editorPanel.components = editorFrames
-			self:UpdateFilterSortEditorHeight(editorFrames)
-			if self.filterSortCustomHost and self.filterSortCustomHost.inlineEditor then
+			self:UpdateFilterSortEditorHeight(editorFrames, editorPanel)
+			if inlineReview then
+				editorPanel.BFL_ReviewChildren = editorFrames
+				local insertIndex = 4
+				if not createState then
+					for index, row in ipairs(allFrames) do
+						if row.entryId == selectedId then
+							insertIndex = index + 1
+							break
+						end
+					end
+				end
+				table.insert(allFrames, insertIndex, editorPanel)
+			elseif self.filterSortCustomHost and self.filterSortCustomHost.inlineEditor then
 				table.insert(allFrames, editorPanel)
 			end
 		end
@@ -8689,6 +9395,7 @@ function Settings:RefreshFilterSortTab()
 		end
 	end
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- ===========================================
@@ -8711,6 +9418,7 @@ function Settings:RefreshBrokerTab()
 	end
 
 	-- Clear existing content using GetChildren for robustness against reference leaks
+	HideComponentList(tab)
 	local children = { tab:GetChildren() }
 	for _, child in ipairs(children) do
 		if child.Hide then
@@ -8721,15 +9429,18 @@ function Settings:RefreshBrokerTab()
 	tab.components = {}
 
 	local allFrames = {}
+	local review = IsLegacyReviewActive() and BFL:GetModule("LegacySettingsReview")
+	local brokerEnabled = DB:Get("brokerEnabled", false)
+	local guildBrokerEnabled = DB:Get("guildBrokerEnabled", false)
+
+	local function AddEnableHint(enabled)
+		if review and not enabled then
+			table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_LEGACY_BROKER_ENABLE_HINT, true))
+		end
+	end
 
 	-- Shared Broker Font Library
-	local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-	local fontList = LSM and LSM:List("font") or { "Friz Quadrata TT" }
-	local fontPaths = {}
-	for i, fontName in ipairs(fontList) do
-		fontPaths[i] = BFL.FontManager:ResolveFontPath(fontName)
-	end
-	local fontOptions = { labels = fontList, values = fontList, fontPaths = fontPaths, useCheckboxes = true }
+	local fontOptions = GetLegacyFontOptions()
 
 	local function RefreshBrokerTooltips()
 		local Broker = BFL:GetModule("Broker")
@@ -8744,7 +9455,7 @@ function Settings:RefreshBrokerTab()
 	end
 
 	-- Header: Data Broker Integration
-	local header = Components:CreateHeader(tab, L.BROKER_SETTINGS_HEADER_INTEGRATION)
+	local header = Components:CreateHeader(tab, L.BROKER_SETTINGS_HEADER_INTEGRATION, "BROKER_SETTINGS_HEADER_INTEGRATION")
 	table.insert(allFrames, header)
 
 	-- Info Text
@@ -8755,7 +9466,7 @@ function Settings:RefreshBrokerTab()
 	local enableBroker = Components:CreateCheckbox(
 		tab,
 		L.BROKER_SETTINGS_ENABLE or "Enable Data Broker",
-		DB:Get("brokerEnabled", false),
+		brokerEnabled,
 		function(val)
 			DB:Set("brokerEnabled", val)
 
@@ -8790,9 +9501,33 @@ function Settings:RefreshBrokerTab()
 			or "Show BetterFriendlist in Data Broker display addons. Requires UI reload to take effect."
 	)
 	table.insert(allFrames, enableBroker)
+	AddEnableHint(brokerEnabled)
+
+	if review then
+		local tooltipMode = Components:CreateDropdown(tab, L.BROKER_SETTINGS_TOOLTIP_MODE, {
+			labels = { L.BROKER_TOOLTIP_BASIC, L.BROKER_TOOLTIP_ADVANCED },
+			values = { "basic", "advanced" },
+		}, function(value)
+			return value == DB:Get("brokerTooltipMode", "advanced")
+		end, function(value)
+			DB:Set("brokerTooltipMode", value)
+			RefreshBrokerTooltips()
+		end)
+		table.insert(allFrames, tooltipMode)
+
+		local clickAction = Components:CreateDropdown(tab, L.BROKER_SETTINGS_CLICK_ACTION, {
+			labels = { L.BROKER_CLICK_TOGGLE, L.BROKER_CLICK_FRIENDS, L.BROKER_CLICK_SETTINGS },
+			values = { "toggle", "friends", "settings" },
+		}, function(value)
+			return value == DB:Get("brokerClickAction", "toggle")
+		end, function(value)
+			DB:Set("brokerClickAction", value)
+		end)
+		table.insert(allFrames, clickAction)
+	end
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.BROKER_SETTINGS_FONT_HEADER or "Broker Tooltip Font"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.BROKER_SETTINGS_FONT_HEADER or "Broker Tooltip Font", "BROKER_SETTINGS_FONT_HEADER"))
 
 	local currentBrokerFont = DB:Get("brokerFont", "Friz Quadrata TT")
 	local brokerFontDropdown
@@ -8882,7 +9617,7 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, brokerNonLatinWarning)
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.BROKER_SETTINGS_APPEARANCE_HEADER or "Broker Tooltip Appearance"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.BROKER_SETTINGS_APPEARANCE_HEADER or "Broker Tooltip Appearance", "BROKER_SETTINGS_APPEARANCE_HEADER"))
 
 	local BrokerUtils = BFL.BrokerUtils
 	local separatorColor = BrokerUtils and BrokerUtils.GetBrokerSeparatorColor and BrokerUtils.GetBrokerSeparatorColor()
@@ -8920,7 +9655,7 @@ function Settings:RefreshBrokerTab()
 	)
 	table.insert(allFrames, separatorPicker)
 
-	if DB:Get("brokerEnabled", false) then
+	if brokerEnabled or (review and review.route == "broker") then
 		-- Show Icon
 		local showIcon = Components:CreateCheckbox(
 			tab,
@@ -9001,8 +9736,9 @@ function Settings:RefreshBrokerTab()
 		)
 		table.insert(allFrames, showGroups)
 
-		-- Sub-options for Split Counts (only visible if enabled)
-		if DB:Get("brokerShowGroups", false) then
+		local splitCounts = DB:Get("brokerShowGroups", false)
+		if splitCounts or review then
+			local prerequisite = splitCounts and "" or ("\n\n" .. L.BROKER_SETTINGS_SHOW_GROUPS)
 			-- Show WoW Icon
 			local showWoWIcon = Components:CreateCheckbox(
 				tab,
@@ -9018,9 +9754,10 @@ function Settings:RefreshBrokerTab()
 			)
 			showWoWIcon:SetTooltip(
 				L.BROKER_SETTINGS_SHOW_WOW_ICON_TITLE or "Show WoW Icon",
-				L.BROKER_SETTINGS_SHOW_WOW_ICON_TOOLTIP
-					or "Display the World of Warcraft icon next to the WoW friend count"
+				(L.BROKER_SETTINGS_SHOW_WOW_ICON_TOOLTIP
+					or "Display the World of Warcraft icon next to the WoW friend count") .. prerequisite
 			)
+			if not splitCounts then showWoWIcon.checkBox:Disable() end
 
 			table.insert(allFrames, showWoWIcon)
 
@@ -9039,9 +9776,10 @@ function Settings:RefreshBrokerTab()
 			)
 			showBNetIcon:SetTooltip(
 				L.BROKER_SETTINGS_SHOW_BNET_ICON_TITLE or "Show Battle.net Icon",
-				L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP
-					or "Display the Battle.net icon next to the Battle.net friend count"
+				(L.BROKER_SETTINGS_SHOW_BNET_ICON_TOOLTIP
+					or "Display the Battle.net icon next to the Battle.net friend count") .. prerequisite
 			)
+			if not splitCounts then showBNetIcon.checkBox:Disable() end
 
 			table.insert(allFrames, showBNetIcon)
 		end
@@ -9125,7 +9863,8 @@ function Settings:RefreshBrokerTab()
 		-- Header: Column Colors
 		local brokerColumnColorsHeader = Components:CreateHeader(
 			tab,
-			L.BROKER_SETTINGS_COLUMN_COLORS or "Column Colors"
+			L.BROKER_SETTINGS_COLUMN_COLORS or "Column Colors",
+			"BROKER_SETTINGS_COLUMN_COLORS"
 		)
 		table.insert(allFrames, brokerColumnColorsHeader)
 
@@ -9157,7 +9896,7 @@ function Settings:RefreshBrokerTab()
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
 		-- Header: Tooltip Columns
-		local columnsHeader = Components:CreateHeader(tab, L.BROKER_SETTINGS_COLUMNS_HEADER)
+		local columnsHeader = Components:CreateHeader(tab, L.BROKER_SETTINGS_COLUMNS_HEADER, "BROKER_SETTINGS_COLUMNS_HEADER")
 		table.insert(allFrames, columnsHeader)
 
 		-- Column Reordering Logic
@@ -9205,6 +9944,8 @@ function Settings:RefreshBrokerTab()
 
 		-- Create reorderable list items
 		local listItems = {}
+		local order, positionControl
+		if IsLegacyReviewActive() then order, positionControl = LegacyOrderOptions(orderedColumns, "key") end
 
 		for i, col in ipairs(orderedColumns) do
 			local onDragStart = function(btn)
@@ -9284,6 +10025,21 @@ function Settings:RefreshBrokerTab()
 				local checked = self:GetChecked()
 				DB:Set("brokerShowCol" .. col.key, checked)
 			end)
+			if order then
+				local columnSetting = "brokerShowCol" .. col.key
+				listItem.BFL_SearchLabels = { col.label, L.BROKER_SETTINGS_COLUMN_ORDER }
+				listItem.BFL_SettingDescriptions = {
+					L.SETTINGS_CENTER_BROKER_COLUMN_ORDER_VISIBILITY_DESC, L.SETTINGS_CENTER_BROKER_COLUMN_ORDER_DESC,
+				}
+				listItem.BFL_SettingSlotCount = 2
+				listItem.BFL_SettingSlotRects = { checkbox, listItem.nameText }
+				listItem.BFL_SettingsExactSlots = true
+				listItem.BFL_Comparison = {
+					{ columnSetting, binary = true, brokerTooltip = true, identity = col.key },
+					{ "brokerColumnOrder", order = order, orderFrom = i, control = positionControl, brokerTooltip = true,
+						columnSetting = columnSetting, identity = col.key },
+				}
+			end
 
 			-- Fix for ugly hover effect
 			checkbox:SetScript("OnEnter", function() end)
@@ -9306,14 +10062,14 @@ function Settings:RefreshBrokerTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
-	local guildHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_HEADER or "Guild Plugin")
+	local guildHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_HEADER or "Guild Plugin", "GUILD_BROKER_SETTINGS_HEADER")
 	table.insert(allFrames, guildHeader)
 
 	-- Enable Guild Broker
 	local enableGuildBroker = Components:CreateCheckbox(
 		tab,
 		L.GUILD_BROKER_SETTINGS_ENABLE or "Enable Guild Broker",
-		DB:Get("guildBrokerEnabled", false),
+		guildBrokerEnabled,
 		function(val)
 			DB:Set("guildBrokerEnabled", val)
 			self:RefreshBrokerTab()
@@ -9344,8 +10100,9 @@ function Settings:RefreshBrokerTab()
 		L.GUILD_BROKER_SETTINGS_ENABLE_DESC or "Show guild member data in your Data Broker display addon"
 	)
 	table.insert(allFrames, enableGuildBroker)
+	AddEnableHint(guildBrokerEnabled)
 
-	if DB:Get("guildBrokerEnabled", false) then
+	if guildBrokerEnabled or (review and review.route == "guildBroker") then
 		-- Show Icon
 		local guildShowIcon = Components:CreateCheckbox(
 			tab,
@@ -9513,7 +10270,7 @@ function Settings:RefreshBrokerTab()
 		if guildMaxRows.SetTooltip then
 			guildMaxRows:SetTooltip(
 				L.GUILD_BROKER_SETTINGS_MAX_ROWS or "Maximum Rows",
-				L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC or "Limit tooltip rows for large guilds (25-200)"
+				L.GUILD_BROKER_SETTINGS_MAX_ROWS_DESC
 			)
 		end
 		table.insert(allFrames, guildMaxRows)
@@ -9603,11 +10360,12 @@ function Settings:RefreshBrokerTab()
 		table.insert(allFrames, guildSortMode)
 
 		-- Column Colors Header
-		local colColorsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMN_COLORS or "Column Colors")
+		local colColorsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMN_COLORS or "Column Colors", "GUILD_BROKER_SETTINGS_COLUMN_COLORS")
 		table.insert(allFrames, colColorsHeader)
 
 		-- Nickname Color: Checkbox "Use Class Color" + conditional color picker
 		local nickUseClassColor = BetterFriendlistDB.guildBrokerNicknameColor == nil
+		local nickColorPicker
 		local nickClassColorCheckbox = Components:CreateCheckbox(
 			tab,
 			L.GUILD_BROKER_NICKNAME_USE_CLASS_COLOR or "Nickname: Use Class Color",
@@ -9621,7 +10379,9 @@ function Settings:RefreshBrokerTab()
 					DB:Set("guildBrokerNicknameColor", currentColor)
 				end
 				-- Toggle color picker visibility
-				if nickColorPicker then
+				if review then
+					self:RefreshBrokerTab()
+				elseif nickColorPicker then
 					if checked then
 						nickColorPicker:Hide()
 						nickColorPicker.isHidden = true
@@ -9632,10 +10392,13 @@ function Settings:RefreshBrokerTab()
 				end
 			end
 		)
+		if review and nickUseClassColor then
+			table.insert(nickClassColorCheckbox.BFL_SearchLabels, L.GUILD_BROKER_SETTINGS_NICKNAME_COLOR)
+		end
 		table.insert(allFrames, nickClassColorCheckbox)
 
 		local currentNickColor = DB:Get("guildBrokerNicknameColor")
-		local nickColorPicker = Components:CreateColorPicker(
+		nickColorPicker = Components:CreateColorPicker(
 			tab,
 			L.GUILD_BROKER_SETTINGS_NICKNAME_COLOR or "Nickname Color",
 			currentNickColor and { r = currentNickColor[1], g = currentNickColor[2], b = currentNickColor[3] } or
@@ -9722,7 +10485,7 @@ function Settings:RefreshBrokerTab()
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
 		-- Guild Tooltip Columns Header
-		local guildColumnsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMNS or "Tooltip Columns")
+		local guildColumnsHeader = Components:CreateHeader(tab, L.GUILD_BROKER_SETTINGS_COLUMNS or "Tooltip Columns", "GUILD_BROKER_SETTINGS_COLUMNS")
 		table.insert(allFrames, guildColumnsHeader)
 
 		-- Guild Column Reordering (same pattern as Friends Broker)
@@ -9770,6 +10533,8 @@ function Settings:RefreshBrokerTab()
 
 		-- Create reorderable list items
 		local guildListItems = {}
+		local order, positionControl
+		if IsLegacyReviewActive() then order, positionControl = LegacyOrderOptions(guildOrderedColumns, "key") end
 
 		for i, col in ipairs(guildOrderedColumns) do
 			local onDragStart = function(btn)
@@ -9843,6 +10608,21 @@ function Settings:RefreshBrokerTab()
 				local checked = self:GetChecked()
 				DB:Set(guildColSettingKey, checked)
 			end)
+			if order then
+				local columnSetting = guildColSettingKey
+				listItem.BFL_SearchLabels = { col.label, L.BROKER_SETTINGS_COLUMN_ORDER }
+				listItem.BFL_SettingDescriptions = {
+					L.SETTINGS_CENTER_BROKER_COLUMN_ORDER_VISIBILITY_DESC, L.SETTINGS_CENTER_BROKER_COLUMN_ORDER_DESC,
+				}
+				listItem.BFL_SettingSlotCount = 2
+				listItem.BFL_SettingSlotRects = { checkbox, listItem.nameText }
+				listItem.BFL_SettingsExactSlots = true
+				listItem.BFL_Comparison = {
+					{ columnSetting, binary = true, brokerTooltip = true, identity = col.key },
+					{ "guildBrokerColumnOrder", order = order, orderFrom = i, control = positionControl, brokerTooltip = true,
+						columnSetting = columnSetting, identity = col.key },
+				}
+			end
 
 			checkbox:SetScript("OnEnter", function() end)
 			checkbox:SetScript("OnLeave", function() end)
@@ -9862,6 +10642,7 @@ function Settings:RefreshBrokerTab()
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- ===========================================
@@ -9869,7 +10650,7 @@ end
 -- ===========================================
 function Settings:ShowGlobalSyncDeleteAllConfirmation()
 	local GlobalSync = BFL:GetModule("GlobalSync")
-	if not GlobalSync or GlobalSync:GetStoredEntryCount() == 0 then return end
+	if not GlobalSync:IsAvailable() or GlobalSync:GetStoredEntryCount() == 0 then return end
 	local database = BetterFriendlistDB and BetterFriendlistDB.GlobalFriends
 	StaticPopupDialogs["BFL_GLOBAL_SYNC_DELETE_ALL"] = {
 		text = L.GLOBAL_SYNC_DELETE_ALL_CONFIRM,
@@ -9880,7 +10661,6 @@ function Settings:ShowGlobalSyncDeleteAllConfirmation()
 			if not BetterFriendlistDB or BetterFriendlistDB.GlobalFriends ~= database then return end
 			GlobalSync:ClearStoredEntries()
 			self:RefreshGlobalSyncTab()
-			if GlobalSync.RefreshTitleFriendUI then GlobalSync:RefreshTitleFriendUI() end
 		end,
 		timeout = 0,
 		whileDead = true,
@@ -9893,7 +10673,6 @@ end
 function Settings:RefreshGlobalSyncTab()
 	local DB = GetDB()
 	local GlobalSync = BFL:GetModule("GlobalSync")
-	local titleFriends = GlobalSync and GlobalSync:UsesTitleFriends() == true
 	local tab = self:GetGlobalSyncTabHost()
 	if not tab or not DB then
 		return
@@ -9901,24 +10680,25 @@ function Settings:RefreshGlobalSyncTab()
 
 	-- Clear existing content
 	HideComponentList(tab)
+	if not GlobalSync:IsAvailable() then return end
 
 	local allFrames = {}
 
 	-- Header: Global Friend Sync
-	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_GLOBAL_SYNC or "Global Friend Sync")
+	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_GLOBAL_SYNC or "Global Friend Sync", "SETTINGS_TAB_GLOBAL_SYNC")
 	table.insert(allFrames, header)
 
 	-- Description
 	local desc = Components:CreateLabel(
 		tab,
-		titleFriends and L.SETTINGS_GLOBAL_SYNC_TITLE_FRIENDS or L.SETTINGS_GLOBAL_SYNC_DESC,
+		L.SETTINGS_GLOBAL_SYNC_DESC,
 		true
 	)
 	table.insert(allFrames, desc)
 
 	local deleteAll = Components:CreateButton(tab, L.BUTTON_DELETE_ALL,
 		function() self:ShowGlobalSyncDeleteAllConfirmation() end, L.GLOBAL_SYNC_DELETE_ALL_DESC)
-	deleteAll:SetEnabled(GlobalSync and GlobalSync:GetStoredEntryCount() > 0)
+	deleteAll:SetEnabled(GlobalSync:GetStoredEntryCount() > 0)
 	table.insert(allFrames, deleteAll)
 
 	-- Enable Global Sync
@@ -9944,15 +10724,11 @@ function Settings:RefreshGlobalSyncTab()
 	)
 	enableSync:SetTooltip(
 		L.SETTINGS_GLOBAL_SYNC_ENABLE or "Enable Global Sync",
-		L.SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP or "Automatically sync friends from other realms to this character."
+		L.SETTINGS_GLOBAL_SYNC_ENABLE_TOOLTIP
 	)
-	if titleFriends then
-		enableSync:Hide()
-	else
-		table.insert(allFrames, enableSync)
-	end
+	table.insert(allFrames, enableSync)
 
-	if titleFriends or DB:Get("enableGlobalSync", false) then
+	if DB:Get("enableGlobalSync", false) then
 		-- Enable Deletion
 		local enableDeletion = Components:CreateCheckbox(
 			tab,
@@ -9972,11 +10748,7 @@ function Settings:RefreshGlobalSyncTab()
 			L.SETTINGS_GLOBAL_SYNC_DELETION_DESC
 				or "Allow the sync process to remove friends from your list if they are removed from the database."
 		)
-		if titleFriends then
-			enableDeletion:Hide()
-		else
-			table.insert(allFrames, enableDeletion)
-		end
+		table.insert(allFrames, enableDeletion)
 
 		-- Show Deleted Friends
 		local showDeleted = Components:CreateCheckbox(
@@ -9999,7 +10771,7 @@ function Settings:RefreshGlobalSyncTab()
 		table.insert(allFrames, Components:CreateSpacer(tab))
 
 		-- Header: Synced Friends
-		local listHeader = Components:CreateHeader(tab, L.SETTINGS_GLOBAL_SYNC_HEADER or "Synced Friends Database")
+		local listHeader = Components:CreateHeader(tab, L.SETTINGS_GLOBAL_SYNC_HEADER or "Synced Friends Database", "SETTINGS_GLOBAL_SYNC_HEADER")
 		table.insert(allFrames, listHeader)
 
 		-- Populate Table
@@ -10009,7 +10781,7 @@ function Settings:RefreshGlobalSyncTab()
 		if BetterFriendlistDB.GlobalFriends then
 			for faction, friends in pairs(BetterFriendlistDB.GlobalFriends) do
 				for key, value in pairs(friends) do
-					if value.guid or value.notes or value.lastSeen or value.deleted then
+					if GlobalSync:IsLegacyRecord(value) and (value.guid or value.notes or value.lastSeen or value.deleted) then
 						-- Check if we should show this friend
 						if not value.deleted or self.showDeletedFriends then
 							local friendUID = key
@@ -10065,12 +10837,23 @@ function Settings:RefreshGlobalSyncTab()
 							end
 
 							-- Action Button (Delete or Restore)
-							local actionBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+							local restore = value.deleted
+							local actionBtn = CreateFrame("Button", nil, row, "CommonSquareIconButtonTemplate")
+							actionBtn:SetHitRectInsets(0, 0, 0, 0)
 							actionBtn:SetSize(20, 20)
-							actionBtn:SetPoint("RIGHT", titleFriends and -30 or -5, 0)
-
-							local restore = titleFriends or value.deleted
-							actionBtn:SetText(titleFriends and "+" or (restore and "R" or "X"))
+							actionBtn:SetPoint("RIGHT", -5, 0)
+							local iconPath = "Interface\\AddOns\\BetterFriendlist\\Icons\\" .. (restore and "rotate-ccw.blp" or "x.blp")
+							actionBtn:SetIcon(iconPath)
+							actionBtn.Icon:SetSize(14, 14)
+							actionBtn.Icon:SetVertexColor(1, 0.82, 0)
+							actionBtn:SetHighlightTexture(iconPath, "ADD")
+							local actionHighlight = actionBtn:GetHighlightTexture()
+							actionHighlight:ClearAllPoints()
+							actionHighlight:SetAllPoints(actionBtn.Icon)
+							actionHighlight:SetAlpha(0.25)
+							-- Keep the base icon button's centered resting position on mouse release.
+							actionBtn:SetScript("OnMouseDown", IconButtonMixin.OnMouseDown)
+							actionBtn:SetScript("OnMouseUp", IconButtonMixin.OnMouseUp)
 							actionBtn:SetScript("OnClick", function()
 								if restore then
 									GlobalSync:RestoreStoredFriend(faction, friendUID)
@@ -10081,32 +10864,12 @@ function Settings:RefreshGlobalSyncTab()
 							end)
 							actionBtn:SetScript("OnEnter", function(owner)
 								BFL_Tooltip:SetOwner(owner, "ANCHOR_RIGHT")
-								BFL_Tooltip:SetText(titleFriends and L.BUTTON_ADD_FRIEND
-									or (restore and L.TOOLTIP_RESTORE_FRIEND or L.TOOLTIP_DELETE_FRIEND))
+								BFL_Tooltip:SetText(restore and L.TOOLTIP_RESTORE_FRIEND or L.TOOLTIP_DELETE_FRIEND)
 								BFL_Tooltip:Show()
 							end)
 							actionBtn:SetScript("OnLeave", function()
 								BFL_Tooltip:Hide()
 							end)
-
-							if titleFriends then
-								local removeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-								removeBtn:SetSize(20, 20)
-								removeBtn:SetPoint("LEFT", actionBtn, "RIGHT", 5, 0)
-								removeBtn:SetText("X")
-								removeBtn:SetScript("OnClick", function()
-									GlobalSync:RemoveStoredEntry(faction, friendUID)
-									self:RefreshGlobalSyncTab()
-									if GlobalSync.RefreshTitleFriendUI then GlobalSync:RefreshTitleFriendUI() end
-								end)
-								removeBtn:SetScript("OnEnter", function(owner)
-									BFL_Tooltip:SetOwner(owner, "ANCHOR_RIGHT")
-									BFL_Tooltip:SetText(L.TOOLTIP_REMOVE_SYNC_ENTRY)
-									BFL_Tooltip:AddLine(L.TOOLTIP_REMOVE_SYNC_ENTRY_DESC, 1, 1, 1, true)
-									BFL_Tooltip:Show()
-								end)
-								removeBtn:SetScript("OnLeave", function() BFL_Tooltip:Hide() end)
-							end
 
 							-- Edit Button (Note)
 							local editBtn = CreateFrame("Button", nil, row)
@@ -10143,6 +10906,17 @@ function Settings:RefreshGlobalSyncTab()
 								BFL_Tooltip:Hide()
 							end)
 
+							if IsLegacyReviewActive() then
+								row.BFL_SearchLabels = { L.TOOLTIP_EDIT_NOTE, restore and L.TOOLTIP_RESTORE_FRIEND or L.TOOLTIP_DELETE_FRIEND }
+								row.BFL_SettingDescriptions = {
+									L.SETTINGS_GUIDE_SYNC_NOTE,
+									restore and L.SETTINGS_GUIDE_SYNC_RESTORE or L.SETTINGS_GUIDE_SYNC_REMOVE,
+								}
+								row.BFL_SettingSlotCount = 2
+								row.BFL_SettingSlotRects = { editBtn, actionBtn }
+								row.BFL_SettingsExactSlots = true
+								row.BFL_SettingIdentity = faction .. "/" .. friendUID
+							end
 							table.insert(allFrames, row)
 						end
 					end
@@ -10156,6 +10930,7 @@ function Settings:RefreshGlobalSyncTab()
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- Refresh Streamer Mode Tab
@@ -10183,9 +10958,10 @@ function Settings:RefreshStreamerTab()
 	tab.components = {}
 
 	local allFrames = {}
+	local activeToggle
 
 	-- Title
-	local title = Components:CreateHeader(tab, L.STREAMER_MODE_TITLE or "Streamer Mode")
+	local title = Components:CreateHeader(tab, L.STREAMER_MODE_TITLE or "Streamer Mode", "STREAMER_MODE_TITLE")
 	table.insert(allFrames, title)
 
 	-- Enable Streamer Mode Toggle
@@ -10201,7 +10977,25 @@ function Settings:RefreshStreamerTab()
 	table.insert(allFrames, enableToggle)
 
 	-- Header: Privacy Options
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_PRIVACY_OPTIONS or "Privacy Options"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_PRIVACY_OPTIONS or "Privacy Options", "SETTINGS_PRIVACY_OPTIONS"))
+
+	if IsLegacyReviewActive() then
+		local StreamerMode = BFL:GetModule("StreamerMode")
+		if StreamerMode then
+			activeToggle = Components:CreateCheckbox(tab, {
+				label = L.SETTINGS_LEGACY_TASK_STREAM,
+				initialValue = StreamerMode:IsActive(),
+				callback = function(checked)
+					if checked ~= (StreamerMode:IsActive() == true) then
+						StreamerMode:Toggle()
+					end
+				end,
+				tooltipTitle = L.STREAMER_MODE_TITLE,
+				tooltipDesc = L.SETTINGS_STREAMER_NAME_FORMAT_DESC,
+			})
+			table.insert(allFrames, activeToggle)
+		end
+	end
 
 	-- 1. Custom Header Text Input
 	local headerBox = Components:CreateInput(
@@ -10242,12 +11036,9 @@ function Settings:RefreshStreamerTab()
 			end
 		end
 	)
-	-- Shift dropdown to prevent clipping (matching other dropdowns in Settings.lua)
-	if formatDropdown.DropDown then
-		local point, relativeTo, relativePoint, xOfs, yOfs = formatDropdown.DropDown:GetPoint(1)
-		if point then
-			formatDropdown.DropDown:SetPoint(point, relativeTo, relativePoint, (xOfs or 0) + 10, yOfs or 0)
-		end
+	if IsLegacyReviewActive() and Components:IsModernDropdown(formatDropdown.DropDown) then
+		enableToggle.checkBox:SetPoint("RIGHT", enableToggle, "RIGHT", 0, 0)
+		if activeToggle then activeToggle.checkBox:SetPoint("RIGHT", activeToggle, "RIGHT", 0, 0) end
 	end
 	-- Add tooltip
 	if formatDropdown.SetTooltip then
@@ -10260,6 +11051,7 @@ function Settings:RefreshStreamerTab()
 
 	-- Store components for cleanup
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- Refresh Raid Tab
@@ -10292,7 +11084,7 @@ function Settings:RefreshRaidTab()
 	local allFrames = {}
 
 	-- Header
-	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_RAID or "Raid & Group")
+	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_RAID or "Raid & Group", "SETTINGS_TAB_RAID")
 	table.insert(allFrames, header)
 
 	-- Description
@@ -10326,7 +11118,7 @@ function Settings:RefreshRaidTab()
 	table.insert(allFrames, readyCheckToggle)
 
 	table.insert(allFrames, Components:CreateSpacer(tab))
-	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_RAID_SHORTCUTS_TITLE or "Raid Shortcuts"))
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_RAID_SHORTCUTS_TITLE or "Raid Shortcuts", "SETTINGS_RAID_SHORTCUTS_TITLE"))
 
 	-- Shortcuts Configuration
 	local shortcuts = DB:Get("raidShortcuts") or {}
@@ -10369,6 +11161,13 @@ function Settings:RefreshRaidTab()
 
 		-- Row container
 		local row = CreateFrame("Frame", nil, tab)
+		row.BFL_SearchLabels = { actionName }
+		local reviewActive = IsLegacyReviewActive()
+		local sample = { raid = actionKey, social = "raidActions", mod = currentMod, button = currentBtn,
+			modifiers = modifierOptions, buttons = buttonOptions }
+		if reviewActive then
+			row.BFL_Comparison = { setmetatable({ "raidShortcutEnabled_" .. actionKey, binary = true, identity = actionKey }, { __index = sample }) }
+		end
 		row:SetHeight(40)
 		row:SetPoint("LEFT", 0, 0)
 		row:SetPoint("RIGHT", 0, 0)
@@ -10600,8 +11399,14 @@ function Settings:RefreshRaidTab()
 				ddBtn:SetWidth(115)
 			end
 
-			-- If action is Target, maybe verify it defaults to None+Left?
-			-- It is configured in DB defaults.
+			if reviewActive then
+				row.BFL_SettingSlotCount = 3
+				row.BFL_SettingSlotControls = { label, modDropdown, btnDropdown }
+				row.BFL_SearchLabels[2] = actionName .. " · " .. L.SETTINGS_RAID_MODIFIER_LABEL
+				row.BFL_SearchLabels[3] = actionName .. " · " .. L.SETTINGS_RAID_BUTTON_LABEL
+				row.BFL_Comparison[2] = setmetatable({ "modifier", control = modDropdown, identity = actionKey }, { __index = sample })
+				row.BFL_Comparison[3] = setmetatable({ "button", control = btnDropdown, identity = actionKey }, { __index = sample })
+			end
 		end
 
 		table.insert(allFrames, row)
@@ -10626,7 +11431,7 @@ function Settings:RefreshRaidTab()
 	local AutoRaidAssist = BFL:GetModule("AutoRaidAssist")
 	if AutoRaidAssist and AutoRaidAssist.RenderSettingsPage then
 		table.insert(allFrames, Components:CreateSpacer(tab))
-		table.insert(allFrames, Components:CreateHeader(tab, L.AUTO_RAID_ASSIST_TITLE or "Auto Raid Assist"))
+		table.insert(allFrames, Components:CreateHeader(tab, L.AUTO_RAID_ASSIST_TITLE or "Auto Raid Assist", "AUTO_RAID_ASSIST_TITLE"))
 		table.insert(
 			allFrames,
 			Components:CreateLabel(
@@ -10641,7 +11446,10 @@ function Settings:RefreshRaidTab()
 		autoRaidAssistContainer:SetPoint("LEFT", 0, 0)
 		autoRaidAssistContainer:SetPoint("RIGHT", 0, 0)
 		autoRaidAssistContainer:SetHeight(AutoRaidAssist:GetSettingsPageHeight())
-		AutoRaidAssist:RenderSettingsPage(autoRaidAssistContainer, { variant = "legacy" })
+		local handle = AutoRaidAssist:RenderSettingsPage(autoRaidAssistContainer, { variant = "legacy" })
+		if IsLegacyReviewActive() and handle then
+			autoRaidAssistContainer.BFL_ReviewChildren = handle.guideRows
+		end
 		table.insert(allFrames, autoRaidAssistContainer)
 	end
 
@@ -10649,6 +11457,7 @@ function Settings:RefreshRaidTab()
 	Components:AnchorChain(allFrames, -5)
 
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 -- ========================================
@@ -10684,7 +11493,7 @@ function Settings:RefreshWhoTab()
 	local L = BFL.L
 
 	-- Header
-	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_WHO or "Who")
+	local header = Components:CreateHeader(tab, L.SETTINGS_TAB_WHO or "Who", "SETTINGS_TAB_WHO")
 	table.insert(allFrames, header)
 
 	-- Description
@@ -10698,7 +11507,7 @@ function Settings:RefreshWhoTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Visual Options
-	local visualHeader = Components:CreateHeader(tab, L.WHO_SETTINGS_VISUAL_HEADER or "Visual")
+	local visualHeader = Components:CreateHeader(tab, L.WHO_SETTINGS_VISUAL_HEADER or "Visual", "WHO_SETTINGS_VISUAL_HEADER")
 	table.insert(allFrames, visualHeader)
 
 	-- Show Class Icons
@@ -10794,7 +11603,7 @@ function Settings:RefreshWhoTab()
 	table.insert(allFrames, Components:CreateSpacer(tab))
 
 	-- Behavior Options
-	local behaviorHeader = Components:CreateHeader(tab, L.WHO_SETTINGS_BEHAVIOR_HEADER or "Behavior")
+	local behaviorHeader = Components:CreateHeader(tab, L.WHO_SETTINGS_BEHAVIOR_HEADER or "Behavior", "WHO_SETTINGS_BEHAVIOR_HEADER")
 	table.insert(allFrames, behaviorHeader)
 
 	-- Double-Click Action
@@ -10813,10 +11622,46 @@ function Settings:RefreshWhoTab()
 		end)
 	)
 
+	if BFL.IsForever then
+		table.insert(allFrames, Components:CreateCheckbox(tab, {
+			label = L.WHO_SETTINGS_OPEN_ON_CHAT_SHIFT_CLICK,
+			initialValue = DB:Get("whoOpenOnChatShiftClick", false) == true,
+			callback = function(enabled) DB:Set("whoOpenOnChatShiftClick", enabled == true) end,
+			tooltipTitle = L.WHO_SETTINGS_OPEN_ON_CHAT_SHIFT_CLICK,
+			tooltipDesc = L.WHO_SETTINGS_OPEN_ON_CHAT_SHIFT_CLICK_DESC,
+		}))
+	end
+
+	local WhoSearches = IsLegacyReviewActive() and BFL:GetModule("WhoSearches")
+	if WhoSearches then
+		local history = Components:CreateCheckbox(tab, {
+			label = L.WHO_HISTORY_ENABLED,
+			initialValue = DB:Get("whoSearchHistoryEnabled", true),
+			callback = function(enabled) WhoSearches:SetHistoryEnabled(enabled) end,
+			tooltipTitle = L.WHO_HISTORY_ENABLED,
+			tooltipDesc = L.SETTINGS_LEGACY_WHO_HISTORY_DESC,
+		})
+		table.insert(allFrames, history)
+
+		local historyLimit = Components:CreateSlider(
+			tab,
+			L.SETTINGS_LEGACY_WHO_HISTORY_LIMIT,
+			1,
+			WhoSearches:GetHistoryLimitCap(),
+			DB:Get("whoSearchHistoryMax", 8),
+			function(value) return tostring(math.floor(value)) end,
+			function(value) DB:Set("whoSearchHistoryMax", math.floor(value)) end
+		)
+		historyLimit:SetStep(1)
+		table.insert(allFrames, historyLimit)
+		table.insert(allFrames, Components:CreateLabel(tab, L.SETTINGS_LEGACY_WHO_HISTORY_LIMIT_DESC, true))
+	end
+
 	-- Anchor
 	Components:AnchorChain(allFrames, -5)
 
 	tab.components = allFrames
+	NotifyLegacyReviewTabBuilt(tab)
 end
 
 return Settings

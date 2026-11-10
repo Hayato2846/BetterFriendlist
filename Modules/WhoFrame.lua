@@ -642,20 +642,66 @@ function WhoFrame:OnNativeWhoRequestSent(showResults)
 	return self:ShowWhoResults()
 end
 
-function WhoFrame:OnNativeWhoPlayerLinkProcessed(link)
-	if not self.nativeWhoLinkSent then return end
-	self.nativeWhoLinkSent = nil
-	if (BFL.IsSecret and BFL:IsSecret(link)) or type(link) ~= "string" or not LinkTypes then return end
+local function IsChatPlayerLinkShiftClick(context)
+	if not (IsShiftKeyDown and IsShiftKeyDown()) or not (ChatFrameUtil and ChatFrameUtil.GetChatFrame) then
+		return false
+	end
+	if (BFL.IsSecret and BFL:IsSecret(context)) or type(context) ~= "table"
+		or (issecrettable and issecrettable(context))
+	then
+		return false
+	end
+	local button, frame = context.button, context.frame
+	if (BFL.IsSecret and (BFL:IsSecret(button) or BFL:IsSecret(frame))) or button ~= "LeftButton"
+		or type(frame) ~= "table" or (issecrettable and issecrettable(frame)) or type(frame.GetID) ~= "function"
+	then
+		return false
+	end
+	local ok, id = pcall(frame.GetID, frame)
+	return ok and not (BFL.IsSecret and BFL:IsSecret(id))
+		and type(id) == "number" and ChatFrameUtil.GetChatFrame(id) == frame
+end
+
+local function IsWhoPlayerLink(link)
+	if (BFL.IsSecret and BFL:IsSecret(link)) or type(link) ~= "string" or not LinkTypes then return false end
 	local linkType = link:match("^([^:]+):[^:]+")
-	if linkType ~= LinkTypes.Player and linkType ~= LinkTypes.PlayerCommunity and linkType ~= LinkTypes.PlayerGM then
+	return linkType == LinkTypes.Player or linkType == LinkTypes.PlayerCommunity or linkType == LinkTypes.PlayerGM
+end
+
+function WhoFrame:OnNativeWhoChatLinkClicked(link, button)
+	if (BFL.IsSecret and BFL:IsSecret(button)) or button ~= "LeftButton"
+		or not (IsShiftKeyDown and IsShiftKeyDown()) or not IsWhoPlayerLink(link)
+	then
 		return
 	end
+	-- Blizzard emits this event before dispatching the hyperlink. A chat
+	-- wrapper may drop the frame before LinkUtil receives the context.
+	local click = { link = link }
+	self.nativeWhoChatClick = click
+	RunNextFrame(function()
+		if self.nativeWhoChatClick == click then self.nativeWhoChatClick = nil end
+	end)
+end
+
+function WhoFrame:OnNativeWhoPlayerLinkProcessed(link, context)
+	local sent = self.nativeWhoLinkSent
+	self.nativeWhoLinkSent = nil
+	if not IsWhoPlayerLink(link) then return end
+	local click = self.nativeWhoChatClick
+	local fromChatClick = click and click.link == link
+	if fromChatClick then self.nativeWhoChatClick = nil end
+	if not sent then return end
 	-- The Blizzard handler also uses modified clicks to paste player names.
 	-- A send observed earlier in the same frame must not turn a paste into Who.
 	if not IsModifiedClick("CHATLINK") or ChatFrameUtil.GetActiveWindow()
 		or StaticPopup_Visible("ADD_IGNORE") or StaticPopup_Visible("ADD_FRIEND")
 		or StaticPopup_Visible("ADD_GUILDMEMBER") or StaticPopup_Visible("CHANNEL_INVITE")
 	then
+		return
+	end
+	-- Blizzard already sent the chat lookup. Keep it in the chat flow instead
+	-- of treating it as an explicit request to open BetterFriendlist's Who tab.
+	if (fromChatClick or IsChatPlayerLinkShiftClick(context)) and self:GetSetting("whoOpenOnChatShiftClick", false) ~= true then
 		return
 	end
 	self:OnNativeWhoRequestSent(true)
@@ -694,8 +740,13 @@ function WhoFrame:InstallNativeWhoRequestObserver()
 	local itemOrigin = Enum and Enum.SocialWhoOrigin and Enum.SocialWhoOrigin.Item
 	local observePlayerLinks = BFL.IsForever and itemOrigin and LinkUtil and type(LinkUtil.ProcessLink) == "function"
 	if observePlayerLinks then
-		hooksecurefunc(LinkUtil, "ProcessLink", function(link)
-			self:OnNativeWhoPlayerLinkProcessed(link)
+		if EventRegistry and type(EventRegistry.RegisterCallback) == "function" then
+			EventRegistry:RegisterCallback("ChatFrame.OnHyperlinkClick", function(_, _frame, link, _text, button)
+				self:OnNativeWhoChatLinkClicked(link, button)
+			end, self)
+		end
+		hooksecurefunc(LinkUtil, "ProcessLink", function(link, _, context)
+			self:OnNativeWhoPlayerLinkProcessed(link, context)
 		end)
 	end
 	hooksecurefunc(C_FriendList, "SendWho", function(_, origin)
@@ -1384,6 +1435,33 @@ end
 -- Responsive Layout Functions
 -- ========================================
 
+function WhoFrame:GetResultColumnWidths(availableWidth, minColumnWidth)
+	-- Adjacent headers overlap by one pixel so their 1px borders collapse into
+	-- a single table divider instead of rendering gaps or double-width lines.
+	local headerOverlap = WHO_HEADER_OVERLAP
+	local numOverlaps = 3 -- ColumnDropdown, LevelHeader, ClassHeader each overlap
+	local totalOverlapGain = numOverlaps * math.abs(headerOverlap)
+
+	-- Adjust available width to account for overlaps
+	local effectiveWidth = availableWidth + totalOverlapGain
+
+	-- Distribute widths proportionally:
+	-- Name: 34%, Column Dropdown: 26%, Level: 10%, Class: 30%
+	-- Level only needs ~30px for 2-3 digits; freed space goes to Name and Class
+	local nameWidth = math.floor(effectiveWidth * 0.34)
+	local columnWidth = math.floor(effectiveWidth * 0.26)
+	local levelWidth = math.floor(effectiveWidth * 0.10)
+	local classWidth = effectiveWidth - nameWidth - columnWidth - levelWidth -- Remaining space
+
+	-- Apply minimum widths
+	nameWidth = math.max(nameWidth, 80)
+	columnWidth = math.max(columnWidth, minColumnWidth)
+	levelWidth = math.max(levelWidth, 28)
+	classWidth = math.max(classWidth, 70)
+
+	return { name = nameWidth, variable = columnWidth, level = levelWidth, class = classWidth }
+end
+
 function WhoFrame:UpdateResponsiveLayout()
 	local frame = BetterFriendsFrame
 	if not frame or not frame.WhoFrame then
@@ -1410,39 +1488,11 @@ function WhoFrame:UpdateResponsiveLayout()
 	end
 	local availableWidth = listInsetWidth - WHO_HEADER_INSET_X - WHO_SCROLLBAR_RESERVE
 
-	-- Adjacent headers overlap by one pixel so their 1px borders collapse into
-	-- a single table divider instead of rendering gaps or double-width lines.
 	local headerOverlap = WHO_HEADER_OVERLAP
-	local numOverlaps = 3 -- ColumnDropdown, LevelHeader, ClassHeader each overlap
-	local totalOverlapGain = numOverlaps * math.abs(headerOverlap)
-
-	-- Adjust available width to account for overlaps
-	local effectiveWidth = availableWidth + totalOverlapGain
-
-	-- Distribute widths proportionally:
-	-- Name: 34%, Column Dropdown: 26%, Level: 10%, Class: 30%
-	-- Level only needs ~30px for 2-3 digits; freed space goes to Name and Class
-	local nameWidth = math.floor(effectiveWidth * 0.34)
-	local columnWidth = math.floor(effectiveWidth * 0.26)
-	local levelWidth = math.floor(effectiveWidth * 0.10)
-	local classWidth = effectiveWidth - nameWidth - columnWidth - levelWidth -- Remaining space
-
-	-- Apply minimum widths
-	nameWidth = math.max(nameWidth, 80)
 	local isClassicElvUISkinActive = BFL.IsClassic and BFL.IsElvUISkinActive and BFL:IsElvUISkinActive()
-	local minColumnWidth = isClassicElvUISkinActive and 110 or 70
-	columnWidth = math.max(columnWidth, minColumnWidth)
-	levelWidth = math.max(levelWidth, 28)
-	classWidth = math.max(classWidth, 70)
-
-	-- CRITICAL: Store calculated widths for button layout
-	-- These will be used in InitButton() to position row content dynamically
-	self.columnWidths = {
-		name = nameWidth,
-		variable = columnWidth,
-		level = levelWidth,
-		class = classWidth,
-	}
+	local widths = self:GetResultColumnWidths(availableWidth, isClassicElvUISkinActive and 110 or 70)
+	self.columnWidths = widths
+	local nameWidth, columnWidth, levelWidth, classWidth = widths.name, widths.variable, widths.level, widths.class
 
 	-- Update column header widths
 	if whoFrame.NameHeader then
@@ -1918,7 +1968,7 @@ function WhoFrame:RenderClassicWhoButtons()
 end
 
 -- Initialize individual Who button
-function WhoFrame:InitButton(button, elementData)
+function WhoFrame:InitButton(button, elementData, sampleWidths)
 	local index = elementData.index
 	local info = elementData.info
 	local dataIndex = elementData.dataIndex or index
@@ -1973,8 +2023,8 @@ function WhoFrame:InitButton(button, elementData)
 
 	-- RESPONSIVE LAYOUT: Position row elements to align directly with column headers
 	-- With ScrollBox x=0 fix, button LEFT = NameHeader LEFT, so header widths map directly
-	if self.columnWidths then
-		local widths = self.columnWidths
+	local widths = sampleWidths or self.columnWidths
+	if widths then
 		local nameStart = showClassIcons and NAME_OFFSET_WITH_ICON or NAME_OFFSET_WITHOUT_ICON
 		local headerGap = WHO_HEADER_OVERLAP
 
@@ -2044,7 +2094,9 @@ function WhoFrame:InitButton(button, elementData)
 
 	-- Variable column based on sort
 	local variableText
-	if whoSortValue == 2 then
+	if sampleWidths then
+		variableText = info.area
+	elseif whoSortValue == 2 then
 		variableText = info.fullGuildName
 	elseif whoSortValue == 3 then
 		variableText = info.raceStr
@@ -2052,6 +2104,10 @@ function WhoFrame:InitButton(button, elementData)
 		variableText = info.area
 	end
 	button.Variable:SetText(variableText or "")
+
+	if sampleWidths then
+		return
+	end
 
 	-- Store full data for tooltip and interactions
 	button.tooltipInfo = {

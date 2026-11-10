@@ -579,7 +579,7 @@ function ThemePalette:ApplyAvatarVisibility(frame)
 	end
 end
 
-function ThemePalette:ApplyToColors(colors, baseColors)
+function ThemePalette:ApplyToColors(colors, baseColors, sample)
 	if type(colors) ~= "table" or type(baseColors) ~= "table" then
 		return
 	end
@@ -588,11 +588,11 @@ function ThemePalette:ApplyToColors(colors, baseColors)
 		colors[key] = CopyArray(value)
 	end
 
-	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
+	local theme = sample and sample.theme or (BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard")
 	if theme ~= "dark" and theme ~= "custom" then
 		return
 	end
-	local settings = self:GetThemeSettings(theme)
+	local settings = sample and sample.settings or self:GetThemeSettings(theme)
 
 	local accent = ToArray(settings.accentColor, baseColors.accent)
 	local accentAlpha = (accent and accent[4]) or 1
@@ -631,7 +631,7 @@ function ThemePalette:ApplyToColors(colors, baseColors)
 		return
 	end
 
-	local customTheme = self:GetCustomTheme()
+	local customTheme = sample and sample.customTheme or self:GetCustomTheme()
 	local background = ToArray(customTheme.backgroundColor)
 	local surface = ToArray(customTheme.surfaceColor)
 	local inset = ToArray(customTheme.insetColor)

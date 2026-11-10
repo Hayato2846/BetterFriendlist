@@ -130,4 +130,16 @@ now = now + 7 * 86400
 events.FRIENDLIST_UPDATE()
 assert(next(BetterFriendlistDB.recentlyAddedTimestamps) == nil, "Expired timestamps should be pruned")
 assert(BetterFriendlistDB.knownFriendUIDs["wow_New-Realm"], "Expiring a timestamp erased the identity")
+local previewSettings = {
+	Get = function(_, key, default)
+		if key == "recentlyAddedDurationUnit" then return "days" end
+		if key == "recentlyAddedDurationValue" then return 7 end
+		return default
+	end,
+}
+local duration = module:GetDurationSeconds(previewSettings)
+assert(duration == 7 * 86400, "the seven-day comparison must use the selected unit")
+assert(module:IsWithinDuration(2 * 3600, duration), "a friend added two hours ago remains in Recently Added")
+assert(not module:IsWithinDuration(8 * 86400, duration), "a friend added eight days ago is outside the seven-day duration")
+assert(not module:IsWithinDuration(duration, duration), "a timestamp exactly on the expiration boundary has expired")
 io.write("Recently Added smoke passed\n")

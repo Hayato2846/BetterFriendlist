@@ -48,6 +48,44 @@ friend.type = "bnet"
 equal(list:GetDisplayName(friend), "Ada Lovelace Retail Realm", "Retail account keeps actual realm")
 equal(brokerDisplay(friend), "Ada Lovelace Retail Realm", "Retail broker keeps realm")
 
+do
+	local savedFormat = BFL.modules.DB.GetNameFormatString
+	local format = "%name% (%character%)"
+	BFL.modules.DB.GetNameFormatString = function() return format end
+	env.BetterFriendlistDB.colorClassNames = true
+	env.BetterFriendlistDB.showFactionIcons = true
+	env.GetClassColorForFriend = function(row) return BFL.ClassUtils:GetClassColorForFriend(row) end
+	local seasonIcon = "|TTimerunningIcon:12:12|t"
+	env.TimerunningUtil = { AddSmallIcon = function(name) return seasonIcon .. name end }
+	local row = { type = "bnet", friendLevel = 3, accountName = "Hayato Test", characterName = "Hayato Test",
+		connected = true, factionName = "Horde", classID = 8, timerunningSeasonID = 1 }
+	local decorated = "|TInterface\\FriendsFrame\\PlusManz-Horde:12:12:0:0|t" .. seasonIcon .. "Hayato Test"
+	local wrapped = "|cff69ccf0(" .. decorated .. ")|r"
+	equal(brokerDisplay(row), "|cff69ccf0" .. decorated .. "|r",
+		"Default broker Title name keeps the whole decorated character without parentheses")
+	format = "%nickname% (%character%)"
+	equal(brokerDisplay(row), "|cff69ccf0" .. decorated .. "|r", "The broker never repeats a Title character as the fallback nickname")
+	row.settingsSample, row.sampleNickname = true, "Raid buddy"
+	equal(brokerDisplay(row), "Raid buddy " .. wrapped, "A configured nickname still appears beside the decorated Title character")
+	format = "%battletag% (%character%)"
+	equal(brokerDisplay(row), "|cff69ccf0" .. decorated .. "|r", "The broker never repeats a Title character as the fallback BattleTag")
+	row.battleTag = "ActualTag#1234"
+	equal(brokerDisplay(row), "ActualTag " .. wrapped, "A present BattleTag still appears beside the decorated Title character")
+	row.battleTag = nil
+	format = "%name% (%character%)"
+	row.titleCustomName = "My mage"
+	equal(brokerDisplay(row), "My mage " .. wrapped, "A distinct broker alias retains the character in parentheses")
+	row.titleCustomName = nil
+	row.friendLevel = 1
+	equal(brokerDisplay(row), "Hayato Test " .. wrapped, "The broker keeps the account label for a regular Battle.net friend")
+	row.friendLevel, row.battleTag, row.accountName = 3, "SafeTag#1234", "Private account label"
+	BFL.StreamerMode = { IsActive = function() return true end }
+	equal(brokerDisplay(row), "SafeTag " .. wrapped, "The broker preserves the selected streamer label")
+	BFL.StreamerMode = nil
+	BFL.modules.DB.GetNameFormatString = savedFormat
+	env.BetterFriendlistDB.colorClassNames, env.BetterFriendlistDB.showFactionIcons = false, nil
+end
+
 -- Exercise actual API ingestion and rendered second lines, not just helpers
 -- fed hand-built display rows. Existing default preferences need no migration.
 for _, modern in ipairs({ false, true }) do

@@ -38,6 +38,8 @@ function FontManager:ResolveFontPath(fontName)
 			return path
 		end
 	end
+	-- Built-in alternative for clients without LibSharedMedia.
+	if fontName == "Arial Narrow" then return "Fonts\\ARIALN.TTF" end
 	-- Unresolvable name: use locale-appropriate default
 	return STANDARD_TEXT_FONT
 end

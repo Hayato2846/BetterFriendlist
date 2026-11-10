@@ -2735,6 +2735,16 @@ local function TrySetIconAtlas(texture, atlas, useAtlasSize)
 	return false
 end
 
+function Compat.ApplyIconTint(texture, color)
+	local tinted = type(color) == "table"
+	texture:SetDesaturated(tinted)
+	if tinted then
+		texture:SetVertexColor(color.r, color.g, color.b, color.a or 1)
+	else
+		texture:SetVertexColor(1, 1, 1, 1)
+	end
+end
+
 function Compat.ApplyIconProfile(texture, profile)
 	if not texture then
 		return false
@@ -2750,6 +2760,7 @@ function Compat.ApplyIconProfile(texture, profile)
 		if TrySetIconAtlas(texture, iconValue, false)
 			or TrySetIconAtlas(texture, profile.atlas, false)
 			or TrySetIconAtlas(texture, profile.fallbackAtlas, false) then
+			Compat.ApplyIconTint(texture, profile.iconColor)
 			return true
 		end
 	end
@@ -2762,6 +2773,7 @@ function Compat.ApplyIconProfile(texture, profile)
 	ResetTexCoord(texture)
 	texture:SetTexture(texturePath)
 	ApplyTexCoord(texture, profile.texCoord)
+	Compat.ApplyIconTint(texture, profile.iconColor)
 	texture:Show()
 	return true
 end
@@ -3231,7 +3243,7 @@ local function EnsureAddOnLoadedCompat(addOnName)
 	return IsAddOnLoadedCompat(addOnName)
 end
 
-local function RequestTitleFriendInviteConfirmation(name, requireIdleDialog)
+local function RequestTitleFriendInviteConfirmation(name)
 	if not BFL.IsRetail
 		or not EventRegistry
 		or not EventRegistry.TriggerEvent
@@ -3241,30 +3253,13 @@ local function RequestTitleFriendInviteConfirmation(name, requireIdleDialog)
 	then
 		return false
 	end
-	if requireIdleDialog and ((BattleNetInviteFrame.IsForbidden and BattleNetInviteFrame:IsForbidden())
-		or BattleNetInviteFrame:IsShown())
-	then
-		return false
-	end
-
 	local ok = pcall(
 		EventRegistry.TriggerEvent,
 		EventRegistry,
 		"BattleNetInviteFrame.TitleFriendInviteByNameRequested",
 		name
 	)
-	if requireIdleDialog then
-		return ok == true and BattleNetInviteFrame:IsShown() and BattleNetInviteFrame or false
-	end
 	return ok == true
-end
-
--- Opens only the Blizzard confirmation. The native Send button owns the invite.
-function Compat.RequestTitleFriendInviteConfirmation(name)
-	if IsSafeNameValue(name) and Compat.AreTitleFriendsEnabled() then
-		return RequestTitleFriendInviteConfirmation(name, true)
-	end
-	return false
 end
 
 local function RequestBattleTagFriendInviteByIDConfirmation(bnetIDAccount, accountName)
@@ -3366,6 +3361,38 @@ function Compat.IsTitleFriend(accountInfo)
 	end
 	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
 	return titleLevel ~= nil and accountInfo.friendLevel == titleLevel
+end
+
+function Compat.GetTitleFriendNameFormat(format, characterName, alias, nickname, battleTag)
+	if alias then
+		if Compat.AreRegionalUniqueNamesEnabled() then
+			alias = alias:gsub("-", " ")
+			characterName = characterName:gsub("-", " ")
+		end
+		if alias ~= characterName then return format end
+	end
+
+	local nameToken = "%%[Nn][Aa][Mm][Ee]%%"
+	local characterToken = "%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%"
+	local function keepCharacter() return "%character%" end
+	local function collapsePair(text, token)
+		text = text:gsub(token .. "%s*%(%s*" .. characterToken .. "%s*%)", keepCharacter)
+		text = text:gsub(characterToken .. "%s*%(%s*" .. token .. "%s*%)", keepCharacter)
+		return text
+	end
+
+	local result = collapsePair(format, nameToken)
+	-- Without %name%, the formatters fall back to the character for missing
+	-- nicknames and BattleTags. Keep the decorated token in those pairs too.
+	if not format:find(nameToken) then
+		if nickname == "" then
+			result = collapsePair(result, "%%[Nn][Ii][Cc][Kk][Nn][Aa][Mm][Ee]%%")
+		end
+		if battleTag == "" then
+			result = collapsePair(result, "%%[Bb][Aa][Tt][Tt][Ll][Ee][Tt][Aa][Gg]%%")
+		end
+	end
+	return result
 end
 
 function Compat.IsOfflineTitleFriend(accountInfoOrFriend, isOffline)
@@ -4108,10 +4135,10 @@ BFL.ReplaceSurnameSeparatorWithLinkSeparator = Compat.ReplaceSurnameSeparatorWit
 BFL.NormalizePlayerIdentityName = Compat.NormalizePlayerName
 BFL.AreTitleFriendsEnabled = Compat.AreTitleFriendsEnabled
 BFL.SendTitleFriendInviteByName = Compat.SendTitleFriendInviteByName
-BFL.RequestTitleFriendInviteConfirmation = Compat.RequestTitleFriendInviteConfirmation
 BFL.SendBattleTagFriendInviteByID = Compat.SendBattleTagFriendInviteByID
 BFL.AreTitleFriendCustomNamesEnabled = Compat.AreTitleFriendCustomNamesEnabled
 BFL.IsTitleFriend = Compat.IsTitleFriend
+BFL.GetTitleFriendNameFormat = Compat.GetTitleFriendNameFormat
 BFL.IsOfflineTitleFriend = Compat.IsOfflineTitleFriend
 BFL.GetCustomTitleFriendName = Compat.GetCustomTitleFriendName
 BFL.SetCustomTitleFriendName = Compat.SetCustomTitleFriendName

@@ -18,7 +18,7 @@ local assertions = 0
 local function check(value, message) assertions = assertions + 1; assert(value, message) end
 local function equal(actual, expected, message) check(actual == expected, message) end
 local core, module = read("Core.lua"), read("Modules/WhoFrame.lua")
-local function fixture(flavor, lateNative)
+local function fixture(flavor, lateNative, eventRegistry)
 	local state = { now = 100, calls = {}, timers = {}, callbacks = {}, nativeOpens = 0, addonOpens = 0, hints = 0, hooks = {}, linkHooks = {} }
 	local BFL = { modules = {}, L = {}, IsMainline = flavor ~= "classic", IsForever = flavor == "forever", HasSecretValues = flavor ~= "classic" }
 	function BFL:RegisterModule(name, value) self.modules[name] = value; return value end
@@ -84,6 +84,7 @@ local function fixture(flavor, lateNative)
 		NormalizeFriendsSubPanel = function(tab) return tab end,
 		WhoFrameEditBoxMixin = {}, WhoFrameColumnDropdownMixin = {},
 		LinkUtil = { ProcessLink = function() end },
+		EventRegistry = eventRegistry,
 	}, { __index = _G })
 	env._G = env
 	state.env, state.BFL = env, BFL

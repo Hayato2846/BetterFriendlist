@@ -64,6 +64,8 @@ local DEFAULT_SETTINGS = {
 	chipFontFlags = "SLUG",
 	maxTooltipChips = 8,
 	enableDynamicTagGroups = false,
+	prioritizeDynamicTagGroups = false,
+	dynamicTagGroupHeaderStyle = "standard",
 	includeCustomTagsInSearch = true,
 	includeBlizzardTagsInSearch = true,
 }
@@ -377,6 +379,8 @@ local function CopyProfile(profile)
 	for key, value in pairs(profile) do
 		if key == "color" or key == "textColor" then
 			copy[key] = CopyColor(value)
+		elseif key == "iconColor" then
+			copy[key] = type(value) == "table" and CopyColor(value) or nil
 		elseif key == "texCoord" then
 			copy[key] = CopyTexCoord(value)
 		else
@@ -610,7 +614,12 @@ local function CompareTagDefinitions(a, b)
 	end
 	local aName = type(a) == "table" and (a._bflSortName or a.name or a.id or "") or ""
 	local bName = type(b) == "table" and (b._bflSortName or b.name or b.id or "") or ""
-	return aName < bName
+	if aName ~= bName then
+		return aName < bName
+	end
+	local aId = type(a) == "table" and a.id or ""
+	local bId = type(b) == "table" and b.id or ""
+	return aId < bId
 end
 
 local EMPTY_TABLE = {}
@@ -722,6 +731,43 @@ local function NormalizeTagName(name)
 		name = name:sub(1, 32)
 	end
 	return name
+end
+
+-- The prefix keeps localized built-in names separate from saved custom names.
+local BUILTIN_SECTIONS = {
+	{ id = "|interests", labelKey = "FRIEND_TAGS_INTERESTS_SECTION", fallback = "Interests" },
+	{ id = "|roles", labelKey = "FRIEND_TAGS_ROLES_SECTION", fallback = "Roles" },
+	{ id = "|custom", labelKey = "FRIEND_TAGS_CUSTOM_SECTION", fallback = "Custom Tags" },
+}
+local BUILTIN_SECTION_BY_ID = {}
+for index, section in ipairs(BUILTIN_SECTIONS) do
+	section.order = index
+	BUILTIN_SECTION_BY_ID[section.id] = section
+end
+
+local function NormalizeSectionName(name)
+	return type(name) == "string" and Trim((name:gsub("[|%c]", " "))) or nil
+end
+
+local function NormalizeSectionOverride(value)
+	if value == false or BUILTIN_SECTION_BY_ID[value] then return value end
+	return NormalizeSectionName(value)
+end
+
+local function HasTagSection(sections, id)
+	local record = sections[id]
+	if BUILTIN_SECTION_BY_ID[id] then
+		return type(record) ~= "table" or record.deleted ~= true
+	end
+	return type(record) == "table" and NormalizeSectionName(id) == id
+end
+
+local function ResolveTagSection(tag, override, sections)
+	local section = NormalizeSectionOverride(override)
+	if section == nil then
+		section = tag.group and ("|" .. tag.group) or "|custom"
+	end
+	if section and HasTagSection(sections, section) then return section end
 end
 
 local function AddUniqueUID(target, seen, uid)
@@ -1262,6 +1308,16 @@ function FriendTags:NormalizeDB()
 	end
 
 	BetterFriendlistDB.friendTagProfiles = BetterFriendlistDB.friendTagProfiles or {}
+	local sections = BetterFriendlistDB.friendTagSettings.sections
+	if type(sections) ~= "table" then sections = {} end
+	BetterFriendlistDB.friendTagSettings.sections = sections
+	-- Development profiles originally stored section names only on the tags.
+	for _, profile in pairs(BetterFriendlistDB.friendTagProfiles) do
+		local section = type(profile) == "table" and NormalizeSectionOverride(profile.section)
+		if section and not BUILTIN_SECTION_BY_ID[section] and type(sections[section]) ~= "table" then
+			sections[section] = {}
+		end
+	end
 	BetterFriendlistDB.customFriendTags = BetterFriendlistDB.customFriendTags or {}
 	BetterFriendlistDB.friendCustomTags = BetterFriendlistDB.friendCustomTags or {}
 	BetterFriendlistDB.friendBlizzardTags = BetterFriendlistDB.friendBlizzardTags or {}
@@ -1404,9 +1460,17 @@ function FriendTags:GetSettings()
 	return db.friendTagSettings
 end
 
+local function NormalizeDynamicTagGroupHeaderStyle(style)
+	if style == "text_color" or style == "chip" then return style end
+	return "standard"
+end
+
 function FriendTags:GetSetting(key, fallback)
 	local settings = self:GetSettings()
 	local value = settings and settings[key]
+	if key == "dynamicTagGroupHeaderStyle" then
+		return NormalizeDynamicTagGroupHeaderStyle(value)
+	end
 	if value == nil then
 		if fallback ~= nil then
 			return fallback
@@ -1421,6 +1485,9 @@ function FriendTags:SetSetting(key, value, refreshCallback)
 		return false
 	end
 	local settings = self:GetSettings()
+	if key == "dynamicTagGroupHeaderStyle" then
+		value = NormalizeDynamicTagGroupHeaderStyle(value)
+	end
 	if settings[key] == value then
 		return false
 	end
@@ -1428,7 +1495,7 @@ function FriendTags:SetSetting(key, value, refreshCallback)
 	-- Dynamic groups only change display-list grouping. They do not alter tag
 	-- definitions, assignments, row chips, search text, or tooltip contents.
 	-- Keep those caches warm while still rebuilding the visible friend list.
-	if key == "enableDynamicTagGroups" then
+	if key == "enableDynamicTagGroups" or key == "prioritizeDynamicTagGroups" or key == "dynamicTagGroupHeaderStyle" then
 		RefreshSurfaces(refreshCallback, {
 			definitionVersion = false,
 			clearCaches = false,
@@ -1474,7 +1541,18 @@ function FriendTags:IsEnabled(runtimeCache)
 	return enabled
 end
 
-function FriendTags:CanDisplayTags(surface, runtimeCache)
+function FriendTags:CanDisplayTags(surface, runtimeCache, previewStreamerMode, sampleSettings)
+	if sampleSettings then
+		if previewStreamerMode and sampleSettings.showTagsInStreamerMode ~= true then return false end
+		if sampleSettings.enabled == false then return false end
+		if surface == "row" then return sampleSettings.showRowChips ~= false end
+		if surface == "tooltip" then return sampleSettings.showTooltipChips ~= false end
+		if surface == "broker" then return sampleSettings.showBrokerChips ~= false end
+		return true
+	end
+	if previewStreamerMode and self:GetSetting("showTagsInStreamerMode", false) ~= true then
+		return false
+	end
 	surface = surface or "default"
 	local cache = runtimeCache or GetRuntimeCache(self)
 	if cache.displayBySurface[surface] ~= nil then
@@ -1632,6 +1710,107 @@ function FriendTags:GetRelatedFriendUIDs(friend, explicitUID)
 	return uids
 end
 
+local function GetRemovedBlizzardTagSet(settings)
+	local removed = settings and settings.removedBlizzardTags
+	return type(removed) == "table" and removed or EMPTY_TABLE
+end
+
+function FriendTags:GetRemovedBlizzardTags()
+	local removed = GetRemovedBlizzardTagSet(self:GetSettings())
+	local tags = {}
+	for _, def in ipairs(BLIZZARD_TAGS) do
+		if removed[def.id] == true then
+			tags[#tags + 1] = { id = def.id, name = GetLocalizedTagName(def) }
+		end
+	end
+	return tags
+end
+
+function FriendTags:SetBlizzardTagRemoved(tagId, removed, refreshCallback)
+	if not BLIZZARD_TAG_BY_ID[tagId] then return false end
+	local settings = self:GetSettings()
+	local removedTags = GetRemovedBlizzardTagSet(settings)
+	removed = removed == true
+	if (removedTags[tagId] == true) == removed then return false end
+	if removedTags == EMPTY_TABLE then
+		removedTags = {}
+		settings.removedBlizzardTags = removedTags
+	end
+	removedTags[tagId] = removed and true or nil
+	RefreshSurfaces(refreshCallback)
+	return true
+end
+
+function FriendTags:GetTagSections()
+	local sections = self:GetSettings().sections
+	local result = {}
+	for _, section in ipairs(BUILTIN_SECTIONS) do
+		local record = sections[section.id]
+		if type(record) ~= "table" then record = EMPTY_TABLE end
+		if record.deleted ~= true then
+			result[#result + 1] = {
+				id = section.id,
+				name = T(section.labelKey, section.fallback),
+				order = tonumber(record.order) or section.order,
+				hidden = record.hidden == true,
+			}
+		end
+	end
+	for id, record in pairs(sections) do
+		if not BUILTIN_SECTION_BY_ID[id] and HasTagSection(sections, id) then
+			result[#result + 1] = { id = id, name = id, order = tonumber(record.order), hidden = record.hidden == true }
+		end
+	end
+	table.sort(result, function(a, b)
+		local aOrder, bOrder = a.order or math.huge, b.order or math.huge
+		if aOrder ~= bOrder then return aOrder < bOrder end
+		return a.id < b.id
+	end)
+	return result
+end
+
+function FriendTags:CreateTagSection(name, refreshCallback)
+	name = NormalizeSectionName(name)
+	if not name then return nil, "invalidName" end
+	for _, section in ipairs(self:GetTagSections()) do
+		if section.name == name then return nil, "exists" end
+	end
+	self:GetSettings().sections[name] = {}
+	RefreshSurfaces(refreshCallback)
+	return name
+end
+
+function FriendTags:SetTagSectionOrder(ids, refreshCallback)
+	if type(ids) ~= "table" then return false end
+	local sections = self:GetSettings().sections
+	local available = {}
+	local current = self:GetTagSections()
+	if #ids ~= #current then return false end
+	for _, section in ipairs(current) do available[section.id] = true end
+	for index = 1, #current do
+		local id = ids[index]
+		if not available[id] then return false end
+		available[id] = nil
+	end
+	for order, id in ipairs(ids) do
+		local record = type(sections[id]) == "table" and sections[id] or {}
+		record.order = order
+		sections[id] = record
+	end
+	RefreshSurfaces(refreshCallback)
+	return true
+end
+
+function FriendTags:SetTagSectionHidden(id, hidden, refreshCallback)
+	local sections = self:GetSettings().sections
+	if not HasTagSection(sections, id) then return false end
+	local record = type(sections[id]) == "table" and sections[id] or {}
+	record.hidden = hidden and true or nil
+	sections[id] = record
+	RefreshSurfaces(refreshCallback)
+	return true
+end
+
 function FriendTags:GetBlizzardTagDefinitions()
 	local cache = GetRuntimeCache(self)
 	if cache.blizzardTagDefinitions then
@@ -1639,10 +1818,11 @@ function FriendTags:GetBlizzardTagDefinitions()
 	end
 
 	local definitions = {}
+	local removed = GetRemovedBlizzardTagSet(cache.settings)
 	for _, def in ipairs(BLIZZARD_TAGS) do
-		if self:IsBlizzardTagSupported(def) then
+		if removed[def.id] ~= true and self:IsBlizzardTagSupported(def) then
 			local icon = GetIconInfo(def.defaultIcon)
-			definitions[#definitions + 1] = {
+			local tag = {
 				id = def.id,
 				source = SOURCE_BLIZZARD,
 				enumKey = def.enumKey,
@@ -1663,6 +1843,8 @@ function FriendTags:GetBlizzardTagDefinitions()
 				iconZoom = NormalizeIconZoom(icon.iconZoom),
 				order = tonumber(def.order) or 0,
 			}
+			tag.chipProfile = self:GetChipProfile(tag)
+			definitions[#definitions + 1] = RefreshTagSortMetadata(tag)
 		end
 	end
 	cache.blizzardTagDefinitions = definitions
@@ -1727,7 +1909,7 @@ function FriendTags:GetCustomTagDefinitions()
 			local name = NormalizeTagName(def.name)
 			if name then
 				local icon = CopyIconInfo(def, GetIconInfo("tag"))
-				definitions[#definitions + 1] = RefreshTagSortMetadata({
+				local tag = {
 					id = id,
 					source = SOURCE_CUSTOM,
 					name = name,
@@ -1743,16 +1925,13 @@ function FriendTags:GetCustomTagDefinitions()
 					iconZoom = NormalizeIconZoom(icon.iconZoom),
 					createdAt = def.createdAt,
 					updatedAt = def.updatedAt,
-				})
+				}
+				tag.chipProfile = self:GetChipProfile(tag)
+				definitions[#definitions + 1] = RefreshTagSortMetadata(tag)
 			end
 		end
 	end
-	table.sort(definitions, function(a, b)
-		if a.order ~= b.order then
-			return a.order < b.order
-		end
-		return (a.name or a.id) < (b.name or b.id)
-	end)
+	table.sort(definitions, CompareTagDefinitions)
 	cache.customTagDefinitions = definitions
 	return definitions
 end
@@ -1766,14 +1945,10 @@ function FriendTags:GetAllTagDefinitions()
 	local definitions = {}
 	local byId = {}
 	for _, def in ipairs(self:GetBlizzardTagDefinitions()) do
-		def.chipProfile = self:GetChipProfile(def)
-		RefreshTagSortMetadata(def)
 		definitions[#definitions + 1] = def
 		byId[def.id] = def
 	end
 	for _, def in ipairs(self:GetCustomTagDefinitions()) do
-		def.chipProfile = self:GetChipProfile(def)
-		RefreshTagSortMetadata(def)
 		definitions[#definitions + 1] = def
 		byId[def.id] = def
 	end
@@ -1781,6 +1956,23 @@ function FriendTags:GetAllTagDefinitions()
 	cache.allTagDefinitions = definitions
 	cache.tagDefinitionById = byId
 	return definitions
+end
+
+function FriendTags:GroupTagDefinitions(definitions)
+	local groups, byId = {}, {}
+	for _, section in ipairs(self:GetTagSections()) do
+		section.tags = {}
+		byId[section.id] = section
+		groups[#groups + 1] = section
+	end
+	local unassigned = { id = "", name = "", tags = {} }
+	for _, def in ipairs(definitions) do
+		local profile = def.chipProfile or self:GetChipProfile(def)
+		local group = byId[profile and profile.section] or unassigned
+		group.tags[#group.tags + 1] = def
+	end
+	if #unassigned.tags > 0 then groups[#groups + 1] = unassigned end
+	return groups
 end
 
 function FriendTags:GetTagDefinition(tagId)
@@ -1914,6 +2106,10 @@ function FriendTags:PruneChipProfileOverride(tagId, profile)
 	if type(profile.textColor) == "table" and not SameColor(profile.textColor, defaultProfile.textColor) then
 		pruned.textColor = CopyColor(profile.textColor)
 	end
+	if type(profile.iconColor) == "table" then
+		pruned.iconColor = CopyColor(profile.iconColor)
+	end
+	pruned.section = NormalizeSectionOverride(profile.section)
 
 	return next(pruned) and pruned or nil
 end
@@ -1993,6 +2189,8 @@ function FriendTags:GetChipProfile(tag)
 		order = tonumber(override.order) or defaultProfile.order,
 		color = CopyColor(override.color, defaultProfile.color),
 		textColor = CopyColor(override.textColor, defaultProfile.textColor),
+		iconColor = override.iconColor,
+		section = ResolveTagSection(tag, override.section, db.friendTagSettings.sections),
 	}
 	cache.chipProfiles[tag.id] = profile
 	return profile
@@ -2078,6 +2276,12 @@ local function BuildChipProfileOverride(self, db, tagId, profilePatch)
 	if type(profilePatch.textColor) == "table" then
 		profile.textColor = CopyColor(profilePatch.textColor)
 	end
+	if profilePatch.iconColor ~= nil then
+		profile.iconColor = type(profilePatch.iconColor) == "table" and CopyColor(profilePatch.iconColor) or nil
+	end
+	if profilePatch.section ~= nil then
+		profile.section = NormalizeSectionOverride(profilePatch.section)
+	end
 
 	return self:PruneChipProfileOverride(tagId, profile)
 end
@@ -2115,8 +2319,13 @@ function FriendTags:SetChipProfiles(patches, refreshCallback)
 		end
 	end
 
+	local sections = db.friendTagSettings.sections
 	for tagId in pairs(patches) do
 		db.friendTagProfiles[tagId] = overrides[tagId]
+		local section = overrides[tagId] and overrides[tagId].section
+		if section and not BUILTIN_SECTION_BY_ID[section] and type(sections[section]) ~= "table" then
+			sections[section] = {}
+		end
 		if pendingNames[tagId] then SetCustomTagName(db.customFriendTags[tagId], pendingNames[tagId]) end
 	end
 	RefreshSurfaces(refreshCallback)
@@ -2575,22 +2784,71 @@ function FriendTags:GetCustomTagAssignmentCount(tagId)
 	return count
 end
 
-function FriendTags:DeleteCustomTag(tagId, refreshCallback)
-	local db = self:NormalizeDB()
-	if type(tagId) ~= "string" or type(db.customFriendTags[tagId]) ~= "table" then
-		return false, "invalidTag"
+local function RemoveCustomTags(db, tagIds)
+	if not next(tagIds) then return end
+	for tagId in pairs(tagIds) do
+		db.customFriendTags[tagId] = nil
+		db.friendTagProfiles[tagId] = nil
 	end
-
-	db.customFriendTags[tagId] = nil
-	db.friendTagProfiles[tagId] = nil
-	for uid, set in pairs(db.friendCustomTags or {}) do
-		if type(set) == "table" and set[tagId] then
-			set[tagId] = nil
+	for uid, set in pairs(db.friendCustomTags) do
+		if type(set) == "table" then
+			for tagId in pairs(tagIds) do set[tagId] = nil end
 			if not HasAny(set) then
 				db.friendCustomTags[uid] = nil
 			end
 		end
 	end
+end
+
+function FriendTags:DeleteCustomTag(tagId, refreshCallback)
+	local db = self:NormalizeDB()
+	if type(tagId) ~= "string" or type(db.customFriendTags[tagId]) ~= "table" then
+		return false, "invalidTag"
+	end
+	RemoveCustomTags(db, { [tagId] = true })
+	RefreshSurfaces(refreshCallback)
+	return true
+end
+
+function FriendTags:DeleteTagSection(id, deleteTags, refreshCallback)
+	local db = self:NormalizeDB()
+	local sections = db.friendTagSettings.sections
+	if not HasTagSection(sections, id) then return false end
+
+	local members = {}
+	local function Collect(tag)
+		local profile = db.friendTagProfiles[tag.id]
+		if type(profile) ~= "table" then profile = EMPTY_TABLE end
+		if ResolveTagSection(tag, profile.section, sections) == id then
+			members[tag.id] = true
+		end
+	end
+	for _, tag in ipairs(BLIZZARD_TAGS) do Collect(tag) end
+	for tagId, tag in pairs(db.customFriendTags) do
+		if type(tag) == "table" then Collect({ id = tagId }) end
+	end
+
+	local removedBlizzard = GetRemovedBlizzardTagSet(db.friendTagSettings)
+	local removedCustom = {}
+	for tagId in pairs(members) do
+		if deleteTags and db.customFriendTags[tagId] then
+			removedCustom[tagId] = true
+		else
+			local profile = CopyProfile(db.friendTagProfiles[tagId])
+			profile.section = false
+			db.friendTagProfiles[tagId] = profile
+			if deleteTags then
+				if removedBlizzard == EMPTY_TABLE then
+					removedBlizzard = {}
+					db.friendTagSettings.removedBlizzardTags = removedBlizzard
+				end
+				removedBlizzard[tagId] = true
+			end
+		end
+	end
+	RemoveCustomTags(db, removedCustom)
+	-- A tombstone prevents a deleted built-in section from returning on reload.
+	sections[id] = BUILTIN_SECTION_BY_ID[id] and { deleted = true } or nil
 	RefreshSurfaces(refreshCallback)
 	return true
 end
@@ -2604,6 +2862,12 @@ function FriendTags:GetChipLabel(tag)
 		return profile.chipLabel
 	end
 	return tag.name
+end
+
+local function IsTagSourceSearchable(source, settings)
+	if source == SOURCE_BLIZZARD then return settings.includeBlizzardTagsInSearch ~= false end
+	if source == SOURCE_CUSTOM then return settings.includeCustomTagsInSearch ~= false end
+	return true
 end
 
 function FriendTags:ShouldIncludeTagOnSurface(tag, surface, runtimeCache)
@@ -2641,11 +2905,7 @@ function FriendTags:ShouldIncludeTagOnSurface(tag, surface, runtimeCache)
 	end
 	if include and surface == "search" then
 		local settings = BetterFriendlistDB and BetterFriendlistDB.friendTagSettings or EMPTY_TABLE
-		if tag.source == SOURCE_BLIZZARD and settings.includeBlizzardTagsInSearch == false then
-			include = false
-		elseif tag.source == SOURCE_CUSTOM and settings.includeCustomTagsInSearch == false then
-			include = false
-		end
+		include = IsTagSourceSearchable(tag.source, settings)
 	end
 	visibility[visibilityKey] = include
 	return include
@@ -2724,6 +2984,45 @@ function FriendTags:GetSearchText(friend)
 	return text
 end
 
+local function FormatTagNames(tags, maxTags, includeLegacy)
+	local names = {}
+	for _, tag in ipairs(tags) do
+		if includeLegacy ~= false or not tag.legacy then names[#names + 1] = tag.name end
+	end
+	if #names == 0 then return nil end
+	local visibleNames = {}
+	for index, name in ipairs(names) do
+		if index > maxTags then
+			visibleNames[#visibleNames + 1] = string.format("+%d", #names - maxTags)
+			break
+		end
+		visibleNames[#visibleNames + 1] = name
+	end
+	return table.concat(visibleNames, ", ")
+end
+
+function FriendTags:CreateSettingsTagExamples(customName, includeMany)
+	local examples = {}
+	for _, def in ipairs(BLIZZARD_TAGS) do
+		local tag = { id = def.id, name = GetLocalizedTagName(def), source = SOURCE_BLIZZARD,
+			defaultIcon = def.defaultIcon, color = def.color, order = def.order }
+		tag.chipProfile = self:GetDefaultChipProfile(tag)
+		examples[#examples + 1] = tag
+	end
+	if customName then
+		local tag = { id = "custom:bfl_settings_example", name = customName, source = SOURCE_CUSTOM, order = 1000 }
+		tag.chipProfile = self:GetDefaultChipProfile(tag)
+		examples[#examples + 1] = tag
+		if includeMany then
+			for index = #examples + 1, 21 do
+				examples[index] = { id = tag.id .. index, name = customName .. " " .. index,
+					source = tag.source, chipProfile = tag.chipProfile }
+			end
+		end
+	end
+	return examples
+end
+
 function FriendTags:GetTooltipTextForFriend(friend, includeLegacy)
 	if not self:CanDisplayTags("tooltip") then
 		return nil
@@ -2741,26 +3040,8 @@ function FriendTags:GetTooltipTextForFriend(friend, includeLegacy)
 		return nil
 	end
 	local maxTags = tonumber(self:GetSetting("maxTooltipChips", 8)) or 8
-	local names = {}
-	for _, tag in ipairs(tags) do
-		if includeLegacy ~= false or not tag.legacy then
-			names[#names + 1] = tag.name
-		end
-	end
-	if #names == 0 then
-		cache.tooltipTextByFriend[cacheKey] = false
-		return nil
-	end
-	local visibleNames = {}
-	for index, name in ipairs(names) do
-		if index > maxTags then
-			visibleNames[#visibleNames + 1] = string.format("+%d", #names - maxTags)
-			break
-		end
-		visibleNames[#visibleNames + 1] = name
-	end
-	local text = table.concat(visibleNames, ", ")
-	cache.tooltipTextByFriend[cacheKey] = text
+	local text = FormatTagNames(tags, maxTags, includeLegacy)
+	cache.tooltipTextByFriend[cacheKey] = text or false
 	return text
 end
 
@@ -2781,16 +3062,8 @@ function FriendTags:GetBrokerTextForFriend(friend)
 		return nil
 	end
 	local maxTags = tonumber(self:GetSetting("maxTooltipChips", 8)) or 8
-	local names = {}
-	for index, tag in ipairs(tags) do
-		if index > maxTags then
-			names[#names + 1] = string.format("+%d", #tags - maxTags)
-			break
-		end
-		names[#names + 1] = tag.name
-	end
-	local text = table.concat(names, ", ")
-	cache.brokerTextByFriend[cacheKey] = text
+	local text = FormatTagNames(tags, maxTags)
+	cache.brokerTextByFriend[cacheKey] = text or false
 	return text
 end
 
@@ -2890,20 +3163,25 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 
 	local function ReplaceWorkingSet(target, definitions, selected)
 		local added = {}
-		if selected then
-			for _, def in ipairs(definitions) do
-				if not target[def.id] then added[#added + 1] = def.id end
-			end
-		end
-		for tagId in pairs(target) do
-			target[tagId] = nil
-		end
-		if selected then
-			for _, def in ipairs(definitions) do
-				target[def.id] = true
-			end
+		for _, def in ipairs(definitions) do
+			if selected and not target[def.id] then added[#added + 1] = def.id end
+			target[def.id] = selected and true or nil
 		end
 		return added
+	end
+
+	local definitions, visibleBlizzardTags, visibleCustomTags = {}, {}, {}
+	for _, def in ipairs(blizzardTags) do definitions[#definitions + 1] = def end
+	for _, def in ipairs(customTags) do definitions[#definitions + 1] = def end
+	table.sort(definitions, CompareTagDefinitions)
+	local groups = self:GroupTagDefinitions(definitions)
+	for _, group in ipairs(groups) do
+		if not group.hidden then
+			for _, def in ipairs(group.tags) do
+				local target = def.source == SOURCE_BLIZZARD and visibleBlizzardTags or visibleCustomTags
+				target[#target + 1] = def
+			end
+		end
 	end
 
 	if options.showHeader then
@@ -2916,8 +3194,10 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 	local function ApplyBulkSelection(selected)
 		local refreshViaCustomTags = featureEnabled == true
 		local added = {}
-		if hasBlizzardTags then
-			local blizzardAdded = ReplaceWorkingSet(workingBlizzardSet, blizzardTags, selected)
+		if #visibleBlizzardTags > 0 then
+			local blizzardAdded = ReplaceWorkingSet(
+				workingBlizzardSet, visibleBlizzardTags, selected
+			)
 			if self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
 				refreshCallback = refreshCallback,
 				userInitiated = true,
@@ -2927,7 +3207,7 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 			end
 		end
 		if featureEnabled then
-			local customAdded = ReplaceWorkingSet(workingCustomSet, customTags, selected)
+			local customAdded = ReplaceWorkingSet(workingCustomSet, visibleCustomTags, selected)
 			if self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID) then
 				for _, id in ipairs(customAdded) do added[#added + 1] = id end
 			end
@@ -2950,6 +3230,39 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 	}
 	items[#items + 1] = { type = "divider" }
 
+	local function AppendHeading(text)
+		if items[#items].type ~= "divider" then
+			items[#items + 1] = { type = "divider" }
+		end
+		items[#items + 1] = { type = "title", text = text }
+	end
+
+	local function AppendTag(def)
+		local tagId = def.id
+		local isBlizzard = def.source == SOURCE_BLIZZARD
+		local workingSet = isBlizzard and workingBlizzardSet or workingCustomSet
+		items[#items + 1] = {
+			type = "checkbox",
+			text = def.name,
+			iconProfile = def.chipProfile,
+			checked = function() return workingSet[tagId] == true end,
+			func = function()
+				workingSet[tagId] = not workingSet[tagId] or nil
+				local saved
+				if isBlizzard then
+					saved = self:SetBlizzardTagsForFriend(friend, workingSet, {
+						refreshCallback = refreshCallback,
+						userInitiated = true,
+					})
+				else
+					saved = self:SetCustomTagsForFriend(friend, workingSet, refreshCallback, explicitUID)
+				end
+				if saved and workingSet[tagId] then NotifyTagAssignment(friend, { tagId }) end
+				return MenuResponse and MenuResponse.Refresh
+			end,
+		}
+	end
+
 	if hasBlizzardTags then
 		local handoffInfo = self:GetLocalBlizzardHandoffInfo(friend, explicitUID)
 		if handoffInfo.available then
@@ -2965,69 +3278,23 @@ function FriendTags:GetMenuItems(friend, explicitUID, displayName, refreshCallba
 			items[#items + 1] = { type = "divider" }
 		end
 
-		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_INTERESTS_SECTION", "Interests") }
-		local rolesTitleCreated = false
-		for _, def in ipairs(blizzardTags) do
-			if def.group == "roles" and not rolesTitleCreated then
-				items[#items + 1] = { type = "divider" }
-				items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_ROLES_SECTION", "Roles") }
-				rolesTitleCreated = true
-			end
+	end
 
-			local tagId = def.id
-			items[#items + 1] = {
-				type = "checkbox",
-				text = GetLocalizedTagName(def),
-				iconProfile = self:GetChipProfile(def),
-				checked = function()
-					return workingBlizzardSet[tagId] == true
-				end,
-				func = function()
-					workingBlizzardSet[tagId] = not workingBlizzardSet[tagId] or nil
-					if self:SetBlizzardTagsForFriend(friend, workingBlizzardSet, {
-						refreshCallback = refreshCallback,
-						userInitiated = true,
-					}) and workingBlizzardSet[tagId] then
-						NotifyTagAssignment(friend, { tagId })
-					end
-					return MenuResponse and MenuResponse.Refresh
-				end,
-			}
-		end
-		if featureEnabled then
-			items[#items + 1] = { type = "divider" }
+	for _, group in ipairs(groups) do
+		local emptyCustom = featureEnabled and group.id == "|custom" and #customTags == 0
+		if not group.hidden and (#group.tags > 0 or emptyCustom) then
+			AppendHeading(group.name ~= "" and group.name or T("FRIEND_TAGS_EDITOR_NO_SECTION", "No Section"))
+			for _, def in ipairs(group.tags) do AppendTag(def) end
+			if emptyCustom then
+				items[#items + 1] = {
+					type = "title",
+					text = T("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"),
+				}
+			end
 		end
 	end
 
 	if featureEnabled then
-		items[#items + 1] = { type = "title", text = T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags") }
-		if #customTags > 0 then
-			for _, def in ipairs(customTags) do
-				local tagId = def.id
-				items[#items + 1] = {
-					type = "checkbox",
-					text = def.name,
-					iconProfile = self:GetChipProfile(def),
-					checked = function()
-						return workingCustomSet[tagId] == true
-					end,
-					func = function()
-						workingCustomSet[tagId] = not workingCustomSet[tagId] or nil
-						if self:SetCustomTagsForFriend(friend, workingCustomSet, refreshCallback, explicitUID)
-							and workingCustomSet[tagId] then
-							NotifyTagAssignment(friend, { tagId })
-						end
-						return MenuResponse and MenuResponse.Refresh
-					end,
-				}
-			end
-		else
-			items[#items + 1] = {
-				type = "title",
-				text = T("FRIEND_TAGS_NO_CUSTOM_TAGS", "No custom tags yet"),
-			}
-		end
-
 		items[#items + 1] = { type = "divider" }
 		items[#items + 1] = {
 			text = T("FRIEND_TAGS_CREATE_CUSTOM", "Create Custom Tag"),
@@ -3069,14 +3336,30 @@ function FriendTags:PopulateMenuContent(submenu, friend, explicitUID, displayNam
 	return true
 end
 
+local function FormatTagMenuTitle(showCount, count)
+	if showCount and count > 0 then
+		return string.format(T("FRIEND_TAGS_MENU_TITLE_COUNT", "Friend Tags (%d)"), count)
+	end
+	return T("FRIEND_TAGS_MENU_TITLE", "Friend Tags")
+end
+
 function FriendTags:GetMenuTitle(friend, explicitUID)
 	friend = self:NormalizeFriendContext(friend, explicitUID)
-	local title = T("FRIEND_TAGS_MENU_TITLE", "Friend Tags")
 	local tags = self:GetTagsForFriend(friend, "menu")
-	if self:GetSetting("showMenuTagCounts", true) and #tags > 0 then
-		title = string.format(T("FRIEND_TAGS_MENU_TITLE_COUNT", "Friend Tags (%d)"), #tags)
+	return FormatTagMenuTitle(self:GetSetting("showMenuTagCounts", true), #tags)
+end
+
+function FriendTags:GetSettingsSampleTagText(surface, settings, tags)
+	if not self:CanDisplayTags(surface, nil, false, settings) then return nil end
+	if surface == "menu" then return FormatTagMenuTitle(settings.showMenuTagCounts ~= false, #tags) end
+	if surface == "search" then
+		local searchable = {}
+		for _, tag in ipairs(tags) do
+			if IsTagSourceSearchable(tag.source, settings) then searchable[#searchable + 1] = tag end
+		end
+		return FormatTagNames(searchable, #searchable)
 	end
-	return title
+	return FormatTagNames(tags, settings.maxTooltipChips or 8, false)
 end
 
 function FriendTags:PopulateMenu(rootDescription, friend, explicitUID, displayName, refreshCallback, options)

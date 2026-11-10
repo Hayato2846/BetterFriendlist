@@ -45,7 +45,7 @@ local function GetMetricSetting(settings, key, fallback)
 	return value
 end
 
-local function ResolveChipMetrics(FriendTags, definitionVersion)
+local function ResolveChipMetrics(FriendTags, definitionVersion, sampleSettings)
 	FriendTags = FriendTags or GetFriendTags()
 	definitionVersion = definitionVersion
 		or (FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion())
@@ -53,7 +53,8 @@ local function ResolveChipMetrics(FriendTags, definitionVersion)
 		or BFL.FriendTagsVersion
 		or 0
 	if
-		resolvedChipMetrics
+		not sampleSettings
+		and resolvedChipMetrics
 		and resolvedChipMetricsFriendTags == FriendTags
 		and resolvedChipMetricsDefinitionVersion == definitionVersion
 	then
@@ -62,7 +63,7 @@ local function ResolveChipMetrics(FriendTags, definitionVersion)
 
 	-- Every visual Friend Tag setting bumps the definition version. Resolve the
 	-- immutable metrics table once per version instead of once per rendered row.
-	local settings = FriendTags and FriendTags.GetSettings and FriendTags:GetSettings()
+	local settings = sampleSettings or FriendTags and FriendTags.GetSettings and FriendTags:GetSettings()
 	local iconSize = ClampNumber(
 		GetMetricSetting(settings, "chipIconSize", DEFAULT_CHIP_ICON_SIZE),
 		8,
@@ -88,7 +89,7 @@ local function ResolveChipMetrics(FriendTags, definitionVersion)
 		fontFlags = BFL.FontManager:GetFontFlags(fontFlags)
 	end
 	local height = math.max(iconSize + 3, fontSize + 4)
-	resolvedChipMetrics = {
+	local metrics = {
 		iconSize = iconSize,
 		fontName = fontName,
 		fontPath = fontPath,
@@ -104,10 +105,13 @@ local function ResolveChipMetrics(FriendTags, definitionVersion)
 		minimumWidth = math.max(26, height),
 		overflowWidth = math.max(30, height),
 	}
-	resolvedChipMetricsFriendTags = FriendTags
-	resolvedChipMetricsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
-		or definitionVersion
-	return resolvedChipMetrics
+	if not sampleSettings then
+		resolvedChipMetrics = metrics
+		resolvedChipMetricsFriendTags = FriendTags
+		resolvedChipMetricsDefinitionVersion = FriendTags and FriendTags.GetDefinitionVersion and FriendTags:GetDefinitionVersion()
+			or definitionVersion
+	end
+	return metrics
 end
 
 local function CopyColor(color, fallback)
@@ -171,6 +175,13 @@ local function SetPillShown(pill, shown)
 			region:Hide()
 		end
 	end
+end
+
+local function SetChipPillColors(border, fill, color)
+	local r, g, b, a = CopyColor(color, DEFAULT_CHIP_COLOR)
+	SetPillColor(border, 0, 0, 0, 1)
+	-- Preserve the color while the one-pixel inset reveals the black outline.
+	SetPillColor(fill, r, g, b, math.min(0.94, a))
 end
 
 local function ApplyFont(fontString, metrics)
@@ -262,9 +273,16 @@ local function GetDesiredChipWidth(labelText, hasIcon, overflow, metrics)
 	return math.max(metrics.minimumWidth, MeasureLabelWidth(labelText, metrics) + padding)
 end
 
+local function GetRowSetting(friendsList, tags, key, fallback)
+	local sample = friendsList and friendsList.settingsSampleTagSettings
+	if sample and sample[key] ~= nil then return sample[key] end
+	if tags then return tags:GetSetting(key, fallback) end
+	return fallback
+end
+
 local function GetRowInsets(friendsList, FriendTags)
 	FriendTags = FriendTags or GetFriendTags()
-	if FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true then
+	if GetRowSetting(friendsList, FriendTags, "fullWidthTagRows", false) == true then
 		return FULL_WIDTH_ROW_INSET, FULL_WIDTH_ROW_INSET
 	end
 	local FriendsUI = BFL:GetModule("FriendsUI")
@@ -374,9 +392,11 @@ local function GetRowCacheContext(friendsList, FriendTags)
 	-- Streamer Mode is deliberately tracked separately from SettingsVersion: it
 	-- changes tag visibility without changing definitions and must never reuse a
 	-- previously visible row-chip result.
-	local metrics = ResolveChipMetrics(FriendTags, tagsDefinitionVersion)
+	local metrics = ResolveChipMetrics(FriendTags, tagsDefinitionVersion, friendsList and friendsList.settingsSampleTagSettings)
 	local fontVersion = GetChipFontVersion(metrics)
-	local streamerModeFlag = BetterFriendlistDB and BetterFriendlistDB.streamerModeActive and 1 or 0
+	local streamerMode = (friendsList and friendsList.settingsSampleStreamerMode)
+		or (BetterFriendlistDB and BetterFriendlistDB.streamerModeActive)
+	local streamerModeFlag = streamerMode and 1 or 0
 	local settingsVersion = (fontVersion * 2) + streamerModeFlag
 	local compactModeFlag = settingsCache and settingsCache.compactMode and 1 or 0
 	local infoDisabledFlag = settingsCache and settingsCache.infoDisabled and 1 or 0
@@ -541,7 +561,7 @@ local function GetCompactRowMode(friendsList, FriendTags)
 	if not (friendsList and friendsList.settingsCache and friendsList.settingsCache.compactMode) then
 		return nil
 	end
-	return FriendTags and FriendTags:GetSetting("compactRowMode", "icon_only") or "icon_only"
+	return GetRowSetting(friendsList, FriendTags, "compactRowMode", "icon_only")
 end
 
 local function CanRenderRow(friend, friendsList, FriendTags)
@@ -552,7 +572,9 @@ local function CanRenderRow(friend, friendsList, FriendTags)
 		return false
 	end
 	FriendTags = FriendTags or GetFriendTags()
-	if not (FriendTags and FriendTags.CanDisplayTags and FriendTags:CanDisplayTags("row")) then
+	if not (
+		FriendTags and FriendTags.CanDisplayTags and FriendTags:CanDisplayTags("row", nil, friendsList.settingsSampleStreamerMode, friendsList.settingsSampleTagSettings)
+	) then
 		return false
 	end
 	local compactMode = GetCompactRowMode(friendsList, FriendTags)
@@ -646,6 +668,7 @@ local function ApplyIcon(texture, profile)
 	-- Zoom is opt-in profile metadata: picker Blizzard icons use the shared
 	-- default, while selected map-legend defaults can provide an exact crop.
 	if iconZoom and ApplyZoomedAtlas(texture, profile, iconZoom) then
+		BFL.Compat.ApplyIconTint(texture, profile.iconColor)
 		return true
 	end
 	local applied = BFL.ApplyIconProfile and BFL.ApplyIconProfile(texture, profile) or false
@@ -653,6 +676,33 @@ local function ApplyIcon(texture, profile)
 		ApplyZoomedTexCoord(texture, profile.texCoord, iconZoom)
 	end
 	return applied
+end
+
+function TagChips:ShowGroupHeaderIcon(button, profile, maxWidth)
+	if not profile or profile.iconType == "none" or not (profile.iconValue or profile.icon or profile.texture or profile.atlas) then
+		return 0
+	end
+	local size = math.min(ResolveChipMetrics().iconSize, math.max(1, button:GetHeight() - 4))
+	if size > maxWidth then return 0 end
+
+	local icon = button.TagHeaderIcon
+	if not icon then
+		-- Keep the icon outside the button's chrome so it survives texture stripping.
+		local layer = CreateFrame("Frame", nil, button)
+		layer:SetAllPoints(button)
+		icon = layer:CreateTexture(nil, "ARTWORK")
+		button.TagHeaderIcon = icon
+	end
+	-- Chip profiles are replaced when definitions change. Reuse the atlas and
+	-- zoom coordinates while the same profile is bound during group toggles.
+	if icon._bflHeaderIconProfile ~= profile then
+		icon._bflHeaderIconProfile = nil
+		if not ApplyIcon(icon, profile) then return 0 end
+		icon._bflHeaderIconProfile = profile
+	end
+	icon:SetSize(size, size)
+	icon:Show()
+	return size
 end
 
 local function ApplyChipGeometry(chip, metrics)
@@ -718,12 +768,8 @@ local function UpdateChipVisual(chip, profile, labelText, allowIcon, overflow, m
 		return chip._bflVisualWidth or 0, chip._bflVisualHasIcon == true
 	end
 
-	local r, g, b, a = CopyColor(profile.color, DEFAULT_CHIP_COLOR)
 	local tr, tg, tb, ta = CopyColor(profile.textColor, DEFAULT_TEXT_COLOR)
-	SetPillColor(chip.pillBorder, 0, 0, 0, 1)
-	-- The fill remains opaque enough to preserve the configured color while the
-	-- one-pixel inset reveals the black outline underneath it.
-	SetPillColor(chip.pillBackground, r, g, b, math.min(0.94, a))
+	SetChipPillColors(chip.pillBorder, chip.pillBackground, profile.color)
 	chip.label:SetTextColor(tr, tg, tb, ta)
 	chip.label:SetText(labelText)
 
@@ -798,7 +844,10 @@ end
 
 function TagChips:GetRowData(friend, friendsList, groupId)
 	local FriendTags = GetFriendTags()
-	local persistentCacheKey, persistentUID = GetPersistentRowCacheKey(friend, FriendTags)
+	local persistentCacheKey, persistentUID
+	if not (friendsList and friendsList.settingsSample) then
+		persistentCacheKey, persistentUID = GetPersistentRowCacheKey(friend, FriendTags)
+	end
 	local groupCacheKey = NormalizeGroupCacheKey(groupId)
 	if persistentCacheKey then
 		persistentCacheKey = persistentCacheKey .. "|group:" .. groupCacheKey
@@ -900,7 +949,7 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 		availableWidth,
 		groupCacheKey
 	)
-	data.fullWidthTagRows = FriendTags and FriendTags:GetSetting("fullWidthTagRows", false) == true or false
+	data.fullWidthTagRows = GetRowSetting(friendsList, FriendTags, "fullWidthTagRows", false) == true
 	if persistentCacheKey then
 		if not self.rowDataByFriend[persistentCacheKey] then
 			self.rowDataByFriendCount = (self.rowDataByFriendCount or 0) + 1
@@ -925,22 +974,39 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 		return data
 	end
 	local dynamicGroupTagId = type(groupId) == "string" and groupId:match("^tag:(.+)$") or nil
-	if dynamicGroupTagId and FriendTags:GetSetting("hideAllDynamicGroupTagChips", false) then
+	if dynamicGroupTagId and GetRowSetting(friendsList, FriendTags, "hideAllDynamicGroupTagChips", false) then
 		return data
 	end
 
-	local tags = FriendTags and FriendTags:GetTagsForFriend(friend, "row") or EMPTY_TABLE
+	local tags
+	if friendsList and friendsList.settingsSample then
+		tags = {}
+		if friend.settingsTagDefinitions then
+			tags = friend.settingsTagDefinitions
+		elseif friend.sampleTags and FriendTags then
+			for _, tag in ipairs(FriendTags:GetAllTagDefinitions()) do
+				if FriendTags:ShouldIncludeTagOnSurface(tag, "row") then
+					tags[#tags + 1] = tag
+					if #tags == (friend.sampleTagLimit or MAX_ROW_CHIPS) then
+						break
+					end
+				end
+			end
+		end
+	else
+		tags = FriendTags and FriendTags:GetTagsForFriend(friend, "row") or EMPTY_TABLE
+	end
 	if #tags == 0 then
 		return data
 	end
 
 	local compactMode = GetCompactRowMode(friendsList, FriendTags)
 	local iconOnly = compactMode == "icon_only"
-	local maxChips = tonumber(FriendTags:GetSetting("maxRowChips", 3)) or 3
+	local maxChips = tonumber(GetRowSetting(friendsList, FriendTags, "maxRowChips", 3)) or 3
 	maxChips = math.max(1, math.min(maxChips, MAX_ROW_CHIPS))
-	local chipsPerLine = ClampNumber(FriendTags:GetSetting("chipsPerLine", DEFAULT_CHIPS_PER_LINE), 1, MAX_ROW_CHIPS, DEFAULT_CHIPS_PER_LINE)
+	local chipsPerLine = ClampNumber(GetRowSetting(friendsList, FriendTags, "chipsPerLine", DEFAULT_CHIPS_PER_LINE), 1, MAX_ROW_CHIPS, DEFAULT_CHIPS_PER_LINE)
 	metrics = metrics or ResolveChipMetrics(FriendTags, tagsDefinitionVersion)
-	local hiddenGroupTagId = FriendTags:GetSetting("hideDynamicGroupTagChip", false)
+	local hiddenGroupTagId = GetRowSetting(friendsList, FriendTags, "hideDynamicGroupTagChip", false)
 		and dynamicGroupTagId
 		or nil
 
@@ -1154,8 +1220,16 @@ function TagChips:CreateStandaloneChip(parent)
 	return parent and CreateChip(parent) or nil
 end
 
-function TagChips:UpdateStandaloneChip(chip, profile, labelText, maxWidth)
-	return UpdateChipVisual(chip, profile, labelText, true, false, maxWidth or STANDALONE_CHIP_MAX_WIDTH, true, ResolveChipMetrics())
+function TagChips:UpdateStandaloneChip(chip, profile, labelText, maxWidth, maxHeight)
+	local metrics = ResolveChipMetrics()
+	local scale = maxHeight and math.min(1, maxHeight / metrics.height) or 1
+	if maxHeight then
+		chip:SetScale(scale)
+	end
+	local width, hasIcon = UpdateChipVisual(
+		chip, profile, labelText, true, false, (maxWidth or STANDALONE_CHIP_MAX_WIDTH) / scale, true, metrics
+	)
+	return width * scale, hasIcon
 end
 
 return TagChips

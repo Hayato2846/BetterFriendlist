@@ -1295,6 +1295,8 @@ function DarkTheme:LayoutSettingsContentChrome(engine, frame)
 	if not engine or not frame or not frame.MainInset or not frame.ContentScrollFrame then
 		return
 	end
+	-- The redesigned settings place the scroll frame beside or below the preview.
+	if BFL:GetModule("LegacySettingsReview") then return end
 
 	local scrollFrame = frame.ContentScrollFrame
 	local scrollBar = GetScrollFrameScrollBar(scrollFrame)
@@ -1680,7 +1682,7 @@ local function SkinModernButtonField(engine, parent, key)
 end
 
 local function SkinModernScrollBoxRows(engine, scrollBox)
-	if not (engine and scrollBox and scrollBox.ForEachFrame) then
+	if not (engine and scrollBox and scrollBox.ForEachFrame and scrollBox.GetView and scrollBox:GetView()) then
 		return
 	end
 	scrollBox:ForEachFrame(function(row)
@@ -1877,6 +1879,13 @@ function DarkTheme:SkinModernVisibleMainContent(engine, frame)
 	end
 end
 
+function DarkTheme:SkinModernFrameShell(engine, frame)
+	-- Keep the Modern hierarchy while the Dark and Custom themes replace the
+	-- native ButtonFrame artwork with their shared reversible backdrop.
+	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0, decorAlpha = 0 })
+	engine:StripButtonFrameArtwork(frame, 0)
+end
+
 function DarkTheme:SkinModernMainFrame(engine, frame)
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local root = FriendsUI and FriendsUI.root
@@ -1901,11 +1910,7 @@ function DarkTheme:SkinModernMainFrame(engine, frame)
 	)
 	if frame.BFL_DarkMainFrameStaticSkinKey ~= staticSkinKey or not frame.BFL_DarkBackdrop then
 		frame.BFL_DarkMainFrameStaticSkinKey = staticSkinKey
-		-- Modern Dark/Custom uses the same flat shell contract as Legacy. Strip
-		-- only the native ButtonFrame artwork; the Modern hierarchy and all
-		-- control geometry remain untouched and RestoreAll can recover Blizzard.
-		engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = 0, decorAlpha = 0 })
-		engine:StripButtonFrameArtwork(frame, 0)
+		self:SkinModernFrameShell(engine, frame)
 		-- Dark/Custom deliberately leaves the overall Battle.net bar transparent;
 		-- only the status, BattleTag display, and menu control own surfaces.
 		engine:SetTextureAlpha(root.BattleNetBar, root.BattleNetBar.Background, 0)
@@ -2454,6 +2459,74 @@ function DarkTheme:SkinGuildFrame(engine)
 	SkinFrameByName(engine, "BFL_GuildMemberInfoPanel", "popup")
 end
 
+local function SkinSettingsPreviewHeader(self, engine, header)
+	if header and header:IsShown() then
+		SkinEditBoxField(engine, header, "search")
+		if header.native and header.native:IsShown() then
+			self:SkinModernFrameShell(engine, header.native)
+			SkinDropdownField(engine, header, "filter")
+			SkinDropdownField(engine, header, "sort")
+			SkinDropdownField(engine, header, "StatusDropdown")
+			SkinModernButtonField(engine, header.battleNet, "MenuButton")
+		else
+			SkinField(engine, header, "tag", "inset")
+		end
+	end
+end
+
+local function SkinSettingsPreviewScene(engine, scene)
+	if not (scene and scene:IsShown()) then return end
+	for index, column in ipairs(scene.columns or {}) do
+		if engine:IsDropdownControl(column) then
+			engine:SkinDropdown(column)
+		else
+			SkinColumnHeaderField(engine, scene.columns, index)
+		end
+	end
+	if scene.group then engine:SkinFrame(scene.group, "inset") end
+end
+
+function DarkTheme:SkinSettingsComparison(engine, review)
+	local picker, editor = review.comparisonPicker, review.comparisonEditor
+	if picker and picker:IsShown() then engine:SkinControl(picker) end
+	if editor and editor:IsShown() then engine:SkinControl(editor) end
+	for _, lane in ipairs(review.comparisonLanes or {}) do
+		if lane:IsShown() then
+			for _, row in ipairs(lane.widgets) do
+				if row:IsShown() then engine:SkinRow(row) end
+			end
+			SkinSettingsPreviewHeader(self, engine, lane.headerSample)
+			for _, scene in pairs(lane.socialSamples or {}) do SkinSettingsPreviewScene(engine, scene) end
+		end
+	end
+end
+
+function DarkTheme:SkinSettingsPreview(engine, review)
+	local shell = review.previewShell
+	if shell:IsShown() then
+		if shell.BFL_PreviewWindowBorder then
+			self:SkinModernFrameShell(engine, shell)
+		else
+			engine:SkinFrame(shell, "inset", { stripTextures = true, textureAlpha = 0 })
+		end
+	end
+	local rows = review.sampleViewport
+	if rows and rows:IsShown() then
+		engine:SkinScrollBar(rows.ScrollBar)
+		for _, row in ipairs(review.sampleWidgets) do
+			if row:IsShown() then engine:SkinRow(row) end
+		end
+	end
+	SkinSettingsPreviewHeader(self, engine, review.headerSample)
+
+	local tabs = review.preview.legacyTabFonts
+	if tabs and tabs:IsShown() then
+		engine:SkinTab(tabs.selected)
+		engine:SkinTab(tabs.other)
+	end
+	SkinSettingsPreviewScene(engine, (review.preview.socialSamples or {})[review.sample])
+end
+
 function DarkTheme:SkinSettingsFrame(engine)
 	local frame = _G.BetterFriendlistSettingsFrame
 	if not frame then
@@ -2546,7 +2619,6 @@ end
 
 function DarkTheme:SkinAuxiliaryFrames(engine)
 	for _, frameInfo in ipairs({
-		{ "BetterFriendlistChangelogFrame", "popup" },
 		{ "BetterFriendlistExportFrame", "popup" },
 		{ "BetterFriendlistImportFrame", "popup" },
 		{ "BetterFriendlistFilterSortEditorFrame", "popup" },
@@ -2949,9 +3021,6 @@ function DarkTheme:InstallHooks()
 		self:SkinCreatedFrame(frame or _G.BetterFriendlistFilterSortEditorFrame)
 	end)
 
-	self:WrapModuleMethod("Changelog", "CreateChangelogWindow", function(_, frame)
-		self:SkinCreatedFrame(frame or _G.BetterFriendlistChangelogFrame)
-	end)
 	self:WrapModuleMethod("RaidTools", "CreateFrame", function(_, frame)
 		self:SkinCreatedFrame(frame or _G.BetterFriendlistRaidToolsFrame)
 	end)

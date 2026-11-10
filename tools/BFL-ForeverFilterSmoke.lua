@@ -24,6 +24,7 @@ local function execute(source, name)
 	return assert(load(source, "@" .. name, "t", env))("BetterFriendlist", BFL)
 end
 execute(read("Utils/ClassicCompat.lua"), "ClassicCompat")
+execute(read("Utils/FriendNotes.lua"), "FriendNotes")
 execute(read("Modules/FilterSortRegistry.lua"), "FilterSortRegistry")
 local registry = BFL.modules.FilterSortRegistry
 local suite = execute(read("Modules/TestSuite.lua"), "TestSuite")
@@ -108,10 +109,16 @@ V:Assert(env.FriendsList:PassesFilters(multi), "FriendsList agrees with the brok
 V:Assert(not env.FriendsList:PassesFilters({ type = "bnet", connected = true, gameAccountInfo = allAccounts[3][1] }), "FriendsList rejects App-only presence")
 
 -- The grouped tooltip must use the same evaluator for the new built-in.
-local tooltipFilter = execute("return function(groupedFriends)\n" .. between(brokerSource, "\t\t-- Apply current filter (to online friends only)", "\t\t-- Apply current sort mode") .. "\nreturn groupedFriends\nend", "Broker grouped tooltip filter")
+local tooltipFilter = execute("return function(groupedFriends, sample)\nlocal settings = sample and sample.settings or BetterFriendlistDB\n"
+	.. between(brokerSource, "\t\t-- Apply current filter (to online friends only)", "\t\t-- Apply current sort mode")
+	.. "\nreturn groupedFriends\nend", "Broker grouped tooltip filter")
 local grouped = tooltipFilter({ nogroup = { multi, { type = "bnet", connected = true, gameAccountInfo = focused } } })
 V:AssertEqual(#grouped.nogroup, 1, "Broker tooltip rejects Retail-only and retains secondary Forever")
 V:Assert(grouped.nogroup[1] == multi, "Filtering retains the original contact and preferred account")
+local sampleGrouped = tooltipFilter({ nogroup = { multi, { type = "bnet", connected = true, gameAccountInfo = focused } } },
+	{ settings = { quickFilter = "all" } })
+V:AssertEqual(#sampleGrouped.nogroup, 2, "A settings sample can compare the All Friends filter")
+V:AssertEqual(env.BetterFriendlistDB.quickFilter, "forever", "The sample filter leaves the live setting intact")
 
 local mobile = { type = "bnet", connected = false, client = "BSAp",
 	gameAccountInfo = { clientProgram = "BSAp", isOnline = true }, gameAccounts = { secondary } }
@@ -145,4 +152,49 @@ env.BetterFriendlistDB.quickFilterVisibility.forever = false
 registry:InvalidateCaches()
 V:AssertEqual(registry:NormalizeQuickFilterId("forever"), "all", "A hidden filter uses the standard selection fallback")
 V:Assert(not isBrokerFriendOnline({ type = "wow", connected = false }, false), "A hidden Forever filter never marks offline fallback friends online")
+-- Live Basic uses the same builder as its preview even with QTip installed.
+local acquired, activated, anchored
+local rows = {}
+local tt = {
+	ScrollFrame = { ClearAllPoints = function() end, SetPoint = function() end },
+	Clear = function() end,
+	GetScript = function() end,
+	SetScript = function() end,
+	SetFrameStrata = function() end,
+	SetMaxHeight = function() end,
+	SmartAnchorTo = function(_, anchor) anchored = anchor end,
+	UpdateLayout = function() end,
+	Show = function() end,
+}
+function tt:AddRow(...)
+	local texts = { ... }
+	rows[#rows + 1] = texts
+	return { GetCell = function()
+		return { SetTextColor = function() end, SetColSpan = function() end }
+	end }
+end
+env.fixtureQTip = { AcquireTooltip = function(_, key, columns)
+	acquired = { key, columns }
+	return tt
+end }
+BFL.BrokerUtils.DismissActiveBrokerTooltip = function() end
+BFL.BrokerUtils.SetActiveBrokerTooltip = function(active) activated = active end
+local route = execute(
+	between(brokerSource, "-- Modules/Broker.lua", "-- Broker Text Update")
+	.. "\nLQT = fixtureQTip\nlocal SetupTooltipAutoHide = function() end\nlocal ApplyElvUISkin = function() end\n"
+	.. between(brokerSource, "local function CreateBasicTooltip(gameTooltip, sample)", "-- Advanced Tooltip")
+	.. between(brokerSource, "local RenderBasicQTipTooltip", "local function CreateLibQTipTooltip")
+	.. between(brokerSource, "local function CreateLibQTipTooltip", "\n\tlocal settings = sample and sample.settings or BetterFriendlistDB")
+	.. "\nreturn 'advanced'\nend\n"
+	.. between(brokerSource, "function RenderBasicQTipTooltip(parent, sample)", "function Broker:RenderSettingsSample")
+	.. "\nreturn CreateLibQTipTooltip", "Broker live Basic routing")
+env.BetterFriendlistDB.brokerTooltipMode = "basic"
+local anchor = {}
+V:AssertEqual(route(anchor), tt, "Basic mode uses the live QTip instance")
+V:AssertEqual(acquired[2], 2, "Basic QTip has only the summary columns")
+V:AssertEqual(anchored, anchor, "the live Basic tooltip stays anchored to the Broker")
+V:AssertEqual(activated, tt, "the live Basic tooltip joins the same active lifecycle")
+V:Assert(#rows >= 5, "the Basic tooltip renders the summary, counts and filter")
+env.BetterFriendlistDB.brokerTooltipMode = "advanced"
+V:AssertEqual(route(anchor), "advanced", "Advanced retains the existing grouped-tooltip path")
 io.write("[OK] Forever filter smoke: " .. assertions .. " assertions, including real menu, list, broker count and tooltip paths\n")

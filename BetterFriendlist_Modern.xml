@@ -244,7 +244,61 @@
 		<Size y="2" />
 	</Frame>
 
-	<Frame name="BFLModernFriendsRootTemplate" virtual="true">
+	<Frame name="BFLModernPortraitVisualTemplate" virtual="true">
+		<Size x="60" y="60" />
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon">
+					<Size x="60" y="60" />
+					<Anchors><Anchor point="CENTER" /></Anchors>
+					<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
+				</Texture>
+				<MaskTexture parentKey="Mask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Size x="60" y="60" />
+					<Anchors><Anchor point="CENTER" /></Anchors>
+					<MaskedTextures><MaskedTexture childKey="Icon" /></MaskedTextures>
+				</MaskTexture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="BFLModernBattleNetBarSurfaceTemplate" virtual="true">
+		<Size y="50" />
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Background" atlas="friends-frame-infobg" setAllPoints="true" />
+			</Layer>
+		</Layers>
+		<Frames>
+			<DropdownButton parentKey="MenuButton">
+				<Size x="34" y="34" />
+				<Anchors><Anchor point="RIGHT" x="-8" y="4" /></Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<Texture parentKey="Icon" atlas="friends-icon-menu" useAtlasSize="true">
+							<Anchors><Anchor point="CENTER" /></Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<NormalTexture parentKey="NormalTexture" atlas="common-button-tertiary-square-normal" />
+				<PushedTexture parentKey="PushedTexture" atlas="common-button-tertiary-square-pressed" />
+				<HighlightTexture parentKey="HighlightTexture" atlas="common-button-tertiary-square-normal" alphaMode="ADD" />
+			</DropdownButton>
+			<Button parentKey="CopyBattleTagButton">
+				<Size x="13" y="13" />
+				<Layers>
+					<Layer level="ARTWORK" textureSubLevel="1">
+						<Texture parentKey="Icon" atlas="friends-icon-battlenet-copy" useAtlasSize="true">
+							<Anchors><Anchor point="CENTER" /></Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<HighlightTexture parentKey="HighlightTexture" atlas="friends-icon-battlenet-copy" alphaMode="ADD" alpha="0.5" />
+			</Button>
+		</Frames>
+	</Frame>
+
+	<Frame name="BFLModernFriendsSurfaceTemplate" virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture parentKey="ContentBackground" file="Interface\Buttons\WHITE8X8">
@@ -262,6 +316,13 @@
 				<Texture parentKey="BottomFade" atlas="friends-frame-bottomtexbg" useAtlasSize="true">
 					<Anchors><Anchor point="BOTTOM" /></Anchors>
 				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<Frame name="BFLModernFriendsRootTemplate" inherits="BFLModernFriendsSurfaceTemplate" virtual="true">
+		<Layers>
+			<Layer level="ARTWORK">
 				<Texture parentKey="TopDivider" atlas="perks-divider-short" texelSnappingBias="0.0" snapToPixelGrid="false">
 					<Size x="400" y="3" />
 				</Texture>
@@ -287,80 +348,15 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Frame parentKey="PortraitOverlay" enableMouse="false">
-				<Size x="60" y="60" />
+			<Frame parentKey="PortraitOverlay" inherits="BFLModernPortraitVisualTemplate" enableMouse="false">
 				<Anchors><Anchor point="TOPLEFT" x="-5" y="7" /></Anchors>
-				<Layers>
-					<Layer level="ARTWORK">
-						<Texture parentKey="Icon" file="Interface\AddOns\BetterFriendlist\Textures\PortraitIcon">
-							<Size x="60" y="60" />
-							<Anchors><Anchor point="CENTER" /></Anchors>
-							<TexCoords left="0.08" right="0.92" top="0.08" bottom="0.92" />
-						</Texture>
-						<MaskTexture parentKey="Mask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
-							<Size x="60" y="60" />
-							<Anchors><Anchor point="CENTER" /></Anchors>
-							<MaskedTextures><MaskedTexture childKey="Icon" /></MaskedTextures>
-						</MaskTexture>
-					</Layer>
-					<Layer level="OVERLAY" textureSubLevel="7">
-						<Texture parentKey="Glow" file="Interface\PVPFrame\TournamentOrganizer" alphaMode="ADD" hidden="true">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="-18" y="12" />
-								<Anchor point="BOTTOMRIGHT" x="64" y="-64" />
-							</Anchors>
-							<TexCoords left="0.8525390625" right="0.9775390625" top="0.0009765625" bottom="0.1259765625" />
-						</Texture>
-					</Layer>
-				</Layers>
-				<Frames>
-					<Button parentKey="HitButton" enableMouse="true">
-						<Anchors>
-							<Anchor point="TOPLEFT" />
-							<Anchor point="BOTTOMRIGHT" />
-						</Anchors>
-					</Button>
-				</Frames>
 			</Frame>
 
-			<Frame parentKey="BattleNetBar">
-				<Size y="50" />
+			<Frame parentKey="BattleNetBar" inherits="BFLModernBattleNetBarSurfaceTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="-1" y="-48" />
 					<Anchor point="TOPRIGHT" x="1" y="-48" />
 				</Anchors>
-				<Layers>
-					<Layer level="BACKGROUND">
-						<Texture parentKey="Background" atlas="friends-frame-infobg" setAllPoints="true" />
-					</Layer>
-				</Layers>
-				<Frames>
-					<DropdownButton parentKey="MenuButton">
-						<Size x="34" y="34" />
-						<Anchors><Anchor point="RIGHT" x="-8" y="4" /></Anchors>
-						<Layers>
-							<Layer level="OVERLAY">
-								<Texture parentKey="Icon" atlas="friends-icon-menu" useAtlasSize="true">
-									<Anchors><Anchor point="CENTER" /></Anchors>
-								</Texture>
-							</Layer>
-						</Layers>
-						<NormalTexture parentKey="NormalTexture" atlas="common-button-tertiary-square-normal" />
-						<PushedTexture parentKey="PushedTexture" atlas="common-button-tertiary-square-pressed" />
-						<HighlightTexture parentKey="HighlightTexture" atlas="common-button-tertiary-square-normal" alphaMode="ADD" />
-					</DropdownButton>
-					<Button parentKey="CopyBattleTagButton">
-						<Size x="13" y="13" />
-						<Layers>
-							<Layer level="ARTWORK" textureSubLevel="1">
-								<Texture parentKey="Icon" atlas="friends-icon-battlenet-copy" useAtlasSize="true">
-									<Anchors><Anchor point="CENTER" /></Anchors>
-								</Texture>
-							</Layer>
-						</Layers>
-						<HighlightTexture parentKey="HighlightTexture" atlas="friends-icon-battlenet-copy" alphaMode="ADD" alpha="0.5" />
-					</Button>
-				</Frames>
 			</Frame>
 
 			<Frame parentKey="FilterBar">

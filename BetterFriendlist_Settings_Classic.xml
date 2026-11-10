@@ -36,7 +36,7 @@
 			</Frame>
 			
 			<!-- Content Scroll Frame - anchored to MainInset -->
-			<ScrollFrame parentKey="ContentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame parentKey="ContentScrollFrame">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.MainInset" relativePoint="TOPLEFT" x="8" y="-5" />
 					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.MainInset" relativePoint="BOTTOMRIGHT" x="-25" y="1" />

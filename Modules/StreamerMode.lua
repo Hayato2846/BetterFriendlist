@@ -46,6 +46,10 @@ end
 function StreamerMode:Toggle()
 	BetterFriendlistDB.streamerModeActive = not BetterFriendlistDB.streamerModeActive
 	self:UpdateState()
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review then
+		review:QueueSample()
+	end
 
 	-- Refresh Friends List to update names
 	if BFL.ForceRefreshFriendsList then
@@ -113,14 +117,16 @@ function StreamerMode:GetFriendMenuLabel(friend)
 	end
 end
 
-function StreamerMode:ApplyToggleButtonVisualState()
-	local button = self.toggleButton
+function StreamerMode:ApplyToggleButtonVisualState(button, active)
+	button = button or self.toggleButton
 	local icon = button and button.Icon
 	if not button or not icon then
 		return
 	end
 
-	local active = self:IsActive()
+	if active == nil then
+		active = self:IsActive()
+	end
 	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
 	local palette, themed
 	if FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.GetModernThemeColors then

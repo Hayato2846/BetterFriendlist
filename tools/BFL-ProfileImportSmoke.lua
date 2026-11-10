@@ -122,6 +122,14 @@ check(db.unknownFutureSetting.value == "preserve future settings", "preserve unk
 check(Groups.groups.old.color.r == .1 and Groups.groups.old.color.a == .4 and Groups.groups.old.countColor.r == .2 and Groups.groups.old.arrowColor.r == .3, "preserve independent colors and alpha")
 check(Groups.groups.old.collapsed and Groups.groups.old.order == 2, "preserve collapse and explicit order")
 
+-- The same backup format preserves both verified Title Friend group keys and
+-- old numeric assignments whose owner can no longer be proven.
+db.friendGroups.bnet_title_0123456789abcdef = { "old" }
+db.friendGroups.bnet_150 = { "old" }
+check(Settings:ImportSettings(assert(Settings:ExportSettings())), "Title Friend group keys survive backup import")
+check(env.BetterFriendlistDB.friendGroups.bnet_title_0123456789abcdef[1] == "old", "preserve confirmed note-based assignment")
+check(env.BetterFriendlistDB.friendGroups.bnet_150[1] == "old", "preserve unmatched numeric assignment")
+
 -- Real editor/registry APIs create a supported depth-five filter; export/import
 -- must preserve both its AST and visible filtering behavior.
 reset()
