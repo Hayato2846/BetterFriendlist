@@ -7,15 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.1.1]        - 2026-11-10
-
-### All WoW Versions
-
-#### Fixed
-- **Changelog** - Clarified the 3.1.0 release notes for Title Friends.
-
----
-
 ## [3.1.0]        - 2026-11-10
 
 ### All WoW Versions
@@ -351,6 +342,9 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 
 ---
 
----
+## [2.8.7]        - 2026-08-24
 
-*Older versions archived. Full history available in git.*
+### Fixed
+- **Large Friend Lists** - BetterFriendlist has received further optimizations for larger friend lists and is now less likely to run into errors when loading them.
+
+---

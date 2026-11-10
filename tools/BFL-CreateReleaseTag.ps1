@@ -5,7 +5,9 @@ param(
 
     [switch]$Push,
     [switch]$ValidateOnly,
-    [string]$Remote = 'origin'
+    [string]$Remote = 'origin',
+    [ValidatePattern('^[a-f0-9]{40}$')]
+    [string]$ReplaceTagObject
 )
 
 Set-StrictMode -Version Latest
@@ -65,9 +67,14 @@ Assert-BFLCleanWorktree -Root $repoRoot
 
 & git -C $repoRoot show-ref --verify --quiet "refs/tags/$tagName"
 if ($LASTEXITCODE -eq 0) {
-    throw "Tag already exists locally: $tagName"
-}
-if ($LASTEXITCODE -ne 1) {
+    if (-not $ReplaceTagObject -or (& git -C $repoRoot rev-parse "refs/tags/$tagName") -cne $ReplaceTagObject) {
+        throw "Tag already exists locally: $tagName"
+    }
+    & git -C $repoRoot merge-base --is-ancestor "refs/tags/$tagName^{commit}" HEAD
+    if ($LASTEXITCODE -ne 0) {
+        throw "Replacement must descend from the existing release: $tagName"
+    }
+} elseif ($LASTEXITCODE -ne 1 -or $ReplaceTagObject) {
     throw "Could not inspect existing tags (git exit code $LASTEXITCODE)."
 }
 
@@ -92,7 +99,7 @@ if ($changelogText -match '(?m)^## \[DRAFT\]') {
     throw 'CHANGELOG.md still contains a [DRAFT] section. Promote it before tagging.'
 }
 
-$previousTagOutput = @(& git -C $repoRoot describe --tags --abbrev=0 --match 'v*' HEAD 2>$null)
+$previousTagOutput = @(& git -C $repoRoot describe --tags --abbrev=0 --match 'v*' --exclude $tagName HEAD 2>$null)
 if ($LASTEXITCODE -ne 0 -or $previousTagOutput.Count -eq 0) {
     throw 'No previous v* release tag is reachable from HEAD; cannot verify translation freshness.'
 }
@@ -128,7 +135,14 @@ if ($ValidateOnly) {
 }
 
 if ($PSCmdlet.ShouldProcess($tagName, 'Create annotated release tag')) {
-    & git -C $repoRoot tag -a $tagName -m "BetterFriendlist $cleanVersion"
+    $tagArgs = @('-a', $tagName, '-m', "BetterFriendlist $cleanVersion")
+    if ($ReplaceTagObject) {
+        if ((& git -C $repoRoot rev-parse "refs/tags/$tagName") -cne $ReplaceTagObject) {
+            throw "Local tag changed during validation: $tagName"
+        }
+        $tagArgs = @('-f') + $tagArgs
+    }
+    & git -C $repoRoot tag @tagArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Could not create release tag $tagName."
     }
@@ -137,7 +151,11 @@ if ($PSCmdlet.ShouldProcess($tagName, 'Create annotated release tag')) {
 
 if ($Push) {
     if ($PSCmdlet.ShouldProcess("$Remote/$tagName", 'Push release tag and start release automation')) {
-        & git -C $repoRoot push $Remote "refs/tags/$tagName"
+        $pushArgs = @($Remote, "refs/tags/$tagName")
+        if ($ReplaceTagObject) {
+            $pushArgs = @("--force-with-lease=refs/tags/${tagName}:$ReplaceTagObject") + $pushArgs
+        }
+        & git -C $repoRoot push @pushArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Tag $tagName exists locally, but pushing it to $Remote failed."
         }
