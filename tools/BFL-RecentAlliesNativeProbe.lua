@@ -6,7 +6,7 @@ do
 	local events = CreateFrame("Frame")
 
 	local function Report(message)
-		print("|cff67ccff[BFL-RA]|r " .. message)
+		DEFAULT_CHAT_FRAME:AddMessage("|cff67ccff[BFL-RA]|r " .. message)
 	end
 
 	local function DataReady()

@@ -3361,7 +3361,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		print(BFL.L.CORE_HELP_CMD_CHANGELOG)
 		print(BFL.L.CORE_HELP_CMD_RESET)
 		if BFL.TitleFriendNotes and BFL.TitleFriendNotes:IsSupported() then
-			print(BFL.L.CORE_HELP_CMD_TITLE_FRIEND_NOTES)
+			DEFAULT_CHAT_FRAME:AddMessage(BFL.L.CORE_HELP_CMD_TITLE_FRIEND_NOTES)
 		end
 		-- The internal forceModern command intentionally remains undiscoverable.
 		-- It is retained only for targeted development diagnostics and must not

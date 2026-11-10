@@ -140,4 +140,4 @@ check(store.returning == nil and not store.enabled and not env.BetterFriendlistD
 titleNotes:Process()
 check(writes == 7 and not token(blank), "disabled mode never recreates IDs")
 check(db:GetFriendGroups("bnet_Friend#1234")[1] == "regular", "ordinary group keys are untouched")
-print("Title Friend note and group migration smoke passed.")
+io.write("Title Friend note and group migration smoke passed.\n")

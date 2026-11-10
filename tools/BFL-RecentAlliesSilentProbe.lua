@@ -6,7 +6,11 @@ do
 	local prefix = "[BFL-RA-SILENT]"
 
 	local function Report(...)
-		print(prefix, ...)
+		local parts = { prefix }
+		for index = 1, select("#", ...) do
+			parts[#parts + 1] = tostring((select(index, ...)))
+		end
+		DEFAULT_CHAT_FRAME:AddMessage(table.concat(parts, " "))
 	end
 
 	local function Finish(state, reason)
