@@ -4,9 +4,20 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published tag (for example, v3.1.0)
+        required: true
+        type: string
+      discord_message_link:
+        description: Link to the existing Discord release announcement
+        required: true
+        type: string
 
 jobs:
   release:
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     
     steps:
@@ -16,6 +27,7 @@ jobs:
           fetch-depth: 0
       
       - name: Package and release
+        if: github.event_name == 'push'
         uses: BigWigsMods/packager@v2
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
@@ -23,18 +35,20 @@ jobs:
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Send Discord Notification
+      - name: Publish or edit Discord release notes
         # Announce only first-time stable or beta release tags.
         # Correction pushes still package and upload, but must not repost release notes.
-        if: success() && github.event.created == true && github.event.forced != true && (!contains(github.ref_name, '-') || contains(github.ref_name, 'beta'))
+        if: success() && (github.event_name == 'workflow_dispatch' || (github.event.created == true && github.event.forced != true && (!contains(github.ref_name, '-') || contains(github.ref_name, 'beta'))))
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ inputs.release_tag || github.ref_name }}
+          DISCORD_MESSAGE_LINK: ${{ inputs.discord_message_link }}
         shell: python
         run: |
           import os
           import json
           import re
+          import subprocess
           import time
           import urllib.error
           import urllib.parse
@@ -86,12 +100,12 @@ jobs:
                   yield embeds
                   message_title = f"{title} (continued)"
 
-          def send_message(request, payload):
-              data = json.dumps(payload).encode("utf-8")
+          def discord_request(request, payload=None):
+              data = json.dumps(payload).encode("utf-8") if payload is not None else None
               for attempt in range(3):
                   try:
                       with urllib.request.urlopen(request, data, timeout=30) as response:
-                          return response.status
+                          return response.status, json.load(response)
                   except urllib.error.HTTPError as error:
                       retry_after = error.headers.get("Retry-After")
                       if error.code != 429 or retry_after is None or attempt == 2:
@@ -130,6 +144,18 @@ jobs:
               exit(1)
 
           version = os.environ.get('VERSION', 'Unknown')
+          editing = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
+          if editing:
+              target = re.fullmatch(
+                  r"https://discord\.com/channels/[0-9]+/([0-9]+)/([0-9]+)",
+                  os.environ.get('DISCORD_MESSAGE_LINK', '').strip(),
+              )
+              if not target or not re.fullmatch(r"v\d+\.\d+\.\d+(?:-beta[0-9]*)?", version):
+                  raise SystemExit("Provide a release tag and a Discord message link.")
+              tag_changelog = subprocess.run(
+                  ["git", "show", f"refs/tags/{version}:CHANGELOG.md"],
+                  capture_output=True, encoding="utf-8", check=True,
+              ).stdout
           
           # Clean version string (remove 'v' prefix for the title)
           clean_version = version
@@ -142,7 +168,7 @@ jobs:
           try:
               if os.path.exists('CHANGELOG.md'):
                   with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
-                      content = f.read()
+                      content = tag_changelog if editing else f.read()
                       
                       # Find start of current version section (e.g. "## [2.0.6]")
                       start_marker = f"## [{clean_version}]"
@@ -171,6 +197,8 @@ jobs:
           # Normalize changelog Markdown for Discord's supported heading levels.
           if changelog_body:
               changelog_body = format_discord_markdown(changelog_body)
+          elif editing:
+              raise SystemExit("The specified tag has no matching changelog entry.")
 
           # Use changelog body if found, otherwise fallback to release body
           fallback_body = "New beta version available for testing!" if is_beta else "New version released!"
@@ -207,13 +235,48 @@ jobs:
           webhook = urllib.parse.urlsplit(webhook_url)
           query = urllib.parse.parse_qsl(webhook.query, keep_blank_values=True)
           query = [(key, value) for key, value in query if key != "wait"]
+          description = f"{links}\n\n{beta_notice}{body}"
+          messages = build_messages(description, embed_title, embed_color, footer_text)
+
+          if editing:
+              channel_id, message_id = target.groups()
+              embeds = next(messages, None)
+              if not embeds or next(messages, None) is not None:
+                  raise SystemExit("The corrected notes must fit in the existing Discord message.")
+
+              endpoint = webhook._replace(
+                  path=f"{webhook.path.rstrip('/')}/messages/{message_id}",
+                  query=urllib.parse.urlencode(query),
+              ).geturl()
+              headers = {"Content-Type": "application/json", "User-Agent": "GitHub-Action"}
+              try:
+                  _, original = discord_request(urllib.request.Request(endpoint, headers=headers))
+                  if (
+                      original.get("channel_id") != channel_id
+                      or original.get("id") != message_id
+                      or (original.get("embeds") or [{}])[0].get("title") != embed_title
+                  ):
+                      raise SystemExit("The Discord message does not match the requested release and channel.")
+                  _, updated = discord_request(
+                      urllib.request.Request(endpoint, headers=headers, method="PATCH"),
+                      {"embeds": embeds, "allowed_mentions": {"parse": []}},
+                  )
+                  if updated.get("id") != message_id or [
+                      embed.get("description") for embed in updated.get("embeds", [])
+                  ] != [embed["description"] for embed in embeds]:
+                      raise SystemExit("Discord returned unexpected content after the edit.")
+              except urllib.error.HTTPError as error:
+                  raise SystemExit(f"Discord returned HTTP {error.code} while editing the release message.")
+              except (urllib.error.URLError, TimeoutError):
+                  raise SystemExit("The Discord edit request could not reach the API.")
+              print(f"Updated existing Discord release message {message_id} for {version}.")
+              exit(0)
+
           query.append(("wait", "true"))
           req = urllib.request.Request(webhook._replace(query=urllib.parse.urlencode(query)).geturl())
           req.add_header("Content-Type", "application/json")
           req.add_header("User-Agent", "GitHub-Action")
 
-          description = f"{links}\n\n{beta_notice}{body}"
-          messages = build_messages(description, embed_title, embed_color, footer_text)
           for number, embeds in enumerate(messages, start=1):
               payload = {
                   "username": webhook_username,
@@ -222,7 +285,7 @@ jobs:
               }
 
               try:
-                  status = send_message(req, payload)
+                  status, _ = discord_request(req, payload)
                   print(f"Discord message {number} sent successfully. Status code: {status}")
               except Exception as error:
                   print(f"Failed to send Discord message {number}: {error}")
