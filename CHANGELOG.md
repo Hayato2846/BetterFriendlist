@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.1]        - 2026-11-10
+
+### All WoW Versions
+
+#### Fixed
+- **Changelog** - Clarified the 3.1.0 release notes for Title Friends.
+
+---
+
 ## [3.1.0]        - 2026-11-10
 
 ### All WoW Versions
@@ -50,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Fixed
 - **Who Searches** - Shift-left-clicking a character name in chat runs the lookup without opening BetterFriendlist's Who tab by default. You can turn automatic opening on under Who settings.
-- **Title Friends** - Title Friends keep their groups and friend notes when they go offline, switch characters, or you log back in. BFL stores the note text in the addon and uses a short ID in the Blizzard note. To move the text back to Blizzard, type `/bfl titlefriendnotes off`.
+- **Title Friends** - Title Friends keep their groups and friend notes when they go offline, switch characters, or you log back in.
 
 ---
 
@@ -342,9 +351,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 
 ---
 
-## [2.8.7]        - 2026-08-24
-
-### Fixed
-- **Large Friend Lists** - BetterFriendlist has received further optimizations for larger friend lists and is now less likely to run into errors when loading them.
-
 ---
+
+*Older versions archived. Full history available in git.*
