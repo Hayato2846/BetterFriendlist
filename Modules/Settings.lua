@@ -749,19 +749,31 @@ function Settings:Show(pageID, focusControlID)
 	self:ShowLegacy()
 end
 
-function Settings:ShowRedesignHint(preview)
+local redesignHintResetForReload = false
+
+function Settings:ResetRedesignHintForReload()
+	local db = GetDB()
+	if not db then return end
+
+	redesignHintResetForReload = true
+	db:Set("settingsRedesignHintSeen", false)
+	local hints = BFL:GetModule("FeatureHints")
+	if hints then hints:Hide("settings.redesign") end
+end
+
+function Settings:ShowRedesignHint()
 	local hints = BFL:GetModule("FeatureHints")
 	local db = GetDB()
-	if not hints or not db then return false end
-	if not preview then
-		local onboarding = BFL:GetModule("AppearanceOnboarding")
-		if db:Get("settingsRedesignHintSeen", false) or (InCombatLockdown and InCombatLockdown())
-			or (onboarding and onboarding.active) then return false end
-	end
+	local friendsFrame = _G.BetterFriendsFrame
+	if redesignHintResetForReload or not hints or not db or not friendsFrame or not friendsFrame:IsVisible() then return false end
+	local onboarding = BFL:GetModule("AppearanceOnboarding")
+	if db:Get("settingsRedesignHintSeen", false) or (InCombatLockdown and InCombatLockdown())
+		or (onboarding and onboarding.active) then return false end
 
 	local shown = hints:Show({
 		id = "settings.redesign",
 		title = L.SETTINGS_REDESIGN_HINT_TITLE,
+		anchor = friendsFrame,
 		entries = {
 			{
 				text = L.SETTINGS_REDESIGN_HINT_BODY,
@@ -769,31 +781,33 @@ function Settings:ShowRedesignHint(preview)
 				onClick = function() self:ShowLegacy() end,
 			},
 		},
-		oncePerSession = not preview,
-		replace = preview,
 	})
-	if shown and not preview then db:Set("settingsRedesignHintSeen", true) end
+	if shown then db:Set("settingsRedesignHintSeen", true) end
 	return shown
 end
 
 function Settings:OnPlayerLogin()
 	local db = GetDB()
-	if not db or db:Get("settingsRedesignHintSeen", false) then return end
+	local friendsFrame = _G.BetterFriendsFrame
+	if not db or not friendsFrame or db:Get("settingsRedesignHintSeen", false) then return end
+
 	local events = CreateFrame("Frame")
-	events:RegisterEvent("PLAYER_ENTERING_WORLD")
 	events:RegisterEvent("PLAYER_REGEN_ENABLED")
 	local function TryShow()
 		if db:Get("settingsRedesignHintSeen", false) or self:ShowRedesignHint() then
 			events:UnregisterAllEvents()
 		end
 	end
-	events:SetScript("OnEvent", function(_, event)
-		if event == "PLAYER_ENTERING_WORLD" then
-			C_Timer.After(3, TryShow)
-		else
-			TryShow()
+
+	local function ScheduleTryShow()
+		if friendsFrame:IsVisible() and not db:Get("settingsRedesignHintSeen", false) then
+			-- Wait for the friends window to finish laying out.
+			C_Timer.After(0, TryShow)
 		end
-	end)
+	end
+	friendsFrame:HookScript("OnShow", ScheduleTryShow)
+	events:SetScript("OnEvent", ScheduleTryShow)
+	ScheduleTryShow()
 end
 
 function Settings:ShowChangelog()

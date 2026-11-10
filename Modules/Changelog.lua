@@ -74,6 +74,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### All WoW Versions
+
+#### Fixed
+- **New Settings Hint** - The hint appears next to the friends list when you open it.
+
+---
+
 ## [3.1.0]        - 2026-11-10
 
 ### All WoW Versions
@@ -409,12 +418,9 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 
 ---
 
-## [2.8.7]        - 2026-08-24
-
-### Fixed
-- **Large Friend Lists** - BetterFriendlist has received further optimizations for larger friend lists and is now less likely to run into errors when loading them.
-
 ---
+
+*Older versions archived. Full history available in git.*
 ]]
 
 local function StripEmojis(text)

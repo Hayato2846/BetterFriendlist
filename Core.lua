@@ -2892,7 +2892,7 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 	elseif msg == "settingshint" then
 		local Settings = BFL:GetModule("Settings")
-		if Settings then Settings:ShowRedesignHint(true) end
+		if Settings then Settings:ResetRedesignHintForReload() end
 	elseif msg:match("^forcemodern") then
 		local argument = msg:match("^forcemodern%s*(%S*)") or ""
 		local FriendsUI = BFL:GetModule("FriendsUI")
