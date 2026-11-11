@@ -107,7 +107,16 @@ function Get-BFLWorkspaceFolderName {
         return 'main'
     }
 
-    return "wt-$(Split-Path -Path $entryPath -Leaf)"
+    $folderName = Split-Path -Path $entryPath -Leaf
+    if ($folderName -eq (Split-Path -Path $repoPath -Leaf)) {
+        # Codex may nest each checkout under a worktree-specific folder.
+        $folderName = Get-BFLBranchNameFromRef $Entry.Branch
+        if ([string]::IsNullOrWhiteSpace($folderName)) {
+            $folderName = Split-Path -Path (Split-Path -Path $entryPath -Parent) -Leaf
+        }
+    }
+
+    return "wt-$folderName"
 }
 
 function Get-BFLWorkspaceFoldersFromFile {
