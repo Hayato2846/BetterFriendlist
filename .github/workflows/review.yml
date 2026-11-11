@@ -13,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BFL_REFERENCES_ROOT: ${{ runner.temp }}/bfl-smoke-references
-      BFL_SMOKE_REPORT: ${{ runner.temp }}/bfl-smoke-results.json
       BFL_LUA: lua5.4
 
     steps:
@@ -22,6 +20,11 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Configure smoke paths
+        run: |
+          echo "BFL_REFERENCES_ROOT=$RUNNER_TEMP/bfl-smoke-references" >> "$GITHUB_ENV"
+          echo "BFL_SMOKE_REPORT=$RUNNER_TEMP/bfl-smoke-results.json" >> "$GITHUB_ENV"
 
       - name: Set up Python
         uses: actions/setup-python@v5
