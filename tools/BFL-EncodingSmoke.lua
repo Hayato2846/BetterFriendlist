@@ -42,3 +42,4 @@ equal(BFL:Base64Decode("eA=="), "native-decoded", "Native decoding remains prefe
 env.C_EncodingUtil.DecodeBase64 = function() return nil end
 equal(BFL:Base64Decode("YQ=="), "a", "Native rejection falls back without dropping the final byte")
 io.write("[OK] Encoding smoke: " .. checks .. " checks passed\n")
+error("BFL CI verification: deliberate smoke failure")
