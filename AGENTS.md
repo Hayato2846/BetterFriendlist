@@ -1,56 +1,46 @@
 # BetterFriendlist Agent Guide
 
-## Workspace
+## Workspace and scope
 
-- Work from `C:\Users\hofer\Documents\BFL\repos\BetterFriendlist` or one feature worktree under `C:\Users\hofer\Documents\BFL\worktrees\BetterFriendlist`.
-- Treat WoW `Interface\AddOns\BetterFriendlist` folders as deployment targets only.
-- At the start of coding or workflow changes, run `git rev-parse --show-toplevel` and `git status --short --branch`.
-- If a thread starts in `C:\Users\hofer\Documents\BFL`, switch into the main repo or the intended worktree before reading, patching, validating, or deploying.
+- Work in `C:\Users\hofer\Documents\BFL\repos\BetterFriendlist` or the intended worktree, never a deployment folder. Before coding/workflow changes run `git rev-parse --show-toplevel` and `git status --short --branch`.
+- One branch/worktree per feature, issue, or parallel chat. For checkout setup, follow [worktree setup](.agents/skills/bfl-feature/references/worktree.md): check attachments, use Codex creation, confirm returned path/branch. Preserve requested names; issue names start `issue-NNN-` in the worktree and branch feature part. Keep `codex/*` local. Preserve unrelated changes and recheck overlapping diffs.
+- GitHub writes require explicit instructions; issue/PR implementation alone does not authorize comments, reactions, metadata or state changes. Use the connector for current remote facts; read the issue/PR body, state and relevant discussion before planning its edits.
+- The maintainer performs live WoW tests. Never use Computer Use, desktop automation or remote input for BFL, or request test contacts/account access. Prepare builds, exact live steps, and analyze supplied results.
 
-## Feature Flow
+## Implementation contracts
 
-- Use one branch and one worktree per feature, issue, or parallel Codex thread.
-- Prefer names that describe the top-level goal. For GitHub issues, prefix both branch and worktree with `issue-NNN-`.
-- Avoid overlapping edits to the same file regions from multiple threads. If overlap is possible, refresh `git status` and inspect the diff before patching.
-- Keep `codex/*` branches local. For releases, merge the feature locally, push the authorized `main` commit with an explicit refspec, and publish only the authorized tag.
-- Use `tools\BFL-Worktree.ps1` for worktree creation, listing, and workspace regeneration.
-
-## Implementation Rules
-
-- Keep runtime logic in `Modules\`, shared helpers in `Utils\`, static data in `Data\`, and UI wiring thin.
-- Check Retail and Classic impact for every user-visible feature or bugfix. Prefer existing `BFL.Is*`, `BFL.Has*`, and `BFL.Compat` helpers over raw flavor checks.
-- Put new user-facing strings through localization and provide real translations in all 10 non-English locale files in the same change. Never copy the English source into translated locales as a placeholder, and never defer translations to a later task.
-- When an existing `enUS` value changes, review and update that key in every translated locale in the same change. Preserve printf placeholders, WoW markup, links, and escaped newlines.
-- Treat a locale-affecting task as incomplete until `tools\BFL-LocalizationCheck.ps1 -Mode Changed -BaseRef <branch-base>` passes. Use `tools\BFL-LocalizationAllowlist.json` only for intrinsically untranslated product names, client key labels, or established locale-specific UI terms. Scope every exception to an exact locale/key or exact locale/value match and document the reason; never allow substrings or an entire locale.
-- Do not leave Perfy instrumentation in normal source. Use `tools\BFL-PerfyCleanup.ps1` to inspect cleanup candidates instead of running `git restore .`.
+- Logic in `Modules/`, helpers in `Utils/`, data in `Data/`; keep UI wiring thin.
+- No emojis in project files. Commits use `{type}: {description} ({context})` with existing BFL types.
+- Assess Retail and every supported Classic flavor for user-visible fixes/features; resolve affected regressions in the same task. Forever is Mainline-family. Verify changed native API/event/template contracts against relevant local sources. Prefer `BFL.Is*`, `BFL.Has*`, `BFL.Compat` over raw version checks.
+- Load `betterfriendlist` for runtime work, `bfl-feature` for implementation/releases/deployment, and `libsettingsdesigner-bfl` for Settings Center/library work only. Load relevant conditional references before their work, especially visual edits and changelog/releases.
+- New strings and changed `enUS` values need real translations in all 10 non-English locales in the same change. Preserve printf placeholders, WoW markup, links and escaped newlines. Require `tools/BFL-LocalizationCheck.ps1 -Mode Changed -BaseRef <branch-base>`. Allowlist only justified exact locale/key or locale/value exceptions for product names, client keys or established UI terms; no substring/whole-locale exceptions.
+- Keep Perfy instrumentation out of normal source; inspect cleanup with `tools/BFL-PerfyCleanup.ps1`, never `git restore .`.
 
 ## Validation
 
-- Match validation to risk. For docs, guidance, comments, or narrow tooling text changes, use `git status`, `git diff --stat`, and only the smallest relevant script.
-- For narrow tooling, ignore, package, or release metadata checks, run `tools\BFL-PackageCheck.ps1`.
-- For runtime Lua/XML/locales/settings changes, run `tools\BFL-PackageCheck.ps1`; deploy a fresh `CleanCopy` only when runtime QA is needed or requested.
-- Use `tools\BFL-PreCommitDelta.ps1` when code changes could introduce new pre-commit warning signatures. Update the baseline with `-UpdateBaseline` only when intentionally accepting or removing known warning signatures.
-- Use `tools\BFL-ReadyForQA.ps1` only for PR readiness, explicit "ready for QA", release-near work, broad/risky changes, or final handoff after substantial runtime work. Pass `-DeployClient retail` or `-DeployClient all` only when deploy validation is actually needed.
-- Use `tools\BFL-ReviewCheck.ps1` for focused review diagnostics when `ReadyForQA` is too broad.
-- Keep `.pkgmeta` aligned with ignored internal files so release packages do not include Codex, docs, tools, logs, backups, or workspace metadata.
+Run applicable checks directly. Reuse successful results only for the same relevant state, including checks inside QA wrappers; repeat after invalidating changes or to resolve failures. Never skip required checks to save tokens.
 
-## Public Changelog
+| Changed surface | Required validation |
+| --- | --- |
+| Docs/guidance/comments/narrow tooling text | `git status`, `git diff --stat`, smallest relevant check |
+| Lua/XML/locales/settings; tooling behavior/ignore/package/release metadata | `tools/BFL-PackageCheck.ps1` |
+| Code that can add warning signatures | `tools/BFL-PreCommitDelta.ps1`; baseline updates only when intentional |
+| User-facing locale keys/values | Localization check above, in addition to runtime checks |
+| Visual layout/themes/fonts/scrolling | Visual reference: before/after simulator captures and image review |
+| Implemented runtime features/fixes for QA | Fresh `CleanCopy`; deployment reference defines clients/exceptions |
+| PR readiness, explicit QA, release-near, broad/risky or substantial runtime handoff | `tools/BFL-ReadyForQA.ps1`; `-DeployClient retail`/`all` only when needed |
 
-- Keep test commands out of the changelog, including drafts. The same rule covers debug, diagnostic, and internal recovery commands, even if the maintainer used them during testing.
-- Write what players can do or what they will notice. Describe internal storage, IDs, and implementation details only in technical documentation. Mention a slash command in release notes only if it is a supported player-facing entry point and helps players use the change.
-- Before publishing, read the full version entry line by line, including previously reviewed bullets and the last bullet. Check the synchronized in-game changelog and verify that every command in the release entry is meant for players. The same entry reaches the package and Discord.
+Use `tools/BFL-ReviewCheck.ps1` for focused diagnostics when full QA is unwarranted. Keep `.pkgmeta` excluding internal files (`.agents`, docs, tools, logs, backups, workspace metadata). Report blocked checks/deploys with exact command/reason; distinguish static/simulator evidence from live in-game, taint and controller results.
 
-## Release Tags
+## Releases
 
-- Never create or push a release tag with raw `git tag` or `git push ... vX.Y.Z` commands.
-- Use `tools\BFL-CreateReleaseTag.ps1 -Version X.Y.Z` for local validation and tag creation. Add `-Push` only when publication was explicitly requested.
-- Keep the authorized version throughout a correction. Replacing an existing tag requires explicit authorization for that tag. A different version requires its own authorization.
-- The tag gate must pass the full localization contract, translation-freshness check, and Lua locale-switching runtime smoke before a tag exists. Do not bypass, weaken, or move these checks into `.github\workflows\release.yml`.
-- Follow the [release checklist and correction procedure](docs/DEPLOYMENT_TESTING.md#release-candidate-flow). Verify publication in GitHub Actions and check each destination separately after a correction.
+- Keep upcoming notes under `[DRAFT]`; follow the changelog/release reference. No test/debug/recovery commands in public notes.
+- Never create/push release tags with raw Git. Use `tools/BFL-CreateReleaseTag.ps1 -Version X.Y.Z`; `-Push` only for explicitly requested publication. Full localization, translation-freshness and Lua locale-switching smoke must pass before a tag exists; never bypass/weaken these gates or move them to CI.
+- Corrections retain the authorized version; tag replacement or a different version needs explicit authorization. Follow the release reference and `docs/DEPLOYMENT_TESTING.md#release-candidate-flow`, including integration and per-destination verification.
 
-## VSCode And Codex
+## Context efficiency
 
-- Open VSCode on the main repo or one active worktree for implementation. Use `BetterFriendlist.code-workspace` for overview across worktrees.
-- Codex should run checks and deploy commands directly rather than asking the user to run a VSCode task.
-- Use Plan or Goal mode for broad migrations, cross-flavor work, or any task where the definition of done needs to stay visible.
-- Optimize for low process overhead: avoid repeated broad scans, full QA wrappers, manual/documentation lookups, or long status narration when the task is small and local.
+- Start with specific symbols/scoped `rg` and bounded excerpts; expand to necessary callers/contracts. Avoid whole-file/log/locale/tool-catalog dumps when focused output suffices.
+- Reuse current instructions/findings/checks; re-read after relevant edits, drift or lost context. Preserve unresolved risks across compaction. Load docs by task, not as a startup bundle.
+- Batch independent reads/checks; summarize success and retain full failure diagnostics. Never truncate evidence needed for diagnosis.
+- Small tasks need a short action/validation statement; broad work needs a concise plan. Create persistent Goals only on explicit request.

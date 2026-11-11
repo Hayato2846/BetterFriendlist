@@ -1,0 +1,20 @@
+# Changelog and release
+
+## Player-facing notes
+
+- Read the latest two or three published entries once to match their English style. Add approved user-visible work to `## [DRAFT]` above the latest release; never append development changes to a dated release. Review the whole upcoming entry against retained changes since the previous release before handoff, consolidating overlap and removing abandoned behavior or draft-only regressions.
+- Structure: `## [DRAFT]` or dated release; `###` WoW-version sections; `#### Added`, `Improved`, `Fixed`, or `Compatibility`. For a larger update, add one short introduction about the biggest changes. Omit empty sections; list each change once in its actual scope.
+- Shared changes go under `### All WoW Versions`. Reuse applicable client headings, e.g. `### Retail Midnight & WoW Forever`, `### WoW Forever`, `### WoW Classic`. Use Added for capabilities, Improved for existing behavior/defaults, Fixed for published bugs, Compatibility for client support.
+- Each bullet starts with **the player-facing feature/UI label**, a hyphen, then one or two plain sentences explaining the capability or symptom. Use in-game terms such as Who, right-click menu, and BattleTag. Mention defaults, levels, client differences, or privacy when they affect players.
+- Keep test, debug, diagnostic, and internal recovery commands out of public notes, including drafts. Slash commands belong only when they are supported player entry points useful for the change. Keep storage, IDs, function/API/file names, interface numbers, internal rendering details, and line numbers in technical docs. Avoid marketing, filler, and unsupported speed/reliability claims.
+
+## Promotion and publication
+
+- Do not promote `[DRAFT]` or increment either TOC version until release work is explicitly requested. At promotion use `## [X.Y.Z]        - YYYY-MM-DD` with the current local date, update both TOCs, preserve retained published text and the existing history limit, then run `tools/BFL-PackageCheck.ps1` to sync `Modules/Changelog.lua`.
+- Before publishing, read the complete version entry line by line, including old and final bullets, and inspect the synchronized in-game changelog. Every command must be player-facing; the same entry reaches packages and Discord.
+- Changelog edits, promotion, commits, merges, and local deployment do not themselves authorize publication, issue comments, or issue closure. Follow the active `AGENTS.md` authorization and release-tag rules. Never use auto-closing issue keywords; reference issues as `(#42)`, `(see #42)`, or `(ref #42)`.
+- Follow `docs/DEPLOYMENT_TESTING.md#release-candidate-flow`, including correction procedures. Use only `tools/BFL-CreateReleaseTag.ps1 -Version X.Y.Z`, adding `-Push` only for explicitly requested publication. Require full localization, translation freshness, and Lua locale-switching smoke before tag creation; do not bypass or move the gate to CI.
+- Keep the authorized version during corrections; replacing a tag or selecting another version requires its own explicit authorization. Keep `codex/*` branches local; merge locally and push only authorized `main` commits with an explicit refspec and the authorized tag. Verify GitHub Actions and each destination separately after corrections.
+- Integrate the reviewed release-candidate commit into local `main` before publishing. Confirm that the reviewed candidate, local `main`, pushed `origin/main`, and release tag identify the same intended commit; a push of an unrelated `main` is not candidate integration. Shared release/package QA uses `-Client all`, including Forever, rather than an older Retail/Classic-only checklist.
+
+Use the GitHub connector for current issue/PR/CI/release/remote-state facts relevant to this operation. Fetch the particular resource and linked discussion needed; do not scan unrelated issues. Commit format: `{type}: {description} ({context})`, using existing `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, or `perf` conventions.
