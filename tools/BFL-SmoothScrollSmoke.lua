@@ -1,8 +1,8 @@
--- Lua 5.4: lua tools/BFL-SmoothScrollSmoke.lua <repo> [WoW UI reference directory]
+-- Lua 5.4: lua tools/BFL-SmoothScrollSmoke.lua <repo> <WoW UI reference directory>
 -- Loads the complete FriendsList module and Blizzard's actual interpolation /
 -- scroll-percentage methods. Frame layout and the native ticker are mocked.
 local repo = assert(arg[1], "repository root required")
-local references = arg[2] or "C:/Users/hofer/Documents/BFL/references"
+local references = assert(arg[2], "WoW UI reference directory is required")
 local function read(path)
 	local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close(); return text
 end

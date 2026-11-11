@@ -58,11 +58,18 @@ local entries = changelog:GetEntries()
 equal(entries[1].version, version, "The installed entry matches both manifests, including drafts")
 local published = {}
 for _, entry in ipairs(entries) do if not entry.isDraft then published[entry.version] = entry end end
-local released, previous = assert(published["3.0.0"]), assert(published["2.9.2"])
-equal(released.date, "2026-11-03", "The new release date is shown")
+-- Follow the retained release history: the package check trims older releases.
+local markdown = read(repo, "CHANGELOG.md")
+local releaseHeadings = {}
+for releaseVersion, date in markdown:gmatch("## %[(%d+%.[^%]]+)%]%s*%-%s*(%d%d%d%d%-%d%d%-%d%d)") do
+	releaseHeadings[#releaseHeadings + 1] = { version = releaseVersion, date = date }
+end
+check(#releaseHeadings >= 2, "The changelog retains at least two published releases")
+local released, previous = assert(published[releaseHeadings[1].version]), assert(published[releaseHeadings[2].version])
+equal(released.date, releaseHeadings[1].date, "The latest published release date is shown")
 check(not released.isDraft and #released.blocks > 0, "Released notes keep their content and release state")
-equal(previous.version, "2.9.2", "The previous release is preserved")
-equal(previous.date, "2026-10-11", "The previous release date is preserved")
+equal(previous.version, releaseHeadings[2].version, "The previous release is preserved")
+equal(previous.date, releaseHeadings[2].date, "The previous release date is preserved")
 local settingsEntries = changelog:GetSettingsCenterEntries(2)
 equal(settingsEntries[1].title, "Version " .. version, "Settings Center shows the installed version")
 equal(settingsEntries[1].rightText, entries[1].date, "Settings Center preserves the matching draft or release date")
@@ -76,8 +83,10 @@ equal(parsed[1].version, "2.9.2", "Future draft headings still use the installed
 check(parsed[1].isDraft and parsed[1].date == BFL.L.SETTINGS_CENTER_CHANGELOG_DRAFT, "Draft parsing remains supported after release promotion")
 equal(#parsed[2].blocks, 1, "Release content excludes the following draft")
 equal(parsed[3].version, "2.9.2", "Unreleased headings follow the same installed-version rule")
-local markdownRelease = between(read(repo, "CHANGELOG.md"), "## [2.9.2]", "## [2.9.1]")
-equal(between(changelogSource, "## [2.9.2]", "## [2.9.1]"), markdownRelease, "Embedded release notes match CHANGELOG.md")
+local latestHeading = "## [" .. releaseHeadings[1].version .. "]"
+local previousHeading = "## [" .. releaseHeadings[2].version .. "]"
+equal(between(changelogSource, latestHeading, previousHeading), between(markdown, latestHeading, previousHeading),
+	"Embedded release notes match CHANGELOG.md")
 
 local saved = { lastChangelogVersion = entries[3].version }
 BFL.modules.DB = {

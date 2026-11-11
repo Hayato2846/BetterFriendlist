@@ -11,6 +11,9 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BFL_LUA: lua5.4
 
     steps:
       - name: Checkout code
@@ -18,10 +21,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure smoke paths
+        run: |
+          echo "BFL_REFERENCES_ROOT=$RUNNER_TEMP/bfl-smoke-references" >> "$GITHUB_ENV"
+          echo "BFL_SMOKE_REPORT=$RUNNER_TEMP/bfl-smoke-results.json" >> "$GITHUB_ENV"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+
+      - name: Test smoke runner failure handling
+        run: python -m unittest discover -s tools/tests -p 'test_smoke_runner.py' -v
+
+      - name: Cache pinned Blizzard UI sources
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BFL_REFERENCES_ROOT }}
+          key: bfl-smoke-ui-${{ runner.os }}-${{ hashFiles('tools/BFL-SmokeTests.json') }}
+
+      - name: Prepare pinned Blizzard UI sources
+        run: python tools/bfl_smoke.py prepare-references --reference-root "$BFL_REFERENCES_ROOT"
 
       - name: Run BetterFriendlist review checks
         shell: pwsh
@@ -30,4 +55,12 @@ jobs:
           if ("${{ github.event_name }}" -eq "pull_request") {
             $baseRef = "origin/${{ github.base_ref }}"
           }
-          ./tools/BFL-ReviewCheck.ps1 -BaseRef $baseRef
+          ./tools/BFL-ReviewCheck.ps1 -BaseRef $baseRef -SmokeMode Full
+
+      - name: Upload smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: ${{ env.BFL_SMOKE_REPORT }}
+          if-no-files-found: ignore
