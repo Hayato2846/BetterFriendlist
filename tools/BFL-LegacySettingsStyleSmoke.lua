@@ -1,7 +1,7 @@
--- lua tools/BFL-LegacySettingsStyleSmoke.lua <repo>
+-- lua tools/BFL-LegacySettingsStyleSmoke.lua <repo> <Retail UI source>
 -- Production style owner; addon-owned frames and theme lifecycle are mocked.
 local root = arg[1] or "."
-local uiRoot = arg[2] or "C:/Users/hofer/Documents/BFL/references/wow-ui-source-live"
+local uiRoot = assert(arg[2], "Retail UI source root is required")
 function GetCurrentEnvironment() return _G end
 assert(loadfile(uiRoot .. "/Interface/AddOns/Blizzard_SharedXML/SecureScrollTemplates.lua"))()
 ScrollUtil, ScrollBoxConstants, BaseScrollBoxEvents = {}, { NoScrollInterpolation = true }, { OnScroll = "OnScroll" }

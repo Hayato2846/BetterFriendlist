@@ -3,6 +3,7 @@ param(
     [string]$DeployClient = 'none',
 
     [string]$BaseRef = $env:BFL_REVIEW_BASE,
+    [string]$ReferenceRoot = $env:BFL_REFERENCES_ROOT,
     [switch]$SkipPackageCheck,
     [switch]$SkipPreCommitDelta,
     [switch]$SkipBranchTriage
@@ -65,9 +66,9 @@ if (-not $SkipPreCommitDelta) {
 Invoke-BFLStep 'Review check' {
     $reviewScript = Join-Path $repoRoot 'tools\BFL-ReviewCheck.ps1'
     if (-not [string]::IsNullOrWhiteSpace($BaseRef) -and -not $BaseRef.StartsWith('-', [System.StringComparison]::Ordinal)) {
-        & $reviewScript -BaseRef $BaseRef -SkipPackageCheck
+        & $reviewScript -BaseRef $BaseRef -SkipPackageCheck -SmokeMode Full -ReferenceRoot $ReferenceRoot
     } else {
-        & $reviewScript -SkipPackageCheck
+        & $reviewScript -SkipPackageCheck -SmokeMode Full -ReferenceRoot $ReferenceRoot
     }
 }
 

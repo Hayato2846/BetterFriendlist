@@ -61,3 +61,7 @@ docs/
 *.py
 !Utils/pre-commit-check.py
 !tools/BFL-BuildForeverFeatureConcept.py
+!tools/bfl_smoke.py
+!tools/tests/test_smoke_runner.py
+__pycache__/
+*.pyc

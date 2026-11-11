@@ -115,14 +115,15 @@ Invoke-BFLReleaseStep "Localization freshness since $previousTag" {
 }
 
 Invoke-BFLReleaseStep 'Localization runtime smoke' {
-    $luaCommand = Get-Command lua -ErrorAction SilentlyContinue
+    $luaExecutable = if ($env:BFL_LUA) { $env:BFL_LUA } else { 'lua' }
+    $luaCommand = Get-Command $luaExecutable -ErrorAction SilentlyContinue
     if ($null -eq $luaCommand) {
         throw 'The local release tag gate requires a Lua interpreter on PATH for localization runtime validation.'
     }
     & $luaCommand.Source (Join-Path $repoRoot 'tools/BFL-LocalizationRuntimeSmoke.lua') $repoRoot
 }
 
-Invoke-BFLReleaseStep 'Ready for QA' {
+Invoke-BFLReleaseStep 'Ready for QA (including all Lua smoke tests)' {
     & (Join-Path $repoRoot 'tools/BFL-ReadyForQA.ps1') -BaseRef $previousTag -SkipBranchTriage
 }
 

@@ -342,9 +342,59 @@ Run the local review gate before opening or updating a PR:
 ```
 
 The review check runs package validation, verifies TOC file references, enforces genuine and
-current translations for changed `enUS` keys, scans changed Lua files for common bug patterns, and prints diff-based
-review risk buckets. On pull requests, GitHub Actions runs the same script and writes the
-summary to the job output.
+current translations for changed `enUS` keys, scans changed Lua files for common bug patterns,
+prints diff-based review risk buckets, and runs the portable Lua smoke tests.
+`BFL-PackageCheck.ps1` remains the quick package/static check without executing the smoke suite.
+
+### Lua smoke tests
+
+Install Python 3 and Lua 5.4 on PATH. LuaJIT and Lua 5.1 cannot run these offline harnesses.
+Use `-Lua <executable>` or `BFL_LUA` if the interpreter is named `lua5.4` instead of `lua`.
+
+```powershell
+.\tools\BFL-SmokeCheck.ps1 -Mode Portable
+.\tools\BFL-SmokeCheck.ps1 -Mode Full
+.\tools\BFL-SmokeCheck.ps1 -Mode Full -List
+.\tools\BFL-SmokeCheck.ps1 -Mode Full -Test BFL-RulesetInviteSmoke.lua
+.\tools\BFL-SmokeCheck.ps1 -Mode Full -ReportPath C:\Temp\bfl-smoke-results.json
+```
+
+`tools/BFL-SmokeTests.json` registers every `tools/*Smoke.lua` file and its arguments.
+Portable mode selects tests that need only BFL. Full mode includes every test and supplies
+the Retail (`live`), Forever, and Classic UI sources, including optional native-parity paths.
+Adding or removing a smoke file without updating the manifest fails either mode.
+
+Each test runs in a fresh Lua process from the repository root. The runner prints results,
+captures stdout/stderr, continues after failures, and returns nonzero if any test fails or
+exceeds its time limit (60 seconds per test by default; override with `-TimeoutSeconds`).
+Missing Lua, missing source folders, and unknown test selections are errors, not successful skips.
+Portable mode explicitly reports the source-dependent tests it excludes.
+
+Full mode finds the BFL hub's existing `references` directory in parent directories of the
+checkout/worktree. Override it with `-ReferenceRoot <directory>` or `BFL_REFERENCES_ROOT`.
+This directory must contain `wow-ui-source-live`, `wow-ui-source-forever`, and
+`wow-ui-source-classic`. Local checks report their actual commits/builds and never update them.
+
+`BFL-ReviewCheck.ps1` defaults to Portable; `-SmokeMode Full` opts into all tests.
+`BFL-ReadyForQA.ps1` always requests Full through the review check, so it runs the suite once.
+The local release-tag gate inherits that full run and retains its earlier mandatory
+localization-runtime gate before creating a tag. No release-tag checks move into GitHub.
+
+On pull requests and manual review runs, GitHub installs Lua 5.4, tests the runner's failure
+handling, prepares cached Blizzard sources at the exact revisions/builds in the manifest,
+and runs `BFL-ReviewCheck.ps1 -SmokeMode Full`. Results appear in the job summary and in the
+`smoke-results` JSON artifact. No live WoW client, credentials, or player contacts are used.
+
+For a dedicated CI source directory, preparation is also available directly:
+
+```powershell
+python tools/bfl_smoke.py prepare-references --reference-root C:\Temp\bfl-smoke-references
+```
+
+Preparation fetches the pinned commits from Gethe's public UI-source repository. It refuses
+to overwrite an existing checkout at another revision or with local changes. To update the
+pins, validate Full against the intended sources, update the three manifest revisions/builds,
+and validate preparation in a fresh directory; the changed manifest produces a new CI cache key.
 
 Use the risk buckets as a review guide, not as a substitute for in-game QA. Anything touching
 TOC/XML, compatibility helpers, secure buttons, context menus, tooltips, SavedVariables, or

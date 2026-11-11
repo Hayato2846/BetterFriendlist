@@ -1,6 +1,9 @@
 param(
     [string]$BaseRef = $env:BFL_REVIEW_BASE,
-    [switch]$SkipPackageCheck
+    [switch]$SkipPackageCheck,
+    [ValidateSet('Portable', 'Full')]
+    [string]$SmokeMode = 'Portable',
+    [string]$ReferenceRoot = $env:BFL_REFERENCES_ROOT
 )
 
 Set-StrictMode -Version Latest
@@ -407,7 +410,7 @@ function Write-RiskSummary {
         $ChangedFiles |
             Where-Object {
                 $_ -match '\.(lua|xml|toc)$' -and
-                $_ -notmatch '^(old_version|reference|predecessor)/'
+                $_ -notmatch '^(old_version|reference|predecessor|tools)/'
             }
     )
     $changelogChanged = $ChangedFiles -contains 'CHANGELOG.md' -or $ChangedFiles -contains 'Modules/Changelog.lua'
@@ -469,6 +472,16 @@ try {
 
 Write-ReviewSection 'Static Lua Patterns'
 Test-StaticLuaPatterns -RepoRoot $repoRoot -ChangedFiles $changedFiles -BaseRef $BaseRef
+
+Write-ReviewSection "Lua Smoke Tests ($SmokeMode)"
+try {
+    & (Join-Path $repoRoot 'tools/BFL-SmokeCheck.ps1') -Mode $SmokeMode -ReferenceRoot $ReferenceRoot
+    if ($LASTEXITCODE -ne 0) {
+        Add-Failure "BFL-SmokeCheck.ps1 exited with code $LASTEXITCODE."
+    }
+} catch {
+    Add-Failure "BFL-SmokeCheck.ps1 failed: $($_.Exception.Message)"
+}
 
 Write-ReviewSection 'Result'
 Write-ReviewLine "Failures: $($script:Failures.Count)"
