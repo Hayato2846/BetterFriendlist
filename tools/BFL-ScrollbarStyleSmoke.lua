@@ -31,7 +31,7 @@ local function texture(parent)
 	function t:SetVertexColor(...) assert(not self.protected and not self.forbidden and self.access ~= false); self.writes = self.writes + 1; self.color = { ... } end
 	function t:IsDesaturated() return self.desaturated end
 	function t:SetDesaturated(value) self.desaturated = value end
-	function t:SetAtlas(atlas) self.atlas = atlas end
+	t.SetAtlas = function(self, atlas) self.atlas = atlas end
 	function t:SetShown(value) self.shown = value end
 	function t:AdjustPointsOffset() end
 	function t:ClearPointsOffset() end
