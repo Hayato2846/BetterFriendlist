@@ -234,6 +234,8 @@ local function LayoutClassicScrollBarTrack(engine, scrollBar)
 	if not (BFL.IsClassic and engine and scrollBar) then
 		return
 	end
+	local style = BFL:GetModule("ScrollbarStyle")
+	if style and style:IsModern(scrollBar) then return end
 
 	local topStepper = scrollBar.Back or scrollBar.ScrollUpButton
 	local bottomStepper = scrollBar.Forward or scrollBar.ScrollDownButton
@@ -587,7 +589,7 @@ local function RestorePortraitArtwork(engine, frame)
 		local modernPortrait = FriendsUI.root and FriendsUI.root.PortraitOverlay
 		if modernPortrait then
 			modernPortrait:SetAlpha(avatarAlpha)
-			SetObjectShown(engine, modernPortrait, modernPortrait, avatarAlpha > 0)
+			SetObjectShown(engine, modernPortrait, modernPortrait, not IsSimpleModeEnabled() and avatarAlpha > 0)
 		end
 		return
 	end
@@ -1199,7 +1201,8 @@ function DarkTheme:LayoutMainListChrome(engine, frame)
 		end
 		scrollBar.BFL_DarkWideScrollbar = true
 		if anchorToScrollFrame then
-			engine:SetFrameSize(scrollBar, 22)
+			local style = BFL:GetModule("ScrollbarStyle")
+			if not (style and style:IsModern(scrollBar)) then engine:SetFrameSize(scrollBar, 22) end
 			engine:SetFramePoints(scrollBar, {
 				{ "TOPLEFT", frame.ScrollFrame, "TOPRIGHT", 0, 0 },
 				{ "BOTTOMLEFT", frame.ScrollFrame, "BOTTOMRIGHT", 0, 0 },
@@ -1575,86 +1578,7 @@ function DarkTheme:SkinMainFrame(engine)
 end
 
 local function SkinModernScrollBar(engine, scrollBar)
-	if not (engine and scrollBar) then
-		return
-	end
-	-- Modern keeps Blizzard's compact MinimalScrollBar construction and only
-	-- darkens its native track, thumb, and steppers. This mirrors the restrained
-	-- group-header treatment and avoids the fully rebuilt Legacy dark scrollbar.
-	local layoutPoints = {}
-	if scrollBar.GetNumPoints and scrollBar.GetPoint then
-		for index = 1, scrollBar:GetNumPoints() do
-			layoutPoints[index] = { scrollBar:GetPoint(index) }
-		end
-	end
-	local layoutWidth = scrollBar.GetWidth and scrollBar:GetWidth()
-	for _, frame in ipairs({
-		scrollBar,
-		scrollBar.Track,
-		scrollBar.Track and scrollBar.Track.Thumb,
-		scrollBar.Back,
-		scrollBar.Forward,
-		scrollBar.ScrollUpButton,
-		scrollBar.ScrollDownButton,
-	}) do
-		if frame then
-			engine:RestoreFrame(frame)
-		end
-	end
-	if #layoutPoints > 0 and scrollBar.ClearAllPoints and scrollBar.SetPoint then
-		scrollBar:ClearAllPoints()
-		for _, point in ipairs(layoutPoints) do
-			scrollBar:SetPoint(unpack(point))
-		end
-	end
-	if layoutWidth and layoutWidth > 0 and scrollBar.SetWidth then
-		scrollBar:SetWidth(layoutWidth)
-	end
-	scrollBar.BFL_DarkWideScrollbar = false
-	local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-	local palette, themed = FriendsUI and FriendsUI.GetModernThemeColors and FriendsUI:GetModernThemeColors()
-	if themed and palette then
-		local surface = palette.surface or { 0.05, 0.05, 0.05, 1 }
-		local thumb = palette.scrollThumb or { 0.42, 0.42, 0.44, 0.78 }
-		-- Do not mix the native atlas toward white: that kept even a black
-		-- Custom surface above 52% luminance and made the scrollbar look almost
-		-- unchanged. Preserve Blizzard's pieces, but multiply them into the same
-		-- quiet dark range as the native group-header surface.
-		local trackTone = {
-			0.28 + (surface[1] or 0) * 0.25,
-			0.28 + (surface[2] or 0) * 0.25,
-			0.28 + (surface[3] or 0) * 0.25,
-			0.78,
-		}
-		local controlTone = {
-			(thumb[1] or 0.42) * 0.78,
-			(thumb[2] or 0.42) * 0.78,
-			(thumb[3] or 0.44) * 0.78,
-			math.min(thumb[4] or 0.78, 0.82),
-		}
-		local function ToneTexture(owner, texture, tone)
-			if not (owner and texture) then
-				return
-			end
-			engine:SetTextureDesaturated(owner, texture, true)
-			engine:SetTextureVertexColor(owner, texture, tone[1], tone[2], tone[3], tone[4])
-		end
-		local track = scrollBar.Track
-		ToneTexture(track, track and track.Begin, trackTone)
-		ToneTexture(track, track and track.Middle, trackTone)
-		ToneTexture(track, track and track.End, trackTone)
-		local thumb = track and track.Thumb
-		ToneTexture(thumb, thumb and thumb.Begin, controlTone)
-		ToneTexture(thumb, thumb and thumb.Middle, controlTone)
-		ToneTexture(thumb, thumb and thumb.End, controlTone)
-		ToneTexture(scrollBar.Back, scrollBar.Back and scrollBar.Back.Texture, controlTone)
-		ToneTexture(scrollBar.Forward, scrollBar.Forward and scrollBar.Forward.Texture, controlTone)
-		ToneTexture(scrollBar.ScrollUpButton, scrollBar.ScrollUpButton and scrollBar.ScrollUpButton.Texture, controlTone)
-		ToneTexture(scrollBar.ScrollDownButton, scrollBar.ScrollDownButton and scrollBar.ScrollDownButton.Texture, controlTone)
-		scrollBar.BFL_ModernDarkToneApplied = true
-	else
-		scrollBar.BFL_ModernDarkToneApplied = nil
-	end
+	if engine and scrollBar then engine:SkinScrollBar(scrollBar) end
 end
 
 local function SkinModernButton(engine, button)
@@ -2527,18 +2451,29 @@ function DarkTheme:SkinSettingsPreview(engine, review)
 	SkinSettingsPreviewScene(engine, (review.preview.socialSamples or {})[review.sample])
 end
 
+function DarkTheme:SkinSettingsWindowChrome(engine, frame)
+	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
+end
+
 function DarkTheme:SkinSettingsFrame(engine)
 	local frame = _G.BetterFriendlistSettingsFrame
 	if not frame then
 		return
 	end
+	local review = BFL:GetModule("LegacySettingsReview")
+	local sidebar = review and review.sidebar
+	if self.settingsSkinVersion == engine.activationVersion and self.settingsSkinSidebar == sidebar then
+		return
+	end
+	self.settingsSkinVersion = engine.activationVersion
+	self.settingsSkinSidebar = sidebar
 
-	engine:SkinFrame(frame, "main", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
+	self:SkinSettingsWindowChrome(engine, frame)
 	SkinField(engine, frame, "MainInset", "inset")
 	SkinField(engine, frame, "CategoryList", "panel")
 	SkinField(engine, frame, "ButtonSeparator", "panel")
 	self:LayoutSettingsContentChrome(engine, frame)
-	engine:SkinTree(frame, 7)
+	engine:SkinTree(frame, 7, nil, true)
 	self:LayoutSettingsContentChrome(engine, frame)
 	SkinSettingsNavigation(engine, frame)
 end
@@ -2647,16 +2582,20 @@ function DarkTheme:SkinCreatedFrame(frame)
 	end
 
 	engine:SkinFrame(frame, "popup", { stripTextures = true, textureAlpha = GetArtworkAlpha(0.08) })
-	engine:SkinTree(frame, 7)
+	engine:SkinTree(frame, 7, nil, true)
 end
 
 function DarkTheme:SkinSettingsFrameDeferred()
 	local engine = GetEngine()
 	if engine and engine:IsActive() then
+		-- Finish the page before it can render a frame with native artwork.
 		self:SkinSettingsFrame(engine)
-		local SettingsDesigner = BFL:GetModule("SettingsDesigner")
-		if SettingsDesigner and SettingsDesigner.ApplySkin then
-			SettingsDesigner:ApplySkin("deferred")
+		for control in pairs(self.pendingSettingsControls or {}) do
+			self:SkinSettingsControl(engine, control)
+		end
+		local review = BFL:GetModule("LegacySettingsReview")
+		for _, control in ipairs(review and review.active and review.controlRows or {}) do
+			self:SkinSettingsControl(engine, control)
 		end
 	end
 
@@ -2670,13 +2609,24 @@ function DarkTheme:SkinSettingsFrameDeferred()
 			local delayedEngine = GetEngine()
 			if delayedEngine and delayedEngine:IsActive() then
 				self:SkinSettingsFrame(delayedEngine)
+				local review = BFL:GetModule("LegacySettingsReview")
+				for _, control in ipairs(review and review.active and review.controlRows or {}) do
+					self:SkinSettingsControl(delayedEngine, control)
+				end
 				local SettingsDesigner = BFL:GetModule("SettingsDesigner")
-				if SettingsDesigner and SettingsDesigner.ApplySkin then
+				if SettingsDesigner and SettingsDesigner.ApplySkin and SettingsDesigner:IsShown() then
 					SettingsDesigner:ApplySkin("deferred")
 				end
 			end
 		end)
 	end
+end
+
+function DarkTheme:SkinSettingsControl(engine, control)
+	local version = engine.activationVersion or 0
+	if control.BFL_SettingsSkinVersion == version then return end
+	engine:SkinControl(control)
+	control.BFL_SettingsSkinVersion = version
 end
 
 function DarkTheme:WrapModuleMethod(moduleName, methodName, after)
@@ -2806,13 +2756,18 @@ function DarkTheme:InstallSettingsComponentHooks()
 		Components[methodName] = function(componentSelf, ...)
 			local holder = original(componentSelf, ...)
 			local engine = engineGetter()
-			if engine and engine:IsActive() then
-				engine:SkinControl(holder)
-				if C_Timer and C_Timer.After then
+			if holder and engine and engine:IsActive() then
+				self.pendingSettingsControls = self.pendingSettingsControls or {}
+				self.pendingSettingsControls[holder] = true
+				if not self.settingsControlsPending then
+					self.settingsControlsPending = true
 					C_Timer.After(0, function()
+						self.settingsControlsPending = nil
+						local pending = self.pendingSettingsControls
+						self.pendingSettingsControls = nil
 						local delayedEngine = engineGetter()
 						if delayedEngine and delayedEngine:IsActive() then
-							delayedEngine:SkinControl(holder)
+							for control in pairs(pending) do self:SkinSettingsControl(delayedEngine, control) end
 						end
 					end)
 				end

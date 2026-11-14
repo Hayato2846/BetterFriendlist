@@ -212,8 +212,24 @@ local originalAvailable = who.IsAvailable
 who.IsAvailable = function() return true end
 env.GetTime = function() return 100 end
 env.UnitLevel, env.GetRealZoneText, env.GetMaxPlayerLevel = function() return 80 end, function() return secret end, function() return 80 end
+local whoTimer
+env.C_Timer = { NewTimer = function(_, callback)
+	whoTimer = { callback = callback, Cancel = function(self) self.cancelled = true end }
+	return whoTimer
+end }
+env.C_FriendList.SetWhoToUi = function(value) check(value == true, "Who routing stays with the submitted query") end
+env.BetterFriendsFrame = { WhoFrame = {
+	GroupInviteButton = { Disable = function() end },
+	AddFriendButton = { Disable = function() end },
+} }
+local beforeRestrictedWho = #calls
 inCombat = true
-check(not who:SendWhoRequest("Ada", 1), "Restricted Who clicks are rejected before setting pending state")
+check(who:SendWhoRequest("Ada", 1), "Who submits to the native client during restrictions")
+equal(#calls, beforeRestrictedWho + 1, "Restricted Who clicks submit exactly once")
+check(who.whoPending, "A submitted query waits for its native result")
+check(who:ReleaseNativeWhoRequest(who.nativeWhoRequestGuard), "The request can complete during restrictions")
+check(whoTimer.cancelled and not who.whoPending, "Completing the request cancels its timeout and spinner")
+who.lastWhoSendTime = nil
 inCombat = false
 check(not who:SendWhoRequest(secret, 1) and not who:SendWhoRequest({}, 1), "Unreadable Who requests are rejected at the boundary")
 check(not who.whoPending, "Rejected Who requests never start a stale spinner")

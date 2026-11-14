@@ -241,6 +241,10 @@ local componentLast = assert(componentSource:find("-- DOUBLE CHECKBOX ROW", comp
 env.FIELD_WIDTH = 180
 assert(load(componentSource:sub(componentFirst, componentLast - 1), "@production settings button", "t", env))()
 local settingsSource = read("Modules/Settings.lua")
+local reviewFirst = assert(settingsSource:find("local function IsLegacyReviewActive(", 1, true))
+local reviewLast = assert(settingsSource:find("local function DisableLegacyDropdown(", reviewFirst, true))
+env.IsLegacyReviewActive = assert(load(settingsSource:sub(reviewFirst, reviewLast - 1)
+	.. "\nreturn IsLegacyReviewActive", "@production legacy review state", "t", env))()
 local availabilityFirst = assert(settingsSource:find("local function IsTabAvailableForClient(", 1, true))
 local availabilityLast = assert(settingsSource:find("function Settings:ShowLegacyReview()", availabilityFirst, true))
 env.TAB_DEFINITIONS = { { id = 1 }, { id = 6 } }

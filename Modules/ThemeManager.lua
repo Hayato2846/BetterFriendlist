@@ -211,6 +211,13 @@ function BFL:UsesFlatTheme()
 	return theme == "dark" or theme == "custom" or theme == "ellesmereui"
 end
 
+function BFL:IsThemeAvatarHidden(theme)
+	theme = theme or self:GetEffectiveTheme()
+	if theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" and theme ~= "ellesmereui" then return false end
+	local DB = self:GetModule("DB")
+	return not DB or DB:Get("hideThemeAvatar", true) ~= false
+end
+
 function BFL:UsesDarkSkinTheme()
 	local theme = self:GetEffectiveTheme()
 	return theme == "dark" or theme == "custom"
@@ -224,7 +231,6 @@ function ThemeManager:Initialize()
 		end, 80)
 	end
 
-	self:InstallStaticPopupHook()
 	self:ApplyCurrentTheme("initialize")
 end
 
@@ -446,6 +452,10 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if FriendsUI and FriendsUI.ApplyTheme then
 		FriendsUI:ApplyTheme(friendsUITheme)
 	end
+	local tagEditor = BFL:GetModule("FriendTagEditor")
+	if tagEditor then tagEditor:RefreshAppearance() end
+	local iconSelector = BFL:GetModule("IconSelector")
+	if iconSelector then iconSelector:RefreshAppearance() end
 	local FeatureHints = BFL:GetModule("FeatureHints")
 	if FeatureHints and FeatureHints.RefreshAppearance then
 		FeatureHints:RefreshAppearance()
@@ -463,7 +473,8 @@ function ThemeManager:ApplyCurrentTheme(reason)
 	if AppearanceOnboarding and AppearanceOnboarding.ApplySkin then
 		AppearanceOnboarding:ApplySkin(reason or "theme-manager")
 	end
-	self:SkinVisibleStaticPopups()
+	local dialogs = BFL:GetModule("Dialogs")
+	if dialogs and dialogs.RefreshInputDialogTheme then dialogs:RefreshInputDialogTheme() end
 	if theme == "blizzard" then
 		-- DarkTheme restores registered controls before module-specific theme and
 		-- layout refreshes run. Finalize native button atlases afterwards so no
@@ -474,6 +485,8 @@ function ThemeManager:ApplyCurrentTheme(reason)
 		end
 	end
 
+	local scrollbarStyle = BFL:GetModule("ScrollbarStyle")
+	if scrollbarStyle then scrollbarStyle:Refresh() end
 	return true
 end
 
@@ -516,143 +529,6 @@ function ThemeManager:ShowReloadDialog(options)
 	return StaticPopup_Show("BFL_EXTERNAL_THEME_RELOAD")
 end
 
-local function IsBetterFriendlistPopup(which)
-	if type(which) ~= "string" then
-		return false
-	end
-
-	return which:sub(1, 4) == "BFL_"
-		or which:sub(1, 18) == "BETTER_FRIENDLIST"
-		or which:sub(1, 16) == "BETTERFRIENDLIST"
-end
-
-local function SkinStaticPopupButton(engine, popup, key)
-	local popupName = popup and popup.GetName and popup:GetName()
-	local button = popup and popup[key]
-	if not button and popupName and popupName ~= "" then
-		button = _G[popupName .. key]
-	end
-	if button then
-		engine:SkinButton(button)
-	end
-end
-
-local function SkinStaticPopupButtons(engine, popup)
-	for _, key in ipairs({
-		"Button1",
-		"Button2",
-		"Button3",
-		"Button4",
-		"ExtraButton",
-	}) do
-		SkinStaticPopupButton(engine, popup, key)
-	end
-
-	local container = popup and popup.ButtonContainer
-	if container and container.GetChildren then
-		for _, child in ipairs({ container:GetChildren() }) do
-			if child and child.IsObjectType and child:IsObjectType("Button") then
-				engine:SkinButton(child)
-			end
-		end
-	end
-end
-
-local function GetStaticPopupEditBox(popup)
-	if not popup then
-		return nil
-	end
-	if popup.GetEditBox then
-		local ok, editBox = pcall(popup.GetEditBox, popup)
-		if ok and editBox then
-			return editBox
-		end
-	end
-	return popup.EditBox or popup.editBox
-end
-
-local function SkinStaticPopupFrame(engine, popup)
-	engine:SkinFrame(popup, "popup", { stripTextures = true, textureAlpha = 0 })
-	-- StaticPopup slots are reused, and GameDialogMixin can restore the native
-	-- BG atlases while preparing a new dialog. Reassert the single themed popup
-	-- surface every time so its alpha is exactly the configured popupOpacity.
-	engine:DampenRegions(popup, 0)
-	engine:DampenKnownArtwork(popup, 0)
-	engine:DampenNineSlice(popup, 0)
-	if popup.BG then
-		engine:DampenFrameTextures(popup.BG, 0, 2)
-	end
-	if popup.AlertIcon then
-		engine:SetTextureAlpha(popup, popup.AlertIcon, 0)
-	end
-
-	engine:SkinTree(popup, 4)
-	local editBox = GetStaticPopupEditBox(popup)
-	if editBox and (not editBox.IsShown or editBox:IsShown()) then
-		engine:SkinEditBox(editBox)
-	end
-	SkinStaticPopupButtons(engine, popup)
-
-	local colors = engine.colors
-	if colors then
-		engine:StyleBackdrop(popup, colors.popup, colors.border)
-	end
-end
-
-function ThemeManager:SkinVisibleStaticPopups()
-	if not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
-		return
-	end
-	local Engine = BFL:GetModule("SkinEngine")
-	if not Engine or not Engine.IsActive or not Engine:IsActive() then
-		return
-	end
-
-	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
-		local popup = _G["StaticPopup" .. i]
-		if popup and popup:IsShown() and IsBetterFriendlistPopup(popup.which) then
-			SkinStaticPopupFrame(Engine, popup)
-		end
-	end
-end
-
-function ThemeManager:SkinStaticPopup(which)
-	if not IsBetterFriendlistPopup(which) or not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
-		return
-	end
-
-	local Engine = BFL:GetModule("SkinEngine")
-	if not Engine then
-		return
-	end
-
-	for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
-		local popup = _G["StaticPopup" .. i]
-		if popup and popup:IsShown() and popup.which == which then
-			SkinStaticPopupFrame(Engine, popup)
-		end
-	end
-end
-
-function ThemeManager:InstallStaticPopupHook()
-	if self.staticPopupHooked or not hooksecurefunc or not StaticPopup_Show then
-		return
-	end
-
-	self.staticPopupHooked = true
-	hooksecurefunc("StaticPopup_Show", function(which)
-		if not IsBetterFriendlistPopup(which) or not (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme()) then
-			return
-		end
-
-		if C_Timer and C_Timer.After then
-			C_Timer.After(0, function()
-				self:SkinStaticPopup(which)
-			end)
-		else
-			self:SkinStaticPopup(which)
-		end
-	end)
-end
+-- Blizzard StaticPopup slots are shared. Only Dialogs-owned frames are themed.
 
 return ThemeManager

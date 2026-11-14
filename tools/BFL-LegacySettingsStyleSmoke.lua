@@ -153,7 +153,7 @@ local settingsFile = assert(io.open(root .. "/Modules/Settings.lua", "rb"))
 local settingsSource = settingsFile:read("*a"); settingsFile:close()
 local helperFirst = assert(settingsSource:find("local function HasSettingsScrollOverflow(", 1, true))
 local helperLast = assert(settingsSource:find("local function SetDeleteIconTexture(", helperFirst, true))
-local settingsEnv = setmetatable({ Settings = {} }, { __index = _G })
+local settingsEnv = setmetatable({ Settings = {}, BFL = BFL }, { __index = _G })
 assert(load(settingsSource:sub(helperFirst, helperLast - 1), "@production settings scrollbar visibility", "t", settingsEnv))()
 modules.Settings = settingsEnv.Settings
 assert(loadfile(root .. "/Modules/LegacySettingsStyle.lua"))("BetterFriendlist", BFL)
@@ -356,4 +356,95 @@ dark:SkinSettingsComparison({
 }, fakeComparison)
 check(darkControls[picker] and darkControls[input] and darkRows[laneRow] and not darkRows[hiddenRow],
 	"Dark and Custom skin active controls and visible samples")
+
+-- Repeated category refreshes must not traverse the growing tree of retired controls.
+BetterFriendlistSettingsFrame = window()
+local treePasses = 0
+modules.LegacySettingsReview = { sidebar = region() }
+local settingsEngine = {
+	activationVersion = 1,
+	SkinFrame = function() end,
+	SkinTree = function() treePasses = treePasses + 1 end,
+}
+dark:SkinSettingsFrame(settingsEngine)
+local initialPasses = treePasses
+for _ = 1, 20 do dark:SkinSettingsFrame(settingsEngine) end
+check(initialPasses > 0 and treePasses == initialPasses, "category changes reuse the themed window shell")
+settingsEngine.activationVersion = 2
+dark:SkinSettingsFrame(settingsEngine)
+check(treePasses > initialPasses, "restoring and reactivating a theme repaints the window")
+local restoredPasses = treePasses
+settingsEngine.activationVersion = 3
+dark:SkinSettingsFrame(settingsEngine)
+check(treePasses > restoredPasses, "switching Dark to Custom repaints the shell")
+
+local originalTimer = C_Timer
+local callbacks, controlPasses = {}, 0
+C_Timer = { After = function(_, callback) callbacks[#callbacks + 1] = callback end }
+settingsEngine.IsActive = function() return true end
+settingsEngine.SkinControl = function(_, control)
+	control.themed = true
+	controlPasses = controlPasses + 1
+end
+modules.SkinEngine = settingsEngine
+modules.SettingsDesigner = nil
+local newControl, nestedControl = {}, {}
+modules.LegacySettingsReview.active = true
+modules.LegacySettingsReview.controlRows = { newControl }
+dark.pendingSettingsControls = { [nestedControl] = true }
+local beforeTransition = treePasses
+dark:SkinSettingsFrameDeferred()
+check(newControl.themed and nestedControl.themed, "new controls are themed before the first visible frame")
+dark:SkinSettingsFrameDeferred()
+for _, callback in ipairs(callbacks) do callback() end
+check(controlPasses == 2, "immediate and deferred work style each new control only once")
+check(treePasses == beforeTransition, "immediate page styling keeps the shell cache")
+C_Timer = originalTimer
+
+-- Auxiliary editors use the same theme owner as Settings without walking shared popups.
+local shell, inset, scrollbar = region(), region(), region()
+shell.CloseButton = region(shell)
+local shells, closes, insets, scrollbars = {}, {}, {}, {}
+eui.facade.Shell = function(widget) shells[widget] = true end
+eui.facade.CloseButton = function(widget) closes[widget] = true end
+eui.facade.Panel = function(widget) insets[widget] = true end
+eui.facade.ScrollBar = function(widget) scrollbars[widget] = true end
+theme = "ellesmereui"
+style:SkinAuxiliaryWindow(shell, inset, { ScrollBar = scrollbar })
+check(shells[shell] and closes[shell.CloseButton] and insets[inset] and scrollbars[scrollbar],
+	"EllesmereUI owns auxiliary window chrome, close icon, inset and scrollbar")
+local elvShell, elvClose
+elv.ElvUISkinProxy.HandlePortraitFrame = function(_, widget) elvShell = widget end
+elv.ElvUISkinProxy.HandleCloseButton = function(_, widget) elvClose = widget end
+theme = "elvui"
+style:SkinAuxiliaryWindow(shell)
+check(elvShell == shell and elvClose == shell.CloseButton, "ElvUI owns the auxiliary shell and close icon")
+
+local iconButton, tile = region(), region()
+iconButton.BFL_SettingsIconButton, iconButton.Icon = true, region(iconButton)
+tile.BFL_SettingsIconTile, tile.selectedTex = true, region(tile)
+local themedIcons, themedTiles, themedInputs = {}, {}, {}
+modules.SkinEngine = {
+	IsActive = function() return true end,
+	SkinIconButton = function(_, button, _, options) themedIcons[button] = options.texture end,
+	SkinButton = function(_, button, options) themedTiles[button] = options.variant end,
+	SkinEditBox = function(_, box) themedInputs[box] = true end,
+	ClearNativeBackdrop = function() end,
+	SetTextureAlpha = function(_, _, texture, alpha) texture:SetAlpha(alpha) end,
+	SkinScrollBar = function() end,
+}
+theme = "custom"
+style:SkinActions({ iconButton, tile }, input)
+check(themedIcons[iconButton] == iconButton.Icon and themedTiles[tile] == "nav" and tile.selectedTex.alpha == 0,
+	"Custom keeps compact action artwork and selected tile state in the shared renderers")
+check(themedInputs[input], "Custom skins editor inputs through the Settings owner")
+local search = region()
+modules.LegacySettingsReview = {
+	previewShell = region(), active = true, search = search, supportButtons = {}, QueueSample = function() end,
+}
+style:Refresh()
+check(themedInputs[search], "a search created after the window skin pass receives the current theme")
+themedInputs[search] = nil
+style:Refresh()
+check(themedInputs[search], "reopening Settings reapplies the search skin without another window tree pass")
 io.write("PASS: legacy settings appearance, theme restoration, missing atlases and Classic fallback (" .. checks .. " checks)\n")

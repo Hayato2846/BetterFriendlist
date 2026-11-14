@@ -3442,9 +3442,12 @@ function GuildFrame:ShowMemberInfoPanel_Legacy(member)
 	self:RefreshMemberInfoPanelAccent()
 	panel._currentMember = member
 
-	-- Anchor to right side of main frame
+	-- Follow the same side preference and screen bounds as BFL's other side windows.
 	panel:ClearAllPoints()
-	if BetterFriendsFrame then
+	local friendsUI = BFL:GetModule("FriendsUI")
+	if BetterFriendsFrame and friendsUI and friendsUI.AnchorAuxiliaryWindow then
+		friendsUI:AnchorAuxiliaryWindow(panel, 0)
+	elseif BetterFriendsFrame then
 		panel:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 4, 0)
 	else
 		panel:SetPoint("CENTER", UIParent, "CENTER", 0, 0)

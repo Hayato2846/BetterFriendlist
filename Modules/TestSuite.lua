@@ -14690,7 +14690,7 @@ function TestSuite:RegisterForeverCompatibilityTests()
 				local x, y = friendsUI:GetSideTabIconAnchorOffsets({
 					GetIconAnchorOffsetsForTabArt = function() return -4, 0 end,
 				}, {}, true)
-				V:AssertEqual(x, -4, "Forever's native side-tab horizontal offset is honored")
+				V:AssertEqual(x, friendsUI:GetSideTabPosition() == "left" and 4 or -4, "Forever's native side-tab horizontal offset follows the chosen side")
 				V:AssertEqual(y, 5, "BFL's count offset composes with the native game-type offset")
 			end
 		end,

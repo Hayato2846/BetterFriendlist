@@ -282,8 +282,8 @@ center = false
 nicknames:OnNicknameSaved("New", nil, "friends")
 center = true
 badge.open.scripts.OnClick()
-equal(opened[1], "friends.formatting", "click uses currently active Settings Center")
-equal(opened[2], "nameFormatPreset", "click focuses exact control")
+equal(opened[1], 1, "click uses standard Settings despite an old beta preference")
+equal(opened[2], nil, "nickname link keeps the standard General entry point")
 equal(badge:IsShown(), false, "opening settings dismisses badge")
 hints.shown = nil
 nicknames:OnNicknameSaved("New", nil, "friends")
@@ -354,7 +354,7 @@ for _, locale in ipairs(locales) do
 		equal(badge.rows[4].parent, badge.details.scrollContent, "details own the additional rows")
 		local entry = hints.entries[4]
 		badge.rows[4].scripts.OnClick()
-		equal(opened[1], useCenter and entry.page or entry.category, "each destination opens its own page")
+		equal(opened[1], entry.category, "each destination opens its own page")
 	end
 end
 BFL:SetLocale("enUS")
@@ -803,8 +803,8 @@ equal(badge.pageNumber.text, "1/3", "previous returns to the first option")
 badge.next.scripts.OnClick()
 local selected = hints.entries[3]
 badge.open.scripts.OnClick()
-equal(opened[1], selected.page, "pager settings action opens the visible option")
-equal(opened[2], selected.control, "pager settings action preserves its control target")
+equal(opened[1], selected.category, "pager settings action opens the visible option")
+equal(opened[2], selected.legacySection, "pager settings action preserves its control target")
 assert(not badge:IsShown(), "opening a paged option dismisses the badge")
 FriendsUI.sideTabs = nil
 
@@ -913,8 +913,8 @@ do
 	equal(notes:GetContact(key).privateNote, noteText, "Enter saves the note")
 	contains(hints.entries[1].path, BFL.L.SETTINGS_CENTER_CATEGORY_PRIVACY, "Settings Center includes the privacy category")
 	badge.open.scripts.OnClick()
-	equal(opened[1], "privacy.notes", "Settings Center opens Private Notes")
-	equal(opened[2], "contactMemory.showTooltipSection", "Settings Center focuses the exact toggle")
+	equal(opened[1], 14, "retired beta link opens Private Notes in standard Settings")
+	equal(opened[2], "privateNotesTooltips", "standard Settings focuses the tooltip checkbox")
 
 	local createFrame = CreateFrame
 	local buttons = {}
@@ -993,8 +993,8 @@ do
 	center, hints.shown = true, nil
 	popup.OnAccept(dialog)
 	badge.open.scripts.OnClick()
-	equal(opened[1], "groups.builtins", "Settings Center opens built-in groups")
-	equal(opened[2], "hideEmptyGroups", "Settings Center focuses the visibility toggle")
+	equal(opened[1], 1, "retired beta link opens standard General settings")
+	equal(opened[2], "hideEmptyGroups", "standard Settings focuses the visibility toggle")
 
 	Reset()
 	friends.searchText = "example query"
@@ -1064,7 +1064,7 @@ do
 			useCenter and BFL.L.SETTINGS_CENTER_PAGE_FRIENDS_DISPLAY or BFL.L.SETTINGS_DISPLAY_OPTIONS,
 			"the second breadcrumb matches the active UI")
 		badge.open.scripts.OnClick()
-		equal(opened[1], useCenter and "groups.builtins" or 1, "favorite group opens in the active settings UI")
+		equal(opened[1], 1, "favorite group opens in the active settings UI")
 		equal(opened[2], "showFavoritesGroup", "favorite group focuses its own toggle")
 		menu.respond(nil, add)
 		assert(not hints:IsShown(), "the hint follows the shared session limit")
@@ -1073,11 +1073,78 @@ do
 		menu.respond(nil, add)
 		badge.more.scripts.OnClick()
 		if badge.pager:IsShown() then badge.open.scripts.OnClick() else badge.rows[2].scripts.OnClick() end
-		equal(opened[1], useCenter and "friends.display" or 1, "favorite icon opens in the active settings UI")
+		equal(opened[1], 1, "favorite icon opens in the active settings UI")
 		equal(opened[2], "enableFavoriteIcon", "favorite icon focuses its own toggle")
 	end
 end
 io.write("PASS: favorite hints after marking, both visibility toggles and both settings UIs\n")
+do
+	local side = "left"
+	function FriendsUI:GetSideTabPosition() return side end
+	FriendsUI.sideTabs = { rail }
+	modernStyle, theme = true, "dark"
+	UIParent.width, UIParent.height, UIParent.top, UIParent.scale = 1600, 900, 900, 1
+	badge.scale = nil
+	for _, ratio in ipairs({ .5, 1, 1.5 }) do
+		BetterFriendsFrame.scale, BetterFriendsFrame.left, BetterFriendsFrame.top = ratio, 850 / ratio, 850 / ratio
+		BetterFriendsFrame.width, BetterFriendsFrame.height = 380, 540
+		rail.left, rail.top, rail.width, rail.shown = BetterFriendsFrame.left - 55, BetterFriendsFrame.top - 122, 55, true
+		side = "left"
+		assert(hints:Show({ id="qa.left-hint", title="Left hint", oncePerSession=false, replace=true,
+			entries={ { text="A short explanation." }, { text="Another option." } } }))
+		local bounds, plan = hints:GetDockBounds(), badge.dockPlan
+		equal(bounds.side, "left", "hints read the configured tab side")
+		assert(plan.left + plan.width <= BetterFriendsFrame.left, "a left hint appears on the right of its owner")
+		badge.more.scripts.OnClick()
+		assert(badge.details:IsShown(), "a left hint with room for details should expand")
+		assert(plan.left + plan.width < bounds.tabLeft, "an expanded left hint covers its rail")
+		side, rail.left = "right", BetterFriendsFrame:GetRight()
+		badge.scripts.OnUpdate(badge, .26)
+		equal(badge.layoutBounds.side, "right", "an open hint follows a tab-side change")
+		BetterFriendsFrame.left, side = 60, "left"
+		rail.left = 5
+		hints:LayoutBadge()
+		equal(badge.layoutBounds.side, "left", "fallback preserves the configured tab side")
+		equal(badge.dockPlan.side, "right", "a left-edge hint falls back to the right")
+		assert(badge.dockPlan.left >= badge.layoutBounds.parentRight,
+			"left-edge fallback overlaps the friends window")
+		assert(badge.dockPlan.left >= badge.layoutBounds.left, "a left-edge hint clips off screen")
+		if badge.details:IsShown() then
+			local dx = badge.dockPlan.left + badge.details.point[4]
+			assert(dx >= rail:GetRight() or dx + badge.details:GetWidth() <= rail.left,
+				"inset left-edge details cover the tab rail")
+		else
+			assert(badge.pager:IsShown(), "left-edge entries remain reachable in the pager")
+		end
+		hints:Hide()
+	end
+	-- Reproduce the reported right-screen-edge overlap, including live movement.
+	for _, ratio in ipairs({ .5, 1, 1.5 }) do
+		BetterFriendsFrame.scale = ratio
+		BetterFriendsFrame.left, BetterFriendsFrame.top = 1600 / ratio - 440, 850 / ratio
+		rail.left, rail.top, rail.width = BetterFriendsFrame:GetRight(), BetterFriendsFrame.top - 122, 55
+		side = "right"
+		assert(hints:Show({ id="qa.edge-hint", title="Favorite added", oncePerSession=false, replace=true,
+			entries={ { text="A short explanation." }, { text="Another option." } } }))
+		local bounds, plan = hints:GetDockBounds(), badge.dockPlan
+		equal(plan.side, "left", "a right-edge hint falls back to the left")
+		assert(plan.left + plan.width <= bounds.parentLeft, "right-edge fallback covers the main window")
+		local left = plan.left
+		badge.more.scripts.OnClick()
+		near(badge.dockPlan.left, left, "expansion keeps the fallback side")
+		assert(badge.details:IsShown(), "fallback leaves room for expanded options")
+		BetterFriendsFrame.left = 20 / ratio
+		rail.left = BetterFriendsFrame:GetRight()
+		badge.scripts.OnUpdate(badge, .26)
+		equal(badge.dockPlan.side, "right", "moving away from the edge restores the preferred side")
+		bounds, plan = hints:GetDockBounds(), badge.dockPlan
+		assert(plan.left >= bounds.parentRight, "restored hint overlaps the main window")
+		assert(plan.left >= bounds.left and plan.left + plan.width <= bounds.right,
+			"fallback movement leaves the screen")
+		hints:Hide()
+	end
+end
+io.write("PASS: hint side preference, screen-edge fallback and live movement at three scales\n")
 io.write("PASS: independent feature IDs, busy handling, previews, custom actions, durations and anchors\n")
 io.write("PASS: " .. layoutCases .. " expanded layouts, " .. scrollCases .. " scroll cases, " .. pagedCases .. " paged layouts\n")
 io.write("PASS: nickname guidance, all 11 locales, both settings UIs, display detection, dismissal and friend/guild popup callbacks\n")

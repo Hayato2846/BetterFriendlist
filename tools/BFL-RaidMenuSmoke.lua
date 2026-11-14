@@ -51,8 +51,9 @@ assert(load(between(core, "function BFL:IsPendingRaidRosterName(", "-- Get a saf
 local raidCode = read(repo .. "/Modules/RaidFrame.lua")
 local code = between(raidCode, "local function IsPendingRaidRosterName(", "local function SafeSetFont(")
 	.. between(raidCode, "local function GetUnitRosterName(", "-- CONSTANTS")
+	.. between(raidCode, "local SORT_MODE_GROUP =", "-- Tab modes")
 	.. between(raidCode, "function RaidFrame:RegisterEvents(", "-- ROSTER MANAGER")
-	.. between(raidCode, "function RaidFrame:UpdateRaidMembers(", "local function GetPartyMasterLooterID(")
+	.. between(raidCode, "function RaidFrame:UpdateRaidMembers(", "-- MEMBER BUTTON MANAGEMENT")
 	.. between(raidCode, "local RAID_SHORTCUT_MODIFIERS", "--- Apply configured shortcuts")
 	.. between(raidCode, "function RaidFrame:HideSecureProxy()", "function RaidFrame:ResolveMemberButton(")
 assert(load(code, "@Modules/RaidFrame.lua", "t", env))()
@@ -171,4 +172,53 @@ assert(not raid:ShowSecureProxyForButton(row), "A change of unit identity invali
 unitNames.raid2 = { "Grace", "OtherRealm" }
 roster[2], env.RaidGroupButton2.name = resolved.name, resolved.name
 assert(raid:ShowSecureProxyForButton(row) and attributes.clickbutton2 == env.RaidGroupButton2)
-io.write("[OK] Native raid menu, delayed roster names, protected combat guard, and flavor fallbacks\n")
+
+local getRosterInfo = env.GetRaidRosterInfo
+env.GetRaidRosterInfo = function(index)
+	if index == 1 then return "Ada", 2, 2, 80, "Mage", "MAGE" end
+end
+raid.displayList = {}
+nameUpdate("raid2")
+resolved = raid.raidMembers[2]
+assert(resolved and resolved.name == "Grace-OtherRealm" and not resolved.pendingName,
+	"A nil roster entry can resolve from a readable unit name")
+for sortMode = 1, 4 do
+	raid.sortMode = sortMode
+	raid:BuildDisplayList()
+	assert(#raid.displayList == 2, "Sorting tolerates a member whose roster metadata is still missing")
+end
+unitNames.raid2 = { "Grace", secret }
+nameUpdate("raid2")
+assert(#raid.raidMembers == 1, "A nil roster slot with no readable full name is skipped")
+env.GetRaidRosterInfo = getRosterInfo
+
+env.IsInRaid = function() return false end
+env.GetNumSubgroupMembers = function() return 1 end
+env.UnitExists = function(unit) return unit == "party1" or unit == "player" end
+env.UnitLevel = function() return 80 end
+env.UnitClass = function() return "Mage", "MAGE" end
+env.UnitGroupRolesAssigned = function() return "DAMAGER" end
+env.UnitIsGroupLeader = function() return false end
+env.GetRealZoneText = function() return "Zone" end
+env.UnitIsConnected = function() return true end
+env.UnitIsDead = function() return false end
+local names = { player = secret, party1 = secret }
+env.UnitName = function(unit) return names[unit] end
+unitNames.party1 = { secret, "OtherRealm" }
+nameUpdate("party1")
+for _, member in ipairs(raid.raidMembers) do
+	assert(member.pendingName and member.name == "Unknown", "Secret party names become safe placeholders")
+end
+raid.sortMode = 1
+raid:BuildDisplayList()
+assert(#raid.displayList == 2, "Pending party names are safe to sort")
+names.player = "Ada"
+unitNames.party1 = { "Grace", "OtherRealm" }
+nameUpdate("party1")
+assert(raid.raidMembers[1].name == "Ada" and not raid.raidMembers[1].pendingName)
+assert(raid.raidMembers[2].name == "Grace-OtherRealm" and not raid.raidMembers[2].pendingName,
+	"A pending party name recovers when the unit name is readable")
+names.party1 = "Grace"
+nameUpdate("party1")
+assert(raid.raidMembers[2].name == "Grace", "Readable party names keep their existing format")
+io.write("[OK] Native raid menu, delayed and restricted roster names, protected combat guard, and flavor fallbacks\n")

@@ -7,6 +7,215 @@ local _, BFL = ...
 BFL.FontManager = {}
 local FontManager = BFL.FontManager
 
+local WINDOW_FONT_TARGETS = setmetatable({}, { __mode = "k" })
+
+function FontManager:RegisterWindowFont(fontString, role)
+	if not (fontString and fontString.GetFont) then return end
+	if not WINDOW_FONT_TARGETS[fontString] then
+		local path, size, flags = fontString:GetFont()
+		WINDOW_FONT_TARGETS[fontString] = { path = path, size = size, flags = flags, role = role,
+			fontObject = fontString.GetFontObject and fontString:GetFontObject() }
+	end
+end
+
+function FontManager:GetWindowFontDefaults(role)
+	local main = _G.BetterFriendsFrame
+	local ui = BFL:GetModule("FriendsUI")
+	local candidate
+	if role == "ActionButton" then
+		local button = main and main.AddFriendButton
+		if ui and ui.IsModernActive and ui:IsModernActive() and ui.root and ui.root.BottomActionBar then
+			button = ui.root.BottomActionBar.AddFriendButton
+		end
+		candidate = button and button:GetFontString()
+	else
+		candidate = main and ((main.TitleContainer and main.TitleContainer.TitleText) or main.TitleText)
+	end
+	local native = candidate and WINDOW_FONT_TARGETS[candidate]
+	if native then return native.path, native.size, native.flags end
+	for _, original in pairs(WINDOW_FONT_TARGETS) do
+		if original.role == role then return original.path, original.size, original.flags end
+	end
+	return STANDARD_TEXT_FONT, 12, ""
+end
+
+function FontManager:ApplyWindowTextFont(target, path, size, flags, custom, originalObject)
+	if not target.SetFontObject then return self:SafeSetFont(target, path, size, flags) end
+	local r, g, b, a = target:GetTextColor()
+	local x, y = target:GetShadowOffset()
+	local sr, sg, sb, sa = target:GetShadowColor()
+	local family = custom and self:GetOrCreateFontFamily(path, size, flags, false)
+	if family then
+		target:SetFontObject(family)
+	else
+		if not custom and originalObject then target:SetFontObject(originalObject) end
+		self:SafeSetFont(target, path, size, flags)
+	end
+	-- Font families supply locale glyph fallbacks; themes still own text colors.
+	target:SetTextColor(r, g, b, a)
+	target:SetShadowOffset(x, y)
+	target:SetShadowColor(sr, sg, sb, sa)
+end
+
+function FontManager:RefreshWindowFonts()
+	local db = BFL:GetModule("DB")
+	if not db then return end
+	local function RegisterButton(button)
+		if not (button and button.GetFontString) then return end
+		local fontString = button:GetFontString()
+		self:RegisterWindowFont(fontString, "ActionButton")
+		local original = WINDOW_FONT_TARGETS[fontString]
+		if original and not original.button then
+			original.button, original.width, original.height = button, button:GetWidth(), button:GetHeight()
+			if button.HookScript then
+				local function RefreshState()
+					if db:Get("fontActionButton", "") ~= "" or db:Get("fontSizeActionButton", 0) > 0 then
+						self:RefreshWindowFonts()
+					end
+				end
+				for _, event in ipairs({ "OnEnter", "OnLeave", "OnMouseDown", "OnMouseUp", "OnEnable", "OnDisable" }) do
+					button:HookScript(event, RefreshState)
+				end
+			end
+		end
+	end
+	local function RegisterWindow(frame)
+		if not frame then return end
+		self:RegisterWindowFont((frame.TitleContainer and frame.TitleContainer.TitleText) or frame.TitleText or frame.Title or frame.title, "WindowTitle")
+		for _, key in ipairs({ "AddFriendButton", "button1", "button2", "applyButton", "createButton" }) do
+			RegisterButton(frame[key])
+		end
+		RegisterButton(frame.BottomActionBar and frame.BottomActionBar.AddFriendButton)
+	end
+	RegisterWindow(_G.BetterFriendsFrame)
+	local friendsUI = BFL:GetModule("FriendsUI")
+	RegisterWindow(friendsUI and friendsUI.root)
+	RegisterWindow(_G.BetterFriendlistSettingsFrame)
+	local review = BFL:GetModule("LegacySettingsReview")
+	RegisterWindow(review and review.frame)
+	local editor = BFL:GetModule("FriendTagEditor")
+	RegisterWindow(editor and editor.frame)
+	RegisterButton(editor and editor.applyButton)
+	local designer = BFL:GetModule("SettingsDesigner")
+	RegisterWindow(designer and designer.GetFrame and designer:GetFrame())
+	local dialogs = BFL:GetModule("Dialogs")
+	RegisterWindow(dialogs and dialogs.inputDialog)
+	for target, original in pairs(WINDOW_FONT_TARGETS) do
+		local face = db:Get("font" .. original.role, "")
+		local size = tonumber(db:Get("fontSize" .. original.role, 0)) or 0
+		local custom = face ~= "" or size > 0
+		if not original.appliedCustom then
+			-- Until the player overrides it, the current theme owns the native font.
+			original.path, original.size, original.flags = target:GetFont()
+			original.fontObject = target.GetFontObject and target:GetFontObject()
+			if original.button then
+				original.width, original.height = original.button:GetWidth(), original.button:GetHeight()
+			end
+		end
+		local path = face ~= "" and self:ResolveFontPath(face) or original.path
+		local layoutPending = false
+		if custom or original.appliedCustom then
+			self:ApplyWindowTextFont(target, path, size > 0 and size or original.size, original.flags,
+				face ~= "", original.fontObject)
+		end
+		if original.button and (custom or original.appliedCustom) then
+			local width = custom and math.max(original.width, target:GetStringWidth() + 24) or original.width
+			local height = custom and math.max(original.height, target:GetStringHeight() + 8) or original.height
+			if math.abs(original.button:GetWidth() - width) > 0.01 or math.abs(original.button:GetHeight() - height) > 0.01 then
+				if InCombatLockdown() and original.button:IsProtected() then
+					layoutPending = true
+					self.windowFontsAfterCombat = true
+					if not self.windowFontCombatCallback then
+						self.windowFontCombatCallback = true
+						BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+							if self.windowFontsAfterCombat then
+								self.windowFontsAfterCombat = nil
+								self:RefreshWindowFonts()
+							end
+						end)
+					end
+				else
+					original.button:SetSize(width, height)
+				end
+			end
+		end
+		original.appliedCustom = custom or layoutPending
+	end
+	if dialogs and dialogs.inputDialog then dialogs:LayoutInputDialog() end
+end
+
+function FontManager:RefreshDisplayFonts()
+	if InCombatLockdown() then return false end
+	local visited, count = {}, 0
+	local function Visit(frame, depth)
+		if not frame or visited[frame] or depth > 10 or (frame.IsForbidden and frame:IsForbidden()) then return end
+		visited[frame] = true
+		local text = frame.GetFontString and frame:GetFontString()
+		if text and text.GetFont then
+			local object = text.GetFontObject and text:GetFontObject()
+			local path, size, flags = text:GetFont()
+			local override = not object
+			if object and object.GetFont then
+				local objectPath, objectSize, objectFlags = object:GetFont()
+				override = path ~= objectPath or size ~= objectSize or (flags or "") ~= (objectFlags or "")
+			end
+			local r, g, b, a = text:GetTextColor()
+			local x, y = text:GetShadowOffset()
+			local sr, sg, sb, sa = text:GetShadowColor()
+			local justifyH = text.GetJustifyH and text:GetJustifyH()
+			local justifyV = text.GetJustifyV and text:GetJustifyV()
+			local spacing = text.GetSpacing and text:GetSpacing()
+			local alternate
+			for _, state in ipairs({ "Normal", "Highlight", "Disabled" }) do
+				local get, set = frame["Get" .. state .. "FontObject"], frame["Set" .. state .. "FontObject"]
+				if get and set then
+					local font = get(frame)
+					if font then
+						if font ~= object then alternate = font end
+						set(frame, font)
+					end
+				end
+			end
+			-- Rebind instances, never mutate shared Blizzard/skin FontObjects.
+			-- Preserve deliberate per-instance size/face overrides and theme colors.
+			-- Swapping through an existing state font defeats same-object fast paths.
+			if object and alternate and text.SetFontObject then text:SetFontObject(alternate) end
+			if object and text.SetFontObject then text:SetFontObject(object) end
+			if override and path and size then self:SafeSetFont(text, path, size, flags) end
+			text:SetTextColor(r, g, b, a)
+			text:SetShadowOffset(x, y)
+			text:SetShadowColor(sr, sg, sb, sa)
+			if justifyH and text.SetJustifyH then text:SetJustifyH(justifyH) end
+			if justifyV and text.SetJustifyV then text:SetJustifyV(justifyV) end
+			if spacing and text.SetSpacing then text:SetSpacing(spacing) end
+			count = count + 1
+		end
+		if frame.GetChildren then
+			for _, child in ipairs({ frame:GetChildren() }) do Visit(child, depth + 1) end
+		end
+	end
+	Visit(BFL.MainFrame or _G.BetterFriendsFrame, 0)
+	Visit(_G.BetterFriendlistSettingsFrame, 0)
+	Visit(_G.BetterFriendlistHelpFrame, 0)
+	for _, name in ipairs({ "FriendTagEditor", "IconSelector", "LegacySettingsReview" }) do
+		local module = BFL:GetModule(name)
+		Visit(module and module.frame, 0)
+	end
+	local designer = BFL:GetModule("SettingsDesigner")
+	Visit(designer and designer.GetFrame and designer:GetFrame(), 0)
+	local dialogs = BFL:GetModule("Dialogs")
+	Visit(dialogs and dialogs.inputDialog, 0)
+	self:RefreshWindowFonts()
+	return count
+end
+
+function FontManager:ResetWindowFont(role)
+	local db = BFL:GetModule("DB")
+	db:Set("font" .. role, "")
+	db:Set("fontSize" .. role, 0)
+	self:RefreshWindowFonts()
+end
+
 -- ========================================
 -- Dependencies
 -- ========================================
@@ -40,6 +249,8 @@ function FontManager:ResolveFontPath(fontName)
 	end
 	-- Built-in alternative for clients without LibSharedMedia.
 	if fontName == "Arial Narrow" then return "Fonts\\ARIALN.TTF" end
+	if fontName == "Skurri" then return "Fonts\\skurri.ttf" end
+	if fontName == "Morpheus" then return "Fonts\\MORPHEUS.ttf" end
 	-- Unresolvable name: use locale-appropriate default
 	return STANDARD_TEXT_FONT
 end

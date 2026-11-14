@@ -506,6 +506,7 @@ end
 
 function ThemePalette:GetAvatarVisibility(theme)
 	theme = theme or (BFL.GetEffectiveTheme and BFL:GetEffectiveTheme()) or "blizzard"
+	if BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden(theme) then return 0 end
 	if theme == "blizzard" then
 		return 1
 	end

@@ -575,11 +575,21 @@ local function GetFriendTagRowRightInset(controlLaneHeight, isModern)
 	return math.max(actionWidth, FRIEND_GAME_ICON_RIGHT_OFFSET + gameIconSize) + FRIEND_TAG_CONTROL_GAP
 end
 
+function FriendsList:GetFavoriteIconAtlas(style)
+	if style == "modern" then
+		return "friends-icon-favorites"
+	elseif style == "blizzard" then
+		return "friendslist-favorite"
+	end
+end
+
 local function GetFavoriteIconLayout(fontSize, style)
 	fontSize = tonumber(fontSize) or BASE_FONT_SIZE
 	local bflIconSize = math.max(1, math.floor(fontSize * 0.70))
 	local isBlizzard = style == "blizzard"
-	local iconSize = isBlizzard and math.max(1, math.floor(fontSize * 1.2)) or bflIconSize
+	local iconSize = isBlizzard and math.max(1, math.floor(fontSize * 1.2))
+		or (style == "modern" and math.max(1, math.floor(fontSize * 0.9)))
+		or bflIconSize
 	local sizeDifferenceOffset = isBlizzard and math.floor((iconSize - bflIconSize) / 2) or 0
 	return {
 		iconSize = iconSize,
@@ -2029,13 +2039,15 @@ local function BuildDisplayList(self)
 			end
 		end
 
-		if not isInAnyGroup then
-			table.insert(friendGroupIds, "nogroup")
-		end
-
 		if enableDynamicTagGroups then
+			local previousCount = #friendGroupIds
 			self:AppendDynamicTagGroups(FriendTags:GetTagsForFriend(friend, "group"), virtualTagGroupByTagId,
 				groupedFriends, assignedGroups, friendGroupIds, prioritizeTagGroups)
+			isInAnyGroup = isInAnyGroup or #friendGroupIds > previousCount
+		end
+
+		if not isInAnyGroup then
+			table.insert(friendGroupIds, "nogroup")
 		end
 
 		local passesFilters = self:PassesFilters(friend)
@@ -3466,6 +3478,51 @@ function FriendsList:GetInviteAccountEntries(friend)
 		Add(friend.gameAccountInfo, true)
 	end
 	return entries
+end
+
+function FriendsList:GetLiveMenuInviteAccount(entry)
+	local id = entry.gameAccountID
+	local getAccount = C_BattleNet and C_BattleNet.GetGameAccountInfoByID
+	if not getAccount or BFL:IsSecret(id) or BFL:IsSecret(entry.playerGuid)
+		or type(id) ~= "number" or id <= 0 or id % 1 ~= 0
+	then
+		return nil, ERR_TRAVEL_PASS_NO_INFO
+	end
+
+	local ok, account = pcall(getAccount, id)
+	if not ok or self:GetReadableInviteField(account, "gameAccountID") ~= id
+		or self:GetReadableInviteField(account, "isOnline") ~= true
+	then
+		return nil, ERR_TRAVEL_PASS_NO_INFO
+	end
+
+	local restriction, reason = self:GetGameAccountInviteRestriction(account)
+	if restriction ~= INVITE_RESTRICTION_NONE then
+		return nil, reason or (BFL.GetInviteRestrictionText and BFL.GetInviteRestrictionText(restriction))
+	end
+	if self:GetReadableInviteField(account, "playerGuid") ~= entry.playerGuid then
+		return nil, ERR_TRAVEL_PASS_NO_INFO
+	end
+	return account
+end
+
+function FriendsList:IsOnlyOnlineMenuInviteAccount(bnetAccountID, gameAccountID)
+	if not (BNGetFriendIndex and C_BattleNet and C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendGameAccountInfo)
+		or BFL:IsSecret(bnetAccountID) or type(bnetAccountID) ~= "number" or bnetAccountID <= 0 or bnetAccountID % 1 ~= 0
+	then return false end
+	local index = BNGetFriendIndex(bnetAccountID)
+	if BFL:IsSecret(index) or type(index) ~= "number" or index < 1 then return false end
+	local count = C_BattleNet.GetFriendNumGameAccounts(index)
+	if BFL:IsSecret(count) or count ~= 1 then return false end
+	local account = C_BattleNet.GetFriendGameAccountInfo(index, 1)
+	if not self:IsReadableInviteRecord(account) then return false end
+	local guid = account.playerGuid
+	local realmID = self:GetReadableInviteField(account, "realmID")
+	return self:GetReadableInviteField(account, "gameAccountID") == gameAccountID
+		and self:GetReadableInviteField(account, "isOnline") == true
+		and self:GetReadableInviteField(account, "wowProjectID") == WOW_PROJECT_ID
+		and type(realmID) == "number" and realmID > 0
+		and not BFL:IsSecret(guid) and (guid == nil or guid == "")
 end
 
 local function GetInviteRestrictionTextSafe(restriction)
@@ -6980,6 +7037,9 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 	local favoritesVisible = visibleGroups["favorites"] ~= nil
 	local inGameVisible = enableInGameGroup and visibleGroups["ingame"] ~= nil
 	local recentlyAddedVisible = enableRecentlyAddedGroup and visibleGroups["recentlyadded"] ~= nil
+	local FriendTags = BFL:GetModule("FriendTags")
+	local tagGroupsEnabled = FriendTags and FriendTags:IsEnabled()
+		and FriendTags:GetSetting("enableDynamicTagGroups", false)
 
 	for _, friend in ipairs(self.friendsList) do
 		-- Apply filters first
@@ -7062,6 +7122,14 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 						isInTargetGroup = true
 					end
 					isInAnyGroup = true
+				end
+			end
+
+			if tagGroupsEnabled then
+				for _, tag in ipairs(FriendTags:GetTagsForFriend(friend, "group")) do
+					isInAnyGroup = true
+					if targetGroupId == "tag:" .. tag.id then isInTargetGroup = true end
+					if FriendTags:GetSetting("prioritizeDynamicTagGroups", false) then break end
 				end
 			end
 
@@ -7430,64 +7498,35 @@ function FriendsList:GetInvitableCount(groupId)
 
 	local count = 0
 
-	for _, friend in ipairs(self.friendsList) do
+	for _, friend in ipairs(self:GetFriendsForGroup(groupId)) do
 		if friend.connected then
-			local friendUID = GetFriendUID(friend)
-			local isInGroup = false
+			-- Validate: Must be WoW, same version, not already in party
+			local isValid = false
+			local characterName = nil
 
-			-- Check group membership (same logic as InviteGroupToParty)
-			if groupId == "favorites" and friend.type == "bnet" and friend.isFavorite then
-				isInGroup = true
-			elseif groupId ~= "favorites" and groupId ~= "nogroup" then
-				isInGroup = friendUID and DB:IsFriendInGroup(friendUID, groupId)
-			elseif groupId == "nogroup" then
-				local hasGroup = false
-				if friend.type == "bnet" and friend.isFavorite then
-					hasGroup = true
-				elseif friendUID then
-					local groups = DB:GetFriendGroups(friendUID)
-					local allGroups = GetGroups()
-					local availableGroups = allGroups and allGroups:GetAll() or {}
-					for _, persistedGroupId in ipairs(groups) do
-						local persistedGroup = availableGroups[persistedGroupId]
-						if persistedGroup and not persistedGroup.builtin then
-							hasGroup = true
-							break
-						end
+			if friend.type == "bnet" then
+				if BFL.IsForever then
+					local account
+					account, characterName = self:GetForeverGroupInviteTarget(friend)
+					isValid = account ~= nil
+				elseif
+					friend.gameAccountInfo
+					and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
+					and friend.gameAccountInfo.gameAccountID
+				then
+					local friendProjectID = friend.gameAccountInfo.wowProjectID
+					if friendProjectID and WOW_PROJECT_ID and friendProjectID == WOW_PROJECT_ID then
+						isValid = true
+						characterName = friend.gameAccountInfo.characterName
 					end
 				end
-				isInGroup = not hasGroup
+			elseif friend.type == "wow" then
+				isValid = true
+				characterName = friend.name
 			end
 
-			if isInGroup then
-				-- Validate: Must be WoW, same version, not already in party
-				local isValid = false
-				local characterName = nil
-
-				if friend.type == "bnet" then
-					if BFL.IsForever then
-						local account
-						account, characterName = self:GetForeverGroupInviteTarget(friend)
-						isValid = account ~= nil
-					elseif
-						friend.gameAccountInfo
-						and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
-						and friend.gameAccountInfo.gameAccountID
-					then
-						local friendProjectID = friend.gameAccountInfo.wowProjectID
-						if friendProjectID and WOW_PROJECT_ID and friendProjectID == WOW_PROJECT_ID then
-							isValid = true
-							characterName = friend.gameAccountInfo.characterName
-						end
-					end
-				elseif friend.type == "wow" then
-					isValid = true
-					characterName = friend.name
-				end
-
-				if isValid and not IsAlreadyInGroup(characterName) then
-					count = count + 1
-				end
+			if isValid and not IsAlreadyInGroup(characterName) then
+				count = count + 1
 			end
 		end
 	end
@@ -7526,74 +7565,42 @@ function FriendsList:InviteGroupToParty(groupId)
 	local inviteCandidates = {}
 
 	-- 1. Collect all candidates
-	for _, friend in ipairs(self.friendsList) do
+	for _, friend in ipairs(self:GetFriendsForGroup(groupId)) do
 		if friend.connected then
-			local friendUID = GetFriendUID(friend)
-			local isInGroup = false
+			-- Validate invitable status (BNet WoW or WoW friend)
+			local isValid = false
+			local characterName = nil
+			local selectedAccount
 
-			-- Check if favorite
-			if groupId == "favorites" and friend.type == "bnet" and friend.isFavorite then
-				isInGroup = true
-			-- Check if in custom group
-			elseif groupId ~= "favorites" and groupId ~= "nogroup" then
-				isInGroup = friendUID and DB:IsFriendInGroup(friendUID, groupId)
-			-- Check if in no group
-			elseif groupId == "nogroup" then
-				local hasGroup = false
-				if friend.type == "bnet" and friend.isFavorite then
-					hasGroup = true
-				elseif friendUID then
-					local groups = DB:GetFriendGroups(friendUID)
-					local allGroups = GetGroups()
-					local availableGroups = allGroups and allGroups:GetAll() or {}
-					for _, persistedGroupId in ipairs(groups) do
-						local persistedGroup = availableGroups[persistedGroupId]
-						if persistedGroup and not persistedGroup.builtin then
-							hasGroup = true
-							break
-						end
+			if friend.type == "bnet" then
+				if BFL.IsForever then
+					selectedAccount, characterName = self:GetForeverGroupInviteTarget(friend)
+					isValid = selectedAccount ~= nil
+				elseif
+					friend.gameAccountInfo
+					and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
+					and friend.gameAccountInfo.gameAccountID
+				then
+					-- Fix #33: Also check WoW project ID (Retail vs Classic)
+					local friendProjectID = friend.gameAccountInfo.wowProjectID
+					if friendProjectID and WOW_PROJECT_ID and friendProjectID == WOW_PROJECT_ID then
+						isValid = true
+						characterName = friend.gameAccountInfo.characterName
 					end
 				end
-				isInGroup = not hasGroup
+			elseif friend.type == "wow" then
+				-- WoW friends are always on same project
+				isValid = true
+				characterName = friend.name
 			end
 
-			-- Add to candidates if found
-			if isInGroup then
-				-- Validate invitable status (BNet WoW or WoW friend)
-				local isValid = false
-				local characterName = nil
-				local selectedAccount
+			-- Fix #33: Skip friends already in our party/raid
+			if isValid and IsAlreadyInGroup(characterName) then
+				isValid = false
+			end
 
-				if friend.type == "bnet" then
-					if BFL.IsForever then
-						selectedAccount, characterName = self:GetForeverGroupInviteTarget(friend)
-						isValid = selectedAccount ~= nil
-					elseif
-						friend.gameAccountInfo
-						and friend.gameAccountInfo.clientProgram == BNET_CLIENT_WOW
-						and friend.gameAccountInfo.gameAccountID
-					then
-						-- Fix #33: Also check WoW project ID (Retail vs Classic)
-						local friendProjectID = friend.gameAccountInfo.wowProjectID
-						if friendProjectID and WOW_PROJECT_ID and friendProjectID == WOW_PROJECT_ID then
-							isValid = true
-							characterName = friend.gameAccountInfo.characterName
-						end
-					end
-				elseif friend.type == "wow" then
-					-- WoW friends are always on same project
-					isValid = true
-					characterName = friend.name
-				end
-
-				-- Fix #33: Skip friends already in our party/raid
-				if isValid and IsAlreadyInGroup(characterName) then
-					isValid = false
-				end
-
-				if isValid then
-					table.insert(inviteCandidates, { friend = friend, gameAccountInfo = selectedAccount or friend.gameAccountInfo })
-				end
+			if isValid then
+				table.insert(inviteCandidates, { friend = friend, gameAccountInfo = selectedAccount or friend.gameAccountInfo })
 			end
 		end
 	end
@@ -8008,9 +8015,13 @@ local function BuildGroupHeaderMenuItems(groupId, includeDelete)
 			text = groupData.name,
 		},
 		{
+			text = BFL.L.MENU_CREATE_GROUP,
+			func = function() BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP") end,
+		},
+		{
 			text = BFL.L.MENU_RENAME_GROUP,
 			func = function()
-				StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
+				BFL.ShowInputDialog("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
 			end,
 		},
 		{
@@ -8054,6 +8065,24 @@ local function BuildGroupHeaderMenuItems(groupId, includeDelete)
 end
 
 -- Update group header button (NEW - Phase 1)
+function FriendsList:RefreshGroupHeadersAfterDisplayChange()
+	if InCombatLockdown() then return 0 end
+	local count = 0
+	local function Refresh(button, data)
+		data = data or button.elementData
+		if data and data.buttonType == BUTTON_TYPE_GROUP_HEADER and button:IsShown() then
+			self:UpdateGroupHeaderButton(button, data)
+			count = count + 1
+		end
+	end
+	if BFL.HasModernScrollBox and self.scrollBox and self.scrollBox.ForEachFrame then
+		self.scrollBox:ForEachFrame(Refresh)
+	else
+		for _, button in ipairs(self.classicHeaderPool or {}) do Refresh(button) end
+	end
+	return count
+end
+
 function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	local groupId = elementData.groupId
 	local name = elementData.name
@@ -8422,7 +8451,8 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		button:SetScript("OnClick", function(self, buttonName)
 			if buttonName == "RightButton" and BFL.OpenSimpleContextMenu then
-				BFL.OpenSimpleContextMenu(self, "BFL_VirtualTagGroupDropdown", {
+				local targetGroupId, targetTagId = self.groupId, self.elementData.tagId
+				local items = {
 					{
 						type = "title",
 						text = name or self.groupId,
@@ -8432,11 +8462,23 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						func = function()
 							local FriendTags = BFL:GetModule("FriendTags")
 							if FriendTags and FriendTags.OpenSettings then
-								FriendTags:OpenSettings(elementData.tagId)
+								FriendTags:OpenSettings(targetTagId)
 							end
 						end,
 					},
-				})
+					{
+						text = L.MENU_CREATE_GROUP,
+						func = function() BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP") end,
+					},
+				}
+				local count = FriendsList:GetInvitableCount(targetGroupId)
+				if count > 0 then
+					items[#items + 1] = {
+						text = L.MENU_INVITE_GROUP .. " (" .. count .. ")",
+						func = function() FriendsList:InviteGroupToParty(targetGroupId) end,
+					}
+				end
+				BFL.OpenSimpleContextMenu(self, "BFL_VirtualTagGroupDropdown", items)
 			else
 				FriendsList:ToggleGroup(self.groupId)
 			end
@@ -8456,8 +8498,9 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		button:SetScript("OnClick", function(self, buttonName)
 			if buttonName == "RightButton" and BFL.OpenSimpleContextMenu then
+				local targetGroupId = self.groupId
 				BFL.OpenSimpleContextMenu(self, "BFL_GroupHeaderDropdown", function()
-					return BuildGroupHeaderMenuItems(self.groupId, includeDelete)
+					return BuildGroupHeaderMenuItems(targetGroupId, includeDelete)
 				end)
 			else
 				FriendsList:ToggleGroup(self.groupId)
@@ -10128,6 +10171,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- Guard: Only BNet friends can have favorites (WoW friends never have isFavorite)
 	local isFavorite = (friend.type == "bnet") and friend.isFavorite
 	local showFavIcon = isFavorite and self.settingsCache.enableFavoriteIcon
+	local iconStyle = self.settingsCache and self.settingsCache.favoriteIconStyle or "bfl"
 
 	-- Optimized Phase 4: State Check for Text
 	local textChanged = false
@@ -10148,7 +10192,9 @@ function FriendsList:UpdateFriendButton(button, elementData)
 
 	-- We check if favorite state changed OR if the text changed (which means width changed)
 	-- Also check if font changed, as that affects text width
-	if button.lastIsFavorite ~= showFavIcon or (showFavIcon and (textChanged or fontChanged or layoutChanged)) then
+	if button.lastIsFavorite ~= showFavIcon
+		or (showFavIcon and (textChanged or fontChanged or layoutChanged or button.lastFavoriteIconStyle ~= iconStyle))
+	then
 		button.lastIsFavorite = showFavIcon
 
 		if showFavIcon then
@@ -10158,19 +10204,19 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				button.favoriteIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Icons\\star")
 			end
 
-			local iconStyle = self.settingsCache and self.settingsCache.favoriteIconStyle or "bfl"
 			if button.lastFavoriteIconStyle ~= iconStyle then
-				if iconStyle == "blizzard" then
+				local favoriteAtlas = self:GetFavoriteIconAtlas(iconStyle)
+				if favoriteAtlas then
 					local applied = false
 					if BFL.SetTextureOrAtlas then
 						applied = BFL.SetTextureOrAtlas(
 							button.favoriteIcon,
-							"friendslist-favorite",
+							favoriteAtlas,
 							"Interface\\AddOns\\BetterFriendlist\\Icons\\star",
 							true
 						)
 					elseif button.favoriteIcon.SetAtlas then
-						local ok = pcall(button.favoriteIcon.SetAtlas, button.favoriteIcon, "friendslist-favorite", true)
+						local ok = pcall(button.favoriteIcon.SetAtlas, button.favoriteIcon, favoriteAtlas, true)
 						applied = ok == true
 					end
 					if not applied then

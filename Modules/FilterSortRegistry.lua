@@ -17,6 +17,40 @@ Registry.MAX_SORT_STEPS = 8
 local BFL_ICON_PREFIX = "Interface\\AddOns\\BetterFriendlist\\Icons\\"
 local BLIZZARD_ICON_PREFIX = "Interface\\Icons\\"
 local THEME_ICON_PREFIX = "Interface\\AddOns\\BetterFriendlist\\Textures\\ThemeIcons\\"
+local NATIVE_FILTER_ICONS = {
+	["logo-wow-retail"] = {
+		fallbackAtlas = "friends-icon-addFriend-logo-WoW",
+		texture = "Interface\\ChatFrame\\UI-ChatIcon-WoW",
+		crop = { 0.25, 0.75, 0.25, 0.75 },
+	},
+	["logo-wow-forever"] = {
+		fallbackAtlas = "friends-icon-addFriend-logo-WoW",
+		texture = "Interface\\ChatFrame\\UI-ChatIcon-WoW",
+		crop = { 0.21, 0.79, 0.21, 0.79 },
+		preserveAspect = true,
+		scale = 1.12,
+	},
+	["friends-icon-addFriend-logo-battleNet"] = {
+		fallbackAtlas = "Battlenet-ClientIcon-App",
+		texture = "Interface\\FriendsFrame\\Battlenet-Battleneticon",
+		crop = { 0, 1, 0, 1 },
+	},
+	["friends-status-online"] = {
+		texture = "Interface\\FriendsFrame\\StatusIcon-Online",
+		crop = { 0.10, 0.90, 0.10, 0.90 },
+	},
+	["friends-status-offline"] = {
+		texture = "Interface\\FriendsFrame\\StatusIcon-Offline",
+		crop = { 0.14, 0.86, 0.14, 0.86 },
+	},
+}
+local LEGACY_FILTER_ICON_ATLASES = {
+	["filter-retail"] = "logo-wow-retail",
+	["filter-wow"] = "logo-wow-retail",
+	["filter-bnet"] = "friends-icon-addFriend-logo-battleNet",
+	["filter-online"] = "friends-status-online",
+	["filter-offline"] = "friends-status-offline",
+}
 local THEME_NEUTRAL_ICON_NAMES = {
 	["check-circle"] = true,
 	["class"] = true,
@@ -938,6 +972,7 @@ local BUILTIN_QUICK_FILTERS = {
 	{
 		id = "all",
 		labelKey = "FILTER_ALL",
+		descriptionKey = "FILTER_ALL_DESC",
 		icon = BFL_ICON_PREFIX .. "filter-all",
 		order = 10,
 		evaluator = BuiltinQuickFilter_All,
@@ -945,41 +980,47 @@ local BUILTIN_QUICK_FILTERS = {
 	{
 		id = "online",
 		labelKey = "FILTER_ONLINE",
-		icon = BFL_ICON_PREFIX .. "filter-online",
+		descriptionKey = "FILTER_ONLINE_DESC",
+		icon = "friends-status-online",
 		order = 20,
 		evaluator = BuiltinQuickFilter_Online,
 	},
 	{
 		id = "offline",
 		labelKey = "FILTER_OFFLINE",
-		icon = BFL_ICON_PREFIX .. "filter-offline",
+		descriptionKey = "FILTER_OFFLINE_DESC",
+		icon = "friends-status-offline",
 		order = 30,
 		evaluator = BuiltinQuickFilter_Offline,
 	},
 	{
 		id = "wowonline",
 		labelKey = "FILTER_WOW_ONLINE",
-		icon = BFL_ICON_PREFIX .. "check-circle",
+		descriptionKey = "FILTER_WOW_ONLINE_DESC",
+		icon = "logo-wow-retail",
 		order = 40,
 		evaluator = BuiltinQuickFilter_WoWOnline,
 	},
 	{
 		id = "wow",
 		labelKey = "FILTER_WOW",
-		icon = BFL_ICON_PREFIX .. "filter-wow",
+		descriptionKey = "FILTER_WOW_DESC",
+		icon = "logo-wow-retail",
 		order = 50,
 		evaluator = BuiltinQuickFilter_WoW,
 	},
 	{
 		id = "bnet",
 		labelKey = "FILTER_BNET",
-		icon = BFL_ICON_PREFIX .. "filter-bnet",
+		descriptionKey = "FILTER_BNET_DESC",
+		icon = "friends-icon-addFriend-logo-battleNet",
 		order = 60,
 		evaluator = BuiltinQuickFilter_BNet,
 	},
 	{
 		id = "hideafk",
 		labelKey = "FILTER_HIDE_AFK",
+		descriptionKey = "FILTER_HIDE_AFK_DESC",
 		icon = BFL_ICON_PREFIX .. "filter-hide-afk",
 		order = 70,
 		evaluator = BuiltinQuickFilter_HideAFK,
@@ -987,20 +1028,23 @@ local BUILTIN_QUICK_FILTERS = {
 	{
 		id = "retail",
 		labelKey = "FILTER_RETAIL",
-		icon = BFL_ICON_PREFIX .. "filter-retail",
+		descriptionKey = "FILTER_RETAIL_DESC",
+		icon = "logo-wow-retail",
 		order = 80,
 		evaluator = BuiltinQuickFilter_Retail,
 	},
 	{
 		id = "forever",
 		labelKey = "FILTER_FOREVER",
-		icon = BFL_ICON_PREFIX .. "filter-wow",
+		descriptionKey = "FILTER_FOREVER_DESC",
+		icon = "logo-wow-forever",
 		order = 85,
 		evaluator = BuiltinQuickFilter_Forever,
 	},
 	{
 		id = "ingame",
 		labelKey = "FILTER_INGAME",
+		descriptionKey = "FILTER_INGAME_DESC",
 		icon = BFL_ICON_PREFIX .. "game",
 		order = 90,
 		evaluator = BuiltinQuickFilter_InGame,
@@ -1008,6 +1052,7 @@ local BUILTIN_QUICK_FILTERS = {
 	{
 		id = "inqueue",
 		labelKey = "FILTER_IN_QUEUE",
+		descriptionKey = "FILTER_IN_QUEUE_DESC",
 		icon = BFL_ICON_PREFIX .. "game",
 		order = 100,
 		evaluator = BuiltinQuickFilter_InQueue,
@@ -1016,6 +1061,7 @@ local BUILTIN_QUICK_FILTERS = {
 	{
 		id = "availableforqueue",
 		labelKey = "FILTER_AVAILABLE_FOR_QUEUE",
+		descriptionKey = "FILTER_AVAILABLE_FOR_QUEUE_DESC",
 		icon = BFL_ICON_PREFIX .. "status",
 		order = 110,
 		evaluator = BuiltinQuickFilter_AvailableForQueue,
@@ -1051,6 +1097,9 @@ local function NormalizeIconRef(iconRef)
 	end
 	if type(iconRef) ~= "string" or iconRef == "" then
 		return nil
+	end
+	if NATIVE_FILTER_ICONS[iconRef] then
+		return iconRef
 	end
 	local normalized = iconRef:gsub("/", "\\")
 	if normalized:match("^%d+$") then
@@ -1259,6 +1308,7 @@ local function BuildDisplayEntry(entry, isCustom)
 		id = entry.id,
 		name = entry.name or GetLocale(entry.labelKey, entry.id),
 		labelKey = entry.labelKey,
+		description = entry.descriptionKey and GetLocale(entry.descriptionKey),
 		icon = entry.icon,
 		isCustom = isCustom and true or false,
 		builtin = not isCustom,
@@ -2203,6 +2253,32 @@ end
 function Registry:FormatIcon(iconRef, size)
 	size = size or 16
 	iconRef = NormalizeIconRef(iconRef) or BFL_ICON_PREFIX .. "filter-all"
+	local atlas = NATIVE_FILTER_ICONS[iconRef] and iconRef
+	if not atlas and type(iconRef) == "string" and iconRef:find(BFL_ICON_PREFIX, 1, true) == 1 then
+		local name = iconRef:sub(#BFL_ICON_PREFIX + 1):gsub("%.[^%.\\]+$", "")
+		atlas = LEGACY_FILTER_ICON_ATLASES[name]
+	end
+	if atlas then
+		local profile = NATIVE_FILTER_ICONS[atlas]
+		if BFL.GetAtlasOrTextureMarkup and BFL.HasAtlas and BFL.HasAtlas(atlas) then
+			local width, height = size, size
+			if profile.preserveAspect then
+				local info = BFL.Compat and BFL.Compat.GetAtlasInfo and BFL.Compat.GetAtlasInfo(atlas)
+				local aspect = info and info.width and info.height and info.height > 0 and info.width / info.height or 1
+				if profile.crop then aspect = aspect * (profile.crop[2] - profile.crop[1]) / (profile.crop[4] - profile.crop[3]) end
+				width, height = size * (profile.scale or 1), size * (profile.scale or 1)
+				if aspect > 1 then height = height / aspect elseif aspect > 0 then width = width * aspect end
+				width, height = math.floor(width + .5), math.floor(height + .5)
+			end
+			return BFL.GetAtlasOrTextureMarkup(atlas, profile.texture, width, height, profile.crop)
+		end
+		if profile.fallbackAtlas and BFL.GetAtlasOrTextureMarkup and BFL.HasAtlas and BFL.HasAtlas(profile.fallbackAtlas) then
+			return BFL.GetAtlasOrTextureMarkup(profile.fallbackAtlas, profile.texture, size, size)
+		end
+		-- Keep native brand and status colors, including when the active theme
+		-- tints BFL-owned icons. Older clients use their installed textures.
+		return string.format("|T%s:%d:%d:0:0|t", profile.texture, size, size)
+	end
 	local usesThemeAccent = (BFL.UsesDarkSkinTheme and BFL:UsesDarkSkinTheme())
 		or (BFL.IsEllesmereUISkinActive and BFL:IsEllesmereUISkinActive())
 	if type(iconRef) == "string"

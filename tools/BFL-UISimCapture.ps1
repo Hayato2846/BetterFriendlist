@@ -3,14 +3,20 @@
 param(
     [ValidatePattern('^[a-z_]+$')]
     [string]$Profile = 'friends_headers_i18n',
-    [ValidateSet('friends', 'nickname_hint')]
+    [ValidateSet('friends', 'nickname_hint', 'tag_editor', 'settings_feedback')]
     [string]$Scenario = 'friends',
-    [ValidateSet('normal', 'narrow', 'modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded')]
+[ValidateSet('normal', 'narrow', 'modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded', 'settings', 'settings-dark-de', 'narrow-dark-de', 'stacked', 'tag-picker', 'custom', 'custom-picker', 'groups', 'theme', 'format', 'help', 'performance', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow')]
     [string]$Variant,
     [string]$SimulatorHome,
     [string]$WowRoot,
     [string]$OutputDirectory,
+    [string[]]$ExtraAddonPath = @(),
     [switch]$RawTextAlignment,
+    [ValidateSet('left', 'right')]
+    [string]$SideTabPosition,
+    [ValidateSet('blizzard', 'dark', 'custom')]
+    [string]$SideTabTheme,
+    [switch]$ShowFriendTabSettings,
     [switch]$Fade
 )
 
@@ -34,9 +40,18 @@ $crop = '600x850+30+20'
 if ($Fade -and $Scenario -ne 'nickname_hint') {
     throw '-Fade requires the nickname_hint scenario.'
 }
+if ($ShowFriendTabSettings) { $crop = '1600x900+0+0' }
 if ($Scenario -eq 'nickname_hint') {
     $variants = @('modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded')
     $crop = '850x850+30+20'
+}
+if ($Scenario -eq 'tag_editor') {
+    $variants = @('normal', 'stacked', 'narrow', 'narrow-dark-de', 'tag-picker', 'custom', 'custom-picker', 'settings', 'settings-dark-de')
+    $crop = '1600x900+0+0'
+}
+if ($Scenario -eq 'settings_feedback') {
+    $variants = @('groups', 'theme', 'format', 'help', 'performance', 'narrow', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow')
+    $crop = '1600x900+0+0'
 }
 if ($Variant) {
     if ($Variant -notin $variants) {
@@ -104,17 +119,50 @@ if (-not $RawTextAlignment) {
 
 $enableFile = Join-Path $run 'AddOns.txt'
 Set-Content -LiteralPath $enableFile -Value 'BetterFriendlist: enabled' -Encoding utf8NoBOM
+foreach ($extraPath in $ExtraAddonPath) {
+    $extra = Get-Item -LiteralPath $extraPath
+    Copy-CaptureTree $extra.FullName (Join-Path $addons $extra.Name)
+    Add-Content -LiteralPath $enableFile -Value "$($extra.Name): enabled" -Encoding utf8NoBOM
+}
 $scene = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'BFL-UISimCapture.lua') -Raw
 foreach ($captureVariant in $variants) {
-    $narrow = ($captureVariant -eq 'narrow').ToString().ToLowerInvariant()
+    $narrow = ($captureVariant -in @('narrow', 'scale-narrow', 'scroll-narrow', 'skin-hover', 'format-narrow', 'scrollbars-narrow', 'filters-narrow')).ToString().ToLowerInvariant()
     $hintStyle = if ($Scenario -eq 'nickname_hint') { "'$($captureVariant.Split('-')[0])'" } else { 'nil' }
     $hintExpanded = $captureVariant.EndsWith('-expanded').ToString().ToLowerInvariant()
     $hintFade = $Fade.IsPresent.ToString().ToLowerInvariant()
-    $configuration = "local profile, narrow, leftAlignedFields, hintStyle, hintExpanded, hintFade = '$Profile', $narrow, {$($leftAlignedFields -join ', ')}, $hintStyle, $hintExpanded, $hintFade"
+    $targetFrame = 'BetterFriendsFrame'
+    $tagScene = 'nil'
+    $feedbackScene = 'nil'
+    if ($Scenario -eq 'settings_feedback') {
+        $feedbackScene = if ($captureVariant -eq 'narrow') { "'performance'" } else { "'$captureVariant'" }
+        if ($captureVariant -eq 'scale-narrow') { $feedbackScene = "'scale'" }
+        if ($captureVariant -eq 'scroll-narrow') { $feedbackScene = "'scroll'" }
+        if ($captureVariant -eq 'scrollbars-narrow') { $feedbackScene = "'scrollbars'" }
+        if ($captureVariant -eq 'filters-narrow') { $feedbackScene = "'filters'" }
+        $targetFrame = if ($captureVariant -eq 'popup') { 'StaticPopup1' } else { 'BetterFriendlistSettingsFrame' }
+        if ($captureVariant -eq 'input') { $targetFrame = 'BFLInputDialog' }
+        if ($captureVariant -eq 'input-layer') { $targetFrame = 'UIParent' }
+        if ($captureVariant -eq 'skin-footer') { $targetFrame = 'BetterFriendsFrame' }
+        if ($captureVariant -eq 'format-narrow') { $feedbackScene = "'format'" }
+    }
+    if ($Scenario -eq 'tag_editor') {
+        $tagScene = "'$captureVariant'"
+        $targetFrame = switch ($captureVariant) {
+            'settings' { 'BetterFriendlistSettingsFrame' }
+            'settings-dark-de' { 'BetterFriendlistSettingsFrame' }
+            'tag-picker' { 'BetterFriendlistIconSelectorFrame' }
+            'custom-picker' { 'BetterFriendlistIconSelectorFrame' }
+            default { 'BetterFriendlistFriendTagEditorFrame' }
+        }
+    }
+    $withFrameColor = (@($ExtraAddonPath | Where-Object { (Split-Path $_ -Leaf) -eq 'FrameColor' }).Count -gt 0).ToString().ToLowerInvariant()
+    if ($ShowFriendTabSettings) { $targetFrame = 'BetterFriendlistSettingsFrame' }
+    $configuration = "local profile, narrow, leftAlignedFields, hintStyle, hintExpanded, hintFade, tagScene, feedbackScene, withFrameColor = '$Profile', $narrow, {$($leftAlignedFields -join ', ')}, $hintStyle, $hintExpanded, $hintFade, $tagScene, $feedbackScene, $withFrameColor"
     $lua = Join-Path $run "$captureVariant.lua"
     $png = Join-Path $run "$captureVariant.png"
     $log = Join-Path $run "$captureVariant.log"
-    [IO.File]::WriteAllText($lua, "$configuration`n$scene")
+    $tabConfiguration = "local sideTabPosition, sideTabTheme, showFriendTabSettings = '$SideTabPosition', '$SideTabTheme', $($ShowFriendTabSettings.IsPresent.ToString().ToLowerInvariant())"
+    [IO.File]::WriteAllText($lua, "$configuration`n$tabConfiguration`n$scene")
 
     $process = [Diagnostics.ProcessStartInfo]::new($simulator)
     $process.UseShellExecute = $false
@@ -132,8 +180,8 @@ foreach ($captureVariant in $variants) {
     $process.Environment['WOW_SIM_ADDONS_TXT'] = $enableFile
     $arguments = @('--no-saved-vars', '--addons-path', $addons, '--session-wtf-path',
         (Join-Path $run "session-$captureVariant"), '--exec-lua', "@$lua", 'screenshot', '--png',
-        '--width', '1600', '--height', '900', '-f', 'BetterFriendsFrame',
-        '--dump-tree', 'BetterFriendsFrame', '--crop', $crop, '-o', $png)
+        '--width', '1600', '--height', '900', '-f', $targetFrame,
+        '--dump-tree', $targetFrame, '--crop', $crop, '-o', $png)
     foreach ($argument in $arguments) {
         $process.ArgumentList.Add($argument)
     }
@@ -171,7 +219,7 @@ foreach ($captureVariant in $variants) {
         if (-not $finished) {
             throw "The $captureVariant capture timed out after three minutes. See '$log'."
         }
-        $frame = Select-String -LiteralPath $log -Pattern '^BetterFriendsFrame \[Frame\] .* visible ' | Select-Object -First 1
+        $frame = Select-String -LiteralPath $log -Pattern "^$targetFrame \[Frame\] .* visible " | Select-Object -First 1
         if ($capture.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $png) -or -not $frame -or
             -not (Select-String -LiteralPath $log -SimpleMatch 'BFLUISimCaptureComplete' -Quiet)) {
             throw "The $captureVariant capture did not finish the BFL scene. See '$log'."

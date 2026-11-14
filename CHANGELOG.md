@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### All WoW Versions
+
+#### Added
+- **Favorite Icon** - Choose the Modern Blizzard favorite star where available, alongside the existing BFL and Blizzard styles.
+- **Settings Window** - Everyone now uses the redesigned Settings. Resize the window and keep your preferred size; narrow windows use a separate preview and help window that docks on the free side and remembers its width, height and collapsed state. Open or close it from the Settings edge, use setting tooltips while it is closed, or widen Settings to bring the panel back inside.
+- **New Settings** - New options and their categories carry the same New badge as unread changelog entries. Click an individual setting to mark it read; category badges clear when all their new options have been read. Read status is saved per profile.
+- **Settings Scrolling** - Enable smooth mouse-wheel scrolling in Settings independently of the friends list. Disabled by default.
+- **Window Fonts** - Set fonts and sizes for window titles and main action buttons separately, with previews and a reset to their original fonts.
+- **Input Dialogs** - Create groups, tags, and sections, rename groups, or copy links and names in windows that match your BFL theme. You can choose native input dialogs under Theme.
+- **BFL Avatar** - Dark, Custom, ElvUI and EllesmereUI hide the avatar by default. Turn off Hide BFL Avatar under Theme to show it again.
+
+#### Improved
+- **Side Windows** - Dialogs and hints use the free space beside the friends list and switch sides when needed. In the Modern layout, they prefer the selected tab side.
+- **Scrollbars** - Modern scrollbars retain their Blizzard appearance and use the accent color of Dark, Custom, ElvUI or EllesmereUI themes. Disabled scroll arrows stay gray.
+- **Friend Tag Editor** - A redesigned editor matches Settings, with tag search, clearer sections, drag-and-drop feedback and direct list actions. Edit icons or custom paths, text, colors and visibility with live previews and pinnable help; per-tag drafts are kept until you apply or discard them, including when switching tags or resizing.
+- **Name Formatting** - Browse format fields in a list under Setting details, collapsed by default. Click a field to select its token for copying.
+- **QuickFilters & Sorters** - Manage filters and sorters in a simpler list, with descriptions for built-in filters and clearer game and status icons. Matching Blizzard icons are used where available; the remaining icons will be updated in a future release.
+- **Groups** - Create a group from a group header, Group Management, or Group Order.
+
+#### Fixed
+- **Display Changes** - Button text and group counters refresh after switching display modes or changing UI scale.
+- **Themes** - Raid Roster Help and the Assist All checkbox use the selected theme throughout, and button hover effects no longer reveal their original artwork. Footer backgrounds no longer extend into the friends list or leave an extra panel beside Add New Friend.
+- **Known Characters** - The tooltip no longer repeats the character already shown above. Other known characters remain available, including when a friend is offline.
+- **Tag Sections** - Hiding or showing a section updates its tags and dynamic tag groups immediately. Each tag keeps its previous visibility choices.
+- **Settings Performance** - Reduced pauses when changing pages, toggling QuickFilters or changing Simple Mode with the Dark or Custom theme.
+- **Theme Settings** - Selecting Dark or Custom immediately shows its customization controls. Broker tooltip appearance options are shown only for themes that support them.
+- **Settings Controls** - Disabled controls, including EllesmereUI dropdowns, look inactive throughout Settings; their rows still offer hover explanations.
+- **Recently Added Group** - Duration Value accepts only numbers.
+- **Settings Preview** - Empty-group notices identify the groups actually hidden in the preview.
+- **Dynamic Tag Groups** - Friends in a tag group leave No Group, including when it has been renamed. Group invitation counts and actions use the members shown in that group.
+- **Group Names** - Create and Rename accept letters after a popup slot was used for numeric input.
+- **Friend Invites** - Right-click menus preserve Blizzard's invitation action and offer a character picker when multiple accounts are available.
+- **Window Position and Scaling** - The friends list restores its saved position after switching display modes or reopening near a screen corner. Settings stays within the available screen space when the friends list scale changes.
+- **Raid Tab** - Party members whose names WoW temporarily hides show as Unknown. Raid members appear as soon as WoW provides their name, even if the raid roster is still loading.
+
+### WoW Retail & WoW Forever
+
+#### Added
+- **Friend Tabs** - Place Modern tabs on the left or right of the friends list, with the right side as the default. The window keeps the selected tab rail on screen when you change sides.
+
+#### Improved
+- **Quick Join** - Group tooltips show when a listing welcomes new players.
+
+#### Fixed
+- **Search Field** - With ElvUI loaded and the Blizzard theme selected, the native search field no longer draws an extra background over BFL's search box.
+
+### WoW Forever
+
+#### Improved
+- **Quick Join** - Group tooltips show when a listing uses Discord voice chat.
+
+#### Fixed
+- **Title Friends** - Whisper is available for Title Friends who appear offline. WoW looks up the character to whisper.
+
+---
+
 ## [3.1.1]        - 2026-11-10
 
 ### All WoW Versions
@@ -319,37 +377,6 @@ BetterFriendlist 2.9.0 adds support for WoW Forever to BetterFriendlist and the 
 
 #### Fixed
 - **Raid Member Right-Click** - Hovering raid members no longer causes a protected-frame anchor error. The normal Blizzard menu, including protected actions, still opens through the secure proxy in both Retail layouts.
-
----
-
-## [2.8.8]        - 2026-09-13
-
-### Retail Live & Classic
-
-#### Added
-- **Master Looter** - Classic raid and party lists now show who is Master Looter. The icon also works with both Retail raid layouts if the client provides that flag.
-
-#### Improved
-- **Addon Window Spacing** - EnhanceQoL, GlobalIgnoreList, and NorthernSkyRaidTools now leave room for the Modern side tabs. Their Legacy positions stay as they were.
-
-#### Fixed
-- **Story Mode Raid Tab** - The Raid tab is now disabled during a Story raid and shows Blizzard's reason when hovered.
-- **ElvUI Broker Tooltips** - Friends and Guild Broker tooltips use the selected ElvUI tooltip style again.
-- **Broker Tooltip Scrolling** - Friend updates no longer jump a scrolled Friends Broker tooltip back to the top.
-- **Raid Member Right-Click** - The Raid Player menu works again in both Retail layouts. Regular clicks, shortcuts, selection, and drag-and-drop keep working on the same row.
-- **Raid Counts** - Member and role counts update after returning to a Raid tab that changed while it was hidden.
-
-### WoW 12.1.5 PTR
-
-#### Added
-- **Friend Search and Sorting** - On 12.1.5, BFL can use Blizzard's new locale-aware text APIs for local friends, tags, groups, realms, and Recent Allies. Other clients keep the existing search behavior.
-
-#### Compatibility
-- **New Client APIs** - Added checks for the new internationalization, LFG, and timer APIs so they are only used when the client provides them.
-- **Raid Updates** - Repeated raid and LFG events now share one pending refresh on 12.1.5. Older clients keep the existing timer path.
-- **Matchmade Raid Markers** - Main Tank and Main Assist markers are hidden when 12.1.5 reports a matchmade raid without manual role requirements.
-
----
 
 ---
 

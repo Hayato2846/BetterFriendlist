@@ -59,6 +59,8 @@ local function UpdateLegacySettingsScrollbar(scrollFrame)
 			bar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 5, 0)
 			bar:SetHideIfUnscrollable(true)
 			scrollFrame.ScrollBar = bar
+			local style = BFL:GetModule("ScrollbarStyle")
+			if style then style:Register(bar, scrollFrame:GetParent()) end
 			ScrollUtil.InitScrollFrameWithScrollBar(scrollFrame, bar)
 			scrollFrame:GetScript("OnScrollRangeChanged")(scrollFrame, 0, scrollFrame:GetVerticalScrollRange())
 			scrollFrame:HookScript("OnScrollRangeChanged", function(frame)
@@ -76,6 +78,8 @@ local function UpdateLegacySettingsScrollbar(scrollFrame)
 	if scrollFrame.ScrollBar then
 		scrollFrame.ScrollBar:SetShown(HasSettingsScrollOverflow(scrollFrame))
 	end
+	local scrolling = BFL:GetModule("SettingsScroll")
+	if scrolling then scrolling:Register(scrollFrame) end
 end
 
 function Settings:UpdateLegacySettingsScrollbar(scrollFrame)
@@ -669,19 +673,14 @@ function Settings:OnLoad(frame)
 	end)
 end
 
+-- Compatibility for older internal links and imported beta opt-ins.
 function Settings:IsSettingsCenterEnabled()
-	return BetterFriendlistDB and BetterFriendlistDB.enableSettingsCenterBeta == true
+	return false
 end
 
-function Settings:ShowSettingsCenter(pageID, focusControlID)
-	local Designer = BFL:GetModule("SettingsDesigner")
-	if Designer and Designer.Show then
-		local frame = Designer:Show(pageID, focusControlID)
-		if frame then
-			return true
-		end
-	end
-	return false
+function Settings:ShowSettingsCenter()
+	self:ShowLegacy()
+	return true
 end
 
 function Settings:HideLegacyWindow()
@@ -704,48 +703,13 @@ function Settings:RefreshVisibleWindowAnchor()
 	end
 
 	if settingsFrame and settingsFrame:IsShown() then
-		FriendsUI:AnchorAuxiliaryWindow(settingsFrame, 0)
+		FriendsUI:AnchorAuxiliaryWindow(settingsFrame, 0, true)
 	end
 
-	local Designer = BFL:GetModule("SettingsDesigner")
-	if Designer and Designer.IsShown and Designer.GetFrame and Designer:IsShown() then
-		local frame = Designer:GetFrame()
-		if frame then
-			FriendsUI:AnchorAuxiliaryWindow(frame, 0)
-		end
-	end
 end
 
-function Settings:OnSettingsCenterBetaChanged(checked)
-	local DB = GetDB()
-	if not DB then
-		return
-	end
-
-	checked = checked == true
-	DB:Set("enableSettingsCenterBeta", checked)
-
-	if checked then
-		self:HideLegacyWindow()
-		self:ShowSettingsCenter("advanced.beta", "enableSettingsCenterBeta")
-		BFL:DebugPrint(L.SETTINGS_CENTER_BETA_ENABLED or "New Settings Center |cff00ff00ENABLED|r")
-	else
-		local Designer = BFL:GetModule("SettingsDesigner")
-		if Designer and Designer.Hide then
-			Designer:Hide()
-		end
-		self:ShowLegacy(4, "betaFeatures")
-		BFL:DebugPrint(L.SETTINGS_CENTER_BETA_DISABLED or "New Settings Center |cffff0000DISABLED|r")
-	end
-end
-
--- The redesigned settings are the default. The separate Settings Center
--- is available to players who explicitly opt into its beta.
-function Settings:Show(pageID, focusControlID)
-	if self:IsSettingsCenterEnabled() and self:ShowSettingsCenter(pageID, focusControlID) then
-		return
-	end
-
+-- All entry points use the redesigned standard Settings.
+function Settings:Show()
 	self:ShowLegacy()
 end
 
@@ -811,9 +775,6 @@ function Settings:OnPlayerLogin()
 end
 
 function Settings:ShowChangelog()
-	if self:IsSettingsCenterEnabled() and self:ShowSettingsCenter("help.changelog") then
-		return
-	end
 	self:ShowLegacy()
 	local review = BFL:GetModule("LegacySettingsReview")
 	if review and review.active then
@@ -823,11 +784,6 @@ end
 
 -- Open the settings based on the legacy XML window, including old tab links.
 function Settings:ShowLegacy(categoryID, focusSection)
-	local Designer = BFL:GetModule("SettingsDesigner")
-	if Designer and Designer.Hide then
-		Designer:Hide()
-	end
-
 	if not settingsFrame then
 		settingsFrame = BetterFriendlistSettingsFrame
 	end
@@ -890,6 +846,8 @@ local function IsLegacyReviewActive()
 end
 
 local function DisableLegacyDropdown(row)
+	row.BFL_SettingDisabled = true
+	row:SetAlpha(0.5)
 	local dropdown = row.DropDown
 	if BFL.IsModernDropdown(dropdown) then
 		dropdown:SetEnabled(false)
@@ -1062,13 +1020,15 @@ local FAVORITE_ICON_TEXTURE = "Interface\\AddOns\\BetterFriendlist\\Icons\\star"
 local function GetFavoriteIconMarkup(style, size)
 	size = tonumber(size) or 17
 	local themed = UsesThemeIconAccent()
+	local FriendsList = BFL:GetModule("FriendsList")
+	local atlas = FriendsList and FriendsList:GetFavoriteIconAtlas(style)
 	if not themed then
-		if style == "blizzard" and BFL.GetAtlasOrTextureMarkup then
-			return BFL.GetAtlasOrTextureMarkup("friendslist-favorite", FAVORITE_ICON_TEXTURE, size, size)
+		if atlas and BFL.GetAtlasOrTextureMarkup then
+			return BFL.GetAtlasOrTextureMarkup(atlas, FAVORITE_ICON_TEXTURE, size, size)
 		end
 		return string.format("|T%s:%d:%d|t", FAVORITE_ICON_TEXTURE, size, size)
 	end
-	if style ~= "blizzard" and BFL.FormatIcon then
+	if not atlas and BFL.FormatIcon then
 		-- The EUI-aware formatter swaps BFL's baked-gold star for a neutral mask
 		-- before tinting, keeping the result at the exact theme accent.
 		return BFL.FormatIcon(FAVORITE_ICON_TEXTURE, size)
@@ -1080,14 +1040,14 @@ local function GetFavoriteIconMarkup(style, size)
 	end
 	r, g, b = ToMarkupByte(r), ToMarkupByte(g), ToMarkupByte(b)
 	if
-		style == "blizzard"
+		atlas
 		and BFL.HasAtlas
-		and BFL.HasAtlas("friendslist-favorite")
+		and BFL.HasAtlas(atlas)
 		and BFL.GetAtlasMarkup
 	then
 		-- Atlas markup accepts RGB bytes after its offsets. Supplying them replaces
 		-- the atlas' native gold with the active Dark/Custom accent.
-		return BFL.GetAtlasMarkup("friendslist-favorite", size, size, 0, 0, r, g, b)
+		return BFL.GetAtlasMarkup(atlas, size, size, 0, 0, r, g, b)
 	end
 	-- The bundled star is 32x32. Full texture bounds are required before the RGB
 	-- byte fields can be supplied in inline texture markup.
@@ -1324,11 +1284,6 @@ end
 
 -- Hide the settings window
 function Settings:Hide()
-	local Designer = BFL:GetModule("SettingsDesigner")
-	if Designer and Designer.Hide then
-		Designer:Hide()
-	end
-
 	self:HideLegacyWindow()
 end
 
@@ -2287,7 +2242,7 @@ end
 function Settings:RenameGroup(groupId, currentName)
 	-- Use the centralized rename dialog from Dialogs.lua which has full validation support.
 	-- Pass groupId as data (4th arg) so OnShow/OnAccept can use it.
-	StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
+	BFL.ShowInputDialog("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
 end
 
 -- Migrate from FriendGroups addon
@@ -3045,6 +3000,13 @@ function Settings:OnCompactModeChanged(checked)
 	BFL:ForceRefreshFriendsList()
 end
 
+function Settings:OnSettingsSmoothScrollingChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	DB:Set("enableSettingsSmoothScrolling", checked == true)
+	BFL:GetModule("SettingsScroll"):Refresh()
+end
+
 function Settings:OnSmoothScrollingChanged(checked)
 	local DB = GetDB()
 	if not DB or not BFL.IsMainline then return end
@@ -3632,6 +3594,14 @@ local function ApplyThemeSettingsChanged(reason)
 	end
 end
 
+function Settings:OnHideThemeAvatarChanged(checked)
+	local DB = GetDB()
+	if not DB then return end
+	DB:Set("hideThemeAvatar", checked == true)
+	ApplyThemeSettingsChanged("theme-avatar")
+	self:RefreshThemeTab()
+end
+
 local function FormatThemePercent(value)
 	value = tonumber(value) or 0
 	return string.format("%d%%", math.floor(value * 100 + 0.5))
@@ -3781,6 +3751,16 @@ function Settings:RefreshThemeTab()
 		themeDropdown.BFL_Comparison = { { "theme", theme = true } }
 	end
 	table.insert(allFrames, themeDropdown)
+	local inputDialogs = Components:CreateCheckbox(tab, L.SETTINGS_BFL_INPUT_DIALOGS,
+		DB:Get("useThemedDialogs", true), function(value) DB:Set("useThemedDialogs", value) end)
+	inputDialogs:SetTooltip(L.SETTINGS_BFL_INPUT_DIALOGS, L.SETTINGS_BFL_INPUT_DIALOGS_DESC)
+	table.insert(allFrames, inputDialogs)
+	if currentTheme == "dark" or currentTheme == "custom" or currentTheme == "elvui" or currentTheme == "ellesmereui" then
+		local hideAvatar = Components:CreateCheckbox(tab, L.SETTINGS_THEME_HIDE_AVATAR,
+			DB:Get("hideThemeAvatar", true), function(value) self:OnHideThemeAvatarChanged(value) end)
+		hideAvatar:SetTooltip(L.SETTINGS_THEME_HIDE_AVATAR, L.SETTINGS_THEME_HIDE_AVATAR_DESC)
+		table.insert(allFrames, hideAvatar)
+	end
 
 	local simpleMode = DB:Get("simpleMode", false)
 
@@ -3865,7 +3845,7 @@ function Settings:RefreshThemeTab()
 	end
 
 	local function AddAvatarSlider(theme)
-		if simpleMode then
+		if simpleMode or DB:Get("hideThemeAvatar", true) then
 			return
 		end
 		AddThemeSlider(
@@ -3938,7 +3918,7 @@ function Settings:RefreshThemeTab()
 	end
 
 	local function AddBrokerTooltipSection(theme)
-		if not ThemePalette or not ThemePalette.GetBrokerTooltipThemeSettings then
+		if (theme ~= "dark" and theme ~= "custom") or not ThemePalette or not ThemePalette.GetBrokerTooltipThemeSettings then
 			return
 		end
 
@@ -4144,16 +4124,7 @@ function Settings:RefreshThemeTab()
 		)
 	end
 
-	if IsLegacyReviewActive() and currentTheme ~= "dark" and currentTheme ~= "custom" then
-		table.insert(allFrames, Components:CreateSpacer(tab))
-		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_THEME_BROKER_TOOLTIP_HEADER, "SETTINGS_THEME_BROKER_TOOLTIP_HEADER"))
-		local requirement = L.SETTINGS_LEGACY_NEEDS_THEME:format(L.SETTINGS_THEME_DARK .. " / " .. L.SETTINGS_THEME_CUSTOM)
-		local note = Components:CreateLabel(tab, requirement)
-		note.BFL_SearchLabels = { L.SETTINGS_THEME_BROKER_TOOLTIP_BACKGROUND, L.SETTINGS_THEME_BROKER_TOOLTIP_OPACITY, L.SETTINGS_THEME_BROKER_TOOLTIP_RESET }
-		table.insert(allFrames, note)
-	else
-		AddBrokerTooltipSection(currentTheme)
-	end
+	AddBrokerTooltipSection(currentTheme)
 
 	Components:AnchorChain(allFrames, -5)
 	tab.components = allFrames
@@ -4192,6 +4163,13 @@ function Settings:RefreshFriendTabsTab()
 	local order, positionControl
 	if review then order, positionControl = LegacyOrderOptions(entries, "id") end
 	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_FRIEND_TABS_ORDER or "Tab Order & Visibility", "SETTINGS_FRIEND_TABS_ORDER"))
+	local sideDropdown = Components:CreateDropdown(tab, L.SETTINGS_MODERN_TAB_POSITION,
+		{ labels = { L.SETTINGS_MODERN_TAB_POSITION_RIGHT, L.SETTINGS_MODERN_TAB_POSITION_LEFT }, values = { "right", "left" } },
+		function(value) return FriendsUI:GetSideTabPosition() == value end,
+		function(value) FriendsUI:SetSideTabPosition(value) end)
+	sideDropdown:SetTooltip(L.SETTINGS_MODERN_TAB_POSITION, L.SETTINGS_MODERN_TAB_POSITION_DESC)
+	sideDropdown.BFL_Comparison = { { "modernSideTabPosition", social = "friendTabs" } }
+	table.insert(allFrames, sideDropdown)
 
 	local visibleColumnX = -176
 	local conditionalColumnX = -73
@@ -4468,20 +4446,17 @@ local function GetFormatFieldDescription(isInfo)
 	return description
 end
 
-local function FormatFieldsAction(isInfo)
-	if not IsLegacyReviewActive() then return end
-	return {
-		label = L.SETTINGS_FORMAT_FIELDS,
-		onClick = function(button)
-			local items = { { type = "title", text = L.SETTINGS_FORMAT_FIELDS } }
-			for line in GetFormatFieldDescription(isInfo):gmatch("[^\n]+") do
-				if line:find("%%[a-z]+%%") then
-					items[#items + 1] = { type = "title", text = line }
-				end
-			end
-			BFL.Compat.OpenSimpleContextMenu(button, "BetterFriendlistFormatFieldsMenu", items)
-		end,
-	}
+function Settings:GetFormatFields(isInfo)
+	local fields, seen = {}, {}
+	for line in GetFormatFieldDescription(isInfo):gmatch("[^\n]+") do
+		local plain = line:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+		local _, last, token = plain:find("(%%[a-z]+%%)")
+		if token and not seen[token] then
+			seen[token] = true
+			fields[#fields + 1] = { token = token, description = plain:sub(last + 1):gsub("^%s*%-%s*", "") }
+		end
+	end
+	return fields
 end
 
 function Settings:RefreshGeneralTab()
@@ -4745,18 +4720,20 @@ function Settings:RefreshGeneralTab()
 	-- Row 7: Favorite Icon + Favorite Icon Dropdown (conditional)
 	local favoriteIconEnabled = DB:Get("enableFavoriteIcon", true)
 	local hasBlizzardFavoriteIcon = BFL.HasAtlas and BFL.HasAtlas("friendslist-favorite")
+	local hasModernFavoriteIcon = BFL.HasAtlas and BFL.HasAtlas("friends-icon-favorites")
 	local blizzardIconTag = GetFavoriteIconMarkup("blizzard", 20)
 
 	local favoriteEntries = {
 		labels = {
 			GetFavoriteIconMarkup("bfl", 17) .. " " .. (L.SETTINGS_FAVORITE_ICON_OPTION_BFL or "BFL Icon"),
 			blizzardIconTag .. " " .. (L.SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD or "Blizzard Icon"),
+			GetFavoriteIconMarkup("modern", 17) .. " " .. L.SETTINGS_FRIENDS_UI_STYLE_MODERN,
 		},
-		values = { "bfl", "blizzard" },
+		values = { "bfl", "blizzard", "modern" },
 	}
 
 	local favoriteDropdownData = nil
-	if hasBlizzardFavoriteIcon and (favoriteIconEnabled or IsLegacyReviewActive()) then
+	if (hasBlizzardFavoriteIcon or hasModernFavoriteIcon) and (favoriteIconEnabled or IsLegacyReviewActive()) then
 		favoriteDropdownData = {
 			label = L.SETTINGS_FAVORITE_ICON_STYLE or "Favorite Icon",
 			entries = favoriteEntries,
@@ -4905,8 +4882,7 @@ function Settings:RefreshGeneralTab()
 				BFL:ForceRefreshFriendsList()
 			end
 		end,
-		IsLegacyReviewActive() and 246 or 350,
-		FormatFieldsAction(false)
+		IsLegacyReviewActive() and 246 or 350
 	)
 	nameCustomInput.BFL_SettingHelpKey = "SETTINGS_NAME_FORMAT_TOOLTIP"
 	if nameCustomInput.SetTooltip then
@@ -4996,8 +4972,7 @@ function Settings:RefreshGeneralTab()
 				BFL:ForceRefreshFriendsList()
 			end
 		end,
-		IsLegacyReviewActive() and 246 or 350,
-		FormatFieldsAction(true)
+		IsLegacyReviewActive() and 246 or 350
 	)
 	if infoCustomInput.SetTooltip then
 		infoCustomInput:SetTooltip(
@@ -5138,6 +5113,9 @@ function Settings:RefreshGeneralTab()
 	-- Header: Group Management
 	local groupHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_MANAGEMENT or "Group Management", "SETTINGS_GROUP_MANAGEMENT")
 	table.insert(allFrames, groupHeader)
+	table.insert(allFrames, Components:CreateButton(tab, L.MENU_CREATE_GROUP, function()
+		BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP")
+	end))
 
 	-- Group Management Row (Favorites / In-Game)
 	local Groups = GetGroups()
@@ -5322,9 +5300,11 @@ function Settings:RefreshGeneralTab()
 			end
 		)
 		CenterNumericInput(durationInput.Input)
+		durationInput.Input:SetNumeric(true)
 		if not recentlyAddedEnabled then
+			durationInput.BFL_SettingDisabled = true
 			durationInput.Input:Disable()
-			durationInput.Input:SetAlpha(0.5)
+			durationInput:SetAlpha(0.5)
 		end
 		durationInput:SetTooltip(
 			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP or "Duration Value",
@@ -5456,6 +5436,14 @@ function Settings:RefreshGeneralTab()
 		L.SETTINGS_LOCK_WINDOW_DESC or "Prevent the main window from being moved."
 	)
 	table.insert(allFrames, lockCheckbox)
+	table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_SETTINGS_WINDOW_SIZE, "SETTINGS_SETTINGS_WINDOW_SIZE"))
+	local settingsScroll = Components:CreateCheckbox(tab, L.SETTINGS_WINDOW_SMOOTH_SCROLLING,
+		DB:Get("enableSettingsSmoothScrolling", false), function(value) self:OnSettingsSmoothScrollingChanged(value) end)
+	settingsScroll:SetTooltip(L.SETTINGS_WINDOW_SMOOTH_SCROLLING, L.SETTINGS_WINDOW_SMOOTH_SCROLLING_DESC)
+	table.insert(allFrames, settingsScroll)
+	table.insert(allFrames, Components:CreateButton(tab, RESET, function()
+		BFL:GetModule("FrameSettings"):ResetSettingsWindowSize()
+	end, L.SETTINGS_SETTINGS_WINDOW_SIZE_DESC))
 
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
@@ -5755,7 +5743,7 @@ function Settings:RefreshFriendTagsTab()
 		end,
 		tooltipTitle = L.FRIEND_TAGS_FULL_WIDTH_ROWS or "Full-width Tag Rows",
 		tooltipDesc = L.FRIEND_TAGS_FULL_WIDTH_ROWS_DESC
-			or "Place tag chips on separate rows that use the full friend-card width.",
+			or "Tags appear below the friend text. Use the full row width so more tag chips fit before wrapping.",
 	}, nil))
 
 	local compactOptions = {
@@ -6496,6 +6484,35 @@ function Settings:RefreshFontsTab()
 	end, FONT_SETTINGS_CONTROL_WIDTH)
 	table.insert(allFrames, raidFlagsDropdown)
 
+	local windowFontOptions = { labels = { DEFAULT }, values = { "" } }
+	for index, value in ipairs(fontOptions.values) do
+		windowFontOptions.values[#windowFontOptions.values + 1] = value
+		windowFontOptions.labels[#windowFontOptions.labels + 1] = fontOptions.labels[index]
+	end
+	for _, entry in ipairs({
+		{ "WindowTitle", "SETTINGS_WINDOW_TITLE_FONT", "SETTINGS_WINDOW_TITLE_FONT_DESC" },
+		{ "ActionButton", "SETTINGS_ACTION_BUTTON_FONT", "SETTINGS_ACTION_BUTTON_FONT_DESC" },
+	}) do
+		local role, key, description = entry[1], entry[2], entry[3]
+		table.insert(allFrames, Components:CreateHeader(tab, L[key], key))
+		local function Refresh() BFL.FontManager:RefreshWindowFonts() end
+		local face = Components:CreateDropdown(tab, L.SETTINGS_FONT, windowFontOptions,
+			function(value) return value == DB:Get("font" .. role, "") end,
+			function(value) DB:Set("font" .. role, value); Refresh() end, FONT_SETTINGS_CONTROL_WIDTH)
+		face:SetTooltip(L[key], L[description])
+		table.insert(allFrames, face)
+		local current = DB:Get("fontSize" .. role, 0)
+		local size = Components:CreateSlider(tab, L.SETTINGS_FONT_SIZE_NUM, 8, 24, current > 0 and current or 12,
+			tostring, function(value) DB:Set("fontSize" .. role, value); Refresh() end, FONT_SETTINGS_CONTROL_WIDTH)
+		size.BFL_SettingDescriptions = { L[description] }
+		table.insert(allFrames, size)
+		local reset = Components:CreateButton(tab, RESET, function()
+			BFL.FontManager:ResetWindowFont(role)
+			self:RefreshFontsTab()
+		end, L[description])
+		table.insert(allFrames, reset)
+	end
+
 	-- Anchor all frames vertically
 	Components:AnchorChain(allFrames, -5)
 
@@ -6715,6 +6732,9 @@ function Settings:RefreshGroupsTab()
 	-- Header: Group Order
 	local orderHeader = Components:CreateHeader(tab, L.SETTINGS_GROUP_ORDER or "Group Order", "SETTINGS_GROUP_ORDER")
 	table.insert(allFrames, orderHeader)
+	table.insert(allFrames, Components:CreateButton(tab, L.MENU_CREATE_GROUP, function()
+		BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP")
+	end))
 
 	-- Get ordered groups
 	local Groups = BFL:GetModule("Groups")
@@ -7446,21 +7466,9 @@ function Settings:RefreshAdvancedTab()
 	betaToggle:SetTooltip(L.SETTINGS_BETA_FEATURES_TITLE, L.SETTINGS_BETA_FEATURES_TOOLTIP)
 	table.insert(allFrames, betaToggle)
 
-	local settingsCenterToggle = Components:CreateCheckbox(tab, {
-		label = L.SETTINGS_ENABLE_SETTINGS_CENTER or "New Settings Center (Beta)",
-		initialValue = BetterFriendlistDB.enableSettingsCenterBeta == true,
-		callback = function(checked)
-			self:OnSettingsCenterBetaChanged(checked)
-		end,
-		tooltipTitle = L.SETTINGS_ENABLE_SETTINGS_CENTER or "New Settings Center (Beta)",
-		tooltipDesc = L.SETTINGS_ENABLE_SETTINGS_CENTER_DESC
-			or "Use the new LibSettingsDesigner Settings Center instead of the classic settings window.",
-	})
-	table.insert(allFrames, settingsCenterToggle)
-
 	-- Beta feature list (informational)
 	-- Only show if there are actual beta features
-	local hasBetaFeatures = true
+	local hasBetaFeatures = false
 	for _, tabDef in ipairs(TAB_DEFINITIONS) do
 		if tabDef.beta and IsTabAvailableForClient(tabDef) then
 			hasBetaFeatures = true
@@ -7480,17 +7488,6 @@ function Settings:RefreshAdvancedTab()
 
 		-- Dynamic list from TAB_DEFINITIONS
 		local listY = -20
-		local settingsCenterIcon = listContainer:CreateTexture(nil, "ARTWORK")
-		settingsCenterIcon:SetSize(14, 14)
-		settingsCenterIcon:SetPoint("TOPLEFT", 5, listY)
-		settingsCenterIcon:SetTexture("Interface\\AddOns\\BetterFriendlist\\Textures\\SettingsCenter\\page-advanced-beta.tga")
-		settingsCenterIcon:SetVertexColor(1, 0.53, 0)
-
-		local settingsCenterText = listContainer:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontHighlightSmall")
-		settingsCenterText:SetPoint("LEFT", settingsCenterIcon, "RIGHT", 6, 0)
-		settingsCenterText:SetPoint("TOP", settingsCenterIcon, "TOP", 0, -1)
-		settingsCenterText:SetText(L.SETTINGS_ENABLE_SETTINGS_CENTER or "New Settings Center (Beta)")
-		listY = listY - 18
 
 		for _, tabDef in ipairs(TAB_DEFINITIONS) do
 			if tabDef.beta and IsTabAvailableForClient(tabDef) then
@@ -7707,12 +7704,12 @@ local function BFL_Settings_GetEditorIndent(depth)
 end
 
 local function BFL_Settings_CreateEditorRow(parent, height, leftOffset, rightOffset)
-	local template = not parent.BFL_ModernReviewBuilder and BackdropTemplateMixin and "BackdropTemplate" or nil
+	local template = not parent.BFL_ModernReviewBuilder and not parent.BFL_FlatBuilder and BackdropTemplateMixin and "BackdropTemplate" or nil
 	local row = CreateFrame("Frame", nil, parent, template)
 	row:SetHeight(height or 30)
 	row:SetPoint("LEFT", leftOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING, 0)
 	row:SetPoint("RIGHT", -(rightOffset or BFL_FILTER_SORT_EDITOR_SIDE_PADDING), 0)
-	if row.SetBackdrop then
+	if row.SetBackdrop and not parent.BFL_FlatBuilder then
 		BFL.SetOwnedBackdrop(row, {
 			bgFile = "Interface\\Buttons\\WHITE8x8",
 			edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -7958,7 +7955,9 @@ function Settings:EnsureFilterSortEditorPanel(reviewTab)
 
 		frame.BFL_SettingsCenterBuilderSkin = customHost and customHost.settingsCenter == true or nil
 		frame.BFL_ModernReviewBuilder = reviewTab and reviewTab.BFL_ModernReviewBuilder
+		frame.BFL_FlatBuilder = reviewTab ~= nil
 		frame.Content.BFL_ModernReviewBuilder = frame.BFL_ModernReviewBuilder
+		frame.Content.BFL_FlatBuilder = frame.BFL_FlatBuilder
 		frame:SetParent(parentFrame)
 		local layoutParent = reviewTab or anchorFrame
 		frame:SetFrameStrata(BFL.GetSafeFrameStrata(layoutParent))
@@ -7970,18 +7969,17 @@ function Settings:EnsureFilterSortEditorPanel(reviewTab)
 		if frame.Content then
 			frame.Content:SetWidth(math.max(320, (parentFrame:GetWidth() or BFL_FILTER_SORT_EDITOR_CONTENT_WIDTH) - 28))
 		end
-		if frame.BFL_ModernReviewBuilder then
+		if frame.BFL_FlatBuilder then
 			frame:ClearBackdrop()
-			if not frame.BFL_ReviewSurface then
-				local surface = frame:CreateTexture(nil, "BACKGROUND")
-				surface:SetAllPoints()
-				frame.BFL_ReviewSurface = surface
+			if not frame.BFL_ReviewDivider then
+				local rule = BFL:GetModule("LegacySettingsStyle"):CreateRule(frame)
+				rule:SetPoint("TOPLEFT")
+				rule:SetPoint("TOPRIGHT")
+				frame.BFL_ReviewDivider = rule
 			end
-			local palette = BFL:GetModule("FriendsUI"):GetModernThemeColors()
-			frame.BFL_ReviewSurface:SetColorTexture(unpack(palette.surface))
-			frame.BFL_ReviewSurface:Show()
+			frame.BFL_ReviewDivider:Show()
 		else
-			if frame.BFL_ReviewSurface then frame.BFL_ReviewSurface:Hide() end
+			if frame.BFL_ReviewDivider then frame.BFL_ReviewDivider:Hide() end
 			BFL_Settings_ApplyBuilderPanelStyle(frame, { 0.010, 0.010, 0.009, 0.58 }, { 0.50, 0.36, 0.10, 0.62 })
 		end
 		return frame
@@ -8092,7 +8090,7 @@ function Settings:UpdateFilterSortEditorHeight(frames, frame)
 	end
 	if frame == self.filterSortInlineEditorFrame then
 		local height = BFL_Settings_GetStackHeight(frames, -5)
-		height = math.max(96, height)
+		height = math.max(frame.BFL_FlatBuilder and 32 or 96, height)
 		frame.Content:SetHeight(height)
 		frame:SetHeight(height + 54)
 		self.filterSortInlineEditorHeight = height + 54
@@ -8303,6 +8301,11 @@ function Settings:RefreshFilterSortTab()
 			tab.bflSelectedSorterId = id
 		end
 		Refresh()
+		if inlineReview then
+			for _, row in ipairs(review.controlRows) do
+				if row.BFL_SettingIdentity == kind .. "/" .. id then review:ShowSettingHelp(row, 2); break end
+			end
+		end
 	end
 
 	local function GetFieldLabel(field)
@@ -8359,9 +8362,10 @@ function Settings:RefreshFilterSortTab()
 		if not row.bg then
 			return
 		end
-		if modernReview then
+		if inlineReview then
 			local selected = row.entryId == selectedId
-			row.bg:SetColorTexture(1, 1, 1, isHover and 0.13 or (selected and 0.09 or 0.025))
+			local r, g, b = GetAccentColor(1, 0.82, 0)
+			row.bg:SetColorTexture(r, g, b, isHover and 0.10 or (selected and 0.07 or 0))
 		elseif isHover then
 			row.bg:SetColorTexture(0.3, 0.3, 0.3, 0.7)
 		elseif row.entryId == selectedId then
@@ -8447,6 +8451,7 @@ function Settings:RefreshFilterSortTab()
 			local tabWidth = math.max(filterButton:GetWidth(), sorterButton:GetWidth())
 			PanelTemplates_TabResize(filterButton, 24, tabWidth)
 			PanelTemplates_TabResize(sorterButton, 24, tabWidth)
+			BFL:GetModule("LegacySettingsStyle"):SkinActions({ filterButton, sorterButton })
 		end
 		if isSettingsCenterInline then
 			sorterButton.bflSelected = selectedKind == "sorter"
@@ -8479,6 +8484,7 @@ function Settings:RefreshFilterSortTab()
 
 	local function AddEntryRow(entry, orderIndex)
 		local row = CreateFrame("Button", nil, listParent, isSettingsCenterInline and "BackdropTemplate" or nil)
+		row.BFL_DarkNoButtonChrome = inlineReview or nil
 		row.entryId = entry.id
 		row.orderIndex = orderIndex
 		row:SetHeight(isSettingsCenterInline and 38 or 34)
@@ -8539,11 +8545,14 @@ function Settings:RefreshFilterSortTab()
 		end)
 
 		local iconButton = CreateFrame("Button", nil, row)
+		iconButton.BFL_DarkNoButtonChrome = inlineReview or nil
 		iconButton:SetSize(24, 24)
 		iconButton:SetPoint("LEFT", check, "RIGHT", 4, 0)
-		iconButton.texture = iconButton:CreateTexture(nil, "ARTWORK")
-		iconButton.texture:SetAllPoints()
-		iconButton.texture:SetTexture(entry.icon)
+		-- Registry icons can be native atlases, file IDs or user texture paths.
+		-- Share menu markup so branding, fallbacks and theme tints stay identical.
+		iconButton.icon = iconButton:CreateFontString(nil, "ARTWORK", "BetterFriendlistFontNormal")
+		iconButton.icon:SetPoint("CENTER")
+		iconButton.icon:SetText(Registry:FormatIcon(entry.icon, 24))
 		iconButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
 		iconButton:SetScript("OnClick", function()
 			SelectEntry(selectedKind, entry.id)
@@ -8585,7 +8594,12 @@ function Settings:RefreshFilterSortTab()
 			end
 			Refresh()
 		end)
-		delete:SetPoint("LEFT", copy, "RIGHT", 4, 0)
+		delete:SetWidth(math.max(58, (delete:GetFontString() or delete.Text):GetStringWidth() + 16))
+		copy:SetWidth(math.max(48, (copy:GetFontString() or copy.Text):GetStringWidth() + 16))
+		delete:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+		copy:ClearAllPoints()
+		copy:SetPoint("RIGHT", delete, "LEFT", -4, 0)
+		name:SetPoint("RIGHT", copy, "LEFT", -8, 0)
 		if inlineReview then
 			local identity = selectedKind .. "/" .. entry.id
 			row.BFL_SettingIdentity = identity
@@ -8593,7 +8607,7 @@ function Settings:RefreshFilterSortTab()
 			row.BFL_SettingSlotCount = 4
 			row.BFL_SettingSlotRects = { check, name, copy, delete }
 			row.BFL_SettingsExactSlots = true
-			row.BFL_SettingDescriptions = { false, false, L.SETTINGS_COMPARE_FILTER_COPY,
+			row.BFL_SettingDescriptions = { false, entry.description, L.SETTINGS_COMPARE_FILTER_COPY,
 				entry.isCustom and L.SETTINGS_COMPARE_FILTER_REMOVE or L.SETTINGS_COMPARE_FILTER_RESET }
 			local helpOnly = entry.isCustom and selectedKind == "filter"
 			row.BFL_Comparison = {
@@ -8602,8 +8616,13 @@ function Settings:RefreshFilterSortTab()
 					helpOnly = helpOnly },
 				{ "menuOrder", order = menuOrder, orderFrom = orderIndex, control = menuPositionControl, menuEntries = allEntries,
 					identity = identity .. "/order", help = "SETTINGS_COMPARE_FILTER_ORDER", outcome = "filterOrder",
+					purpose = entry.description,
 					helpOnly = helpOnly },
 			}
+			if entry.description then
+				row.BFL_Comparison[2] = { "visible", binary = true, filterEditor = selectedKind, entryID = entry.id,
+					entry = entry, identity = identity .. "/purpose", help = "FILTER_BUILDER_BUILTIN_LOCKED", purpose = entry.description }
+			end
 		end
 		row:SetScript("OnDragStart", function(selfRow)
 			draggingEntryRow = selfRow
@@ -8727,10 +8746,11 @@ function Settings:RefreshFilterSortTab()
 			label:SetPoint("RIGHT", row, "RIGHT", -12, 0)
 			label:SetJustifyH("LEFT")
 			label:SetWordWrap(true)
-			label:SetText(
-				L.FILTER_BUILDER_BUILTIN_LOCKED
-					or "Built-ins can be shown, hidden, reordered, or duplicated. Duplicate one to edit its rules."
-			)
+			local guidance = L.FILTER_BUILDER_BUILTIN_LOCKED
+				or "Built-ins can be shown, hidden, reordered, or duplicated. Duplicate one to edit its rules."
+			label:SetText(entry.description and (entry.description .. "\n\n" .. guidance) or guidance)
+			label:SetWidth(math.max(160, editorContent:GetWidth() - 2 * BFL_FILTER_SORT_EDITOR_SIDE_PADDING - 24))
+			row:SetHeight(math.max(54, label:GetStringHeight() + 16))
 			table.insert(editorFrames, row)
 			return nil
 		end
@@ -9330,6 +9350,8 @@ function Settings:RefreshFilterSortTab()
 				true
 			)
 		)
+		local intro = allFrames[#allFrames]
+		intro:SetHeight(math.max(32, intro:GetStringHeight()))
 	end
 	if not isSettingsCenterEditor then
 		AddModeRow()
@@ -9353,6 +9375,8 @@ function Settings:RefreshFilterSortTab()
 					or (L.FILTER_BUILDER_CREATE_SORTER_TITLE or "Create Sorter")
 			)
 			AddCreateEditor(createState.kind, createState.templateId)
+		elseif entry and inlineReview and not entry.isCustom then
+			editorPanel:Hide()
 		elseif entry then
 			editorPanel.title:SetText((L.FILTER_BUILDER_EDITOR or "Editor") .. ": " .. entry.name)
 			if not inlineReview then

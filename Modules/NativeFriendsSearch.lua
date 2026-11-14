@@ -419,10 +419,15 @@ local function CaptureLayout(frame, view, search, friendsFrame)
 	local insets = ReadValues(search:GetTextInsets())
 	AddState(session, box, "GetTextInsets", "SetTextInsets", unpack(insets, 1, insets.n))
 	AddState(session, box, "IsShown", "SetShown", true)
-	for _, key in ipairs({ "Background", "searchIcon", "Instructions" }) do
+	-- The input keeps its native handlers; only BFL's underlying field supplies
+	-- the decoration while it is borrowed. Include addon-created skin backings
+	-- in the same snapshot so Blizzard receives their original opacity on release.
+	local decorations = {}
+	for _, key in ipairs({ "Background", "searchIcon", "Instructions", "backdrop", "Backdrop", "NineSlice", "Left", "Middle", "Right" }) do
 		local region = box[key]
-		if region then
+		if region and not decorations[region] then
 			if not CanUseRegion(region, true) then return nil, "Blizzard search decoration " .. key end
+			decorations[region] = true
 			AddState(session, region, "GetAlpha", "SetAlpha", 0)
 		end
 	end

@@ -227,6 +227,8 @@ local function SkinScrollBar(S, scrollBar)
 	if not scrollBar then
 		return
 	end
+	local style = BFL:GetModule("ScrollbarStyle")
+	if style and (not style:CanAccess(scrollBar) or style:IsModern(scrollBar)) then style:Apply(scrollBar); return end
 
 	-- Validation: Ensure scrollBar is an object
 	if not scrollBar.IsObjectType then
@@ -519,6 +521,13 @@ function ElvUISkin:RegisterSkin()
 		end,
 	})
 	self.ElvUIEngine, self.ElvUISkins, self.ElvUISkinProxy = E, RealS, S
+	if not self.ScrollbarMediaHookInstalled and type(E.UpdateMedia) == "function" then
+		self.ScrollbarMediaHookInstalled = true
+		hooksecurefunc(E, "UpdateMedia", function()
+			local style = BFL:GetModule("ScrollbarStyle")
+			if style then style:Refresh() end
+		end)
+	end
 	-- Register callback once; ThemeManager may re-apply after theme changes.
 	-- The callback itself still covers ElvUI's normal addon skin pass.
 	if S.AddCallbackForAddon and not self.ElvUICallbackRegistered then
@@ -609,6 +618,7 @@ function ElvUISkin:SkinFrames(E, S)
 	local portraitButton, DB = frame.PortraitButton, BFL:GetModule("DB")
 	local simpleMode = DB and DB:Get("simpleMode", false) == true
 	local shouldSkinPortrait = portraitButton ~= nil and ShouldSkinLegacyElvUIPortrait(BFL.IsClassic, simpleMode)
+		and not (BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden())
 	-- Skin the BFL portrait
 	if portraitButton then
 		-- BFL:DebugPrint("ElvUISkin: Skinning PortraitButton")
@@ -3312,7 +3322,8 @@ function ElvUISkin:SkinModernPortrait(E, frame, FriendsUI)
 	end
 	SetTextureAlpha(portrait.Mask, 0)
 	portrait.BFL_ModernSquarePortrait = true
-	portrait:SetShown(not (FriendsUI.IsSimpleModeEnabled and FriendsUI:IsSimpleModeEnabled()))
+	portrait:SetShown(not (FriendsUI.IsSimpleModeEnabled and FriendsUI:IsSimpleModeEnabled())
+		and not (BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden()))
 end
 
 function ElvUISkin:SkinModernActionButton(S, button)
@@ -3622,7 +3633,7 @@ local function SkinSettingsControl(self, S, control)
 	elseif control:IsObjectType("DropdownButton") then
 		self:SkinModernDropdown(S, control)
 		return
-	elseif control:IsObjectType("Button") then
+	elseif control:IsObjectType("Button") and not control.BFL_DarkNoButtonChrome then
 		if control.isTopTab then
 			if not control.BFL_ElvUISettingsTabSkinned and CallElvUIHandler(S, "HandleTab", control) then
 				control.BFL_ElvUISettingsTabSkinned = true
@@ -3643,10 +3654,48 @@ local function SkinSettingsControl(self, S, control)
 	end
 end
 
+function ElvUISkin:SkinSettingsWindow(frame, inset, scroll)
+	local S = GetActiveSettingsSkin(self)
+	if not S then return end
+	if not frame.BFL_ElvUISettingsWindowSkinned then
+		CallElvUIHandler(S, "HandlePortraitFrame", frame)
+		if frame.CloseButton then CallElvUIHandler(S, "HandleCloseButton", frame.CloseButton) end
+		if inset then
+			inset:StripTextures()
+			EnsureTransparentBackdrop(inset)
+		end
+		if scroll then SkinScrollBar(S, scroll.ScrollBar) end
+		frame.BFL_ElvUISettingsWindowSkinned = true
+	end
+end
+
+function ElvUISkin:SkinInputDialog(frame)
+	local S = GetActiveSettingsSkin(self)
+	if not S then return false end
+	frame:SetBackdrop(nil)
+	EnsureTransparentBackdrop(frame)
+	ApplyModernElvUIBackdrop(self.ElvUIEngine, frame)
+	self:SkinModernEditBox(S, frame.EditBox)
+	self:SkinModernButton(S, frame.button1)
+	self:SkinModernButton(S, frame.button2)
+	return true
+end
+
 function ElvUISkin:SkinSettingsActions(buttons, editBox)
 	local S = GetActiveSettingsSkin(self)
 	if not S then return end
-	for _, button in ipairs(buttons or {}) do self:SkinModernButton(S, button) end
+	for _, button in ipairs(buttons or {}) do
+		if button.BFL_SettingsIconButton then
+			self:SkinModernBorderlessActionButton(S, button)
+			button.Icon:Show()
+			button.Icon:SetVertexColor(BFL:GetThemeAccentColor())
+		elseif button.BFL_SettingsIconTile then
+			self:SkinModernActionButton(S, button)
+			button.Icon:Show()
+		else
+			self:SkinModernButton(S, button)
+		end
+	end
 	self:SkinModernEditBox(S, editBox)
 end
 
@@ -3665,9 +3714,13 @@ local function SkinSettingsPreviewHeader(self, S, E, header)
 		self:SkinModernEditBox(S, header.search)
 		if header.native and header.native:IsShown() then
 			if not header.native.BFL_ElvUIModernFrameSkinned then
-				CallElvUIHandler(S, "HandlePortraitFrame", header.native)
-				header.native.BFL_ElvUIModernFrameSkinned = true
+				header.native.BFL_ElvUIModernFrameSkinned = CallElvUIHandler(S, "HandlePortraitFrame", header.native)
 			end
+			-- ApplyModernPortrait restores corner artwork whenever the sample is
+			-- laid out again. Keep the native shell hidden after every refresh.
+			if header.native.NineSlice then header.native.NineSlice:Hide() end
+			if header.native.Bg then header.native.Bg:Hide() end
+			ApplyModernElvUIBackdrop(E, header.native)
 			SetTextureAlpha(header.topSurface.TopFade, 0)
 			SetTextureAlpha(header.topSurface.BottomFade, 0)
 			self:SkinModernDropdown(S, header.StatusDropdown)
@@ -3793,19 +3846,12 @@ function ElvUISkin:SkinModernScrollBoxRows(S, scrollBox)
 end
 
 function ElvUISkin:SkinModernTabs(FriendsUI)
-	local previous
 	for _, tab in ipairs((FriendsUI and FriendsUI.sideTabs) or {}) do
 		if tab and tab.IsShown and tab:IsShown() then
 			self:SkinModernSideTab(tab)
-			tab:ClearAllPoints()
-			if previous then
-				tab:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -1)
-			else
-				tab:SetPoint("TOPLEFT", _G.BetterFriendsFrame, "TOPRIGHT", 2, -1)
-			end
-			previous = tab
 		end
 	end
+	if FriendsUI and FriendsUI.LayoutNavigationTabs then FriendsUI:LayoutNavigationTabs() end
 end
 
 function ElvUISkin:InstallModernDynamicHooks(E, S, FriendsUI)
@@ -4204,7 +4250,8 @@ function ElvUISkin:RegisterTests()
 			V:AssertEqual(relativePoint, "TOPLEFT", "Modern ElvUI portrait aligns with the frame corner")
 			V:AssertEqual(x, 4, "Modern ElvUI portrait keeps the Legacy horizontal inset")
 			V:AssertEqual(y, -4, "Modern ElvUI portrait keeps the Legacy vertical inset")
-			V:AssertEqual(portrait:IsShown(), not FriendsUI:IsSimpleModeEnabled(), "Modern ElvUI keeps the avatar hidden in Simple Mode")
+			V:AssertEqual(portrait:IsShown(), not FriendsUI:IsSimpleModeEnabled()
+				and not (BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden()), "Modern ElvUI respects Simple Mode and the avatar setting")
 			V:Assert(
 				not root.BattleNetBar.Background or root.BattleNetBar.Background:GetAlpha() == 0,
 				"Modern ElvUI suppresses the Battle.net bar background"
@@ -4228,6 +4275,7 @@ function ElvUISkin:RegisterTests()
 			end
 			local previousTab
 			local selectedTabCount = 0
+			local left = FriendsUI:GetSideTabPosition() == "left"
 			for _, tab in ipairs(FriendsUI.sideTabs or {}) do
 				if tab:IsShown() then
 					V:AssertEqual(tab:GetWidth(), 30, "Modern ElvUI side tabs match SocialUI width")
@@ -4249,16 +4297,16 @@ function ElvUISkin:RegisterTests()
 						selectedTabCount = selectedTabCount + 1
 					end
 					local tabPoint, tabRelativeTo, tabRelativePoint, tabX, tabY = tab:GetPoint(1)
-					V:AssertEqual(tabPoint, "TOPLEFT", "Modern ElvUI side tabs use top-left chaining")
+					V:AssertEqual(tabPoint, left and "TOPRIGHT" or "TOPLEFT", "Modern ElvUI side tabs follow the chosen side")
 					if previousTab then
 						V:AssertEqual(tabRelativeTo, previousTab, "Modern ElvUI side tabs form one compact rail")
-						V:AssertEqual(tabRelativePoint, "BOTTOMLEFT", "Modern ElvUI side tabs chain vertically")
+						V:AssertEqual(tabRelativePoint, left and "BOTTOMRIGHT" or "BOTTOMLEFT", "Modern ElvUI side tabs chain vertically")
 						V:AssertEqual(tabX, 0, "Modern ElvUI side tabs share one horizontal edge")
 						V:AssertEqual(tabY, -1, "Modern ElvUI side tabs keep a one-pixel gap")
 					else
 						V:AssertEqual(tabRelativeTo, BetterFriendsFrame, "Modern ElvUI side tabs anchor to the main frame")
-						V:AssertEqual(tabRelativePoint, "TOPRIGHT", "Modern ElvUI side tabs begin at the frame top")
-						V:AssertEqual(tabX, 2, "Modern ElvUI side tabs use SocialUI's horizontal offset")
+						V:AssertEqual(tabRelativePoint, left and "TOPLEFT" or "TOPRIGHT", "Modern ElvUI side tabs begin at the frame top")
+						V:AssertEqual(tabX, left and -2 or 2, "Modern ElvUI side tabs use SocialUI's horizontal offset")
 						V:AssertEqual(tabY, -1, "Modern ElvUI side tabs use SocialUI's vertical offset")
 					end
 					previousTab = tab

@@ -1050,7 +1050,7 @@ local QUICK_JOIN_ROLE_ATLASES_BORDERLESS = {
 }
 
 local function IsUsableTooltipValue(value)
-	return value ~= nil and not (BFL.IsSecret and BFL:IsSecret(value))
+	return not (BFL.IsSecret and BFL:IsSecret(value)) and value ~= nil
 end
 
 local function GetQuickJoinEntryLFGListID(entry)
@@ -1059,7 +1059,7 @@ local function GetQuickJoinEntryLFGListID(entry)
 	end
 
 	local queueData = entry.displayedQueues[1].queueData
-	if not queueData or queueData.queueType ~= "lfglist" or not queueData.lfgListID then
+	if not queueData or queueData.queueType ~= "lfglist" then
 		return nil
 	end
 
@@ -1070,14 +1070,12 @@ local function GetQuickJoinEntryLFGListID(entry)
 	if groupInfo and (groupInfo._hasSecretValues or groupInfo.lfgListCensored) then
 		return nil
 	end
-	if BFL.IsSecret and BFL:IsSecret(queueData.lfgListID) then
-		return nil
-	end
 	if BFL.StreamerMode and BFL.StreamerMode.IsActive and BFL.StreamerMode:IsActive() then
 		return nil
 	end
 
-	return queueData.lfgListID
+	local lfgListID = queueData.lfgListID
+	return IsUsableTooltipValue(lfgListID) and type(lfgListID) == "number" and lfgListID or nil
 end
 
 local function GetQuickJoinEntryQueueData(entry)
@@ -1085,12 +1083,16 @@ local function GetQuickJoinEntryQueueData(entry)
 end
 
 local function GetQuickJoinSearchResultInfo(lfgListID)
-	if not C_LFGList or not C_LFGList.GetSearchResultInfo then
+	if not IsUsableTooltipValue(lfgListID) or type(lfgListID) ~= "number"
+		or not C_LFGList or not C_LFGList.GetSearchResultInfo
+	then
 		return nil
 	end
 
 	local ok, searchResultInfo = pcall(C_LFGList.GetSearchResultInfo, lfgListID)
-	if not ok or not searchResultInfo then
+	if not ok or not IsUsableTooltipValue(searchResultInfo) or type(searchResultInfo) ~= "table"
+		or (issecrettable and issecrettable(searchResultInfo))
+	then
 		return nil
 	end
 
@@ -1301,7 +1303,7 @@ local function GetQuickJoinSearchResultPlayerInfo(lfgListID, memberIndex)
 	return memberInfo
 end
 
-local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
+local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets, lfgListID, searchResultInfo)
 	if hasSecrets or not memberCount or memberCount <= 0 then
 		return nil
 	end
@@ -1311,8 +1313,7 @@ local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
 		return mockEntries
 	end
 
-	local lfgListID = GetQuickJoinEntryLFGListID(entry)
-	if not lfgListID then
+	if not lfgListID or not searchResultInfo then
 		return nil
 	end
 
@@ -1323,11 +1324,6 @@ local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
 		end
 	end
 
-	local searchResultInfo = GetQuickJoinSearchResultInfo(lfgListID)
-	if not searchResultInfo then
-		return nil
-	end
-
 	local displayType = GetQuickJoinActivityDisplayType(entry, searchResultInfo)
 	if not QuickJoinDisplayTypeEnumeratesMembers(displayType) then
 		return nil
@@ -1336,7 +1332,9 @@ local function BuildQuickJoinMemberClassEntries(entry, memberCount, hasSecrets)
 	local okMemberCount, searchResultMemberCount = pcall(function()
 		return searchResultInfo.numMembers
 	end)
-	if okMemberCount and type(searchResultMemberCount) == "number" and searchResultMemberCount > 0 then
+	if okMemberCount and IsUsableTooltipValue(searchResultMemberCount)
+		and type(searchResultMemberCount) == "number" and searchResultMemberCount > 0
+	then
 		memberCount = searchResultMemberCount
 	end
 
@@ -1468,39 +1466,26 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		isBNetFriend = true
 	end
 
-	-- First, try to get fresh searchResultInfo.leaderName for lfglist queues (ONLY if not BNet friend)
-	if
-		not isBNetFriend
-		and not (self.groupInfo and self.groupInfo._isMock)
-		and self.displayedQueues
-		and #self.displayedQueues > 0
-		and self.displayedQueues[1]
-	then
-		local firstQueue = self.displayedQueues[1]
-		if
-			firstQueue.queueData
-			and firstQueue.queueData.queueType == "lfglist"
-			and firstQueue.queueData.lfgListID
-			and C_LFGList
-			and C_LFGList.GetSearchResultInfo
-		then
-			-- CRITICAL: Fetch FRESH searchResultInfo to get CHARACTER name (not cached BNet name)
-			local searchResultInfo = C_LFGList.GetSearchResultInfo(firstQueue.queueData.lfgListID)
-			if searchResultInfo then
-				-- 12.0.0+: Update secret detection for this tooltip render.
-				-- Values may have become secret since GetGroupInfo() was called.
-				if BFL:IsSecret(searchResultInfo.searchResultID) then
-					hasSecrets = true
-				end
-				if not hasSecrets and searchResultInfo.censored then
-					groupTitle = GetCensoredLFGGroupName()
-					comment = nil
-				end
-				-- Secret strings can be stored and passed to SetText/string.format safely
-				if searchResultInfo.leaderName then
-					leaderName = searchResultInfo.leaderName
-				end
-			end
+	-- Use the current listing for optional details and for the non-Battle.net leader name.
+	local detailsID = GetQuickJoinEntryLFGListID(self)
+	local lookupID = detailsID
+	if not lookupID and not isBNetFriend and not (self.groupInfo and self.groupInfo._isMock) then
+		local queueData = GetQuickJoinEntryQueueData(self)
+		if queueData and queueData.queueType == "lfglist" then
+			lookupID = queueData.lfgListID
+		end
+	end
+	local searchResultInfo = GetQuickJoinSearchResultInfo(lookupID)
+	local listingCensored
+	if searchResultInfo then
+		hasSecrets = hasSecrets or BFL:IsSecret(searchResultInfo.searchResultID)
+		listingCensored = searchResultInfo.censored
+		if not hasSecrets and not BFL:IsSecret(listingCensored) and listingCensored then
+			groupTitle = GetCensoredLFGGroupName()
+			comment = nil
+		end
+		if not isBNetFriend then
+			leaderName = searchResultInfo.leaderName
 		end
 	end
 
@@ -1565,6 +1550,23 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 		end
 		if playstyleName then
 			tooltip:AddLine(playstyleName, 0.1, 1.0, 0.1) -- Green color
+		end
+	end
+
+	if detailsID and searchResultInfo and not hasSecrets and not BFL:IsSecret(listingCensored)
+		and not listingCensored
+	then
+		local isDelisted = searchResultInfo.isDelisted
+		if not BFL:IsSecret(isDelisted) and not isDelisted then
+			local newPlayerFriendly = searchResultInfo.newPlayerFriendly
+			if IsUsableTooltipValue(newPlayerFriendly) and newPlayerFriendly == true then
+				tooltip:AddLine(L.QUICK_JOIN_NEW_PLAYER_FRIENDLY, 0.1, 1.0, 0.1, true)
+			end
+			local voiceMode = searchResultInfo.voiceMode
+			local discordMode = Enum and Enum.LFGEntryVoiceMode and Enum.LFGEntryVoiceMode.Discord
+			if discordMode and IsUsableTooltipValue(voiceMode) and voiceMode == discordMode then
+				tooltip:AddLine(L.QUICK_JOIN_DISCORD_VOICE, 1.0, 0.82, 0, true)
+			end
 		end
 	end
 
@@ -1634,7 +1636,7 @@ function QuickJoinEntry:ApplyToTooltip(tooltip)
 	local healerCount = (self.groupInfo and self.groupInfo.numHealers) or 0
 	local dpsCount = (self.groupInfo and self.groupInfo.numDPS) or 0
 
-	local memberEntries = BuildQuickJoinMemberClassEntries(self, memberCount, hasSecrets)
+	local memberEntries = BuildQuickJoinMemberClassEntries(self, memberCount, hasSecrets, detailsID, searchResultInfo)
 	if not AddQuickJoinMemberClassLines(tooltip, memberEntries) then
 		local memberText = string.format(
 			"|cffffd100%s|r |cffffffff%d (%d/%d/%d)|r",

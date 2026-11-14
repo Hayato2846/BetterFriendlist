@@ -462,6 +462,7 @@ local function RenderTabRail(rail, FriendsUI, order, counts, rowHeight, columns)
 	local columnWidth = rail:GetWidth() / columns
 	local elvui = BFL:GetModule("ElvUISkin")
 	local skinTabs = elvui and elvui:IsSkinEnabled()
+	local left = FriendsUI:GetSideTabPosition() == "left"
 	for index, sectionID in ipairs(order) do
 		local tab = rail.tabs[sectionID]
 		if not tab then
@@ -479,7 +480,18 @@ local function RenderTabRail(rail, FriendsUI, order, counts, rowHeight, columns)
 		tab.label:SetText(rail.labels[sectionID])
 		local column = math.floor((index - 1) / rows)
 		local row = (index - 1) % rows
-		tab.slot:SetPoint("TOPRIGHT", -6 - (columns - 1 - column) * columnWidth, -24 - row * rowHeight)
+		tab.slot:ClearAllPoints()
+		tab:ClearAllPoints()
+		tab.label:ClearAllPoints()
+		if left then
+			tab.slot:SetPoint("TOPLEFT", 6 + column * columnWidth, -24 - row * rowHeight)
+			tab:SetPoint("LEFT")
+			tab.label:SetPoint("LEFT", tab, "RIGHT", 6, 0)
+		else
+			tab.slot:SetPoint("TOPRIGHT", -6 - (columns - 1 - column) * columnWidth, -24 - row * rowHeight)
+			tab:SetPoint("RIGHT")
+			tab.label:SetPoint("RIGHT", tab, "LEFT", -6, 0)
+		end
 		tab.slot:SetSize(1, rowHeight)
 		FriendsUI:RenderSettingsNavigationTab(tab, sectionID, counts[sectionID] or 0, index == 1)
 		if skinTabs then elvui:SkinModernSideTab(tab) end
@@ -504,13 +516,12 @@ local function RenderTabs(scene, width, db, maxHeight, _, variant)
 	for _, entry in ipairs(FriendsUI:GetFriendTabSettingsEntries()) do
 		labels[entry.id] = entry.label
 	end
-	local renderer = FriendsUI
+	local renderer = setmetatable({
+		GetSideTabPosition = function() return db:Get("modernSideTabPosition") == "left" and "left" or "right" end,
+	}, { __index = FriendsUI })
 	if variant and variant.order then
-		renderer = setmetatable({
-			GetFriendTabOrder = function() return db:Get(variant[1]) end,
-		}, { __index = FriendsUI })
-	elseif variant then
-		renderer = setmetatable({}, { __index = FriendsUI })
+		renderer.GetFriendTabOrder = function() return db:Get(variant[1]) end
+	elseif variant and variant.tab then
 		local id, key = variant.tab, variant[1]
 		local value = db:Get(key)
 		function renderer:IsFriendTabVisible(sectionID)
@@ -539,7 +550,7 @@ local function RenderTabs(scene, width, db, maxHeight, _, variant)
 		rail.labels = labels
 		rail:SetPoint("TOPLEFT", (index - 1) * (railWidth + 8), 0)
 		rail:SetSize(railWidth, height)
-		RenderTabRail(rail, FriendsUI, orders[index], tabSampleStates[index].counts, rowHeight, columns)
+		RenderTabRail(rail, renderer, orders[index], tabSampleStates[index].counts, rowHeight, columns)
 	end
 	return height
 end

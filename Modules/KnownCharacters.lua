@@ -44,6 +44,18 @@ local function Name(value, realm)
 	return Text(value)
 end
 local function CharacterKey(name) return name:lower() end
+local function DisplayedCharacter(friend)
+	if not SafeTable(friend) or Secret(friend.type) then return nil end
+	if friend.type == "wow" then return Name(friend.name, friend.realmName) end
+	if friend.type ~= "bnet" then return nil end
+	local game = friend.gameAccountInfo
+	if not SafeTable(game) or Secret(game.isOnline) or game.isOnline ~= true
+		or Secret(game.clientProgram) or game.clientProgram ~= "WoW"
+	then return nil end
+	local project, region = Number(game.wowProjectID), Number(game.regionID)
+	if not project or project ~= Number(WOW_PROJECT_ID) or not region or region ~= Region() then return nil end
+	return Name(game.characterName, game.realmName)
+end
 local function ValidOwner(owner)
 	if Secret(owner) or type(owner) ~= "string" or #owner > 256 then return false end
 	local kind, family, project, region, identity = owner:match("^([bp]):([a-z]+):(%d+):(%d+):(.+)$")
@@ -335,6 +347,17 @@ function Known:GetTooltipLines(friend)
 	end
 	local entries = self:GetEntries(friend)
 	if #entries == 0 then return nil end
+	-- The native tooltip already names the displayed character. Keep it in the
+	-- stored associations/menu, but reserve tooltip space for other characters.
+	local current = DisplayedCharacter(friend)
+	if current then
+		local currentKey, others = CharacterKey(current), {}
+		for _, entry in ipairs(entries) do
+			if CharacterKey(entry.name) ~= currentKey then others[#others + 1] = entry end
+		end
+		entries = others
+		if #entries == 0 then return nil end
+	end
 	local store = self:GetStore(false)
 	return self:FormatTooltipLines(entries, store.maxTooltipCharacters)
 end

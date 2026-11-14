@@ -730,6 +730,7 @@ end
 function SkinEngine:Activate(theme)
 	local activeTheme = theme == "custom" and "custom" or "dark"
 	local needsFullPass = self.active ~= true or self.activeTheme ~= activeTheme
+	if needsFullPass then self.activationVersion = (self.activationVersion or 0) + 1 end
 	local changedTokens = self:RefreshThemeColors()
 	self.active = true
 	self.activeTheme = activeTheme
@@ -1997,6 +1998,12 @@ function SkinEngine:ApplyButtonState(button, interactionState)
 		return
 	end
 	button.BFL_DarkInteractionState = interactionState
+	-- SharedButtonTemplate can create its highlight after the first skin pass.
+	-- Check the state textures directly before the renderer's cached-state return.
+	if button.BFL_DarkButtonSkinned then
+		self:SetTextureAlpha(button, button.GetHighlightTexture and button:GetHighlightTexture(), 0)
+		self:SetTextureAlpha(button, button.GetDisabledTexture and button:GetDisabledTexture(), 0)
+	end
 	self:RegisterRenderer(button, "button-state", BUTTON_THEME_TOKENS, self.RefreshButtonRenderer)
 
 	local selectedTab = button.BFL_DarkTabButton and self:IsTabSelected(button)
@@ -2273,10 +2280,10 @@ function SkinEngine:SkinButton(button, opts)
 		self:SetTextureAlpha(button, button:GetPushedTexture(), 0)
 	end
 	if button.GetDisabledTexture then
-		self:SetTextureAlpha(button, button:GetDisabledTexture(), 0.18)
+		self:SetTextureAlpha(button, button:GetDisabledTexture(), 0)
 	end
 	if button.GetHighlightTexture then
-		self:SetTextureAlpha(button, button:GetHighlightTexture(), 0.18)
+		self:SetTextureAlpha(button, button:GetHighlightTexture(), 0)
 	end
 	self:SkinButtonTextures(button, textureAlpha)
 
@@ -2592,7 +2599,10 @@ function SkinEngine:IsTabSelected(tab)
 		selectedTab = PanelTemplates_GetSelectedTab and PanelTemplates_GetSelectedTab(owner) or owner.selectedTab
 	end
 	local tabId = tab.GetID and tab:GetID()
-	return selectedTab and tabId and selectedTab == tabId
+	if selectedTab and tabId and tabId > 0 then return selectedTab == tabId end
+	-- Anonymous PanelTopTabButtonTemplate controls use native active artwork
+	-- instead of a parent's selectedTab ID. Its shown state survives skinning.
+	return tab.LeftActive and tab.LeftActive:IsShown() or false
 end
 
 function SkinEngine:CenterTabText(tab)
@@ -2647,9 +2657,14 @@ function SkinEngine:RefreshRelatedTabs(tab)
 		for i = 1, 4 do
 			self:SkinTab(_G["BetterFriendsFrameBottomTab" .. i])
 		end
-	else
+	elseif LowerName(tab):find("^betterfriendsframetab%d") then
 		for i = 1, 4 do
 			self:SkinTab(_G["BetterFriendsFrameTab" .. i])
+		end
+	else
+		local parent = tab.GetParent and tab:GetParent()
+		for _, sibling in ipairs(parent and { parent:GetChildren() } or {}) do
+			if sibling.BFL_DarkTabButton then self:SkinTab(sibling) end
 		end
 	end
 	self.BFL_DarkRefreshingTabs = nil
@@ -3672,6 +3687,8 @@ function SkinEngine:SkinScrollBar(scrollBar)
 	if not self:IsActive() or not scrollBar or IsForbidden(scrollBar) then
 		return
 	end
+	local style = BFL:GetModule("ScrollbarStyle")
+	if style and (not style:CanAccess(scrollBar) or style:IsModern(scrollBar)) then style:Apply(scrollBar); return end
 
 	if scrollBar.BFL_DarkWideScrollbar == nil and self:IsBFLFrame(scrollBar) then
 		scrollBar.BFL_DarkWideScrollbar = true
@@ -4216,7 +4233,7 @@ function SkinEngine:SkinControl(control)
 	if self:IsDropdownControl(control) then
 		self:SkinDropdown(control)
 	elseif objectType == "Button" then
-		self:SkinButton(control)
+		if control.isTopTab or control.LeftActive then self:SkinTab(control) else self:SkinButton(control) end
 	elseif objectType == "CheckButton" then
 		self:SkinCheckButton(control)
 	elseif objectType == "EditBox" then
@@ -4280,10 +4297,12 @@ function SkinEngine:RefreshControlLabelRenderer(control)
 	end
 end
 
-function SkinEngine:SkinTree(root, maxDepth, currentDepth)
+function SkinEngine:SkinTree(root, maxDepth, currentDepth, visibleOnly)
 	if not self:IsActive() or not root or IsForbidden(root) or not root.GetChildren then
 		return
 	end
+	local style = BFL:GetModule("ScrollbarStyle")
+	if style and (not style:CanAccess(root) or style:IsModern(root)) then style:Apply(root); return end
 
 	currentDepth = currentDepth or 0
 	maxDepth = maxDepth or 4
@@ -4292,7 +4311,8 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 	end
 
 	for _, child in ipairs(GetCachedChildFrames(root) or {}) do
-		if child and not IsForbidden(child) and not child.BFL_DarkManagedSubtree then
+		if child and not IsForbidden(child) and not child.BFL_DarkManagedSubtree
+			and (not visibleOnly or child:IsShown()) then
 			local objectType = GetObjectType(child)
 			local lowerName = LowerName(child)
 
@@ -4313,7 +4333,7 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 					self:SkinNativeTextureButton(child)
 				elseif child.BFL_DarkColorSwatchButton then
 					self:SkinColorSwatch(child)
-				elseif lowerName:find("tab") then
+				elseif child.isTopTab or child.LeftActive or lowerName:find("tab") then
 					self:SkinTab(child)
 				elseif lowerName:find("close") then
 					self:SkinCloseButton(child)
@@ -4334,7 +4354,7 @@ function SkinEngine:SkinTree(root, maxDepth, currentDepth)
 				self:SkinFrame(child, lowerName:find("inset") and "inset" or "panel")
 			end
 
-			self:SkinTree(child, maxDepth, currentDepth + 1)
+			self:SkinTree(child, maxDepth, currentDepth + 1, visibleOnly)
 		end
 	end
 end

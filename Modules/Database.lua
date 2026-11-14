@@ -27,6 +27,7 @@ local defaults = {
 	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
 	showWelcomeMessage = true, -- Show the welcome message on login
 	enableSmoothScrolling = false, -- Mainline friends list animation is opt-in
+	enableSettingsSmoothScrolling = false,
 	groupOrder = nil, -- nil = use default order (favorites, custom alphabetically, nogroup)
 	groupColors = {}, -- {groupId: {r, g, b}} - custom colors for group headers
 	groupCountColors = {}, -- {groupId: {r, g, b}} - custom colors for group counts (overrides global)
@@ -56,11 +57,22 @@ local defaults = {
 	-- Visual Settings
 	compactMode = false, -- Use compact button layout
 	theme = "blizzard", -- Registered UI theme ID; built-ins and addon-backed themes are declared by ThemeManager
+	hideThemeAvatar = true,
 	darkThemeSettings = ThemePalette and ThemePalette:GetDefaultDarkSettings() or {},
 	customThemeSettings = ThemePalette and ThemePalette:GetDefaultCustomSettings() or {},
 	customTheme = {},
 	enableElvUISkin = false, -- Legacy ElvUI skin toggle shown outside beta theme settings
 	fontSize = "normal", -- "small", "normal", "large"
+	useThemedDialogs = true,
+	settingsWindowSize = {},
+	settingsPreviewWidth = 380,
+	settingsPreviewHeight = 600,
+	settingsPreviewCollapsed = false,
+	settingsNewReadState = {},
+	fontWindowTitle = "", -- Empty face and zero size preserve each native font.
+	fontSizeWindowTitle = 0,
+	fontActionButton = "",
+	fontSizeActionButton = 0,
 	-- Font Customization (LibSharedMedia)
 	fontFriendName = "Friz Quadrata TT",
 	fontSizeFriendName = 12,
@@ -120,7 +132,7 @@ local defaults = {
 	accordionGroups = false, -- Only allow one group to be open at a time (default: OFF)
 	showFavoritesGroup = true, -- Show the Favorites group (default: ON)
 	enableFavoriteIcon = true, -- Show the Favorite icon on the friend button (default: ON)
-	favoriteIconStyle = "bfl", -- Favorite icon style: "bfl" or "blizzard"
+	favoriteIconStyle = "bfl", -- Favorite icon style: "bfl", "blizzard", or "modern"
 	showFactionBg = false, -- Show faction color as background (default: OFF)
 	showMultiAccountBadge = true, -- Show badge on friends with multiple game accounts online (default: ON)
 	showMultiAccountInfo = true, -- Append multi-account details to the info line (default: ON)
@@ -147,7 +159,6 @@ local defaults = {
 	debugPrintEnabled = false, -- Toggle debug prints with /bfl debug print
 	-- Beta Features
 	enableBetaFeatures = false, -- Enable experimental Beta features (default: OFF)
-	enableSettingsCenterBeta = false, -- Use the LibSettingsDesigner Settings Center beta (default: OFF)
 	-- Stable optional features
 	externalMenuBridgeEnabled = true, -- Add supported addon actions to supported BFL context menus (default: ON)
 	externalMenuBridgeDefaultMigrationVersion = 1, -- v2.9.1 one-time enablement; later user choices remain untouched
@@ -212,6 +223,7 @@ local defaults = {
 	appearanceOnboardingVersion = 0, -- One-time Retail style/theme onboarding schema; installation-local and not imported
 	appearanceOnboardingResume = false, -- Temporary reload-resume state; installation-local and not imported
 	modernFriendTabOrder = {}, -- Modern SocialUI side-tab order; missing IDs are appended in their default order
+	modernSideTabPosition = "right",
 	modernFriendTabVisibility = {}, -- Per-tab visibility; missing IDs remain visible
 	modernFriendTabPopulatedOnly = { quick_join = false, friend_requests = false }, -- Optional empty-state hiding for count-driven tabs
 	mainFrameSize = {}, -- {[layoutName] = {width, height}} - Main frame size per layout

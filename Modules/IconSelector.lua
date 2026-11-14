@@ -463,6 +463,18 @@ function IconSelector:GetBlizzardIcons()
 	return self.blizzardIcons
 end
 
+local function GetCustomPath(editBox)
+	return (editBox:GetText() or ""):match("^%s*(.-)%s*$")
+end
+
+function IconSelector:ConfirmCustomPath()
+	local frame = self.frame
+	local path = GetCustomPath(frame.customPath)
+	if not frame.onCustomPath or path == "" then return end
+	frame.onCustomPath(path)
+	frame:Hide()
+end
+
 function IconSelector:CreateFrame()
 	if self.frame then
 		return self.frame
@@ -536,7 +548,7 @@ function IconSelector:CreateFrame()
 	frame.count:SetJustifyH("RIGHT")
 	frame.count:SetJustifyV("MIDDLE")
 
-	frame.scroll = CreateFrame("ScrollFrame", nil, frame.inner, "UIPanelScrollFrameTemplate")
+	frame.scroll = BFL:GetModule("Settings"):CreateSettingsScrollFrame(frame.inner)
 	frame.scroll:SetPoint("TOPLEFT", frame.inner, "TOPLEFT", 14, -82)
 	frame.scroll:SetPoint("BOTTOMRIGHT", frame.inner, "BOTTOMRIGHT", -30, 48)
 	frame.content = CreateFrame("Frame", nil, frame.scroll)
@@ -547,6 +559,28 @@ function IconSelector:CreateFrame()
 	frame.close:SetPoint("BOTTOMRIGHT", frame.inner, "BOTTOMRIGHT", -14, 12)
 	frame.close:SetScript("OnClick", function()
 		frame:Hide()
+	end)
+
+	frame.customLabel = frame.inner:CreateFontString(nil, "OVERLAY", "BetterFriendlistFontHighlightSmall")
+	frame.customLabel:SetPoint("LEFT", frame.inner, "BOTTOMLEFT", 14, 24)
+	frame.customPath = CreateFrame("EditBox", nil, frame.inner, "InputBoxTemplate")
+	frame.customPath:SetAutoFocus(false)
+	frame.customPath:SetMaxLetters(180)
+	frame.customPath:SetHeight(22)
+	frame.customPath:SetFontObject("BetterFriendlistFontHighlightSmall")
+	frame.customPath:SetPoint("LEFT", frame.customLabel, "RIGHT", 10, 0)
+	frame.customApply = CreateModernButton(frame.inner, GetText("FRIEND_TAGS_EDITOR_APPLY", "Apply"), 84)
+	frame.customApply:SetPoint("RIGHT", frame.close, "LEFT", -8, 0)
+	frame.customPath:SetPoint("RIGHT", frame.customApply, "LEFT", -8, 0)
+	frame.customApply:SetScript("OnClick", function() self:ConfirmCustomPath() end)
+	frame.customPath:SetScript("OnEnterPressed", function() self:ConfirmCustomPath() end)
+	frame.customPath:SetScript("OnEscapePressed", function() frame:Hide() end)
+	frame.customPath:SetScript("OnTextChanged", function(input)
+		frame.customApply:SetEnabled(GetCustomPath(input) ~= "")
+	end)
+	frame:HookScript("OnHide", function()
+		frame.onCustomPath = nil
+		frame.customPath:ClearFocus()
 	end)
 
 	frame.buttons = {}
@@ -606,6 +640,12 @@ function IconSelector:AcquireButton(index)
 	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetPoint("TOPLEFT", 4, -4)
 	button.icon:SetPoint("BOTTOMRIGHT", -4, 4)
+	button.Icon = button.icon
+	button.BFL_SettingsIconTile = true
+	button.selectedTex = button:CreateTexture(nil, "BORDER")
+	button.selectedTex:SetAllPoints()
+	button.selectedTex:SetColorTexture(1, 0.76, 0.18, 0.15)
+	button.selectedTex:Hide()
 	button:SetScript("OnClick", function(self)
 		if frame.callback and self.iconItem then
 			frame.callback(self.iconItem.value, self.iconItem.profile)
@@ -673,6 +713,7 @@ function IconSelector:RefreshFrame()
 			end
 			button.icon:SetTexCoord(frame.activeSource == "blizzard" and 0.08 or 0, frame.activeSource == "blizzard" and 0.92 or 1, frame.activeSource == "blizzard" and 0.08 or 0, frame.activeSource == "blizzard" and 0.92 or 1)
 			local selected = tostring(frame.initialIcon or "") == tostring(item.value or "")
+			button.selectedTex:SetShown(selected)
 			button:SetBackdropColor(selected and 0.20 or 0.035, selected and 0.15 or 0.035, selected and 0.05 or 0.045, selected and 0.95 or 0.78)
 			button:SetBackdropBorderColor(selected and 1.00 or 0.22, selected and 0.76 or 0.22, selected and 0.18 or 0.26, selected and 1 or 0.72)
 			button:Show()
@@ -684,12 +725,28 @@ function IconSelector:RefreshFrame()
 	end
 
 	local rows = math.ceil(math.max(visibleIndex, 1) / columns)
-	frame.content:SetHeight(math.max(350, rows * (size + gap)))
+	local contentHeight = rows * (size + gap)
+	frame.scroll.BFL_SettingsContentHeight = contentHeight
+	frame.content:SetHeight(math.max(frame.scroll:GetHeight(), contentHeight))
+	frame.scroll:UpdateScrollChildRect()
+	frame.scroll:SetVerticalScroll(math.min(frame.scroll:GetVerticalScroll(), math.max(0, contentHeight - frame.scroll:GetHeight())))
+	BFL:GetModule("Settings"):UpdateLegacySettingsScrollbar(frame.scroll)
 	frame.count:SetText(tostring(visibleIndex))
 	frame.tagButton:SetShown(type(frame.extraIcons) == "table" and #frame.extraIcons > 0)
 	frame.tagButton:SetEnabled(frame.activeSource ~= "tags")
 	frame.bflButton:SetEnabled(frame.activeSource ~= "bfl")
 	frame.blizzardButton:SetEnabled(frame.activeSource ~= "blizzard")
+	self:RefreshAppearance()
+end
+
+function IconSelector:RefreshAppearance()
+	local frame = self.frame
+	if not frame then return end
+	local style = BFL:GetModule("LegacySettingsStyle")
+	style:SkinAuxiliaryWindow(frame, frame.inner, frame.scroll)
+	style:SkinActions({ frame.tagButton, frame.bflButton, frame.blizzardButton, frame.close, frame.customApply }, frame.search)
+	style:SkinActions(nil, frame.customPath)
+	style:SkinActions(frame.buttons)
 end
 
 function IconSelector:Show(owner, initialIcon, callback, options)
@@ -697,6 +754,16 @@ function IconSelector:Show(owner, initialIcon, callback, options)
 	frame.callback = callback
 	frame.extraIcons = options and options.extraIcons or nil
 	frame.initialIcon = initialIcon
+	frame.onCustomPath = options and options.onCustomPath or nil
+	local hasCustomPath = type(frame.onCustomPath) == "function"
+	frame.customLabel:SetText(GetText("FRIEND_TAGS_EDITOR_ICON_CUSTOM", "Custom Path"))
+	frame.customApply:SetText(GetText("FRIEND_TAGS_EDITOR_APPLY", "Apply"))
+	frame.customLabel:SetShown(hasCustomPath)
+	frame.customPath:SetShown(hasCustomPath)
+	frame.customApply:SetShown(hasCustomPath)
+	frame.customPath:SetText(hasCustomPath and options.customPath or "")
+	frame.customPath:SetCursorPosition(0)
+	frame.customApply:SetEnabled(hasCustomPath and GetCustomPath(frame.customPath) ~= "")
 	frame.activeSource = (options and options.source) or (frame.extraIcons and "tags" or "bfl")
 	if frame.activeSource == "tags" and not frame.extraIcons then
 		frame.activeSource = "bfl"

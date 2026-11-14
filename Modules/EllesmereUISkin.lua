@@ -56,6 +56,7 @@ local function RefreshCheckboxAccent(api, checkbox)
 			r, g, b = accentR, accentG, accentB
 		end
 	end
+	if checkbox.IsEnabled and not checkbox:IsEnabled() then r, g, b = .5, .5, .5 end
 	for _, texture in ipairs({
 		checkbox.GetCheckedTexture and checkbox:GetCheckedTexture(),
 		checkbox.GetDisabledCheckedTexture and checkbox:GetDisabledCheckedTexture(),
@@ -156,8 +157,32 @@ local function LooksLikeCloseButton(frame, name)
 	return name:find("CloseButton", 1, true) ~= nil or name:find("Close", 1, true) ~= nil
 end
 
+local function ReflectControlState(frame)
+	if not EllesmereUISkin:IsSkinEnabled() then return end
+	local target = frame.IsEnabled and frame or frame.Button
+	if not (target and target.IsEnabled) then return end
+	if frame.BFL_EllesmereEnabledAlpha == nil then frame.BFL_EllesmereEnabledAlpha = frame:GetAlpha() end
+	local enabled = target:IsEnabled()
+	frame:SetAlpha(frame.BFL_EllesmereEnabledAlpha * (enabled and 1 or .4))
+	local label = frame.Text or frame.SelectionText or frame.GetFontString and frame:GetFontString()
+	if label then
+		local value = enabled and 1 or .5
+		label:SetTextColor(value, value, value)
+	end
+end
+
+local function BindControlState(frame)
+	ReflectControlState(frame)
+	local target = frame.IsEnabled and frame or frame.Button
+	if not target or not target.HookScript or frame.BFL_EllesmereStateBound then return end
+	frame.BFL_EllesmereStateBound = true
+	for _, event in ipairs({ "OnShow", "OnEnable", "OnDisable" }) do
+		if target:HasScript(event) then target:HookScript(event, function() ReflectControlState(frame) end) end
+	end
+end
+
 local function SkinWidget(api, frame)
-	if not api or not frame or frame.BFL_SupportIcon or frame.BFL_SettingsReleaseHeader or IsForbidden(frame) then
+	if not api or not frame or frame.BFL_SupportIcon or frame.BFL_SettingsReleaseHeader or frame.BFL_DarkNoButtonChrome or IsForbidden(frame) then
 		return
 	end
 
@@ -165,6 +190,7 @@ local function SkinWidget(api, frame)
 	local name = GetName(frame)
 	if objectType == "EditBox" then
 		SafeCall(api, "EditBox", frame)
+		BindControlState(frame)
 	elseif objectType == "CheckButton" then
 		SkinCheckbox(api, frame)
 	elseif objectType == "StatusBar" then
@@ -173,6 +199,7 @@ local function SkinWidget(api, frame)
 		EllesmereUISkin:SkinActionButton(frame, GROUP_ORDER_ICON_KEYS)
 	elseif LooksLikeDropdown(frame, name) then
 		SafeCall(api, "Dropdown", frame)
+		BindControlState(frame)
 	elseif objectType == "Button" and LooksLikeTab(frame, name) then
 		SafeCall(api, "Tab", frame)
 	elseif objectType == "Button" and LooksLikeCloseButton(frame, name) then
@@ -190,6 +217,8 @@ local function SkinWidgetTree(api, root, maxDepth, currentDepth, visited)
 	if not root or IsForbidden(root) then
 		return
 	end
+	local scrollbarStyle = BFL:GetModule("ScrollbarStyle")
+	if scrollbarStyle and (not scrollbarStyle:CanAccess(root) or scrollbarStyle:IsModern(root)) then scrollbarStyle:Apply(root); return end
 	currentDepth = currentDepth or 0
 	maxDepth = maxDepth or 6
 	visited = visited or setmetatable({}, { __mode = "k" })
@@ -208,14 +237,6 @@ local function SkinWidgetTree(api, root, maxDepth, currentDepth, visited)
 	end
 end
 
-local function IsBFLPopup(which)
-	return type(which) == "string"
-		and (
-			which:sub(1, 4) == "BFL_"
-			or which:sub(1, 18) == "BETTER_FRIENDLIST"
-			or which:sub(1, 16) == "BETTERFRIENDLIST"
-		)
-end
 
 local function Color(r, g, b, a)
 	return { r or 0, g or 0, b or 0, a ~= nil and a or 1 }
@@ -498,6 +519,11 @@ function EllesmereUISkin:SkinLegacyPortrait(frame)
 	if not self:IsSkinEnabled() or not portraitButton or not portraitButton.CreateTexture then
 		return
 	end
+	local DB = BFL:GetModule("DB")
+	local shown = not (DB and DB:Get("simpleMode", false))
+		and not (BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden())
+	portraitButton:SetShown(shown)
+	if not shown then self:SetLegacyPortraitShown(frame, false); return end
 	portraitButton:ClearAllPoints()
 	portraitButton:SetPoint(
 		"TOPLEFT",
@@ -563,6 +589,7 @@ function EllesmereUISkin:SkinRequestedActionControls(frame)
 	self:SkinActionButton(raf and raf.RewardClaiming and raf.RewardClaiming.ClaimOrViewRewardButton)
 	self:SkinActionButton(raidControl and raidControl.RaidInfoButton)
 	self:SkinIconButton(raidControl and raidControl.ReadyCheckButton)
+	self:SkinCheckbox(raidControl and raidControl.EveryoneAssistCheckbox)
 	self:SkinActionButton(raid and raid.RaidToolsButton)
 	self:SkinActionButton(raid and raid.ConvertToRaidButton)
 	self:SkinActionButton(who and who.WhoButton)
@@ -629,6 +656,20 @@ function EllesmereUISkin:SkinModernChrome(frame, FriendsUI)
 	if not root then
 		return
 	end
+	self:SkinScrollBar(frame.MinimalScrollBar)
+	for _, key in ipairs({ "RecentAlliesFrame", "IgnoreListWindow", "WhoFrame", "GuildFrame" }) do
+		local owner = frame[key]
+		if owner then self:SkinScrollBar(owner.ScrollBar or owner.ClassicScrollBar) end
+	end
+	local requests = root.RequestsFrame
+	if requests then
+		self:SkinScrollBar(requests.ScrollBar)
+		if requests.RealIDWarning then self:SkinScrollBar(requests.RealIDWarning.ScrollBar) end
+	end
+	local quickJoin = frame.QuickJoinFrame
+	if quickJoin and quickJoin.ContentInset then self:SkinScrollBar(quickJoin.ContentInset.ScrollBar) end
+	local raf = frame.RecruitAFriendFrame
+	if raf and raf.RecruitList then self:SkinScrollBar(raf.RecruitList.ScrollBar) end
 	-- This pass is already coalesced by ScheduleMainFrameRefresh. Do not cache it
 	-- by object identity: Blizzard restores template artwork and button state on
 	-- the same control instances during tab changes and frame reopen.
@@ -683,18 +724,6 @@ function EllesmereUISkin:SkinTooltip(tooltip)
 	tooltip.bflEllesmereUISkinned = true
 end
 
-function EllesmereUISkin:SkinStaticPopups()
-	if not self:IsSkinEnabled() then
-		return
-	end
-	for index = 1, STATICPOPUP_NUMDIALOGS or 4 do
-		local popup = _G["StaticPopup" .. index]
-		if popup and popup.IsShown and popup:IsShown() and IsBFLPopup(popup.which) then
-			SafeCall(self.facade, "Panel", popup)
-			SkinWidgetTree(self.facade, popup, 3)
-		end
-	end
-end
 
 function EllesmereUISkin:SkinLegacySettings()
 	local frame = _G.BetterFriendlistSettingsFrame
@@ -710,11 +739,40 @@ function EllesmereUISkin:SkinLegacySettings()
 	self:SkinSettingsActions(review and review.supportButtons)
 end
 
+function EllesmereUISkin:SkinSettingsWindow(frame, inset, scroll)
+	if not self:IsSkinEnabled() then return end
+	SafeCall(self.facade, "Shell", frame)
+	if frame.CloseButton then SafeCall(self.facade, "CloseButton", frame.CloseButton) end
+	if inset then
+		if inset == frame.Inset then SafeCall(self.facade, "Inset", inset)
+		else SafeCall(self.facade, "Panel", inset, { inset = true }) end
+	end
+	if scroll then self:SkinScrollBar(scroll.ScrollBar) end
+end
+
+function EllesmereUISkin:SkinInputDialog(frame)
+	if not self:IsSkinEnabled() then return false end
+	frame:SetBackdrop(nil)
+	SafeCall(self.facade, "Shell", frame)
+	SafeCall(self.facade, "EditBox", frame.EditBox)
+	self:SkinActionButton(frame.button1)
+	self:SkinActionButton(frame.button2)
+	return true
+end
+
+function EllesmereUISkin:SkinScrollBar(bar)
+	local style = BFL:GetModule("ScrollbarStyle")
+	if style and (not style:CanAccess(bar) or style:IsModern(bar)) then style:Apply(bar); return end
+	SafeCall(self.facade, "ScrollBar", bar, true)
+end
+
 function EllesmereUISkin:SkinSettingsActions(buttons, editBox)
 	if not self:IsSkinEnabled() then return end
 	for _, button in ipairs(buttons or {}) do
 		if button.BFL_SettingsIconButton then
 			self:SkinIconButton(button)
+		elseif button.BFL_SettingsIconTile then
+			self:SkinActionButton(button, { "Icon", "selectedTex" })
 		else
 			self:SkinActionButton(button, button.BFL_SupportIcon and { "BFL_SupportIcon" } or nil)
 		end
@@ -737,7 +795,11 @@ function EllesmereUISkin:SkinAuxiliaryWindows()
 		"FriendsFriendsFrame",
 	}) do
 		local frame = _G[frameName]
-		SafeCall(self.facade, "Shell", frame)
+		if frameName == "BetterFriendlistHelpFrame" and frame then
+			self:SkinSettingsWindow(frame, frame.Inset, frame.ScrollFrame)
+		else
+			SafeCall(self.facade, "Shell", frame)
+		end
 		SkinWidgetTree(self.facade, frame, 7)
 	end
 	self:SkinIgnoreListWindow(_G.BetterFriendsFrame and _G.BetterFriendsFrame.IgnoreListWindow)
@@ -893,7 +955,7 @@ function EllesmereUISkin:SkinSettingsComparison(review)
 	if not self:IsSkinEnabled() then return end
 	local api = self.facade
 	local version = self:GetPaletteVersion()
-	SafeCall(api, "ScrollBar", review.hoverHelp.scroll.ScrollBar, true)
+	self:SkinScrollBar(review.hoverHelp.scroll.ScrollBar)
 	local picker, editor = review.comparisonPicker, review.comparisonEditor
 	if picker and picker:IsShown() then SkinWidget(api, picker) end
 	if editor and editor:IsShown() then SkinWidgetTree(api, editor, 3) end
@@ -908,6 +970,43 @@ function EllesmereUISkin:SkinSettingsComparison(review)
 			end
 		end
 	end
+end
+
+function EllesmereUISkin:SkinMainFooter(frame, FriendsUI, modern)
+	local owner = frame
+	if modern then owner = FriendsUI and FriendsUI.root and FriendsUI.root.BottomActionBar end
+	local previous = frame.BFL_EllesmereFooterOwner
+	if previous and previous ~= owner and previous.BFL_EllesmereFooterBackground then
+		previous.BFL_EllesmereFooterBackground:Hide()
+	end
+	frame.BFL_EllesmereFooterOwner = owner
+	if not owner then return end
+	local background = owner.BFL_EllesmereFooterBackground
+	if not background then
+		background = owner:CreateTexture(nil, "BACKGROUND", nil, -5)
+		background:SetColorTexture(0, 0, 0, 0.5)
+		owner.BFL_EllesmereFooterBackground = background
+	end
+	background:ClearAllPoints()
+	if modern then
+		-- Inherit the actual action bar's bounds and visibility on every tab.
+		background:SetAllPoints(owner)
+	else
+		local height = 0
+		local geometry = BFL.WindowGeometry
+		if geometry and frame.Inset then
+			local _, bottom = geometry:GetRect(frame)
+			local _, contentBottom = geometry:GetRect(frame.Inset)
+			if bottom and contentBottom then
+				height = math.max(0, (contentBottom - bottom) / geometry:GetRatio(frame))
+			end
+		end
+		background:SetPoint("BOTTOMLEFT")
+		background:SetPoint("BOTTOMRIGHT")
+		background:SetHeight(height)
+	end
+	background:SetAlpha(1)
+	background:Show()
 end
 
 function EllesmereUISkin:SkinMainFrame(frame)
@@ -934,7 +1033,9 @@ function EllesmereUISkin:SkinMainFrame(frame)
 		and previous.raidInset == (raid and raid.GroupsInset)
 		and previous.quickJoinInset == (quickJoin and quickJoin.ContentInset)
 	if not staticChromeUnchanged then
-		SafeCall(api, "Shell", frame, { bottomBar = 80, noBorder = true })
+		-- EUI creates its fixed bottomBar only once. BFL owns the footer instead
+		-- so Modern's smaller, sometimes hidden action bar cannot be overlapped.
+		SafeCall(api, "Shell", frame, { noBorder = true })
 		SafeCall(api, "Inset", frame.Inset)
 		SafeCall(api, "CloseButton", frame.CloseButton)
 		SafeCall(api, "Inset", who and who.ListInset)
@@ -953,6 +1054,7 @@ function EllesmereUISkin:SkinMainFrame(frame)
 			}
 		end
 	end
+	self:SkinMainFooter(frame, FriendsUI, modern)
 	-- Same-object native reinitialization is invisible to the static shell key.
 	-- Fade only the native NineSlice layers on every coalesced refresh while the
 	-- expensive facade Shell/Inset construction remains cached.
@@ -1003,7 +1105,8 @@ function EllesmereUISkin:Apply(reason)
 	if SettingsDesigner and SettingsDesigner.GetFrame then
 		self:SkinSettingsCenter(SettingsDesigner:GetFrame())
 	end
-	self:SkinStaticPopups()
+	local style = BFL:GetModule("ScrollbarStyle")
+	if style then style:Refresh() end
 	return true
 end
 
@@ -1179,13 +1282,7 @@ function EllesmereUISkin:InstallHooks()
 			self:ScheduleApply("legacy-settings-show")
 		end)
 	end
-	if type(_G.StaticPopup_Show) == "function" then
-		hooksecurefunc("StaticPopup_Show", function(which)
-			if IsBFLPopup(which) then
-				self:ScheduleApply("static-popup")
-			end
-		end)
-	end
+
 end
 
 function EllesmereUISkin:Initialize()

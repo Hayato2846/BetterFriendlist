@@ -80,10 +80,12 @@ view:SetPoint("TOPLEFT", blizzard, "TOPLEFT", 5, -10)
 view.FilterBar = newFrame(view, true)
 local box = newFrame(view.FilterBar, true)
 box.font, box.insets = "Blizzard font", { 22, 22, 0, 0 }
-for _, key in ipairs({ "Background", "searchIcon", "Instructions" }) do
+local decorationKeys={ "Background", "searchIcon", "Instructions", "backdrop", "Backdrop", "NineSlice", "Left", "Middle", "Right" }
+for _, key in ipairs(decorationKeys) do
 	box[key] = newFrame(box, true)
 	box[key]:SetAlpha(0.75)
 end
+box.Backdrop=box.backdrop
 view.FilterBar.SearchBar = box
 box:SetPoint("LEFT", view.FilterBar, "LEFT", 15, 0)
 view.RefreshSearchResults = function() error("addon called Blizzard's search") end
@@ -167,6 +169,7 @@ assert(box:GetFrameLevel() > bflBox:GetFrameLevel() and box:GetFrameStrata() == 
 assert(bflBox:IsVisible() and bflBox:IsMouseEnabled(), "the original BFL control remains available")
 assert(not view.ScrollBox:IsShown(), "the native list is not rendered as a second list")
 assert(box.Background:GetAlpha() == 0 and box.searchIcon:GetAlpha() == 0 and box.Instructions:GetAlpha() == 0)
+for _,key in ipairs(decorationKeys) do assert(box[key]:GetAlpha()==0,"native input decoration covers the BFL search: "..key) end
 assert(box:GetFontObject() == "Blizzard font" and box:GetTextInsets() == bflBox:GetTextInsets())
 inCombat = false
 box.text = "Mapko"
@@ -217,6 +220,7 @@ assignedWidth, assignedHeight = view:GetSize(true)
 assert(assignedWidth == 320 and assignedHeight == 480, "rollback restores the assigned size instead of the old rect")
 view.rectWidth, view.rectHeight = nil, nil
 assert(box.Background:GetAlpha() == 0.75 and box.searchIcon:GetAlpha() == 0.75 and box.Instructions:GetAlpha() == 0.75)
+for _,key in ipairs(decorationKeys) do assert(box[key]:GetAlpha()==.75,"native input decoration was not restored: "..key) end
 assert(box:GetFontObject() == "Blizzard font" and box:GetTextInsets() == 22)
 section = "friends"
 updateLayout()

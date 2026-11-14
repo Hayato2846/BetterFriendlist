@@ -2894,6 +2894,10 @@ function FriendTags:ShouldIncludeTagOnSurface(tag, surface, runtimeCache)
 		include = false
 	end
 	local profile = tag.chipProfile or self:GetChipProfile(tag)
+	local section = type(profile) == "table" and cache.settings.sections and cache.settings.sections[profile.section]
+	if type(section) == "table" and section.hidden == true then
+		include = false
+	end
 	if type(profile) ~= "table" or profile.visible == false then
 		include = false
 	elseif surface == "row" and profile.rowVisible == false then
@@ -3110,7 +3114,7 @@ function FriendTags:GetTagCount(friend)
 end
 
 function FriendTags:ShowCustomTagDialog(friend, displayName, refreshCallback)
-	StaticPopup_Show("BFL_FRIEND_TAGS_CREATE_CUSTOM_TAG", displayName or T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags"), nil, {
+	BFL.ShowInputDialog("BFL_FRIEND_TAGS_CREATE_CUSTOM_TAG", displayName or T("FRIEND_TAGS_CUSTOM_SECTION", "Custom Tags"), nil, {
 		friend = friend,
 		refreshCallback = refreshCallback,
 	})

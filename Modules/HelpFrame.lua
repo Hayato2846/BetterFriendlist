@@ -81,6 +81,12 @@ end
 
 function HelpFrame:RefreshAccentColors()
 	self:UpdateAccentColors(helpFrame)
+	self:RefreshAppearance()
+end
+
+function HelpFrame:RefreshAppearance()
+	if not helpFrame then return end
+	BFL:GetModule("LegacySettingsStyle"):SkinAuxiliaryWindow(helpFrame, helpFrame.Inset, helpFrame.ScrollFrame)
 end
 
 function HelpFrame:UpdateText(frame)
@@ -157,36 +163,11 @@ function HelpFrame:CreateFrame()
 		frame.TitleContainer.TitleText:SetText(BFL.L.RAID_HELP_TITLE or "Raid Roster Help")
 	end
 
-	-- ScrollFrame with modern ScrollUtil
-	local scrollFrame
-
-	if BFL.HasModernScrollBox and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
-		-- Retail: Modern ScrollUtil
-		scrollFrame = CreateFrame("ScrollFrame", nil, frame)
-		frame.ScrollFrame = scrollFrame
-		scrollFrame:SetPoint("TOPLEFT", 12, -30)
-		scrollFrame:SetPoint("BOTTOMRIGHT", -30, 30)
-
-		-- Mixin CallbackRegistry (Required for ScrollUtil)
-		if not scrollFrame.RegisterCallback then
-			Mixin(scrollFrame, CallbackRegistryMixin)
-			scrollFrame:OnLoad()
-		end
-
-		-- Create ScrollBar (EventFrame inheriting MinimalScrollBar)
-		local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
-		frame.ScrollBar = scrollBar
-		scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 6, 0)
-		scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 6, 0)
-
-		ScrollUtil.InitScrollFrameWithScrollBar(scrollFrame, scrollBar)
-	else
-		-- Classic: Legacy UIPanelScrollFrameTemplate
-		scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-		frame.ScrollFrame = scrollFrame
-		scrollFrame:SetPoint("TOPLEFT", 12, -30)
-		scrollFrame:SetPoint("BOTTOMRIGHT", -32, 30)
-	end
+	local settings = BFL:GetModule("Settings")
+	local scrollFrame = settings:CreateSettingsScrollFrame(frame)
+	frame.ScrollFrame, frame.ScrollBar = scrollFrame, scrollFrame.ScrollBar
+	scrollFrame:SetPoint("TOPLEFT", 12, -30)
+	scrollFrame:SetPoint("BOTTOMRIGHT", -30, 30)
 
 	-- Content
 	local content = CreateFrame("Frame", nil, scrollFrame)
@@ -346,6 +327,10 @@ function HelpFrame:CreateFrame()
 			total = total + fs:GetStringHeight() + 5
 		end
 		content:SetHeight(total + 20)
+		scrollFrame.BFL_SettingsContentHeight = total + 20
+		scrollFrame:UpdateScrollChildRect()
+		scrollFrame:SetVerticalScroll(math.min(scrollFrame:GetVerticalScroll(), math.max(0, total + 20 - scrollFrame:GetHeight())))
+		settings:UpdateLegacySettingsScrollbar(scrollFrame)
 	end
 	frame:LayoutContent() -- Initial layout
 
@@ -357,6 +342,7 @@ function HelpFrame:CreateFrame()
 		end
 		HelpFrame:UpdateAccentColors(frame)
 		HelpFrame:UpdateText(frame) -- Update text on show
+		HelpFrame:RefreshAppearance()
 		-- Close RaidTools when opening Help
 		local RaidTools = BFL:GetModule("RaidTools")
 		if RaidTools then

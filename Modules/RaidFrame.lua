@@ -79,8 +79,9 @@ local SORT_MODE_RANK = 4 -- By raid rank (leader, assist, member)
 
 -- PERFY OPTIMIZATION: Static sort comparators (avoid anonymous closure creation per sort)
 local function RaidSortByGroupThenName(a, b)
-	if a.subgroup ~= b.subgroup then
-		return a.subgroup < b.subgroup
+	local groupA, groupB = a.subgroup or 1, b.subgroup or 1
+	if groupA ~= groupB then
+		return groupA < groupB
 	end
 	return a.name < b.name
 end
@@ -90,15 +91,17 @@ local function RaidSortByName(a, b)
 end
 
 local function RaidSortByClassThenName(a, b)
-	if a.classFileName ~= b.classFileName then
-		return a.classFileName < b.classFileName
+	local classA, classB = a.classFileName or "", b.classFileName or ""
+	if classA ~= classB then
+		return classA < classB
 	end
 	return a.name < b.name
 end
 
 local function RaidSortByRankThenName(a, b)
-	if a.rank ~= b.rank then
-		return a.rank > b.rank
+	local rankA, rankB = a.rank or 0, b.rank or 0
+	if rankA ~= rankB then
+		return rankA > rankB
 	end
 	return a.name < b.name
 end
@@ -1578,10 +1581,11 @@ function RaidFrame:UpdateRaidMembers()
 
 	for i = 1, numMembers do
 		local name, rank, subgroup, level, class, fileName, zone, online, isDead, role, isML = GetRaidRosterInfo(i)
+		local unit = "raid" .. i
+		local hasRosterName = BFL:IsSecret(name) or name ~= nil
+		name = ResolveRaidRosterName(unit, name)
 
-		if BFL:IsSecret(name) or name ~= nil then
-			local unit = "raid" .. i
-			name = ResolveRaidRosterName(unit, name)
+		if hasRosterName or name ~= nil then
 
 			local member = {
 				index = i,
@@ -1627,14 +1631,15 @@ function RaidFrame:UpdatePartyMembers()
 	local masterLooterPartyID = GetPartyMasterLooterID()
 
 	-- Player
-	local playerName = UnitName("player")
+	local playerName = ResolveRaidRosterName("player", UnitName("player"))
 	local playerLevel = UnitLevel("player")
 	local playerClass, playerFileName = UnitClass("player")
 	local playerRole = UnitGroupRolesAssigned("player")
 
 	table.insert(self.raidMembers, {
 		index = 0,
-		name = playerName,
+		name = playerName or UNKNOWN or "Unknown",
+		pendingName = playerName == nil,
 		rank = UnitIsGroupLeader("player") and 2 or 0,
 		subgroup = 1,
 		level = playerLevel,
@@ -1653,14 +1658,15 @@ function RaidFrame:UpdatePartyMembers()
 	for i = 1, GetNumSubgroupMembers() do
 		local unit = "party" .. i
 		if UnitExists(unit) then
-			local name = UnitName(unit)
+			local name = ResolveRaidRosterName(unit, UnitName(unit))
 			local level = UnitLevel(unit)
 			local class, fileName = UnitClass(unit)
 			local role = UnitGroupRolesAssigned(unit)
 
 			table.insert(self.raidMembers, {
 				index = i,
-				name = name,
+				name = name or UNKNOWN or "Unknown",
+				pendingName = name == nil,
 				rank = 0,
 				subgroup = 1,
 				level = level,

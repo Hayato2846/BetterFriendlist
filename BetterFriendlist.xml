@@ -2126,6 +2126,11 @@
 									<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
 										relativePoint="BOTTOMRIGHT" x="2" y="0" />
 								</Anchors>
+								<Scripts>
+									<OnLoad inherit="append">
+										BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+									</OnLoad>
+								</Scripts>
 							</EventFrame>
 						</Frames>
 					</Frame>
@@ -2498,6 +2503,11 @@
 							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
 								relativePoint="BOTTOMRIGHT" x="0" y="0" />
 						</Anchors>
+						<Scripts>
+							<OnLoad inherit="append">
+								BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+							</OnLoad>
+						</Scripts>
 					</EventFrame>
 					<!-- Visible while a Who request is waiting for the server response. -->
 					<Frame parentKey="LoadingSpinner" hidden="true" inherits="SpinnerTemplate">
@@ -2654,6 +2664,11 @@
 					<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollFrame"
 						relativePoint="BOTTOMRIGHT" x="5" y="0" />
 				</Anchors>
+				<Scripts>
+					<OnLoad inherit="append">
+						BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+					</OnLoad>
+				</Scripts>
 			</EventFrame>
 			<!-- Bottom Buttons -->
 			<Button parentKey="AddFriendButton" inherits="UIPanelButtonTemplate" text="ADD_FRIEND">
@@ -2802,6 +2817,11 @@
 							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
 								relativePoint="BOTTOMRIGHT" x="5" y="3" />
 						</Anchors>
+						<Scripts>
+							<OnLoad inherit="append">
+								BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+							</OnLoad>
+						</Scripts>
 					</EventFrame>
 				</Frames>
 				<Scripts>
@@ -2837,6 +2857,11 @@
 							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
 								relativePoint="BOTTOMRIGHT" x="5" y="0" />
 						</Anchors>
+						<Scripts>
+							<OnLoad inherit="append">
+								BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+							</OnLoad>
+						</Scripts>
 					</EventFrame>
 					<!-- Loading Spinner (Blizzard's SpinnerTemplate) -->
 					<Frame parentKey="LoadingSpinner" hidden="true" inherits="SpinnerTemplate">
@@ -3248,6 +3273,11 @@
 										relativeKey="$parent.ScrollBoxContainer"
 										relativePoint="BOTTOMRIGHT" x="5" y="2" />
 								</Anchors>
+								<Scripts>
+									<OnLoad inherit="append">
+										BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+									</OnLoad>
+								</Scripts>
 							</EventFrame>
 
 							<!-- Request to Join Button (bottom-right, outside dark background) -->
@@ -3333,6 +3363,11 @@
 							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
 								relativePoint="BOTTOMRIGHT" x="5" y="3" />
 						</Anchors>
+						<Scripts>
+							<OnLoad inherit="append">
+								BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+							</OnLoad>
+						</Scripts>
 					</EventFrame>
 
 					<!-- No Instances Message -->
@@ -3730,6 +3765,11 @@
 							<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox"
 								relativePoint="BOTTOMRIGHT" x="0" y="0" />
 						</Anchors>
+						<Scripts>
+							<OnLoad inherit="append">
+								BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+							</OnLoad>
+						</Scripts>
 					</EventFrame>
 				</Frames>
 				<Layers>

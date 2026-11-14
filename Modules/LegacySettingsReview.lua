@@ -400,7 +400,7 @@ local function BuildGroups(db, friends, automatic, targetID, renderer)
 	local mode = db:Get("inGameGroupMode", "same_game")
 	local accordion = automatic and db:Get("accordionGroups", false)
 	local data = {}
-	local hiddenEmpty = false
+	local hiddenEmpty = {}
 
 	local function GetMembers(id)
 		local members, total, online, visibleOnline = {}, 0, 0, 0
@@ -445,7 +445,7 @@ local function BuildGroups(db, friends, automatic, targetID, renderer)
 			members, total, online, visibleOnline = GetMembers(id)
 			count = #members
 			if hideEmpty and visibleOnline == 0 then
-				hiddenEmpty = true
+				hiddenEmpty[#hiddenEmpty + 1] = configuredName or group.name or Text(group.label)
 				return
 			elseif count == 0 and filter ~= "all" then
 				return
@@ -477,8 +477,8 @@ local function BuildGroups(db, friends, automatic, targetID, renderer)
 	for index, group in ipairs(sampleGroups) do
 		local id = group.id
 		if id == targetID or (automatic and enabled[id]) or (not automatic and (id ~= "recentlyadded" or enabled[id])) then
-			if group.total == 0 and hideEmpty and id ~= targetID then
-				hiddenEmpty = true
+			if not automatic and group.total == 0 and hideEmpty and id ~= targetID then
+				hiddenEmpty[#hiddenEmpty + 1] = groupNames[id] and groupNames[id].name or group.name or Text(group.label)
 			else
 				Add(group, index)
 				shownTarget = shownTarget or id == targetID
@@ -496,7 +496,7 @@ local function BuildGroups(db, friends, automatic, targetID, renderer)
 		Add({ id = "bfl_settings_group", label = "SETTINGS_LEGACY_SAMPLE_ZONE", count = 1, total = 1, friendIndex = 2 }, 6)
 	end
 	table.sort(data, function(a, b) return a.order < b.order end)
-	return data, hiddenEmpty
+	return data, #hiddenEmpty > 0 and table.concat(hiddenEmpty, ", ") or nil
 end
 
 function Review:PreviewGroup(groupId)
@@ -862,10 +862,10 @@ function Review:RenderSample()
 		end
 	end
 	local note = filterNote
-	if #data == 0 and not filterNote then
+	if hiddenEmpty then
+		note = L.SETTINGS_LEGACY_SAMPLE_EMPTY_HIDDEN:format(hiddenEmpty)
+	elseif #data == 0 and not filterNote then
 		note = L.SETTINGS_LEGACY_NO_RESULTS
-	elseif hiddenEmpty then
-		note = L.SETTINGS_LEGACY_SAMPLE_EMPTY_HIDDEN
 	elseif self.route == "rows" then
 		local format, disabled, isDefault = db:GetInfoFormatString()
 		if disabled or (not isDefault and not (format and format:lower():find("%level%", 1, true))) then
@@ -982,6 +982,8 @@ function Review:QueueSample()
 	if self.sampleTimer then return end
 	self.sampleTimer = C_Timer.NewTimer(0, function()
 		self.sampleTimer = nil
+		local dock = BFL:GetModule("SettingsPreviewDock")
+		if dock and dock.resizing then dock.previewDirty = true; return end
 		self:RenderSample()
 		local style = BFL:GetModule("LegacySettingsStyle")
 		if style then style:SkinPreview(self) end
@@ -989,6 +991,7 @@ function Review:QueueSample()
 		-- inert after styling while preserving the sample picker and scrollbar.
 		self:KeepSamplesPassive()
 		self:LayoutSettingHelp()
+		if dock then dock:RefreshSkinLevels() end
 		self:RefreshHeight()
 	end)
 end
@@ -1035,81 +1038,84 @@ function Review:Layout()
 		row:SetHeight(navHeight)
 		row.label:ClearAllPoints()
 		row.label:SetPoint("LEFT", row.labelInset, 0)
-		row.label:SetWidth(math.max(1, self.sidebar:GetWidth() - row.labelInset - 8))
+		row.label:SetWidth(math.max(1, self.sidebar:GetWidth() - row.labelInset - 8 - (row.BFL_NewBadgeWidth or 0)))
 		if row.selected then
 			LayoutNavigationSelection(row)
 		end
 	end
-	local broker = self.sample == "broker" or self.sample == "guildBroker"
-	local docked = self.sample and not broker and width >= 815
 	local hasGuides = self.guideRows and #self.guideRows > 0
-	local helpBeside = hasGuides and width >= 815
-	local helpStacked = hasGuides and not helpBeside
-	local stackedSpace = inset:GetHeight() + top - 198
-	-- Keep the font picker and both raid control strips visible in the stacked layout.
-	local guideHeight = math.min(220, math.floor(stackedSpace * 0.54))
-	if self.route == "rowFonts" then
-		guideHeight = 280
-	elseif self.route == "raid" then
-		guideHeight = 250
-	end
-	local helpHeight = math.min(math.max(86, guideHeight),
-		math.max(86, stackedSpace - (self.sample and 100 or 0)))
-	local dockWidth = (docked or helpBeside) and math.min(432, width - 484) or 0
-	self.sampleDocked = docked
-	self.helpStacked = helpStacked
-	self.helpVisible = helpBeside or helpStacked
-
-	-- A stacked preview leaves space for the scroll gap and three settings rows.
-	self.sampleHeightLimit = inset:GetHeight() + top - (docked and 46 or 198)
-	if docked and helpBeside then
-		self.sampleHeightLimit = math.max(100, self.sampleHeightLimit - 224)
-	elseif helpStacked and self.sample then
-		self.sampleHeightLimit = math.max(72, stackedSpace - helpHeight - 4)
-	end
-	self.singleSample = self.sample and not docked and self.frame:GetHeight() < (helpStacked and 640 or 480)
-	self.scroll:ClearAllPoints()
-	local sideBySide = docked or helpBeside
-	self.scroll:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", sideBySide and -(dockWidth + 38) or -25, 41)
-	if self.sample then
-		self.preview:ClearAllPoints()
-		self.preview:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -12, top)
-		if docked then
-			self.preview:SetWidth(dockWidth)
-			self.scroll:SetPoint("TOPLEFT", inset, "TOPLEFT", 8, top)
-		else
-			self.preview:SetWidth(width - 24)
-			self.scroll:SetPoint("TOPLEFT", self.preview, "BOTTOMLEFT", -4, -6)
+	local hasSideContent = self.sample or hasGuides
+	local detached = hasSideContent and width < 815
+	local host, expanded = BFL:GetModule("SettingsPreviewDock"):Update(self, detached)
+	local beside = hasSideContent and not detached
+	local dockWidth = beside and math.min(432, width - 484) or 0
+	local tooltips = detached and not expanded and hasGuides
+	if self.helpTooltips ~= tooltips then
+		self:HideSettingTooltip()
+		if tooltips then
+			self.pinnedGuideID, self.pinPress = nil, nil
+			self.markComparison = false
+			if self.hoverTint then self.hoverTint:Hide() end
 		end
-		self.preview:Show()
-		self:QueueSample()
-	elseif self.home and self.home:IsShown() then
+	end
+	self.previewDetached, self.helpTooltips = detached, tooltips
+	self.scroll:ClearAllPoints()
+	self.scroll:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", beside and -(dockWidth + 38) or -25, 41)
+	self.scroll:SetPoint("TOPLEFT", inset, "TOPLEFT", 8, top)
+	self:LayoutPreview()
+	if self.home and self.home:IsShown() then
 		self.home:SetPoint("TOPLEFT", inset, "TOPLEFT", 8, top)
 		self.home:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -25, top)
 		self.scroll:SetPoint("TOPLEFT", self.home.rule, "BOTTOMLEFT", -12, -4)
-	else
-		self.scroll:SetPoint("TOPLEFT", inset, "TOPLEFT", 8, top)
 	end
-	if self.helpVisible then
-		local help = self.hoverHelp
-		help:ClearAllPoints()
-		if self.sample then
-			help:SetPoint("TOPRIGHT", self.preview, "BOTTOMRIGHT", 0, -8)
-		else
-			help:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -12, top)
-		end
-		help:SetWidth(helpBeside and dockWidth or width - 24)
-		if helpStacked then
-			help:SetHeight(helpHeight)
-			self.scroll:SetPoint("TOPLEFT", help, "BOTTOMLEFT", -4, -6)
-		end
-	end
-	self.content:SetWidth(math.max(1, width - (sideBySide and (dockWidth + 46) or 33)))
-	self:LayoutSettingHelp()
+	self.content:SetWidth(math.max(1, width - (beside and (dockWidth + 46) or 33)))
 	if self.home and self.home:IsShown() then
 		self:LayoutHome()
 	end
 	self:RefreshHeight()
+end
+
+
+-- A detached resize must not relayout navigation or the editable settings.
+-- During the drag, native anchors and clipping track the new viewport; sample
+-- rendering and comparison skinning run once the resize has finished.
+function Review:LayoutPreview(sizing)
+	local inset, top = self.frame.MainInset, -42
+	local hasGuides = self.guideRows and #self.guideRows > 0
+	local hasSideContent = self.sample or hasGuides
+	local detached, tooltips = self.previewDetached, self.helpTooltips
+	local dock = BFL:GetModule("SettingsPreviewDock")
+	local host = detached and dock.window.content
+	local dockWidth = not detached and math.min(432, inset:GetWidth() - 484) or 0
+	self.sampleDocked = hasSideContent
+	self.helpVisible = hasGuides and not tooltips
+	self.sampleHeightLimit = detached and math.max(80, host:GetHeight() - (hasGuides and 220 or 0) - 8)
+		or math.max(100, inset:GetHeight() + top - 46 - (hasGuides and 224 or 0))
+	self.singleSample = self.sample and self.sampleHeightLimit < 190
+	if self.sample and not tooltips then
+		self.preview:ClearAllPoints()
+		self.preview:SetPoint("TOPRIGHT", host or inset, "TOPRIGHT", detached and 0 or -12, detached and 0 or top)
+		self.preview:SetWidth(detached and host:GetWidth() or dockWidth)
+		self.preview:Show()
+		if not sizing then self:QueueSample() end
+	else
+		self.preview:Hide()
+	end
+	if self.helpVisible then
+		local help = self.hoverHelp
+		help:ClearAllPoints()
+		if detached then
+			if self.sample then help:SetPoint("TOPLEFT", self.preview, "BOTTOMLEFT", 0, -8)
+			else help:SetPoint("TOPLEFT", host, "TOPLEFT") end
+			help:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT")
+		elseif self.sample then
+			help:SetPoint("TOPRIGHT", self.preview, "BOTTOMRIGHT", 0, -8)
+		else
+			help:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -12, top)
+		end
+		if not detached then help:SetWidth(dockWidth) end
+	end
+	if not sizing then self:LayoutSettingHelp() end
 end
 
 local function HideTabFrames(content)
@@ -1392,7 +1398,7 @@ function Review:GetComparison()
 				end
 			end
 		end
-	elseif control.BFL_ComparisonRange and control.GetValue then
+	elseif control.BFL_ComparisonRange and control.GetValue and not guide.windowFont then
 		current = control:GetValue()
 	elseif control.Input and not guide.read then
 		current = control.Input:GetText()
@@ -1799,6 +1805,7 @@ function Review:RenderComparisonLane(lane, guide, db, value, width, top)
 	if lane.geometrySample then lane.geometrySample:Hide() end
 	if lane.outcomeSample then lane.outcomeSample:Hide() end
 	if lane.filterMenuLine then lane.filterMenuLine:Hide() end
+	if lane.windowFontSample then lane.windowFontSample:Hide() end
 	if not guide.brokerTooltip then
 		ReleaseComparisonTooltip(lane)
 		if lane.tooltipSurface then lane.tooltipSurface:Hide(); lane.tooltipSummary:Hide() end
@@ -1806,6 +1813,35 @@ function Review:RenderComparisonLane(lane, guide, db, value, width, top)
 	if guide.privacy or guide.outcome then
 		for _, widget in ipairs(lane.widgets) do widget:Hide() end
 		return RenderOutcomeLines(lane, GetOutcomeComparisonLines(guide, settings, value), width, top)
+	end
+	if guide.windowFont then
+		for _, widget in ipairs(lane.widgets) do widget:Hide() end
+		local button = guide.windowFont == "ActionButton"
+		if not lane.windowFontSample then
+			lane.windowFontSample = CreateFrame("Frame", nil, lane)
+			lane.windowFontSample.title = Label(lane.windowFontSample, "GameFontNormal", "BetterFriendlist")
+			lane.windowFontSample.title:SetPoint("TOPLEFT")
+			lane.windowFontSample.button = CreateFrame("Button", nil, lane.windowFontSample, "UIPanelButtonTemplate")
+			lane.windowFontSample.button:SetSize(240, 30)
+			lane.windowFontSample.button:SetPoint("TOPLEFT")
+			lane.windowFontSample.button:SetText(ADD_FRIEND)
+		end
+		local sample = lane.windowFontSample
+		sample:SetPoint("TOPLEFT", 0, -top)
+		sample:SetSize(width, 36)
+		sample:Show()
+		sample.title:SetShown(not button)
+		sample.title:SetWidth(width)
+		sample.title:SetWordWrap(false)
+		sample.button:SetShown(button)
+		sample.button:SetWidth(math.min(280, width))
+		local target = button and sample.button:GetFontString() or sample.title
+		local face = settings:Get("font" .. guide.windowFont, "")
+		local size = settings:Get("fontSize" .. guide.windowFont, 0)
+		local nativePath, nativeSize, flags = BFL.FontManager:GetWindowFontDefaults(guide.windowFont)
+		BFL.FontManager:ApplyWindowTextFont(target, face ~= "" and BFL.FontManager:ResolveFontPath(face) or nativePath,
+			size > 0 and size or nativeSize, flags, face ~= "")
+		return top + 42
 	end
 	if guide.geometry then
 		for _, widget in ipairs(lane.widgets) do widget:Hide() end
@@ -2151,7 +2187,7 @@ function Review:RenderSettingComparison(width, top)
 		and key ~= "brokerTooltipMode" and key ~= "guildBrokerFilter"
 	local minimumPairWidth = pairBrokerExcerpts and 374 or 490
 	local stack = width < minimumPairWidth or guide.header or guide.social
-		or (guide.brokerTooltip and not pairBrokerExcerpts) or guide.theme or guide.geometry or guide.privacy or guide.filterEditor
+		or (guide.brokerTooltip and not pairBrokerExcerpts) or guide.theme or guide.geometry or guide.windowFont or guide.privacy or guide.filterEditor
 	local laneWidth = stack and width or math.floor((width - 10) / 2)
 	top = bottom
 	for index, value in ipairs({ current, alternate }) do
@@ -2164,6 +2200,7 @@ function Review:RenderSettingComparison(width, top)
 		local title = Text(binary and (index == 1 and "STATUS_DISABLED" or "STATUS_ENABLED")
 			or (index == 1 and "SETTINGS_COMPARE_CURRENT" or "SETTINGS_COMPARE_ALTERNATE"))
 		local label = not binary and ValueText(value)
+		if guide.windowFont and value == 0 then label = DEFAULT end
 		if binary then title = title:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
 		lane.title:SetText(label and label ~= "" and (title .. " · " .. label) or title)
 		local height = self:RenderComparisonLane(lane, guide, db, value, laneWidth, lane.title:GetStringHeight() + 5)
@@ -2212,6 +2249,8 @@ function Review:UpdateComparisonHighlight()
 					local tab = rail.tabs[tabID]
 					if tab and tab:IsVisible() then widget = tab; break end
 				end
+			elseif guide[1] == "modernSideTabPosition" then
+				widget = scene.rails and scene.rails[1]
 			else
 				local row = scene.rows[1]
 				widget = scene.group or (row and guide.region and row[guide.region]) or scene.actionHint or row
@@ -2283,13 +2322,100 @@ function Review:UpdateSettingHelpPinButton()
 	button:SetShown(self.guideEntry ~= nil)
 end
 
+function Review:RenderFormatFields(width, top)
+	local guide = self.guideEntry and self.guideEntry[4]
+	local panel = self.formatFieldsPanel
+	if not (guide and guide.formatFields) then
+		if panel then panel:Hide() end
+		return top
+	end
+	if not panel then
+		panel = CreateFrame("Frame", nil, self.hoverHelp.content)
+		self.formatFieldsPanel = panel
+		panel.rows = {}
+		panel.header = TextLink(panel, Text("SETTINGS_FORMAT_FIELDS"), function()
+			self.formatFieldsExpanded = not self.formatFieldsExpanded
+			self:LayoutSettingHelp()
+			if self.previewDetached then
+				self.hoverHelp.scroll:SetVerticalScroll(self.formatFieldsExpanded and panel.top or 0)
+			end
+		end)
+		panel.header.chevron = ReviewIcon(panel.header, "chevron-right", 14)
+		panel.header.chevron:SetPoint("LEFT")
+		panel.header.chevron:SetVertexColor(0.92, 0.76, 0.45)
+		panel.header.label:SetPoint("LEFT", 19, 0)
+		panel.hint = Label(panel, "BetterFriendlistFontHighlightSmall", Text("SETTINGS_FORMAT_FIELDS_COPY_HINT"))
+	end
+	panel:ClearAllPoints()
+	panel:SetPoint("TOPLEFT", 0, -top)
+	panel.top = top
+	panel:SetWidth(width)
+	panel:Show()
+	panel.header:SetPoint("TOPLEFT")
+	panel.header:SetWidth(width)
+	local expanded = self.formatFieldsExpanded == true
+	panel.header.chevron:SetRotation(expanded and -math.pi / 2 or 0)
+	panel.hint:SetShown(expanded)
+	local y = 28
+	if expanded then
+		panel.hint:SetPoint("TOPLEFT", 0, -y)
+		panel.hint:SetWidth(width)
+		y = y + panel.hint:GetStringHeight() + 8
+	end
+	local fields = self.settings:GetFormatFields(guide.formatFields == "info")
+	for index, field in ipairs(fields) do
+		local row = panel.rows[index]
+		if not row then
+			row = CreateFrame("Frame", nil, panel)
+			panel.rows[index] = row
+			row.token = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+			row.token:SetAutoFocus(false)
+			row.token:SetFontObject("BetterFriendlistFontHighlightSmall")
+			row.token:SetTextInsets(4, 4, 0, 0)
+			row.token:SetJustifyH("LEFT")
+			row.token:SetScript("OnEditFocusGained", function(box) box:HighlightText() end)
+			row.token:SetScript("OnMouseUp", function(box) box:HighlightText() end)
+			row.token:SetScript("OnEnterPressed", function(box) box:ClearFocus() end)
+			row.token:SetScript("OnEscapePressed", function(box) box:ClearFocus() end)
+			row.token:SetScript("OnTextChanged", function(box)
+				if box.BFL_FormatToken and box:GetText() ~= box.BFL_FormatToken then
+					box:SetText(box.BFL_FormatToken)
+					box:HighlightText()
+				end
+			end)
+			row.description = Label(row, "BetterFriendlistFontHighlightSmall", "")
+			row.token:SetPoint("TOPLEFT", 5, 0)
+			row.token:SetSize(115, 24)
+			row.description:SetPoint("TOPLEFT", row.token, "TOPRIGHT", 12, -4)
+		end
+		row:SetShown(expanded)
+		if expanded then
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", 0, -y)
+			row:SetWidth(width)
+			row.token.BFL_FormatToken = field.token
+			row.token:SetText(field.token)
+			row.description:SetWidth(math.max(1, width - 132))
+			row.description:SetText(field.description)
+			row:SetHeight(math.max(28, row.description:GetStringHeight() + 8))
+			BFL:GetModule("LegacySettingsStyle"):SkinActions(nil, row.token)
+			y = y + row:GetHeight()
+		else
+			row.token:ClearFocus()
+		end
+	end
+	for index = #fields + 1, #panel.rows do panel.rows[index]:Hide() end
+	panel:SetHeight(y)
+	return top + y + 12
+end
+
 function Review:LayoutSettingHelp()
 	local help = self.hoverHelp
 	if not self.helpVisible then
 		help:Hide()
 		return
 	end
-	if not self.helpStacked then
+	if not self.previewDetached then
 		local available = (help:GetTop() or 0) - (self.support:GetTop() or 0) - 6
 		help:SetHeight(math.max(68, available))
 	end
@@ -2322,6 +2448,7 @@ function Review:LayoutSettingHelp()
 		help.sections[index].title:Hide()
 		help.sections[index].body:Hide()
 	end
+	y = self:RenderFormatFields(width, y)
 	y = self:RenderSettingComparison(width, y)
 	self:UpdateComparisonHighlight()
 	local style = BFL:GetModule("LegacySettingsStyle")
@@ -2333,10 +2460,13 @@ function Review:LayoutSettingHelp()
 	help.content:SetSize(width, y)
 	help.scroll:UpdateScrollChildRect()
 	self.settings:UpdateLegacySettingsScrollbar(help.scroll)
+	local dock = BFL:GetModule("SettingsPreviewDock")
+	if dock then dock:RefreshSkinLevels() end
 	help:Show()
 end
 
 function Review:ShowSettingHelp(row, slot, highlightPreview)
+	if self.helpTooltips then return end
 	if self.pinnedGuideID then return end
 	local entry = row.BFL_SettingGuide and row.BFL_SettingGuide[slot or 1]
 	if not entry then return end
@@ -2347,7 +2477,9 @@ function Review:ShowSettingHelp(row, slot, highlightPreview)
 		self.comparisonValue = nil
 		self:SetFavoriteHovered(self.route == "rows" and IsFavoriteGuide(self.guideEntries))
 		self:LayoutSettingHelp()
-		self.hoverHelp.scroll:SetVerticalScroll(0)
+		local fields = self.formatFieldsPanel
+		local showFields = self.previewDetached and entry[4] and entry[4].formatFields and self.formatFieldsExpanded == true
+		self.hoverHelp.scroll:SetVerticalScroll(showFields and fields and fields.top or 0)
 	else
 		self:UpdateComparisonHighlight()
 	end
@@ -2378,7 +2510,7 @@ function Review:FindGuideRow(owner)
 end
 
 function Review:GetHoveredGuideRow(forPin)
-	if not (self.active and self.hoverHelp:IsShown() and BFL:IsRegionMouseOver(self.scroll)) then return end
+	if not (self.active and (self.helpTooltips or self.hoverHelp:IsVisible()) and BFL:IsRegionMouseOver(self.scroll)) then return end
 	-- A control inside a row can own mouse focus. Walk to the row before
 	-- falling back to its hit rectangle for the label and the empty space.
 	local focus
@@ -2472,7 +2604,37 @@ function Review:HandleSettingHelpClick(event, button)
 	end
 end
 
+function Review:HideSettingTooltip()
+	if self.tooltipGuideRow and BFL_Tooltip:GetOwner() == self.tooltipGuideRow then BFL_Tooltip:Hide() end
+	self.tooltipGuideRow, self.tooltipGuideEntry = nil, nil
+end
+
+function Review:UpdateSettingTooltip()
+	local row = not self:IsHelpInteractionLocked() and self:GetHoveredGuideRow()
+	local slot = row and self:GetGuideSlot(row)
+	local entry = slot and row.BFL_SettingGuide[slot]
+	if not entry then
+		self:HideSettingTooltip()
+		if self.hoverTint then self.hoverTint:Hide() end
+		return
+	end
+	if self.tooltipGuideRow ~= row or self.tooltipGuideEntry ~= entry or not BFL_Tooltip:IsShown()
+		or BFL_Tooltip:GetOwner() ~= row then
+		self.tooltipGuideRow, self.tooltipGuideEntry = row, entry
+		BFL_Tooltip:SetOwner(row, "ANCHOR_RIGHT")
+		BFL_Tooltip:SetText(entry[1])
+		BFL_Tooltip:AddLine(entry[2], 1, 1, 1, true)
+		BFL_Tooltip:Show()
+		local backing = BFL_Tooltip.BFL_DarkBackdrop
+		if backing then backing:SetFrameLevel(math.max(0, BFL_Tooltip:GetFrameLevel() - 1)) end
+	end
+	if self.route ~= "friendTabs" or not row.BFL_SettingsExactSlots then self:ShowSettingHelpHighlight(row, slot) end
+end
+
 function Review:UpdateSettingHelpHover()
+	local dock = BFL:GetModule("SettingsPreviewDock")
+	if dock and dock.resizing then return end
+	if self.helpTooltips then self:UpdateSettingTooltip(); return end
 	if self.pinnedGuideID or not self.guideRowsByFrame then return end
 	local locked = self:IsHelpInteractionLocked()
 	local row = not locked and self:GetHoveredGuideRow()
@@ -2491,7 +2653,9 @@ function Review:UpdateSettingHelpHover()
 		if tint then tint:Hide() end
 		return
 	end
-	local highlight = self.route ~= "friendTabs"
+	-- The sortable tab list keeps its own visibility/order hit targets and
+	-- highlights. Ordinary settings such as Tab Position use the standard row.
+	local highlight = self.route ~= "friendTabs" or not row.BFL_SettingsExactSlots
 	self:ShowSettingHelp(row, slot, highlight)
 	if not highlight or self.focusedRow == row or not row.BFL_SettingGuide[slot] then
 		if tint then tint:Hide() end
@@ -2582,6 +2746,9 @@ function Review:BindSettingHelp(row, guideKeys, section)
 			local comparison = row.BFL_Comparison and row.BFL_Comparison[slot]
 			local guide = comparison and comparison.help or key and Catalog.guides[key]
 			local description = guide and Text(guide) or row.BFL_SettingDescriptions and row.BFL_SettingDescriptions[slot]
+			if comparison and comparison.purpose then
+				description = comparison.purpose .. (description and ("\n\n" .. description) or "")
+			end
 			if not description or Normalize(description) == Normalize(label) then
 				description = GetGuideDescription(key)
 			end
@@ -2596,6 +2763,8 @@ function Review:BindSettingHelp(row, guideKeys, section)
 				local alternatives = Text("SETTINGS_GUIDE_CHOICES"):format(table.concat(choices, " · "))
 				description = description and (description .. "\n\n" .. alternatives) or alternatives
 			end
+			-- A setting row keeps its hover/pin target even without bespoke help.
+			description = description or ""
 			if description then
 				local routeComparisons = Catalog.comparisons[self.route]
 				local sectionComparisons = routeComparisons and routeComparisons[section]
@@ -2631,6 +2800,8 @@ function Review:BindSettingHelp(row, guideKeys, section)
 			if self.active and self.guideRowsByFrame and self.guideRowsByFrame[row] then self:ShowSettingHelp(row) end
 		end)
 	end
+	local flags = BFL:GetModule("SettingsNewFlags")
+	if flags then flags:BindRow(self, row, section) end
 end
 
 function Review:OnBuilt(tab)
@@ -2704,7 +2875,14 @@ function Review:OnBuilt(tab)
 	if #details > 0 then
 		self.detailsButton:SetParent(tab)
 		PositionContentRow(self.detailsButton, tab)
-		self.detailsButton.label:SetText(Text("SETTINGS_LEGACY_MORE"))
+		local detailSection = details[1].BFL_LegacySectionKey
+		for _, row in ipairs(details) do
+			if row.BFL_LegacySectionKey and row.BFL_LegacySectionKey ~= detailSection then
+				detailSection = nil
+				break
+			end
+		end
+		self.detailsButton.label:SetText(Text(detailSection or "SETTINGS_LEGACY_MORE"))
 		self.detailsButton.chevron:SetRotation(self.detailsOpen and -math.pi / 2 or 0)
 		self.detailsButton:Show()
 		main[#main + 1] = self.detailsButton
@@ -2799,6 +2977,8 @@ function Review:UpdateNavigation(category)
 			end
 		end
 	end
+	local flags = BFL:GetModule("SettingsNewFlags")
+	if flags then flags:RefreshNavigation(self) end
 end
 
 function Review:UpdateAvailability()
@@ -2882,6 +3062,7 @@ function Review:ListButton(index, text, action, path, route)
 end
 
 function Review:ClearPage()
+	self:HideSettingTooltip()
 	if self.comparisonIconEntry then
 		self.comparisonIconEntry = nil
 		if BetterFriendlistIconSelectorFrame then BetterFriendlistIconSelectorFrame:Hide() end
@@ -3174,7 +3355,7 @@ function Review:Navigate(route, hit)
 		if reason == "theme" then
 			self:ListButton(1, Text("SETTINGS_THEME_DROPDOWN"), function() self:Navigate("theme") end)
 		elseif reason == "beta" then
-			self:ListButton(1, Text("SETTINGS_BETA_FEATURES_TITLE"), function() self:Navigate("help") end)
+			self:ListButton(1, Text("SETTINGS_BETA_FEATURES_TITLE"), function() self:Navigate("advanced") end)
 		else
 			self:ListButton(1, Text("SETTINGS_FRIENDS_UI_STYLE_HEADER"), function() self:Navigate("layout") end)
 		end
@@ -3490,9 +3671,24 @@ function Review:Create(frame, settings)
 		TextLink(self.content, Text("CHANGELOG_TITLE"), function()
 			self:ShowHome("releaseTitle")
 		end),
+		TextLink(self.content, Text("SETTINGS_GROUP_MANAGEMENT"), function()
+			self:Navigate("automatic")
+		end),
+		TextLink(self.content, Text("SETTINGS_NAME_FORMAT_HEADER"), function()
+			self:Navigate("rows", { key = "SETTINGS_NAME_FORMAT_HEADER" })
+		end),
+		TextLink(self.content, Text("SETTINGS_TAB_FRIEND_TAGS"), function()
+			self:Navigate("tags")
+		end),
 	}
 	self.helpButtons[1].BFL_SearchLabels = { Text("SETTINGS_CENTER_HELP_SUPPORT") }
 	self.helpButtons[2].BFL_SearchLabels = { Text("CHANGELOG_TITLE") }
+	self.helpButtons[3].BFL_SearchLabels = { Text("SETTINGS_GROUP_MANAGEMENT") }
+	self.helpButtons[3].BFL_SettingDescriptions = { Text("SETTINGS_GUIDE_EMPTY_GROUPS") }
+	self.helpButtons[4].BFL_SearchLabels = { Text("SETTINGS_NAME_FORMAT_HEADER") }
+	self.helpButtons[4].BFL_SettingDescriptions = { Text("SETTINGS_NAME_FORMAT_DESC") }
+	self.helpButtons[5].BFL_SearchLabels = { Text("SETTINGS_TAB_FRIEND_TAGS") }
+	self.helpButtons[5].BFL_SettingDescriptions = { Text("FRIEND_TAGS_ENABLE_DESC") }
 	for _, button in ipairs(self.helpButtons) do
 		button:Hide()
 	end
@@ -3541,11 +3737,9 @@ function Review:Create(frame, settings)
 		frame:UnregisterAllEvents()
 		self.pinPress = nil
 	end)
-	local divider = help:CreateTexture(nil, "ARTWORK")
+	local divider = BFL:GetModule("LegacySettingsStyle"):CreateRule(help)
 	divider:SetPoint("TOPLEFT", helpTitle, "BOTTOMLEFT", 0, -6)
 	divider:SetPoint("RIGHT", -14, 0)
-	divider:SetHeight(1)
-	divider:SetColorTexture(1, 1, 1, 0.16)
 	help.scroll = self.settings:CreateSettingsScrollFrame(help)
 	help.scroll:SetPoint("TOPLEFT", divider, "BOTTOMLEFT", 0, -9)
 	help.scroll:SetPoint("BOTTOMRIGHT", -17, 6)
@@ -3554,7 +3748,8 @@ function Review:Create(frame, settings)
 	help.scroll:SetScrollChild(help.content)
 	help.sections = {}
 	local hoverElapsed = 0
-	help:SetScript("OnUpdate", function(_, elapsed)
+	frame:HookScript("OnUpdate", function(_, elapsed)
+		if not self.active then return end
 		hoverElapsed = hoverElapsed + elapsed
 		if hoverElapsed >= 0.04 then
 			hoverElapsed = 0
@@ -3576,13 +3771,11 @@ function Review:Create(frame, settings)
 	self.previewTitle = Label(self.preview, "BetterFriendlistFontNormal", Text("SETTINGS_LEGACY_SAMPLE"))
 	self.previewTitle:SetPoint("TOPLEFT", 8, -8)
 	self.previewTitle:SetPoint("TOPRIGHT", -75, -8)
-	local previewRule = self.preview:CreateTexture(nil, "ARTWORK")
+	local previewRule = BFL:GetModule("LegacySettingsStyle"):CreateRule(self.preview)
 	previewRule:SetPoint("TOPLEFT", 8, -28)
 	previewRule:SetPoint("TOPRIGHT", -8, -28)
-	previewRule:SetHeight(1)
-	previewRule:SetColorTexture(1, 1, 1, 0.16)
 	self.previewRule = previewRule
-	self.previewNote = Label(self.preview, "BetterFriendlistFontHighlightSmall", Text("SETTINGS_LEGACY_SAMPLE_EMPTY_HIDDEN"))
+	self.previewNote = Label(self.preview, "BetterFriendlistFontHighlightSmall", "")
 	self.sampleNext = NavigationRow(self.preview, "", function()
 		self.sampleGroupID = nil
 		self.sampleIndex = self.sampleIndex % self.sampleCount + 1
@@ -3637,10 +3830,10 @@ function Review:Open(frame, settings, tab, anchor)
 		contentWidth = self.content:GetWidth(),
 		scrollPoints = ReadPoints(self.scroll),
 	}
-	local width = math.min(1170, UIParent:GetWidth() - 24)
-	local height = math.min(800, UIParent:GetHeight() - 42)
-	frame:SetSize(width, height)
-	frame.CategoryList:SetWidth(width < 800 and 156 or 174)
+	local frameSettings = BFL:GetModule("FrameSettings")
+	frameSettings:InitializeSettingsWindow(frame)
+	frameSettings:FitSettingsWindow(frame)
+	frame.BFL_ResizeGrip:Show()
 	self.active = true
 	self.sidebar:Show()
 	self.search:Show()
@@ -3650,6 +3843,7 @@ function Review:Open(frame, settings, tab, anchor)
 		self:ShowHome()
 	end
 	settings:RefreshVisibleWindowAnchor()
+	BFL.FontManager:RefreshWindowFonts()
 	local style = BFL:GetModule("LegacySettingsStyle")
 	if style then style:Refresh() end
 end
@@ -3658,7 +3852,10 @@ function Review:Deactivate()
 	if not self.active then
 		return
 	end
+	if self.frame.BFL_StopResize then self.frame.BFL_StopResize() end
 	self.active = nil
+	BFL:GetModule("SettingsPreviewDock"):Hide()
+	if self.frame.BFL_ResizeGrip then self.frame.BFL_ResizeGrip:Hide() end
 	self:ClearPage()
 	self.search:Hide()
 	self.support:Hide()

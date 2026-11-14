@@ -1828,7 +1828,12 @@ function RaidTools:CreateFrame()
 	local frame = CreateFrame("Frame", "BetterFriendlistRaidToolsFrame", BetterFriendsFrame, "ButtonFrameTemplate")
 	frame.BFL_AccentFontStrings = {}
 	frame:SetSize(280, 400)
-	frame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 5, 0)
+	local friendsUI = BFL:GetModule("FriendsUI")
+	if friendsUI and friendsUI.AnchorAuxiliaryWindow then
+		friendsUI:AnchorAuxiliaryWindow(frame, 0)
+	else
+		frame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 5, 0)
+	end
 	frame:SetFrameStrata("HIGH")
 	frame:EnableMouse(true)
 	frame:SetMovable(false)

@@ -2518,15 +2518,19 @@ end
 -- @param atlasName: Atlas name to try
 -- @param fallbackFile: Optional explicit fallback file path
 -- @param useAtlasSize: Optional SetAtlas useAtlasSize flag
+-- @param options: Optional filterMode, resetTexCoords, wrapModeHorizontal and wrapModeVertical
 -- @return boolean: true when an atlas was applied, false when a fallback texture was used
-function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize)
+function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize, options)
 	if not texture then
 		return false
 	end
 
 	if texture.SetAtlas and HasAtlas(atlasName) then
 		local success
-		if useAtlasSize ~= nil then
+		if options then
+			success = pcall(texture.SetAtlas, texture, atlasName, useAtlasSize == true, options.filterMode,
+				options.resetTexCoords, options.wrapModeHorizontal, options.wrapModeVertical)
+		elseif useAtlasSize ~= nil then
 			success = pcall(texture.SetAtlas, texture, atlasName, useAtlasSize)
 		else
 			success = pcall(texture.SetAtlas, texture, atlasName)
@@ -2537,19 +2541,39 @@ function Compat.SetTextureOrAtlas(texture, atlasName, fallbackFile, useAtlasSize
 	end
 
 	local fallback = fallbackFile or ATLAS_FALLBACKS[atlasName]
+	local wrapX = options and options.wrapModeHorizontal
+	local wrapY = options and options.wrapModeVertical
+	local filter = options and options.filterMode
 	if fallback then
-		texture:SetTexture(fallback)
+		texture:SetTexture(fallback, wrapX, wrapY, filter)
 	else
 		-- Last resort: try as direct texture path
-		texture:SetTexture(atlasName)
+		texture:SetTexture(atlasName, wrapX, wrapY, filter)
 	end
 	return false
 end
 
-function Compat.GetAtlasOrTextureMarkup(atlasName, fallbackFile, width, height)
+function Compat.GetAtlasOrTextureMarkup(atlasName, fallbackFile, width, height, atlasCrop)
 	width = tonumber(width) or 16
 	height = tonumber(height) or width
 	if HasAtlas(atlasName) then
+		local info = atlasCrop and GetAtlasInfo(atlasName)
+		local file = info and (info.filename or info.file)
+		if file then
+			-- Crop relative to this atlas element, preserving its client-specific
+			-- sheet coordinates. A virtual canvas keeps the integer markup precise.
+			local coordScale = 65536
+			local atlasWidth = info.rightTexCoord - info.leftTexCoord
+			local atlasHeight = info.bottomTexCoord - info.topTexCoord
+			return string.format(
+				"|T%s:%d:%d:0:0:%d:%d:%d:%d:%d:%d|t",
+				file, height, width, coordScale, coordScale,
+				math.floor((info.leftTexCoord + atlasWidth * atlasCrop[1]) * coordScale + 0.5),
+				math.floor((info.leftTexCoord + atlasWidth * atlasCrop[2]) * coordScale + 0.5),
+				math.floor((info.topTexCoord + atlasHeight * atlasCrop[3]) * coordScale + 0.5),
+				math.floor((info.topTexCoord + atlasHeight * atlasCrop[4]) * coordScale + 0.5)
+			)
+		end
 		return string.format("|A:%s:%d:%d|a", atlasName, width, height)
 	end
 	local texturePath = fallbackFile or ATLAS_FALLBACKS[atlasName]
