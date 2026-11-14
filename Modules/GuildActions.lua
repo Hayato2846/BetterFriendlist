@@ -528,38 +528,7 @@ function GuildActions:CopyName(member)
 		return
 	end
 
-	local editBoxWidth = 300
-	StaticPopupDialogs["BFL_GUILD_COPY_NAME"] = {
-		text = T("GUILD_COPY_NAME_TITLE", "Copy Name"),
-		button1 = CLOSE or OKAY or "Close",
-		hasEditBox = true,
-		editBoxWidth = editBoxWidth,
-		OnShow = function(dialog)
-			local editBox = GetEditBox(dialog)
-			if editBox then
-				editBox:SetText(copyText)
-				editBox:HighlightText()
-				editBox:SetFocus()
-			end
-			if BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
-				BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
-			end
-		end,
-		EditBoxOnEnterPressed = function(editBox)
-			editBox:GetParent():Hide()
-		end,
-		EditBoxOnEscapePressed = function(editBox)
-			editBox:GetParent():Hide()
-		end,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		preferredIndex = 3,
-	}
-	local dialog = StaticPopup_Show("BFL_GUILD_COPY_NAME")
-	if dialog and BFL.BrokerUtils and BFL.BrokerUtils.FixCopyStaticPopupLayout then
-		BFL.BrokerUtils.FixCopyStaticPopupLayout(dialog, editBoxWidth)
-	end
+	return BFL:GetModule("Dialogs"):ShowCopy(copyText, T("GUILD_COPY_NAME_TITLE", "Copy Name"), 300)
 end
 
 function GuildActions:SetNicknameDialog(member)

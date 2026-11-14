@@ -3,6 +3,19 @@ local ADDON_NAME, BFL = ...
 local FriendsUI = BFL:RegisterModule("FriendsUI", {})
 BFL.FriendsUI = FriendsUI
 
+local function GetPortraitHeaderInset()
+	return BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden() and 9 or 65
+end
+
+local function GetStatusDropdownInset()
+	if BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden() and BFL:GetEffectiveTheme() == "ellesmereui" then
+		-- The dark contact surface starts four units inside the window; this bar
+		-- starts one unit outside it. Align their visible left edges.
+		return 5
+	end
+	return GetPortraitHeaderInset()
+end
+
 local STYLE_MODERN = "modern"
 local STYLE_LEGACY = "legacy"
 local MODERN_LAYOUT_KEY = "RetailModern"
@@ -890,14 +903,17 @@ local function ApplySectionIcon(texture, definition, selected)
 			or (selected and CUSTOM_TAB_ICON_ACTIVE_COLOR or CUSTOM_TAB_ICON_INACTIVE_COLOR)
 		local multiplier = themed and not selected and (tonumber(palette.customTabInactiveMultiplier) or 1) or 1
 		texture:SetVertexColor(color[1] * multiplier, color[2] * multiplier, color[3] * multiplier, 1)
-		texture:SetAlpha(disabled and 0.5 or 1)
-		return
+	else
+		ApplyAtlasTexture(texture, selected and definition.activeAtlas or definition.inactiveAtlas, definition.fallback)
+		texture:SetDesaturated(themed or disabled)
+		local color = themed and palette.accent or MODERN_BLIZZARD_THEME_COLORS.control
+		texture:SetVertexColor(color[1], color[2], color[3], 1)
 	end
-	ApplyAtlasTexture(texture, selected and definition.activeAtlas or definition.inactiveAtlas, definition.fallback)
-	texture:SetDesaturated(themed or disabled)
-	local color = themed and palette.accent or MODERN_BLIZZARD_THEME_COLORS.control
-	texture:SetVertexColor(color[1], color[2], color[3], 1)
+	-- Keep content above mirrored tab artwork, including after a skin has
+	-- hidden the same region as part of its native button chrome.
+	texture:SetDrawLayer("OVERLAY", 4)
 	texture:SetAlpha(disabled and 0.5 or 1)
+	texture:Show()
 end
 
 function FriendsUI:ApplyFriendTabIcon(texture, sectionID, selected)
@@ -1086,6 +1102,22 @@ end
 function FriendsUI:GetFriendTabOrder()
 	local db = GetDB()
 	return self:NormalizeFriendTabOrder(db and db.modernFriendTabOrder)
+end
+
+function FriendsUI:GetSideTabPosition()
+	local db = GetDB()
+	return db and db.modernSideTabPosition == "left" and "left" or "right"
+end
+
+function FriendsUI:SetSideTabPosition(position)
+	SetDBValue("modernSideTabPosition", position == "left" and "left" or "right")
+	self:RefreshFriendTabSettings()
+	local frameSettings = BFL:GetModule("FrameSettings")
+	if frameSettings and frameSettings.db then frameSettings:ApplyClamping() end
+	local settings = BFL:GetModule("Settings")
+	if settings and settings.RefreshVisibleWindowAnchor then settings:RefreshVisibleWindowAnchor() end
+	self:RefreshRaidInfoFrameAnchor()
+	self:RefreshAuxiliaryWindowAnchors()
 end
 
 function FriendsUI:SetFriendTabOrder(order)
@@ -1682,6 +1714,14 @@ function FriendsUI:CreateNavigationTabs()
 		tab.activeAtlas = definition.activeAtlas
 		tab.inactiveAtlas = definition.inactiveAtlas
 		tab.fallbackTexture = definition.fallback
+		-- Native mouse handlers reset icon anchors to the right-hand artwork.
+		-- These hooks affect only BFL-owned tabs and preserve readable icons/counts.
+		tab:HookScript("OnMouseDown", function(button, mouseButton)
+			if mouseButton == "LeftButton" then self:AnchorSideTabContents(button, definition, true) end
+		end)
+		tab:HookScript("OnMouseUp", function(button, mouseButton)
+			if mouseButton == "LeftButton" then self:AnchorSideTabContents(button, definition) end
+		end)
 		local onClick = function(button)
 			self:SelectSection(button.sectionID)
 		end
@@ -1699,7 +1739,7 @@ function FriendsUI:CreateNavigationTabs()
 			if button:IsEnabled() and not themed and button.HighlightTexture then
 				button.HighlightTexture:Show()
 			end
-			GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+			GameTooltip:SetOwner(button, self:GetSideTabPosition() == "left" and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
 			GameTooltip:SetText(button.tooltipText or button.sectionID)
 			if button.disabledReason then
 				if GameTooltip_AddErrorLine then
@@ -1741,7 +1781,64 @@ function FriendsUI:GetSideTabIconAnchorOffsets(tab, definition, hasCount)
 	if hasCount then
 		offsetY = offsetY + 5
 	end
+	if self:GetSideTabPosition() == "left" then offsetX = -offsetX end
 	return offsetX, offsetY
+end
+
+function FriendsUI:AnchorSideTabContents(tab, definition, pressed)
+	local palette, themed = self:GetModernThemeColors()
+	local flat = (themed and not palette.preserveNativeSideTabs) or self.currentTheme == "elvui"
+	local hasCount = tab.Count and tab.Count:IsShown()
+	local x, y = 0, hasCount and 5 or 0
+	if not flat then x, y = self:GetSideTabIconAnchorOffsets(tab, definition, hasCount) end
+	if tab.Icon then
+		tab.Icon:ClearAllPoints()
+		tab.Icon:SetPoint("CENTER", tab, "CENTER", x + (pressed and 1 or 0), y - (pressed and 1 or 0))
+	end
+	if tab.Count then
+		tab.Count:ClearAllPoints()
+		tab.Count:SetPoint("BOTTOM", tab, "BOTTOM", flat and 0 or (self:GetSideTabPosition() == "left" and 2 or -2), 6)
+	end
+end
+
+function FriendsUI:ApplySideTabDirection(tab)
+	local left = self:GetSideTabPosition() == "left"
+	-- Mirror decorative chrome only. Forever's MaskTexture clips the readable
+	-- icon; converting its atlas into raw sprite-sheet UVs can hide that icon.
+	for _, key in ipairs({ "Background", "SelectedTexture", "HighlightTexture", "TabGlow" }) do
+		local texture = tab[key]
+		if texture and texture.GetTexCoord and texture.SetTexCoord then
+			local state = texture.BFL_SideTabCoordinates
+			local atlas = texture.GetAtlas and texture:GetAtlas()
+			local info = atlas and BFL.GetAtlasInfo and BFL.GetAtlasInfo(atlas)
+			if info and (info.file or info.filename) then
+				state = { atlas = atlas, file = info.file or info.filename,
+					normal = { info.leftTexCoord, info.topTexCoord, info.leftTexCoord, info.bottomTexCoord,
+						info.rightTexCoord, info.topTexCoord, info.rightTexCoord, info.bottomTexCoord } }
+				texture.BFL_SideTabCoordinates = state
+			end
+			local fileID = texture.GetTextureFileID and texture:GetTextureFileID()
+			local filePath = texture.GetTextureFilePath and texture:GetTextureFilePath()
+			-- Use the atlas's own file and exact rectangle for the mirrored art.
+			-- Returning right restores SetAtlas, including its native sampling state.
+			-- A skin's replacement color/texture must never resurrect native chrome.
+			if state and (atlas == state.atlas or fileID == state.file or filePath == state.file) then
+				if left then
+					local c = state.normal
+					texture:SetTexture(state.file)
+					texture:SetTexCoord(c[5], c[1], c[2], c[4])
+				elseif not atlas then
+					local restored = BFL.SetTextureOrAtlas(texture, state.atlas, state.file, false, {
+						resetTexCoords = true,
+					})
+					if not restored then
+						local c = state.normal
+						texture:SetTexCoord(c[1], c[5], c[2], c[4])
+					end
+				end
+			end
+		end
+	end
 end
 
 function FriendsUI:IsStoryRaidActive()
@@ -1836,26 +1933,34 @@ function FriendsUI:LayoutNavigationTabs(sectionIDs, themed)
 			end
 		end
 	end
+	local left = self:GetSideTabPosition() == "left"
+	local elvui = self.currentTheme == "elvui"
+	local point, relativePoint = left and "TOPRIGHT" or "TOPLEFT", left and "TOPLEFT" or "TOPRIGHT"
+	local offset = elvui and 2 or (themed and MODERN_THEMED_SIDE_TAB_OFFSET_X or 0)
 	local previous
 	for _, sectionID in ipairs(orderedSections) do
 		local definition = SECTION_BY_ID[sectionID]
 		local tab = definition and definition.tab
 		if tab then
+			self:ApplySideTabDirection(tab)
+			self:AnchorSideTabContents(tab, definition)
 			tab:ClearAllPoints()
 			if previous then
-				tab:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -3)
+				tab:SetPoint(point, previous, left and "BOTTOMRIGHT" or "BOTTOMLEFT", 0, elvui and -1 or -3)
 			else
 				tab:SetPoint(
-					"TOPLEFT",
+					point,
 					BetterFriendsFrame,
-					"TOPRIGHT",
-					themed and MODERN_THEMED_SIDE_TAB_OFFSET_X or 0,
-					-122
+					relativePoint,
+					left and -offset or offset,
+					elvui and -1 or -122
 				)
 			end
 			previous = tab
 		end
 	end
+	local frameSettings = BFL:GetModule("FrameSettings")
+	if frameSettings and frameSettings.db then frameSettings:ApplyClamping() end
 end
 
 function FriendsUI:UpdateSideTabContents(tab, definition, count, selected, skinSideTabs)
@@ -1868,6 +1973,7 @@ function FriendsUI:UpdateSideTabContents(tab, definition, count, selected, skinS
 		icon:SetAlpha(tab:IsEnabled() and 1 or 0.5)
 	end
 	if tab.Count then
+		tab.Count:SetDrawLayer("OVERLAY", 5)
 		tab.Count:SetShown(count > 0)
 		tab.Count:SetText(count > 0 and count or "")
 		if tab.Icon then
@@ -1888,6 +1994,8 @@ function FriendsUI:RenderSettingsNavigationTab(tab, sectionID, count, selected)
 	self:UpdateSideTabContents(tab, definition, count, selected, skinSideTabs)
 	tab.BFL_RequestGlowActive = sectionID == "friend_requests" and count > 0 and not selected
 	ApplyModernSideTabTheme(tab, skinSideTabs and palette or MODERN_BLIZZARD_THEME_COLORS, skinSideTabs, selected)
+	self:ApplySideTabDirection(tab)
+	self:AnchorSideTabContents(tab, definition)
 	-- The themed button renderer can hide regions it considers chrome.
 	-- Paint the preview icon above the tab shell using the same section art.
 	local icon = tab.Icon or tab.icon
@@ -1948,6 +2056,8 @@ function FriendsUI:RefreshNavigation()
 		end
 	end
 	self:LayoutNavigationTabs(availableSections, skinSideTabs)
+	local frameSettings = BFL:GetModule("FrameSettings")
+	if frameSettings and frameSettings.db then frameSettings:ApplyClamping() end
 	if
 		modernActive
 		and self.selectedSection
@@ -2158,12 +2268,12 @@ function FriendsUI:LayoutBattleTagActions(bar, header, streamerButton)
 	menu:SetPoint("RIGHT", bar, "RIGHT", -8, offsetY)
 
 	bnetFrame:ClearAllPoints()
-	bnetFrame:SetPoint("LEFT", bar, "LEFT", 65, offsetY)
+	bnetFrame:SetPoint("LEFT", bar, "LEFT", GetPortraitHeaderInset(), offsetY)
 	bnetFrame:SetPoint("RIGHT", menu, "LEFT", -7, offsetY)
 	local status = header.StatusDropdown
 	if status then
 		status:ClearAllPoints()
-		status:SetPoint("LEFT", bar, "LEFT", 65, offsetY)
+		status:SetPoint("LEFT", bar, "LEFT", GetStatusDropdownInset(), offsetY)
 		status:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
 		status:SetFrameLevel(bnetFrame:GetFrameLevel() + 1)
 		self:ConstrainModernDropdownText(status, nil, 4)
@@ -3021,9 +3131,10 @@ function FriendsUI:ApplyModernSectionTopChrome(sectionID)
 	if not self.root then
 		return
 	end
-	-- The native fade supplies the warm SocialUI color transition in every
-	-- section. Raid only removes BFL's additional contact-list divider.
-	SafeShow(self.root.TopFade, true)
+	-- Flat themes already own their surface. Only Blizzard uses the native
+	-- warm transition; section changes must not reveal it again.
+	local _, themed = self:GetModernThemeColors()
+	SafeShow(self.root.TopFade, not themed)
 	SafeShow(self.root.TopDivider, sectionID ~= "raid")
 end
 
@@ -3477,12 +3588,12 @@ function FriendsUI:HasVisibleModernSideTabs()
 	return false
 end
 
-function FriendsUI:GetAuxiliaryWindowOffset(legacyOffset)
-	-- LargeSideTabButtonTemplate protrudes from the main frame's right edge.
+function FriendsUI:GetAuxiliaryWindowOffset(legacyOffset, side)
+	-- Reserve the tab rail only on the side where it is displayed.
 	-- The visible rail is authoritative here: during Blizzard's side-window
 	-- callback the stored style can briefly lag behind the already applied layout.
 	local hasModernRail = self:IsModernActive() or self:HasVisibleModernSideTabs()
-	return hasModernRail and 68 or (legacyOffset or 5)
+	return hasModernRail and self:GetSideTabPosition() == (side or "right") and 68 or (legacyOffset or 5)
 end
 
 function FriendsUI:GetRaidInfoMoverRuntimeState(window)
@@ -3496,9 +3607,58 @@ function FriendsUI:GetRaidInfoMoverRuntimeState(window)
 	return runtimeState and runtimeState[window] or nil
 end
 
-function FriendsUI:AnchorAuxiliaryWindow(window, topOffset)
+function FriendsUI:AnchorAuxiliaryWindow(window, topOffset, screenAware)
 	if not (window and BetterFriendsFrame) then
 		return false
+	end
+	if screenAware ~= false and BFL.WindowGeometry then
+		window.BFL_DockTopOffset = topOffset or 0
+		self.auxiliaryWindows = self.auxiliaryWindows or setmetatable({}, { __mode = "k" })
+		self.auxiliaryWindows[window] = true
+		if not window.BFL_ScreenDockHooked then
+			window.BFL_ScreenDockHooked = true
+			window:HookScript("OnShow", function()
+				self:AnchorAuxiliaryWindow(window, window.BFL_DockTopOffset, true)
+			end)
+			window:HookScript("OnUpdate", function()
+				if window.BFL_Resizing then return end
+				if InCombatLockdown() and window:IsProtected() then
+					window.BFL_DockGeometry = nil
+					return
+				end
+				local geometry = BFL.WindowGeometry
+				local x, y, w, h = geometry:GetRect(BetterFriendsFrame)
+				local scale = window:GetEffectiveScale()
+				local windowWidth, windowHeight = window:GetSize()
+				local rightGap, leftGap = self:GetAuxiliaryWindowOffset(nil, "right"), self:GetAuxiliaryWindowOffset(nil, "left")
+				local preferredSide = self:GetSideTabPosition()
+				local screenWidth, screenHeight = UIParent:GetSize()
+				local uiScale = UIParent:GetEffectiveScale()
+				local state = window.BFL_DockGeometry
+				if not state or state[1] ~= x or state[2] ~= y or state[3] ~= w or state[4] ~= h
+					or state[5] ~= scale or state[6] ~= windowWidth or state[7] ~= windowHeight
+					or state[8] ~= rightGap or state[9] ~= leftGap or state[10] ~= preferredSide
+					or state[11] ~= screenWidth or state[12] ~= screenHeight or state[13] ~= uiScale then
+					window.BFL_DockGeometry = { x, y, w, h, scale, windowWidth, windowHeight, rightGap, leftGap,
+						preferredSide, screenWidth, screenHeight, uiScale }
+					self:AnchorAuxiliaryWindow(window, window.BFL_DockTopOffset, true)
+				end
+			end)
+		end
+		if InCombatLockdown() and window:IsProtected() then
+			window.BFL_DockGeometry = nil
+			return false
+		end
+		local ratio = BFL.WindowGeometry:GetRatio(BetterFriendsFrame)
+		local moverState = self:GetRaidInfoMoverRuntimeState(window)
+		local moverWasApplying = moverState and moverState.isApplying
+		if moverState then moverState.isApplying = true end
+		local anchored, side = BFL.WindowGeometry:Dock(window, BetterFriendsFrame,
+			self:GetAuxiliaryWindowOffset(nil, "right") * ratio, (topOffset or 0) * ratio,
+			self:GetAuxiliaryWindowOffset(nil, "left") * ratio, self:GetSideTabPosition())
+		if moverState then moverState.isApplying = moverWasApplying end
+		window.BFL_DockSide = side
+		return anchored
 	end
 	-- EnhanceQoLMover restores saved UIParent coordinates from a SetPoint hook.
 	-- While BFL owns RaidInfoFrame as a docked child, suppress only that runtime
@@ -3520,6 +3680,14 @@ function FriendsUI:AnchorAuxiliaryWindow(window, topOffset)
 		moverState.isApplying = moverWasApplying
 	end
 	return true
+end
+
+function FriendsUI:RefreshAuxiliaryWindowAnchors()
+	for window in pairs(self.auxiliaryWindows or {}) do
+		if window:IsShown() then self:AnchorAuxiliaryWindow(window, window.BFL_DockTopOffset, true) end
+	end
+	local hints = BFL:GetModule("FeatureHints")
+	if hints and hints.IsShown and hints:IsShown() then hints:RefreshAppearance() end
 end
 
 function FriendsUI:RefreshRaidInfoFrameAnchor(frame)
@@ -4083,7 +4251,8 @@ function FriendsUI:ApplyModernPortrait(frame, root, sampleSimpleMode)
 	if simpleMode == nil then simpleMode = db and db.simpleMode == true end
 	local palette, themed = self:GetModernThemeColors()
 	local flatTheme = BFL.UsesFlatTheme and BFL:UsesFlatTheme() == true
-	local showNativePortraitChrome = not simpleMode and not flatTheme
+	local hideThemeAvatar = BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden()
+	local showNativePortraitChrome = not simpleMode and not flatTheme and not hideThemeAvatar
 	frame._bflModernPortraitChromeShown = showNativePortraitChrome
 	-- PortraitFrame can restore its native portrait and corner artwork whenever
 	-- the panel is shown. Reapply this state on every Modern layout pass rather
@@ -4174,7 +4343,7 @@ function FriendsUI:ApplyModernPortrait(frame, root, sampleSimpleMode)
 			SafeShow(portrait.Mask, true)
 			portrait.BFL_ModernSquarePortrait = nil
 		end
-		SafeShow(portrait, not simpleMode)
+		SafeShow(portrait, not simpleMode and not hideThemeAvatar)
 	end
 	-- PortraitFrame restores NineSlice artwork whenever it updates portrait
 	-- visibility. Reassert the flat Modern theme shell after that native pass.
@@ -4199,7 +4368,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 		if header.StatusDropdown then
 			header.StatusDropdown:SetParent(self.root.BattleNetBar)
 			header.StatusDropdown:ClearAllPoints()
-			header.StatusDropdown:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+			header.StatusDropdown:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", GetStatusDropdownInset(), headerControlOffsetY)
 			header.StatusDropdown:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
 			self:ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
 		end
@@ -4207,7 +4376,7 @@ function FriendsUI:ApplyModernContentLayout(sectionID, skipNavigationRefresh)
 		if bnetFrame then
 			bnetFrame:SetParent(self.root.BattleNetBar)
 			bnetFrame:ClearAllPoints()
-			bnetFrame:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+			bnetFrame:SetPoint("LEFT", self.root.BattleNetBar, "LEFT", GetPortraitHeaderInset(), headerControlOffsetY)
 			bnetFrame:SetPoint("RIGHT", self.root.BattleNetBar.MenuButton, "LEFT", -7, headerControlOffsetY)
 			bnetFrame:Show()
 			SafeShow(bnetFrame.Background, not (BFL.UsesFlatTheme and BFL:UsesFlatTheme()))
@@ -4376,7 +4545,7 @@ function FriendsUI:ApplyModernLayout()
 		if header.StatusDropdown then
 			header.StatusDropdown:SetParent(root.BattleNetBar)
 			header.StatusDropdown:ClearAllPoints()
-			header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+			header.StatusDropdown:SetPoint("LEFT", root.BattleNetBar, "LEFT", GetStatusDropdownInset(), headerControlOffsetY)
 			header.StatusDropdown:SetSize(54, MODERN_TOP_CONTROL_HEIGHT)
 			self:ConstrainModernDropdownText(header.StatusDropdown, nil, 4)
 			header.StatusDropdown:Show()
@@ -4385,7 +4554,7 @@ function FriendsUI:ApplyModernLayout()
 			local bnetFrame = header.BattlenetFrame
 			bnetFrame:SetParent(root.BattleNetBar)
 			bnetFrame:ClearAllPoints()
-			bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", 65, headerControlOffsetY)
+			bnetFrame:SetPoint("LEFT", root.BattleNetBar, "LEFT", GetPortraitHeaderInset(), headerControlOffsetY)
 			bnetFrame:SetPoint("RIGHT", root.BattleNetBar.MenuButton, "LEFT", -7, headerControlOffsetY)
 			bnetFrame:Show()
 			SafeShow(bnetFrame.Background, not (BFL.UsesFlatTheme and BFL:UsesFlatTheme()))
@@ -4938,6 +5107,7 @@ function FriendsUI:ApplyEffectiveStyle(reason)
 	if Settings and Settings.RefreshVisibleWindowAnchor then
 		Settings:RefreshVisibleWindowAnchor()
 	end
+	if BFL.FontManager then BFL.FontManager:RefreshWindowFonts() end
 	if effective == STYLE_LEGACY then
 		-- Theme and tab refreshes may run their own visibility pass. Legacy owns
 		-- these title-bar controls, so assert their final state afterwards.
@@ -5323,9 +5493,13 @@ end
 function FriendsUI:ApplyModernContactSurfaceTheme(surface, palette, themed)
 	ApplyTextureColor(surface.ContentBackground, palette.background)
 	if themed then
-		ApplySolidTextureColor(surface.TopFade, palette.surface)
-		ApplySolidTextureColor(surface.BottomFade, palette.surface)
+		-- Native fades keep a fixed atlas width. A solid tint turns them into
+		-- separate rectangles on wider windows; the themed surface fills this area.
+		SafeShow(surface.TopFade, false)
+		SafeShow(surface.BottomFade, false)
 	else
+		SafeShow(surface.TopFade, true)
+		SafeShow(surface.BottomFade, true)
 		ApplyAtlasTexture(surface.TopFade, "friends-frame-toptexbg")
 		SetTextureDesaturated(surface.TopFade, false)
 		ApplyTextureColor(surface.TopFade, MODERN_BLIZZARD_THEME_COLORS.control)
@@ -6025,6 +6199,8 @@ function FriendsUI:RegisterTests()
 				not addFriendButton.Center or addFriendButton.Center:GetAlpha() == 0,
 				"Modern ThreeSlice center artwork does not bleed through the themed button"
 			)
+			V:Assert(not self.root.TopFade:IsShown() and not self.root.BottomFade:IsShown(),
+				"Flat themes do not turn the native gradients into fixed-width rectangles")
 			local friendsTab = SECTION_BY_ID.friends and SECTION_BY_ID.friends.tab
 			V:Assert(
 				friendsTab and friendsTab.BFL_DarkBackdrop and friendsTab.BFL_DarkBackdrop:IsShown(),
@@ -6051,13 +6227,15 @@ function FriendsUI:RegisterTests()
 					break
 				end
 			end
-			local tabPoint, tabRelativeTo, tabRelativePoint, tabX = firstTab and firstTab:GetPoint(1)
+			local tabPoint, tabRelativeTo, tabRelativePoint, tabX
+			if firstTab then tabPoint, tabRelativeTo, tabRelativePoint, tabX = firstTab:GetPoint(1) end
+			local left = self:GetSideTabPosition() == "left"
 			V:Assert(
 				firstTab
-					and tabPoint == "TOPLEFT"
+					and tabPoint == (left and "TOPRIGHT" or "TOPLEFT")
 					and tabRelativeTo == frame
-					and tabRelativePoint == "TOPRIGHT"
-					and tabX == MODERN_THEMED_SIDE_TAB_OFFSET_X,
+					and tabRelativePoint == (left and "TOPLEFT" or "TOPRIGHT")
+					and tabX == (left and -MODERN_THEMED_SIDE_TAB_OFFSET_X or MODERN_THEMED_SIDE_TAB_OFFSET_X),
 				"Modern themed side tabs close the gap to the main frame"
 			)
 			local iconPoint, iconRelativeTo, iconRelativePoint, iconX = friendsTab.Icon:GetPoint(1)
@@ -6130,18 +6308,30 @@ function FriendsUI:RegisterTests()
 			)
 			local scrollBar = frame.MinimalScrollBar
 			local trackR, trackG, trackB = scrollBar.Track.Begin:GetVertexColor()
+			local accentR, accentG, accentB = BFL:GetThemeAccentColor()
 			V:Assert(
 				scrollBar
 					and not scrollBar.BFL_DarkScrollBarSkinned
-					and scrollBar.BFL_ModernDarkToneApplied
+					and scrollBar.BFL_NativeScrollbarStyle
 					and scrollBar.Track
 					and scrollBar.Track.Begin
 					and scrollBar.Track.Begin:IsDesaturated()
-					and trackR < 0.5
-					and trackG < 0.5
-					and trackB < 0.5,
-				"Modern themed scrollbars retain native chrome with a restrained dark tone"
+					and math.abs(trackR - accentR) < 0.001
+					and math.abs(trackG - accentG) < 0.001
+					and math.abs(trackB - accentB) < 0.001,
+				"Modern themed scrollbars retain native chrome in the theme accent"
 			)
+			for _, button in ipairs({ scrollBar.Back, scrollBar.Forward }) do
+				local r, g, b = button.Texture:GetVertexColor()
+				local enabled = button:IsEnabled()
+				V:Assert(
+					math.abs(r - (enabled and accentR or 1)) < 0.001
+						and math.abs(g - (enabled and accentG or 1)) < 0.001
+						and math.abs(b - (enabled and accentB or 1)) < 0.001
+						and button.Texture:IsDesaturated(),
+					"Modern scrollbar arrows use accent when enabled and gray when disabled"
+				)
+			end
 			local friendRow
 			local groupHeader
 			local FriendsList = BFL:GetModule("FriendsList")
@@ -6613,7 +6803,12 @@ function FriendsUI:RegisterTests()
 			return BetterFriendsFrame ~= nil
 		end,
 		action = function(V)
-			local expectedOffset = (self:IsModernActive() or self:HasVisibleModernSideTabs()) and 68 or 5
+			if not BFL.WindowGeometry:GetRect(BetterFriendsFrame) then
+				V:Skip("The friends window geometry is not resolved")
+				return
+			end
+			local right = self:GetSideTabPosition() == "right"
+			local expectedOffset = (self:IsModernActive() or self:HasVisibleModernSideTabs()) and right and 68 or 5
 			V:AssertEqual(self:GetAuxiliaryWindowOffset(), expectedOffset, "Auxiliary window spacing follows the active UI style")
 			local originalSideTabs = self.sideTabs
 			local originalIsModernActive = self.IsModernActive
@@ -6630,7 +6825,7 @@ function FriendsUI:RegisterTests()
 			local transitionOffset = self:GetAuxiliaryWindowOffset()
 			self.sideTabs = originalSideTabs
 			self.IsModernActive = originalIsModernActive
-			V:AssertEqual(transitionOffset, 68, "Visible Modern side tabs remain authoritative during style transitions")
+			V:AssertEqual(transitionOffset, right and 68 or 5, "Visible Modern side tabs remain authoritative during style transitions")
 			self.sideTabs = nil
 			self.IsModernActive = function()
 				return false
@@ -6641,11 +6836,19 @@ function FriendsUI:RegisterTests()
 			V:AssertEqual(customLegacyOffset, 12, "Auxiliary integrations preserve their Legacy spacing")
 			local anchor
 			local shown = false
+			local active = true
 			local moverState = { isApplying = false }
 			local probe = {
 				GetParent = function()
 					return BetterFriendsFrame
 				end,
+				GetEffectiveScale = function() return BetterFriendsFrame:GetEffectiveScale() end,
+				GetWidth = function() return 160 end,
+				GetHeight = function() return 200 end,
+				GetSize = function() return 160, 200 end,
+				IsProtected = function() return false end,
+				IsShown = function() return active and shown end,
+				HookScript = function() end,
 				Show = function()
 					shown = true
 					-- Reproduce Blizzard restoring RaidInfoFrame's native zero-gap point.
@@ -6669,14 +6872,22 @@ function FriendsUI:RegisterTests()
 			end
 			local anchored = self:ShowAndAnchorRaidInfoFrame(probe)
 			self.GetRaidInfoMoverRuntimeState = originalGetMoverState
+			active = false
+			if self.auxiliaryWindows then self.auxiliaryWindows[probe] = nil end
 			V:Assert(anchored, "Raid Info uses the shared auxiliary-window anchor")
 			V:Assert(shown, "Raid Info is shown before BFL finalizes its docked anchor")
 			V:AssertEqual(moverState.isApplying, false, "Raid Info preserves the external mover's runtime state")
-			V:AssertEqual(anchor[1], "TOPLEFT", "Raid Info anchors from its top-left corner")
 			V:AssertEqual(anchor[2], BetterFriendsFrame, "Raid Info anchors to BetterFriendlist")
-			V:AssertEqual(anchor[3], "TOPRIGHT", "Raid Info starts beyond BetterFriendlist's right edge")
-			V:AssertEqual(anchor[4], expectedOffset, "Raid Info clears the side-tab rail only in Modern UI")
-			V:AssertEqual(anchor[5], 0, "Raid Info remains top-aligned with BetterFriendlist")
+			local leftSide = probe.BFL_DockSide == "left"
+			V:AssertEqual(anchor[1], leftSide and "TOPRIGHT" or "TOPLEFT", "Raid Info uses its chosen dock side")
+			V:AssertEqual(anchor[3], leftSide and "TOPLEFT" or "TOPRIGHT", "Raid Info retains its owner-relative anchor")
+			local geometry = BFL.WindowGeometry
+			local x, y, width, height = geometry:GetRect(BetterFriendsFrame)
+			local ratio = geometry:GetRatio(probe)
+			local dockLeft = x + (leftSide and 0 or width) + anchor[4] * ratio - (leftSide and 160 * ratio or 0)
+			local dockTop = y + height + anchor[5] * ratio
+			V:Assert(dockLeft >= -.01 and dockLeft + 160 * ratio <= UIParent:GetWidth() + .01, "Raid Info remains reachable horizontally")
+			V:Assert(dockTop <= UIParent:GetHeight() + .01 and dockTop - 200 * ratio >= -.01, "Raid Info remains reachable vertically")
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_ModernSimplePortraitReopen", {
@@ -6717,7 +6928,8 @@ function FriendsUI:RegisterTests()
 				end
 				db.simpleMode = false
 				self:ApplyModernPortrait()
-				V:Assert(self.root.PortraitOverlay:IsShown(), "Standard Mode shows the Modern portrait")
+				V:AssertEqual(self.root.PortraitOverlay:IsShown(), not (BFL.IsThemeAvatarHidden and BFL:IsThemeAvatarHidden()),
+					"Standard Mode respects the theme avatar setting")
 				V:Assert(not self.root.PortraitOverlay:IsMouseEnabled(), "Modern portrait is decorative")
 				V:Assert(not self.root.PortraitOverlay.HitButton, "Modern portrait has no hit target")
 				V:Assert(
@@ -6988,7 +7200,9 @@ function FriendsUI:RegisterTests()
 			)
 			local previousSection = self.selectedSection or "friends"
 			self:ApplyModernSectionTopChrome("raid")
-			V:Assert(self.root.TopFade:IsShown() and not self.root.TopDivider:IsShown(), "Modern Raid keeps the shared top fade without BFL's divider")
+			local _, themed = self:GetModernThemeColors()
+			V:AssertEqual(self.root.TopFade:IsShown(), not themed, "Modern Raid uses the native top fade only with Blizzard's theme")
+			V:Assert(not self.root.TopDivider:IsShown(), "Modern Raid hides the contact-list divider")
 			self:ApplyModernSectionTopChrome(previousSection)
 		end,
 	})

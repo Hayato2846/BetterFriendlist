@@ -20,8 +20,10 @@ def load_manifest(repo):
     if manifest.get("schemaVersion") != 1:
         raise SmokeError("Unsupported smoke manifest schemaVersion")
     sources = manifest["sources"]
-    if set(sources) != {"live", "forever", "classic"}:
-        raise SmokeError("Manifest must pin live, forever and classic sources")
+    required_sources = {"live", "forever", "classic"}
+    supported_sources = required_sources | {"classic_ptr", "classic_era", "classic_anniversary"}
+    if not required_sources <= set(sources) or set(sources) - supported_sources:
+        raise SmokeError("Manifest must pin live, forever and classic sources; only supported Classic flavors may be added")
     for name, source in sources.items():
         if not re.fullmatch(r"[0-9a-f]{40}", source["revision"]):
             raise SmokeError(f"{name}: expected a full source commit SHA")

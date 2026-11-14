@@ -13,6 +13,239 @@ local L = BFL.L
 -- Register the Dialogs module
 local Dialogs = BFL:RegisterModule("Dialogs", {})
 
+-- Only these addon-owned text workflows may use the private dialog. Native
+-- confirmations, invitations and other addons' StaticPopup slots stay native.
+local INPUT_DIALOGS = {
+	BETTER_FRIENDLIST_CREATE_GROUP = true,
+	BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND = true,
+	BETTER_FRIENDLIST_RENAME_GROUP = true,
+	BFL_FRIEND_TAG_EDITOR_CREATE_SECTION = true,
+	BFL_FRIEND_TAG_EDITOR_CREATE_CUSTOM = true,
+	BFL_FRIEND_TAGS_CREATE_CUSTOM_TAG = true,
+	BFL_COPY_TEXT = true,
+}
+
+function Dialogs:RefreshInputDialogTheme()
+	local frame = self.inputDialog
+	if not frame then return end
+	local engine = BFL:GetModule("SkinEngine")
+	local theme = BFL:GetEffectiveTheme()
+	local external = theme == "ellesmereui" and BFL:GetModule("EllesmereUISkin")
+		or theme == "elvui" and BFL:GetModule("ElvUISkin")
+	if external and external:SkinInputDialog(frame) then
+		-- Only this private BFL frame is handed to external skin adapters.
+		-- Shared Blizzard StaticPopup slots are never styled here.
+	elseif engine and engine:IsActive() and BFL:UsesDarkSkinTheme() then
+		frame:SetBackdrop(nil)
+		engine:SkinFrame(frame, "popup")
+		engine:SkinEditBox(frame.EditBox)
+		engine:SkinButton(frame.button1)
+		engine:SkinButton(frame.button2)
+	else
+		if engine then
+			engine:RestoreFrame(frame)
+			engine:RestoreFrame(frame.EditBox)
+			engine:RestoreFrame(frame.button1)
+			engine:RestoreFrame(frame.button2)
+		end
+		frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+			edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true,
+			tileSize = 32, edgeSize = 32, insets = { left = 11, right = 11, top = 11, bottom = 11 } })
+		frame:SetBackdropColor(1, 1, 1, 1)
+		frame:SetBackdropBorderColor(1, 1, 1, 1)
+	end
+	if BFL.FontManager then BFL.FontManager:RefreshWindowFonts() end
+end
+
+function Dialogs:AcceptInputDialog()
+	local frame = self.inputDialog
+	if not (frame and frame.spec and frame.button1:IsEnabled()) then return end
+	local keepOpen = frame.spec.OnAccept and frame.spec.OnAccept(frame, frame.data)
+	if not keepOpen then frame:Hide() end
+end
+
+function Dialogs:LayoutInputDialog()
+	local frame = self.inputDialog
+	if not frame then return end
+	local ratio = BFL.WindowGeometry:GetRatio(frame)
+	local buttonWidth = math.max(145, frame.button1:GetFontString():GetStringWidth() + 24,
+		frame.button2:GetFontString():GetStringWidth() + 24)
+	local width = math.min(UIParent:GetWidth() / ratio - 24, math.max(380, frame.EditBox:GetWidth() + 48, buttonWidth * 2 + 58))
+	frame:SetWidth(width)
+	local inputTop = 57 + frame.text:GetStringHeight()
+	frame.EditBox:SetPoint("TOP", 0, -inputTop)
+	frame.BFL_ErrorLabel:SetPoint("TOPLEFT", 24, -(inputTop + 30))
+	frame.BFL_ErrorLabel:SetPoint("TOPRIGHT", -24, -(inputTop + 30))
+	local buttonHeight = math.max(24, frame.button1:GetFontString():GetStringHeight() + 8,
+		frame.button2:GetFontString():GetStringHeight() + 8)
+	frame.button1:SetSize((width - 58) / 2, buttonHeight)
+	frame.button2:SetSize((width - 58) / 2, buttonHeight)
+	local copy = frame.spec and frame.spec.copyText
+	frame.button2:SetShown(not copy)
+	frame.button1:ClearAllPoints()
+	if copy then
+		frame.button1:SetWidth(buttonWidth)
+		frame.button1:SetPoint("BOTTOM", 0, 18)
+	else
+		frame.button1:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -5, 18)
+	end
+	frame:SetHeight(inputTop + 30 + math.max(20, frame.BFL_ErrorLabel:GetStringHeight()) + buttonHeight + 28)
+end
+
+function Dialogs:CreateInputDialog()
+	local frame = CreateFrame("Frame", "BFLInputDialog", UIParent, "BackdropTemplate")
+	frame:Hide()
+	frame:SetSize(380, 188)
+	frame:SetFrameStrata("DIALOG")
+	frame:SetToplevel(true)
+	frame:SetClampedToScreen(true)
+	frame:EnableMouse(true)
+	frame:SetMovable(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame.title = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	frame.title:SetPoint("TOPLEFT", 24, -18)
+	frame.title:SetPoint("TOPRIGHT", -24, -18)
+	frame.title:SetWordWrap(false)
+	frame.title:SetText("BetterFriendlist")
+	frame.TitleContainer = { TitleText = frame.title }
+	frame.text = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	frame.text:SetPoint("TOPLEFT", 24, -45)
+	frame.text:SetPoint("TOPRIGHT", -24, -45)
+	frame.text:SetWordWrap(true)
+	frame.EditBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+	frame.editBox = frame.EditBox
+	frame.EditBox:SetSize(280, 24)
+	frame.EditBox:SetPoint("TOP", 0, -82)
+	frame.EditBox:SetAutoFocus(false)
+	frame.BFL_ErrorLabel = frame:CreateFontString(nil, "ARTWORK", "GameFontRedSmall")
+	frame.BFL_ErrorLabel:SetPoint("TOPLEFT", 24, -111)
+	frame.BFL_ErrorLabel:SetPoint("TOPRIGHT", -24, -111)
+	frame.BFL_ErrorLabel:SetWordWrap(true)
+	frame.button1 = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.button2 = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.button1:SetSize(145, 24)
+	frame.button2:SetSize(145, 24)
+	frame.button1:SetPoint("BOTTOMRIGHT", frame, "BOTTOM", -5, 18)
+	frame.button2:SetPoint("BOTTOMLEFT", frame, "BOTTOM", 5, 18)
+	frame.button1:SetScript("OnClick", function() self:AcceptInputDialog() end)
+	frame.button2:SetScript("OnClick", function()
+		if frame.spec and frame.spec.OnCancel then frame.spec.OnCancel(frame, frame.data) end
+		frame:Hide()
+	end)
+	frame.EditBox:SetScript("OnEnterPressed", function() self:AcceptInputDialog() end)
+	frame.EditBox:SetScript("OnEscapePressed", function()
+		if frame.spec and frame.spec.copyText then frame:Hide() else frame.button2:Click() end
+	end)
+	frame.EditBox:SetScript("OnKeyUp", function(_, key)
+		if frame.spec and frame.spec.copyText and key == "C" and IsControlKeyDown() then frame:Hide() end
+	end)
+	frame.EditBox:SetScript("OnTextChanged", function(editBox, userInput)
+		if frame.spec and frame.spec.EditBoxOnTextChanged then
+			frame.spec.EditBoxOnTextChanged(editBox, userInput)
+		end
+		self:LayoutInputDialog()
+	end)
+	frame:SetScript("OnHide", function()
+		if frame.spec and frame.spec.OnHide then frame.spec.OnHide(frame, frame.data) end
+		frame.spec, frame.data, frame.which = nil, nil, nil
+		frame.EditBox:ClearFocus()
+	end)
+	table.insert(UISpecialFrames, "BFLInputDialog")
+	self.inputDialog = frame
+	return frame
+end
+
+function Dialogs:RaiseInputDialog(frame)
+	local level = frame:GetParent():GetFrameLevel()
+	local function Include(window)
+		if not window or not window:IsVisible() or window:GetFrameStrata() ~= "DIALOG" then return end
+		level = math.max(level, window:GetFrameLevel())
+		for _, child in ipairs({ window:GetChildren() }) do Include(child) end
+	end
+	local editor = BFL:GetModule("FriendTagEditor")
+	local designer = BFL:GetModule("SettingsDesigner")
+	Include(editor and editor.frame)
+	Include(_G.BetterFriendlistSettingsFrame)
+	Include(designer and designer.GetFrame and designer:GetFrame())
+	-- Keep Blizzard's DIALOG strata and top-level Raise behavior, while placing
+	-- our private frame above the visible BFL editor hierarchy as well.
+	local function SetLevel(window, value)
+		window:SetFrameLevel(value)
+		for _, child in ipairs({ window:GetChildren() }) do
+			SetLevel(child, value + ((child == window.BFL_DarkBackdrop or child == window.backdrop) and -1 or 1))
+		end
+	end
+	-- The flat backdrop sits one level below its owner. Keep that backdrop
+	-- above the editor too, and move the private controls with their parent.
+	SetLevel(frame, level + 2)
+	frame:Raise()
+end
+
+function Dialogs:ShowInput(which, text1, text2, data)
+	local db = BFL:GetModule("DB")
+	local spec = StaticPopupDialogs[which]
+	if not (INPUT_DIALOGS[which] and spec and db and db:Get("useThemedDialogs", true)) then
+		return StaticPopup_Show(which, text1, text2, data)
+	end
+	local frame = self.inputDialog or self:CreateInputDialog()
+	if frame:IsShown() then frame:Hide() end
+	frame.spec, frame.data, frame.which = nil, nil, nil
+	frame.EditBox:SetNumeric(false)
+	frame.EditBox:SetMaxLetters(0)
+	frame.EditBox:SetText("")
+	frame.BFL_ErrorLabel:SetText("")
+	frame.button1:Enable()
+	frame.spec, frame.data, frame.which = spec, data, which
+	frame.text:SetText((text1 or text2) and string.format(spec.text, text1 or "", text2 or "") or spec.text)
+	frame.button1:SetText(spec.button1)
+	frame.button2:SetText(spec.button2 or CANCEL)
+	frame.EditBox:SetWidth(math.min(spec.editBoxWidth or 280, math.max(80, UIParent:GetWidth() / BFL.WindowGeometry:GetRatio(frame) - 72)))
+	self:RefreshInputDialogTheme()
+	-- Match StaticPopup's ordinary in-game anchor and top-level dialog ordering
+	-- without joining its shared popup pool or changing Blizzard-owned frames.
+	local parent = GetFullScreenFrame and GetFullScreenFrame() or UIParent
+	frame:SetParent(parent)
+	frame:ClearAllPoints()
+	frame:SetPoint("TOP", parent, "TOP", 0, spec.topOffset or -135)
+	frame:Show()
+	self:RaiseInputDialog(frame)
+	if spec.OnShow then spec.OnShow(frame, data) end
+	self:LayoutInputDialog()
+	return frame
+end
+
+function BFL.ShowInputDialog(...)
+	return Dialogs:ShowInput(...)
+end
+
+-- Links and explicit copy actions share the private input dialog, including
+-- theme, layering and the user's native-dialog preference. Never skin a pooled
+-- StaticPopup slot or leave a copy-specific key handler installed on it.
+function Dialogs:ShowCopy(value, title, width)
+	StaticPopupDialogs.BFL_COPY_TEXT = {
+		text = title or L.SETTINGS_CENTER_SUPPORT_COPY_LINKS,
+		button1 = CLOSE or OKAY,
+		hasEditBox = true,
+		copyText = true,
+		maxLetters = 0,
+		editBoxWidth = width or 350,
+		OnShow = function(dialog)
+			local editBox = dialog.EditBox or dialog.editBox
+			editBox:SetNumeric(false)
+			editBox:SetMaxLetters(0)
+			editBox:SetText(value)
+			editBox:SetFocus()
+			editBox:HighlightText()
+		end,
+		EditBoxOnEnterPressed = function(editBox) editBox:GetParent():Hide() end,
+		EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
+		timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+	}
+	return self:ShowInput("BFL_COPY_TEXT")
+end
+
 local function ApplyDefaultSlugToFontString(fontString)
 	if BFL.FontManager and BFL.FontManager.ApplyDefaultSlugToFontString then
 		BFL.FontManager:ApplyDefaultSlugToFontString(fontString)
@@ -118,6 +351,8 @@ local function ValidateDialogInput(editBox, isRename)
 end
 
 local function StartGroupValidation(dialog, isRename)
+	-- StaticPopup edit boxes are shared with numeric dialogs and other skins.
+	dialog.EditBox:SetNumeric(false)
 	dialog.BFL_GroupEditBoxColor = { dialog.EditBox:GetTextColor() }
 	ValidateDialogInput(dialog.EditBox, isRename)
 end

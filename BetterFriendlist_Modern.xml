@@ -440,6 +440,11 @@
 									<Anchor point="TOPLEFT" relativeKey="$parent.ScrollableWarningText" relativePoint="TOPRIGHT" x="17" />
 									<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollableWarningText" relativePoint="BOTTOMRIGHT" x="17" />
 								</Anchors>
+								<Scripts>
+									<OnLoad inherit="append">
+										BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+									</OnLoad>
+								</Scripts>
 							</EventFrame>
 						</Frames>
 						<Scripts><OnMouseWheel function="nop" /></Scripts>
@@ -449,6 +454,11 @@
 					</Frame>
 					<EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
 						<Anchors><Anchor point="TOPLEFT" relativeKey="$parent.ScrollBox" relativePoint="TOPRIGHT" x="4" /><Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox" relativePoint="BOTTOMRIGHT" x="4" /></Anchors>
+						<Scripts>
+							<OnLoad inherit="append">
+								BFL:GetModule("ScrollbarStyle"):Register(self, self:GetParent())
+							</OnLoad>
+						</Scripts>
 					</EventFrame>
 				</Frames>
 				<Layers><Layer level="ARTWORK"><FontString parentKey="EmptyLabel" inherits="BetterFriendlistFontLarge" justifyH="CENTER" wordwrap="true" hidden="true"><Anchors><Anchor point="CENTER" /><Anchor point="LEFT" x="30" /><Anchor point="RIGHT" x="-30" /></Anchors><Color color="FRIENDS_GRAY_COLOR" /></FontString></Layer></Layers>

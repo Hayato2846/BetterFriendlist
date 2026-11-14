@@ -20,6 +20,7 @@ end
 local function scenario(accounts, options)
 	options = options or {}
 	local snapshot = title()
+	snapshot.isFavorite = true
 	snapshot.gameAccountInfo = accounts[1]
 	local c = setup({ snapshot }, { modern = true, classic = options.classic })
 	local env, BFL, list = c.env, c.BFL, c.list
@@ -44,7 +45,7 @@ local function scenario(accounts, options)
 	env.C_BattleNet.InviteFriend = function(id) c.sent[#c.sent + 1] = id end
 	BFL.modules.DB.GetPreferredGameAccount = function() return options.preferred end
 	list:UpdateFriendsList()
-	c.friend = assert(list.friendsList[1]); c.friend.isFavorite = true
+	c.friend = assert(list.friendsList[1])
 	return c
 end
 local function copy(value) local result = {}; for key, field in pairs(value) do result[key] = field end; return result end

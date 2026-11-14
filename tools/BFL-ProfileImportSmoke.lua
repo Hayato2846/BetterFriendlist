@@ -16,6 +16,7 @@ function BFL:RegisterEventCallback() end
 function BFL.GetNumWoWFriends() return 0 end
 function BFL:NormalizeWoWFriendName(name) return name end
 local env = setmetatable({
+	InCombatLockdown = function() return false end,
 	loadstring = function() error("profile input must never execute") end,
 	setfenv = function() error("profile input must never execute") end,
 	BNGetNumFriends = function() return 0 end,

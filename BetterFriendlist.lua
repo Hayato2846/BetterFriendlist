@@ -2458,12 +2458,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_GetDisplayedInviteTypeSafe(guid)
-				if not guid or not GetDisplayedInviteType or BFL:IsSecret(guid) then
+				if BFL:IsSecret(guid) or type(guid) ~= "string" or guid == "" or not GetDisplayedInviteType then
 					return nil
 				end
 
 				local ok, inviteType = pcall(GetDisplayedInviteType, guid)
-				if ok then
+				if ok and not BFL:IsSecret(inviteType) and type(inviteType) == "string" then
 					return inviteType
 				end
 				return nil
@@ -2502,6 +2502,40 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return true
 				end
 				return false
+			end
+
+			local function BFL_InvokeVerifiedMenuInvite(friends, entry, directInviteFriendID)
+				if InCombatLockdown() then return false end
+				local account, reason = friends:GetLiveMenuInviteAccount(entry)
+				if not account then return false, reason end
+
+				-- Use addon-owned arguments and the party APIs. The FriendsFrame
+				-- wrapper also changes shared HelpTip state.
+				local guid = entry.playerGuid
+				if guid == nil or guid == "" then
+					if directInviteFriendID and friends:IsOnlyOnlineMenuInviteAccount(directInviteFriendID, entry.gameAccountID) then
+						return BFL.BNInviteFriend(entry.gameAccountID)
+					end
+					return false, ERR_TRAVEL_PASS_NO_INFO
+				end
+				if BFL.IsGUIDInGroup then
+					local grouped = BFL.IsGUIDInGroup(guid, LE_PARTY_CATEGORY_HOME)
+					if BFL:IsSecret(grouped) or grouped then return false end
+				end
+				local action = BFL_GetDisplayedInviteTypeSafe(guid)
+				if action ~= entry.inviteType then return false, ERR_TRAVEL_PASS_NO_INFO end
+				if action == "REQUEST_INVITE" or action == "REQUEST_INVITE_CROSS_FACTION" then
+					if not BNRequestInviteFriend then return false end
+					BNRequestInviteFriend(entry.gameAccountID)
+					return true
+				end
+				if action == "SUGGEST_INVITE" or action == "SUGGEST_INVITE_CROSS_FACTION" then
+					local full = C_PartyInfo and C_PartyInfo.IsPartyFull and C_PartyInfo.IsPartyFull()
+					if BFL:IsSecret(full) or full then return false, ERR_GROUP_FULL end
+				elseif action ~= "INVITE" and action ~= "INVITE_CROSS_FACTION" then
+					return false
+				end
+				return BFL.BNInviteFriend(entry.gameAccountID)
 			end
 
 			-- Multi-Game-Account: Replace Blizzard's single invite button with a character picker submenu
@@ -3047,7 +3081,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- Add "Create Group" option at the top
 				groupsButton:CreateButton(L.MENU_CREATE_GROUP, function()
-					StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
+					BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
 				end)
 
 				-- Add "Remove from All Groups" button immediately after Create Group (User request)
@@ -3211,11 +3245,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				return nil, FriendsList
 			end
 
-			local function BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline, nativeInvite, verifiedFriend)
-				if isOffline or not rootDescription or not contextData then
-					if nativeInvite then nativeInvite:SetEnabled(false) end
-					return
-				end
+			local function BFL_AddInviteButton(rootDescription, contextData, isBNet, isOffline, nativeInvite, verifiedFriend, nativeAccountID)
+				if isOffline or not rootDescription or not contextData then return end
 
 				if isBNet then
 					local friendData, FriendsList
@@ -3226,41 +3257,60 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 					local accountEntries = friendData and FriendsList.GetInviteAccountEntries
 						and FriendsList:GetInviteAccountEntries(friendData)
-					local function CreateInvite(text, callback, enabled, reason)
-						if not nativeInvite then
-							return BFL.CreateMenuButton(rootDescription, text, callback, { enabled = enabled, tooltip = reason })
+					local useVerifiedInvite = verifiedFriend and BFL.HasSecretValues
+					if useVerifiedInvite and not nativeInvite and accountEntries and #accountEntries == 0 then
+						local primary = FriendsList:GetReadableInviteField(contextData.accountInfo, "gameAccountInfo")
+						local id = FriendsList:GetReadableInviteField(primary, "gameAccountID")
+						local guid = FriendsList:GetReadableInviteField(primary, "playerGuid")
+						local account = id and not BFL:IsSecret(primary.playerGuid)
+							and FriendsList:GetLiveMenuInviteAccount({ gameAccountID = id, playerGuid = guid })
+						if account then
+							local entry = FriendsList:BuildAccountDisplay(account)
+							entry.isInvitable = true
+							accountEntries[1] = entry
 						end
-						nativeInvite:SetResponder(callback)
-						BFL.Compat.SetMenuElementText(nativeInvite, text)
-						nativeInvite:SetEnabled(enabled)
-						if reason and nativeInvite.SetTooltip then
-							nativeInvite:SetTooltip(function(tooltip)
-								tooltip:SetText(text)
-								tooltip:AddLine(reason, 1, 0.25, 0.25, true)
-							end)
-						end
-						return nativeInvite
 					end
 					if friendData and ((accountEntries and #accountEntries > 0)
 						or (friendData.invitableAccounts and #friendData.invitableAccounts > 0)) then
 						local friendUID = FriendsList and FriendsList.GetFriendUID and FriendsList:GetFriendUID(friendData)
-						local lastInvited = friendUID and FriendsList.GetLastInvitedAccountID
-							and FriendsList:GetLastInvitedAccountID(friendUID)
-							or nil
 						local entries = {}
 
 						for _, ga in ipairs(accountEntries or friendData.invitableAccounts) do
 							local entry = accountEntries and ga or (FriendsList.BuildAccountDisplay and FriendsList:BuildAccountDisplay(ga))
 							if entry then
-								entry.isPreferred = lastInvited and entry.gameAccountID == lastInvited or false
 								entry.inviteType = BFL_GetDisplayedInviteTypeSafe(entry.playerGuid)
 								entry.inviteText = BFL_GetInviteButtonText(entry.inviteType)
 								entries[#entries + 1] = entry
 							end
 						end
 
+						local only = entries[1]
+						if not only then return end
+						if nativeInvite and #entries == 1 and not only.restrictionText
+							and (not nativeAccountID or nativeAccountID == only.gameAccountID or not only.isInvitable)
+						then
+							return
+						end
+
+						local directInviteFriendID
+						if useVerifiedInvite and BFL.IsRetail and not BFL.IsForever and not nativeInvite
+							and #entries == 1 and friendData.totalGameAccounts == 1
+						then
+							directInviteFriendID = contextData.bnetIDAccount
+						end
+						local function IsEnabled(entry)
+							return entry.isInvitable ~= false and (not useVerifiedInvite or entry.inviteType ~= nil
+								or (directInviteFriendID ~= nil and (entry.playerGuid == nil or entry.playerGuid == "")))
+						end
+
 						local function InviteEntry(entry)
-							local didInvite, reason = BFL_InvokeBNetInviteOrRequest(entry)
+							if not IsEnabled(entry) then return end
+							local didInvite, reason
+							if useVerifiedInvite then
+								didInvite, reason = BFL_InvokeVerifiedMenuInvite(FriendsList, entry, directInviteFriendID)
+							else
+								didInvite, reason = BFL_InvokeBNetInviteOrRequest(entry)
+							end
 							if didInvite and friendUID and entry.gameAccountID and FriendsList.SetLastInvitedAccountID then
 								FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
 							elseif verifiedFriend and reason and UIErrorsFrame and UIErrorsFrame.AddExternalErrorMessage then
@@ -3268,7 +3318,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end
 						end
 
-						if #entries > 1 then
+						if #entries > 1 or nativeInvite then
 							local inviteText = entries[1].inviteText
 							local mixedInviteTypes = false
 							for _, entry in ipairs(entries) do
@@ -3280,32 +3330,22 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 							local title = mixedInviteTypes and (TRAVEL_PASS_INVITE or PARTY_INVITE or INVITE or "Invite")
 								or (inviteText or BFL_GetInviteButtonText(nil))
-							local inviteMenu
-							if nativeInvite then
-								inviteMenu = CreateInvite(title, function() return MenuResponse.Open end, true)
-							else
-								inviteMenu = rootDescription:CreateButton(title)
-							end
+							if nativeInvite then title = L.INVITE_ACCOUNT_PICKER_TITLE end
+							local inviteMenu = rootDescription:CreateButton(title)
 							for _, entry in ipairs(entries) do
 								local label = entry.text or entry.name or UNKNOWN or "Unknown"
-								if mixedInviteTypes and entry.inviteText then
+								if (nativeInvite or mixedInviteTypes) and entry.inviteText then
 									label = entry.inviteText .. ": " .. label
 								end
 								BFL.CreateMenuButton(inviteMenu, label, function()
 									InviteEntry(entry)
-								end, { enabled = entry.isInvitable ~= false, tooltip = entry.restrictionText })
+								end, { enabled = IsEnabled(entry), tooltip = entry.restrictionText })
 							end
-						elseif entries[1] then
-							local entry = entries[1]
-							CreateInvite(entry.inviteText or BFL_GetInviteButtonText(nil), function()
-								InviteEntry(entry)
-							end, entry.isInvitable ~= false, entry.restrictionText)
-						elseif nativeInvite then
-							nativeInvite:SetEnabled(false)
+						else
+							BFL.CreateMenuButton(rootDescription, only.inviteText, function()
+								InviteEntry(only)
+							end, { enabled = IsEnabled(only), tooltip = only.restrictionText })
 						end
-					elseif nativeInvite then
-						-- A native action without a readable BFL target cannot be validated.
-						nativeInvite:SetEnabled(false)
 					end
 					return
 				end
@@ -3316,6 +3356,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local buttonText = BFL_GetInviteButtonText(inviteType)
 
 					rootDescription:CreateButton(buttonText, function()
+						if verifiedFriend and BFL.HasSecretValues and InCombatLockdown() then return end
 						if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
 							if BFL.RequestInviteFromUnit then
 								BFL.RequestInviteFromUnit(fullName)
@@ -4128,7 +4169,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			-- Extend the native menu using BFL's own context, separate from Whisper.
-			local function BFL_AddNativeFriendMenu(root, tag, row, friend, isBNet)
+			local function BFL_AddNativeFriendMenu(root, tag, row, friend, isBNet, nativeContext)
 				local context = BFL_CreateFriendMenuContext(row, friend, isBNet)
 
 				local elements = {}
@@ -4140,7 +4181,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				local invite = elements[PARTY_INVITE] or elements[REQUEST_INVITE] or elements[SUGGEST_INVITE]
 					or elements[TRAVEL_PASS_INVITE_CROSS_FACTION] or elements[TRAVEL_PASS_INVITE] or elements[INVITE]
 				if isBNet or not invite then
-					BFL_AddInviteButton(root, context, isBNet, context.isOffline, invite, friend)
+					local friends = GetFriendsList()
+					local account = friends:GetReadableInviteField(nativeContext, "accountInfo")
+					local gameAccount = friends:GetReadableInviteField(account, "gameAccountInfo")
+					local nativeAccountID = friends:GetReadableInviteField(gameAccount, "gameAccountID")
+					BFL_AddInviteButton(root, context, isBNet, context.isOffline, invite, friend, nativeAccountID)
 				end
 
 				local titleNotes = BFL.TitleFriendNotes
@@ -4238,7 +4283,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								if hints then hints:ObserveMenu(root) end
 							end
 							if row then
-								BFL_AddNativeFriendMenu(root, menuTag, row, friend, isBNet)
+								BFL_AddNativeFriendMenu(root, menuTag, row, friend, isBNet, context)
 								return
 							end
 							AddGroupsToFriendMenu(owner, root, context)
@@ -5815,14 +5860,13 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 
 		AddContactsMenuDecoration(rootDescription, L.MENU_TITLE)
 
-		local settingsText = L.MENU_SETTINGS
 		local Changelog = BFL:GetModule("Changelog")
-		if Changelog and Changelog:HasUnreadVersions() then
-			settingsText = settingsText .. "  " .. Changelog:GetNewBadge()
-		end
-		rootDescription:CreateButton(settingsText, function()
+		local settingsEntry = rootDescription:CreateButton(L.MENU_SETTINGS, function()
 			BetterFriendlistSettings_Show()
 		end)
+		if Changelog and Changelog:HasUnreadVersions() then
+			BFL:GetModule("NewFeatureBadge"):AttachToMenu(settingsEntry)
+		end
 
 		AddContactsMenuDecoration(rootDescription)
 
@@ -5920,7 +5964,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 
 		-- Create Group option
 		rootDescription:CreateButton(L.MENU_CREATE_GROUP, function()
-			StaticPopup_Show("BETTER_FRIENDLIST_CREATE_GROUP")
+			BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP")
 		end)
 
 		AddContactsMenuDecoration(rootDescription)

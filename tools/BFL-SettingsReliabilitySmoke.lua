@@ -48,6 +48,7 @@ execute("Modules/ThemePalette.lua")
 execute("Modules/ThemeManager.lua")
 execute("Modules/Database.lua")
 execute("Modules/Groups.lua")
+execute("Modules/SettingsScroll.lua")
 execute("Modules/FilterSortRegistry.lua")
 execute("Modules/Settings.lua")
 execute("Modules/FriendTags.lua")
@@ -57,6 +58,17 @@ execute("Modules/AutoRaidAssist.lua")
 execute("Modules/FrameSettings.lua")
 env.BetterFriendlistDB = { taintFreeWhisper = true }
 BFL.modules.DB:Initialize()
+equal(BFL.modules.DB:Get("hideThemeAvatar"), true, "Themes hide the avatar by default")
+for _, theme in ipairs({ "dark", "custom", "elvui", "ellesmereui" }) do
+	equal(BFL:IsThemeAvatarHidden(theme), true, theme .. " starts with the avatar hidden")
+	equal(BFL.modules.ThemePalette:GetAvatarVisibility(theme), 0, theme .. " reports zero avatar visibility")
+end
+equal(BFL:IsThemeAvatarHidden("blizzard"), false, "The Blizzard theme keeps its avatar")
+BFL.modules.DB:Set("hideThemeAvatar", false)
+for _, theme in ipairs({ "dark", "custom", "elvui", "ellesmereui" }) do
+	equal(BFL:IsThemeAvatarHidden(theme), false, theme .. " can show the avatar again")
+end
+BFL.modules.DB:Set("hideThemeAvatar", true)
 equal(env.BetterFriendlistDB.taintFreeWhisper, nil, "upgrading removes the retired whisper setting")
 local oldWhisperBackup = assert(BFL.modules.DB:PrepareImportedProfile({
 	exportVersion = 3, customGroups = {}, friendGroups = {}, taintFreeWhisper = true,
@@ -108,16 +120,23 @@ assert(failures == 0 and errors == 0, "toggle persistence regressed")
 local uiScale, frameScale = 1, 1
 env.UIParent = { GetEffectiveScale = function() return uiScale end }
 env.InCombatLockdown = function() return false end
+local restoredPosition, clampingPasses = nil, 0
 BFL.MainFrame = {
+	SetClampedToScreen = function(_, enabled) assert(enabled); clampingPasses = clampingPasses + 1 end,
 	SetSize = function() end,
 	GetScale = function() return frameScale end,
 	SetScale = function(_, scale) frameScale = scale end,
+	ClearAllPoints = function() restoredPosition = nil end,
+	SetPoint = function(_, point, _, relativePoint, x, y)
+		restoredPosition = { point, relativePoint, x, y }
+	end,
 }
 
 local scheduled
 local timerAfter = env.C_Timer.After
 env.C_Timer.After = function(_, callback) scheduled = callback end
 local FrameSettings = BFL.modules.FrameSettings
+FrameSettings.db.mainFramePosition.Shared = { point = "TOPLEFT", relativePoint = "TOPLEFT", x = 120, y = -90 }
 FrameSettings:OnPlayerLogin()
 scheduled()
 FrameSettings:ApplyScale(1.25)
@@ -126,7 +145,11 @@ events.DISPLAY_SIZE_CHANGED[1][1]()
 events.UI_SCALE_CHANGED[1][1]()
 scheduled()
 equal(uiScale * frameScale, 1.25, "display changes preserve the effective window scale")
+assert(clampingPasses > 0, "display changes must refresh the frame's screen bounds")
 equal(env.BetterFriendlistDB.windowScale, 1.25, "display changes preserve the saved window scale")
+equal(restoredPosition[1], "TOPLEFT", "display changes restore the saved anchor")
+equal(restoredPosition[3], 120, "display changes restore the saved horizontal position")
+equal(restoredPosition[4], -90, "display changes restore the saved vertical position")
 
 uiScale = 0.5
 events.CVAR_UPDATE[1][1]("uiScale")

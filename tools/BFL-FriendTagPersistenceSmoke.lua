@@ -34,6 +34,23 @@ for _, migrated in ipairs({ false, true }) do
 	editor.RefreshEditor = function(self) self:LoadState(tags:GetTagDefinition(self.selectedTagId)) end
 	local id = assert(tags:CreateCustomTag("Teacher"))
 	editor:Show(id)
+	local schedule, refreshRequests = BFL.ScheduleFriendsListRefresh, 0
+	BFL.ScheduleFriendsListRefresh = function() refreshRequests = refreshRequests + 1 end
+	local sectionID = tags:GetChipProfile(id).section
+	editor:ToggleSectionVisibility({ id = sectionID, hidden = false })
+	equal(refreshRequests, 1, "hiding a section from the editor requests a friends-list refresh")
+	equal(tags:GetSettings().sections[sectionID].hidden, true, "the editor hides the section")
+	editor:ToggleSectionVisibility({ id = sectionID, hidden = true })
+	equal(refreshRequests, 2, "showing a section from the editor requests a friends-list refresh")
+	equal(tags:GetSettings().sections[sectionID].hidden, nil, "the editor shows the section")
+	BFL.ScheduleFriendsListRefresh = schedule
+	editor.filter = "teacher"
+	local matching = editor:GetTagListGroups(editor:GetDefinitions())
+	equal(matching[1].tags[1].id, id, "search matches the tag by name without changing its ID")
+	editor.filter = "does not exist"
+	equal(#editor:GetTagListGroups(editor:GetDefinitions()), 0, "an unmatched filter is empty")
+	equal(editor.selectedTagId, id, "filtering keeps the selected tag")
+	editor.filter = nil
 	local state = editor.editState
 	state.name = "Personal name"
 	state.color = { r = .13, g = .77, b = .46, a = .9 }
@@ -202,21 +219,37 @@ for _, migrated in ipairs({ false, true }) do
 	reopened:SetLabelMode("custom")
 	equal(reopened:GetPreviewLabel(), "Learner :)", "custom text survives applying Icon Only and reloading")
 	reopened:SetLabelMode("icon_only")
-	local chooseIcon, warning
+	local chooseIcon, choosePath, warning
 	local button = {}
 	reopened.frame = { IsShown = function() return true end }
 	reopened.iconSelectButton = button
-	reopened.iconInput = {
+	reopened.iconInputRow = {
 		SetShown = function(self, shown) self.shown = shown end,
 	}
-	reopened.preview = { empty = {
-		SetText = function(_, text) warning = text end,
-		Show = function() end,
-	} }
+	local function NoOp() end
+	local widget = { ClearAllPoints = NoOp, SetPoint = NoOp, Show = NoOp, GetHeight = function() return 32 end,
+		GetChildren = function() end }
+	local previewTags
+	BFL.modules.FriendsList = { CreateSettingsSampleContext = function()
+		return { RenderSettingsSample = function(_, _, _, _, data)
+			previewTags = data.friend.settingsTagDefinitions
+			return widget
+		end }
+	end }
+	reopened.preview = {
+		IsShown = function() return true end,
+		title = { SetText = NoOp },
+		compare = { SetText = NoOp, SetWidth = NoOp, SetShown = NoOp, GetFontString = function()
+			return { GetStringWidth = function() return 40 end }
+		end },
+		rowHost = { GetWidth = function() return 245 end, SetHeight = NoOp },
+		status = { SetText = NoOp },
+		empty = { SetText = function(_, text) warning = text end, SetHeight = NoOp, GetStringHeight = function() return 15 end },
+	}
 	BFL.ShowIconSelector = function(anchor, _, callback, options)
 		equal(anchor, button, "the icon library uses the editor control as owner")
 		equal(options.source, "tags", "the shared icon library opens with tag icons")
-		chooseIcon = callback
+		chooseIcon, choosePath = callback, options.onCustomPath
 	end
 	reopened:OpenIconSelector(button)
 	assert(chooseIcon, "the editor opens the shared icon library directly")
@@ -224,20 +257,27 @@ for _, migrated in ipairs({ false, true }) do
 	reopened:SetIconMode("none")
 	equal(reopened:GetPreviewIcon(), nil, "Remove Icon immediately changes the preview")
 	equal(warning, BFL.L.FRIEND_TAGS_EDITOR_ICON_REQUIRED, "the preview explains why Icon Only is empty")
+	equal(#previewTags, 0, "the sample row does not include an icon-only tag without an icon")
+	reopened.previewSaved = true
+	reopened:RefreshPreview()
+	equal(previewTags[1].chipProfile.iconValue, 1234567, "comparing the saved state passes the saved icon to the row renderer")
+	reopened.previewSaved = false
 	equal(restored:GetChipProfile(id).iconValue, 1234567, "Remove Icon does not change saved data before Apply")
 	reopened:SetIconMode("custom")
-	assert(reopened.iconInput.shown, "Custom Path reveals the field")
+	assert(reopened.iconInputRow.shown, "Custom Path reveals the field")
 	assert(not reopened:CommitState(), "an empty custom path cannot apply")
 	reopened.editState.customIconPath = "Interface\\Icons\\INV_Misc_QuestionMark"
 	reopened:MarkDraft()
 	reopened:SetIconMode("none")
-	assert(not reopened.iconInput.shown, "Remove Icon hides the custom path field")
+	assert(not reopened.iconInputRow.shown, "Remove Icon hides the custom path field")
 	reopened:SetIconMode("custom")
 	equal(reopened:GetPreviewIcon(), "Interface\\Icons\\INV_Misc_QuestionMark", "switching back restores the draft path")
 	reopened:OpenIconSelector(button)
 	reopened:LoadState(restored:GetTagDefinition(second))
 	chooseIcon(7654321)
+	choosePath("Interface\\Icons\\Stale")
 	assert(reopened:GetPreviewIcon() ~= 7654321, "a stale icon callback cannot write to another tag")
+	assert(reopened.editState.customIconPath ~= "Interface\\Icons\\Stale", "a stale custom path cannot write to another tag")
 	reopened:LoadState(restored:GetTagDefinition(id))
 	reopened:OpenIconSelector(button)
 	chooseIcon(7654321, { iconType = "texture", iconValue = 7654321, iconZoom = .2 })
@@ -247,7 +287,9 @@ for _, migrated in ipairs({ false, true }) do
 	reopened.EnsureFrame = function(self) return self.frame end
 	reopened.RefreshList = function() end
 	reopened.RefreshEditor = function(self) self:LoadState(restored:GetTagDefinition(self.selectedTagId)) end
-	reopened:SetIconMode("custom")
+	choosePath("Interface\\Icons\\INV_Misc_QuestionMark")
+	equal(reopened.editState.iconMode, "custom", "the picker applies the custom path to the draft")
+	equal(restored:GetChipProfile(id).iconValue, 1234567, "entering a path in the picker still waits for Apply")
 	assert(reopened:CommitState())
 	equal(restored:GetChipProfile(id).iconValue, "Interface\\Icons\\INV_Misc_QuestionMark", "Apply stores the chosen custom path")
 	equal(reopened.editState.iconMode, "custom", "the applied path loads in Custom Icon Path mode")
@@ -269,6 +311,48 @@ for _, migrated in ipairs({ false, true }) do
 	equal(restored:ShouldIncludeTagOnSurface(definition, "row"), true, "the friends list resumes its saved selection")
 	equal(restored:ShouldIncludeTagOnSurface(definition, "tooltip"), false, "tooltips keep their unchecked state")
 	equal(restored:ShouldIncludeTagOnSurface(definition, "broker"), true, "the broker resumes its saved selection")
+end
+
+-- Hover tracks the row, a row click pins it, and hovering a second row preserves the pin.
+do
+	local BFL, env, execute = make()
+	execute("Modules/FriendTagEditor.lua")
+	local editor = BFL.modules.FriendTagEditor
+	local function NoOp() end
+	local function Row()
+		return {
+			EnableMouse = NoOp,
+			CreateTexture = function() return { SetAllPoints = NoOp, Hide = NoOp } end,
+			HookScript = function(self, script, callback) self[script] = callback end,
+		}
+	end
+	editor.RefreshHelp = NoOp
+	local over
+	function BFL:IsRegionMouseOver(row) return row == over end
+	env.C_Timer.After = function(_, callback) callback() end
+	env.GetCursorPosition = function() return 100, 100 end
+	local first, second = Row(), Row()
+	editor:BindHelp(first, nil, "Chip Color", "Background")
+	editor:BindHelp(second, nil, "Section", "Menu section", "section")
+	over = first
+	first:OnEnter()
+	equal(editor.helpTopic.title, "Chip Color", "hover opens the matching help")
+	first:OnMouseDown("LeftButton")
+	first:OnMouseUp("LeftButton")
+	equal(editor.pinnedHelpTopic, editor.helpTopic, "clicking row space pins the current help")
+	over = second
+	first:OnLeave()
+	second:OnEnter()
+	equal(editor.helpTopic.title, "Chip Color", "other rows cannot overwrite the pinned help")
+	second:OnMouseDown("LeftButton")
+	second:OnMouseUp("LeftButton")
+	equal(editor.pinnedHelpTopic.target, "section", "clicking another row pins its preview target")
+	second:OnMouseDown("LeftButton")
+	second:OnMouseUp("LeftButton")
+	equal(editor.pinnedHelpTopic, nil, "clicking a pinned row releases it")
+	over = nil
+	second:OnLeave()
+	equal(editor.hoverHelpTopic, nil, "leaving the row removes the hover highlight")
 end
 
 -- A close request covers drafts on tags other than the current selection.
@@ -420,7 +504,7 @@ do
 	local entry = Assign().entries[1]
 	assert(entry.path:find(BFL.L.SETTINGS_CENTER_PAGE_FRIEND_TAGS, 1, true), "settings path follows Settings Center")
 	hints:OpenEntry(entry)
-	equal(destination, "groups.friendtags/friendTags.showRowChips", "Settings Center focuses the blocking toggle")
+	equal(destination, "13/friendTagsVisibility", "retired beta routing still opens the tag visibility section")
 
 	tags:SetSetting("showRowChips", true)
 	assert(tags:SetChipProfile(tagId, { visible = false }))
@@ -551,6 +635,11 @@ do
 	local menu = tags:GetMenuItems(friend)
 	equal(menu[4].text, "Old Raid", "the menu uses the saved section order")
 	assert(tags:SetTagSectionHidden("Old Raid", true))
+	local beforeHiddenProfile = env.CopyTable(tags:GetChipProfile(custom))
+	for _, surface in ipairs({ "row", "tooltip", "broker", "group", "search" }) do
+		equal(tags:ShouldIncludeTagOnSurface(tags:GetTagDefinition(custom), surface), false, "hidden sections suppress " .. surface)
+		equal(tags:ShouldIncludeTagOnSurface(tags:GetTagDefinition(raidTag), surface), false, "hidden sections suppress built-in " .. surface)
+	end
 	equal(GetMenuEntry("Old Raid"), nil, "the hidden section title is omitted")
 	equal(GetMenuEntry("Custom raid tag"), nil, "the hidden section tags are omitted")
 	GetMenuEntry(BFL.L.FRIEND_TAGS_CLEAR_ALL).func()
@@ -573,6 +662,12 @@ do
 	equal(sections[5].id, empty, "empty sections survive import and reload")
 	assert(tags:SetTagSectionHidden("Old Raid", false))
 	assert(GetMenuEntry("Custom raid tag"), "showing the section restores menu entries")
+	for _, surface in ipairs({ "row", "tooltip", "broker", "group" }) do
+		equal(tags:ShouldIncludeTagOnSurface(tags:GetTagDefinition(custom), surface), true, "showing a section restores " .. surface)
+	end
+	for _, key in ipairs({ "visible", "rowVisible", "tooltipVisible", "brokerVisible" }) do
+		equal(tags:GetChipProfile(custom)[key], beforeHiddenProfile[key], "section hiding preserves " .. key)
+	end
 
 	assert(tags:DeleteTagSection("Old Raid", false))
 	equal(tags:GetChipProfile(raidTag).section, nil, "keeping a built-in tag leaves it unassigned")
@@ -637,5 +732,37 @@ do
 	end
 	assert(contracts >= 16, "existing tag coverage unexpectedly shrank")
 	io.write("[OK] Existing tag contracts: " .. contracts .. " cases\n")
+end
+do
+	local _, env = make()
+	local source = read("Modules/FriendTagEditor.lua")
+	local helpers = assert(source:match("(local function SetActionIcon.-)\nlocal function DeleteTagLabel"))
+	local noop, seen, lastText = function() end, 0
+	local texture = setmetatable({}, { __index = function() return noop end })
+	env.IconButtonMixin = { OnMouseDown = noop, OnMouseUp = noop }
+	env.CreateFrame = function()
+		return setmetatable({ Icon = texture, hooks = {},
+			GetHighlightTexture = function() return texture end,
+			HookScript = function(self, event, callback) self.hooks[event] = callback end,
+		}, { __index = function() return noop end })
+	end
+	env.BFL_Tooltip = { SetOwner = noop, Show = noop, Hide = noop,
+		SetText = function(_, text)
+			assert(type(text) == "string", "native GameTooltip:SetText requires text")
+			seen, lastText = seen + 1, text
+		end,
+	}
+	local create = assert(load(helpers .. "\nreturn CreateIconAction", "@production icon action", "t", env))()
+	local button = create({}, "chevron-down", nil, noop)
+	button.hooks.OnEnter(button)
+	for _, label in ipairs({ false, 0, "" }) do
+		button.actionLabel = label
+		button.hooks.OnEnter(button)
+	end
+	equal(seen, 0, "unlabelled action buttons never pass nil or invalid text to the tooltip")
+	button.actionLabel = "Collapse Section"
+	button.hooks.OnEnter(button)
+	equal(seen, 1, "labelled action buttons show their tooltip")
+	equal(lastText, "Collapse Section", "the tooltip receives the action label")
 end
 io.write("[OK] Friend tag persistence: " .. checks .. " checks\n")

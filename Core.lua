@@ -1683,7 +1683,7 @@ function BFL:UpdatePortraitVisibility(reason)
 	local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 	local simpleMode = DB:Get("simpleMode", false)
 	local shouldShow = not simpleMode
-	local shouldShowPortrait = shouldShow
+	local shouldShowPortrait = shouldShow and not (self.IsThemeAvatarHidden and self:IsThemeAvatarHidden())
 	local isClassicElvUISkinActive = CoreIsClassicElvUISkinActive()
 
 	-- Classic+ElvUI owns this area; never let the Simple Mode Blizzard
@@ -2893,6 +2893,9 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 	elseif msg == "settingshint" then
 		local Settings = BFL:GetModule("Settings")
 		if Settings then Settings:ResetRedesignHintForReload() end
+	elseif msg == "testnewflags" then
+		local flags = BFL:GetModule("SettingsNewFlags")
+		if flags then flags:ResetCurrentReadState() end
 	elseif msg:match("^forcemodern") then
 		local argument = msg:match("^forcemodern%s*(%S*)") or ""
 		local FriendsUI = BFL:GetModule("FriendsUI")

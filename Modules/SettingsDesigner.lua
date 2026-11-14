@@ -610,6 +610,7 @@ local function RefreshBrokerTooltips()
 end
 
 local function RefreshFonts()
+	if BFL.FontManager then BFL.FontManager:RefreshWindowFonts() end
 	if BFL.ApplyTabFonts then
 		BFL:ApplyTabFonts()
 	end
@@ -791,7 +792,6 @@ local NEW_TAGS = {
 	["advanced.beta"] = true,
 	["appearance.theme"] = true,
 	["broker.sync"] = true,
-	["enableSettingsCenterBeta"] = true,
 	["enableGuildTab"] = true,
 	["externalMenuBridgeEnabled"] = true,
 	["groups.order"] = true,
@@ -2710,15 +2710,6 @@ local function HasPendingLocalBlizzardTags()
 		and FriendTags:GetLocalBlizzardTagAssignmentCount() > 0
 end
 
-local function SetSettingsCenterBetaEnabled(value)
-	local Settings = BFL:GetModule("Settings")
-	if Settings and Settings.OnSettingsCenterBetaChanged then
-		Settings:OnSettingsCenterBetaChanged(value == true)
-	else
-		SetDB("enableSettingsCenterBeta", value == true)
-	end
-end
-
 local function IsThemeCustomizationVisible()
 	return true
 end
@@ -2837,7 +2828,9 @@ local function RegisterThemeTuning(theme, title, baseOrder)
 			default = defaults[key] or 0,
 			formatter = PercentFormatter,
 			order = baseOrder + 10 + index,
-			visibleWhen = visible,
+			visibleWhen = function()
+				return visible() and (key ~= "avatarVisibility" or GetDB("hideThemeAvatar", true) == false)
+			end,
 			getValue = function()
 				return GetThemeSetting(theme, key) or 0
 			end,
@@ -3425,6 +3418,20 @@ local function RegisterFriendsPages()
 		visibleWhen = function() return SettingsDesigner:IsModernFriendsUI() end,
 	})
 	AddGroup("friends.tabs", "order", T("SETTINGS_FRIEND_TABS_ORDER", "Tab Order & Visibility"), 100)
+	AddDropdown("friends.tabs", {
+		key = "modernSideTabPosition", group = "order", label = L.SETTINGS_MODERN_TAB_POSITION,
+		desc = L.SETTINGS_MODERN_TAB_POSITION_DESC, default = "right", order = 90,
+		list = { right = L.SETTINGS_MODERN_TAB_POSITION_RIGHT, left = L.SETTINGS_MODERN_TAB_POSITION_LEFT }, orderList = { "right", "left" },
+		getValue = function()
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			return FriendsUI and FriendsUI.GetSideTabPosition and FriendsUI:GetSideTabPosition() or GetDB("modernSideTabPosition", "right")
+		end,
+		setValue = function(value)
+			local FriendsUI = SettingsDesigner:GetFriendsUI()
+			if FriendsUI and FriendsUI.SetSideTabPosition then FriendsUI:SetSideTabPosition(value)
+			else SetDB("modernSideTabPosition", value == "left" and "left" or "right") end
+		end,
+	})
 	app:RegisterControl("friends.tabs", {
 		id = "friends.tabs.order",
 		groupID = "order",
@@ -3475,8 +3482,12 @@ local function RegisterFriendsPages()
 		group = "favorites",
 		label = T("SETTINGS_FAVORITE_ICON_STYLE", "Favorite Icon"),
 		desc = T("SETTINGS_FAVORITE_ICON_STYLE_DESC", "Choose which icon is used for favorites."),
-		list = { bfl = T("SETTINGS_FAVORITE_ICON_OPTION_BFL", "BFL Icon"), blizzard = T("SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD", "Blizzard Icon") },
-		orderList = { "bfl", "blizzard" },
+		list = {
+			bfl = T("SETTINGS_FAVORITE_ICON_OPTION_BFL", "BFL Icon"),
+			blizzard = T("SETTINGS_FAVORITE_ICON_OPTION_BLIZZARD", "Blizzard Icon"),
+			modern = T("SETTINGS_FRIENDS_UI_STYLE_MODERN", "Modern"),
+		},
+		orderList = { "bfl", "blizzard", "modern" },
 		default = "bfl",
 		order = 310,
 		parentCheck = function() return GetDB("enableFavoriteIcon", true) == true end,
@@ -3572,6 +3583,15 @@ end
 local function RegisterAppearancePages()
 	RegisterPage({ id = "appearance.theme", category = "appearance", title = T("SETTINGS_CENTER_PAGE_APPEARANCE_THEME", "Theme"), description = T("SETTINGS_CENTER_PAGE_APPEARANCE_THEME_DESC", "Controls the BetterFriendlist visual theme."), iconKey = "bfl-appearance-theme", order = 100, newTagID = "appearance.theme" })
 	AddGroup("appearance.theme", "theme", T("SETTINGS_THEME_HEADER", "Theme"), 100)
+	AddToggle("appearance.theme", { key = "useThemedDialogs", group = "theme", label = L.SETTINGS_BFL_INPUT_DIALOGS,
+		desc = L.SETTINGS_BFL_INPUT_DIALOGS_DESC, default = true, order = 115 })
+	AddToggle("appearance.theme", { key = "hideThemeAvatar", group = "theme", label = L.SETTINGS_THEME_HIDE_AVATAR,
+		desc = L.SETTINGS_THEME_HIDE_AVATAR_DESC, default = true, order = 120,
+		visibleWhen = function()
+			local theme = BFL:GetEffectiveTheme()
+			return theme == "dark" or theme == "custom" or theme == "elvui" or theme == "ellesmereui"
+		end,
+		method = "OnHideThemeAvatarChanged", refreshOnChange = true })
 	AddDropdown("appearance.theme", {
 		key = "theme",
 		group = "theme",
@@ -3609,6 +3629,27 @@ local function RegisterAppearancePages()
 		end
 	end
 
+	for index, entry in ipairs({ { "WindowTitle", "SETTINGS_WINDOW_TITLE_FONT" }, { "ActionButton", "SETTINGS_ACTION_BUTTON_FONT" } }) do
+		local role, title = entry[1], entry[2]
+		local group = "window" .. role
+		local order = 600 + index * 10
+		AddGroup("appearance.fonts", group, L[title], order)
+		AddDropdown("appearance.fonts", { key = "font" .. role, group = group, label = L.SETTINGS_FONT,
+			desc = L[title .. "_DESC"], default = "", order = order + 1, after = RefreshFonts,
+			listFunc = function()
+				local choices = CopyTable(GetFontOptions())
+				choices[""] = DEFAULT
+				return choices
+			end })
+		AddSlider("appearance.fonts", { key = "fontSize" .. role, group = group, label = L.SETTINGS_FONT_SIZE_NUM,
+			desc = L[title .. "_DESC"], min = 8, max = 24, step = 1, default = 12, integer = true, order = order + 2,
+			getValue = function() local value = GetDB("fontSize" .. role, 0); return value > 0 and value or 12 end,
+			after = RefreshFonts })
+		AddButton("appearance.fonts", { id = "resetFont" .. role, group = group, label = RESET, buttonText = RESET,
+			desc = L[title .. "_DESC"], order = order + 3,
+			onClick = function() BFL.FontManager:ResetWindowFont(role); RefreshVisibleSettingsCenter() end })
+	end
+
 	RegisterPage({ id = "appearance.frame", category = "appearance", title = T("SETTINGS_CENTER_PAGE_APPEARANCE_FRAME", "Frame"), description = T("SETTINGS_CENTER_PAGE_APPEARANCE_FRAME_DESC", "Controls BetterFriendlist frame dimensions, scale, and movement."), iconKey = "bfl-appearance-frame", order = 120 })
 	AddGroup("appearance.frame", "size", T("SETTINGS_FRAME_DIMENSIONS_HEADER", "Frame Dimensions"), 100)
 	AddSlider("appearance.frame", { id = "defaultFrameWidth", key = "defaultFrameWidth", group = "size", label = T("SETTINGS_FRAME_WIDTH", "Width:"), min = 380, max = 800, step = 5, default = 415, integer = true, order = 100, getValue = function() return MainFrameSize(nil, "width", 415) end, setValue = function(value) RefreshFrameSize(value, nil) end })
@@ -3636,6 +3677,10 @@ local function RegisterAppearancePages()
 		end,
 	})
 	AddToggle("appearance.frame", { key = "lockWindow", group = "size", label = T("SETTINGS_LOCK_WINDOW", "Lock Window"), desc = T("SETTINGS_LOCK_WINDOW_DESC", "Prevent the BetterFriendlist frame from being moved."), default = false, order = 130, after = function(value) local FrameSettings = BFL:GetModule("FrameSettings"); if FrameSettings and FrameSettings.ApplyLock then FrameSettings:ApplyLock(value) end end })
+	AddGroup("appearance.frame", "settings", L.SETTINGS_SETTINGS_WINDOW_SIZE, 200)
+	AddToggle("appearance.frame", { key = "enableSettingsSmoothScrolling", group = "settings",
+		label = L.SETTINGS_WINDOW_SMOOTH_SCROLLING, desc = L.SETTINGS_WINDOW_SMOOTH_SCROLLING_DESC,
+		default = false, order = 200, method = "OnSettingsSmoothScrollingChanged" })
 end
 
 local function RegisterFriendTagsControls()
@@ -4469,7 +4514,6 @@ local function RegisterAdvancedPages()
 	RegisterPage({ id = "advanced.beta", category = "advanced", title = T("SETTINGS_CENTER_PAGE_ADVANCED_BETA", "Beta Features"), iconKey = "bfl-advanced-beta", mainToggleID = "enableBetaFeatures", order = 110, newTagID = "advanced.beta" })
 	AddGroup("advanced.beta", "beta", T("SETTINGS_BETA_FEATURES_TITLE", "Beta Features"), 100)
 	AddToggle("advanced.beta", { key = "enableBetaFeatures", group = "beta", label = T("SETTINGS_BETA_FEATURES_ENABLE", "Enable Beta Features"), desc = T("SETTINGS_BETA_FEATURES_TOOLTIP", "Shows experimental BetterFriendlist features."), default = false, order = 100, refreshOnChange = true, skinRefresh = true, newTagID = "advanced.beta" })
-	AddToggle("advanced.beta", { key = "enableSettingsCenterBeta", group = "beta", label = T("SETTINGS_ENABLE_SETTINGS_CENTER", "New Settings Center (Beta)"), desc = T("SETTINGS_ENABLE_SETTINGS_CENTER_DESC", "Use the new LibSettingsDesigner Settings Center instead of the classic settings window."), default = false, order = 105, setValue = SetSettingsCenterBetaEnabled, skinRefresh = true, newTagID = "enableSettingsCenterBeta" })
 	AddToggle("advanced.beta", { key = "debugPrintEnabled", group = "beta", label = T("SETTINGS_DEBUG_PRINT", "Debug Prints"), desc = T("SETTINGS_DEBUG_PRINT_DESC", "Enable verbose BetterFriendlist debug output."), default = false, order = 110, after = function(value) BFL.debugPrintEnabled = value == true end })
 	AddGroup("advanced.beta", "available", T("SETTINGS_BETA_FEATURES_LIST", "Currently available Beta Features:"), 200)
 	AddBetaFeatureLink({
@@ -4782,13 +4826,19 @@ function SettingsDesigner:Show(pageID, focusControlID)
 		return nil
 	end
 	local frame = ConfigUI:Open(registeredApp, pageID, focusControlID)
+	local scrolling = BFL:GetModule("SettingsScroll")
+	if frame and scrolling then
+		scrolling:Register(frame.Scroll, 64)
+		scrolling:Register(frame.SidebarScroll, 64)
+	end
 	local FrameSettings = BFL:GetModule("FrameSettings")
 	if FrameSettings then FrameSettings:ApplyAuxiliaryScale(frame) end
 	local FriendsUI = BFL:GetModule("FriendsUI")
 	if frame and FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive() and FriendsUI.AnchorAuxiliaryWindow then
-		FriendsUI:AnchorAuxiliaryWindow(frame, 0)
+		FriendsUI:AnchorAuxiliaryWindow(frame, 0, true)
 	end
 	self:ApplySkin("open")
+	if BFL.FontManager then BFL.FontManager:RefreshWindowFonts() end
 	return frame
 end
 

@@ -88,7 +88,18 @@ local previousHeading = "## [" .. releaseHeadings[2].version .. "]"
 equal(between(changelogSource, latestHeading, previousHeading), between(markdown, latestHeading, previousHeading),
 	"Embedded release notes match CHANGELOG.md")
 
-local saved = { lastChangelogVersion = entries[3].version }
+-- A draft can share the installed version with the latest published entry.
+-- Read state tracks versions, so exercise three distinct versions in either state.
+local readEntries, readVersions = {}, {}
+for _, entry in ipairs(entries) do
+	if not readVersions[entry.version] then
+		readVersions[entry.version] = true
+		readEntries[#readEntries + 1] = entry
+	end
+end
+local originalGetEntries = changelog.GetEntries
+changelog.GetEntries = function() return readEntries end
+local saved = { lastChangelogVersion = readEntries[3].version }
 BFL.modules.DB = {
 	Get = function(_, key, default)
 		if saved[key] ~= nil then return saved[key] end
@@ -96,9 +107,9 @@ BFL.modules.DB = {
 	end,
 	Set = function(_, key, value) saved[key] = value end,
 }
-local newest, older = entries[1].version, entries[2].version
+local newest, older = readEntries[1].version, readEntries[2].version
 local unread = changelog:GetUnreadVersions()
-check(unread[newest] and unread[older] and not unread[entries[3].version], "Legacy read marker preserves older releases")
+check(unread[newest] and unread[older] and not unread[readEntries[3].version], "Legacy read marker preserves older releases")
 changelog:MarkVersionRead(newest)
 check(changelog:HasUnreadVersions() and changelog:GetUnreadVersions()[older], "Reading the newest leaves the older badge")
 changelog:MarkVersionRead(older)
@@ -108,12 +119,13 @@ saved.lastChangelogVersion = "0.0.0"
 unread = changelog:GetUnreadVersions()
 check(unread[newest] and not unread[older], "First visit only badges the latest release")
 changelog:MarkVersionRead(newest)
-local nextRelease = { { version = "99.0.0" }, entries[1], entries[2] }
+local nextRelease = { { version = "99.0.0" }, readEntries[1], readEntries[2] }
 unread = changelog:GetUnreadVersions(nextRelease)
 check(unread["99.0.0"] and not unread[newest], "A later update keeps individually read releases read")
 saved.changelogReadState = { through = "3.0.3-dev", versions = {} }
 unread = changelog:GetUnreadVersions({ { version = "3.0.3" }, { version = "3.0.2" } })
 check(unread["3.0.3"] and not unread["3.0.2"], "A release superseding a draft can be marked unread")
+changelog.GetEntries = originalGetEntries
 BFL.modules.DB = nil
 
 -- Name formatting retains character styling, aliases, privacy and sort behavior.

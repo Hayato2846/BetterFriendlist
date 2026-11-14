@@ -86,6 +86,7 @@ local function IsWhisperRecipient(friend, isWho)
 	if isWho then return true end
 	if BFL:IsSecret(friend.connected) then return false end
 	if friend.type == "bnet" then
+		if BFL.IsForever then return true end
 		return not (BFL.IsOfflineTitleFriend and BFL.IsOfflineTitleFriend(friend, friend.connected == false))
 	end
 	return friend.connected == true

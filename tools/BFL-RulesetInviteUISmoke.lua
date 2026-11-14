@@ -248,6 +248,8 @@ for _, mutation in ipairs({ "guid", "ruleset", "offline", "faction", "missing", 
 	elseif mutation == "secretFaction" then changed.factionName = secret
 	else refreshError = true end
 	fresh[10] = changed
+	local entry = FriendsList:BuildAccountDisplay(captured)
+	equal(FriendsList:GetLiveMenuInviteAccount(entry), nil, mutation .. " prevents fresh menu target validation")
 	noAction(callback, mutation .. " stale menu cannot submit")
 	noAction(pickerCallback, mutation .. " stale picker cannot submit")
 	noAction(function() broker(captured) end, mutation .. " stale Broker cannot submit")
@@ -265,8 +267,19 @@ setAccounts({ captured })
 local readOnly = {}; for key, value in pairs(captured) do if key:sub(1, 3) ~= "bfl" then readOnly[key] = value end end
 setmetatable(readOnly, { __newindex = function() error("Native snapshot mutated") end })
 fresh[10] = readOnly
+equal(FriendsList:GetLiveMenuInviteAccount(FriendsList:BuildAccountDisplay(captured)), readOnly,
+	"menu validation accepts the unchanged fresh account")
 rowClick(); equal(#calls, 1, "fresh immutable account can be dispatched without writing addon fields")
 equal(readOnly.bflIsInvitable, nil, "UI does not add cached eligibility to fresh native records")
+
+env.BNGetFriendIndex = function(id) return id == 42 and 1 or nil end
+local withoutGUID = game(10, "PvE"); withoutGUID.playerGuid = nil
+setAccounts({ withoutGUID })
+check(FriendsList:IsOnlyOnlineMenuInviteAccount(42, 10), "the only GUID-less online account is identified")
+check(not FriendsList:IsOnlyOnlineMenuInviteAccount(43, 10), "an unknown friend cannot authorize a direct invite")
+check(not FriendsList:IsOnlyOnlineMenuInviteAccount(42, 11), "a different account cannot authorize a direct invite")
+setAccounts({ withoutGUID, game(11, "PvE") })
+check(not FriendsList:IsOnlyOnlineMenuInviteAccount(42, 10), "multiple live accounts make the direct invite ambiguous")
 
 for _, missingGUID in ipairs({ false, "" }) do
 	local unpinned = game(10, "PvE"); unpinned.playerGuid = missingGUID or nil

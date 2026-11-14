@@ -80,6 +80,14 @@ class SmokeRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("unregistered: ['BFL-NewSmoke.lua']", result.stderr)
 
+    def test_additional_classic_sources_can_be_pinned_for_full_coverage(self):
+        for name in ("classic_ptr", "classic_era", "classic_anniversary"):
+            self.manifest["sources"][name] = dict(self.manifest["sources"]["classic"])
+        self.add_test("BFL-SixClientsSmoke.lua", "", ["{repo}", "{references}"])
+        result = self.run_check("--mode", "Full", "--list")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("BFL-SixClientsSmoke.lua", result.stdout)
+
     def test_deleted_registered_file_is_rejected(self):
         (self.tools / "BFL-FirstSmoke.lua").unlink()
         result = self.run_check()

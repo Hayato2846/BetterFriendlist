@@ -2645,7 +2645,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 										table.insert(items, {
 											text = L("MENU_RENAME_GROUP"),
 											func = function()
-												StaticPopup_Show("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
+												BFL.ShowInputDialog("BETTER_FRIENDLIST_RENAME_GROUP", nil, nil, groupId)
 											end,
 										})
 										table.insert(items, {

@@ -106,6 +106,7 @@ function FrameSettings:Initialize()
 
 		-- Hook for saving position after drag
 		frame:HookScript("OnDragStop", function()
+			self:ApplyClamping()
 			self:SavePosition()
 		end)
 
@@ -128,13 +129,15 @@ function FrameSettings:Initialize()
 			if not (self.db.useUIPanelSystem and not InCombatLockdown()) then
 				self:ApplyPosition()
 			end
+			self:ApplyClamping()
+			BFL.FontManager:RefreshWindowFonts()
 		end)
 	end
 end
 
 function FrameSettings:OnPlayerLogin()
 	local function RefreshScale()
-		self:QueueScaleRefresh()
+		self:QueueScaleRefresh(false, true)
 	end
 
 	BFL:RegisterEventCallback("DISPLAY_SIZE_CHANGED", RefreshScale)
@@ -143,17 +146,22 @@ function FrameSettings:OnPlayerLogin()
 		if type(name) ~= "string" or BFL:IsSecret(name) then return end
 		name = name:lower()
 		if name == "uiscale" or name == "useuiscale" then
-			self:QueueScaleRefresh(true)
+			self:QueueScaleRefresh(true, true)
+		elseif name == "gxmaximize" then
+			self:QueueScaleRefresh(false, true)
 		end
 	end)
 	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
-		if self.scaleRefreshAfterCombat then self:ApplyScale() end
+		if self.scaleRefreshAfterCombat or self.displayTextRefreshAfterCombat then self:QueueScaleRefresh(false, true) end
+		if self.positionAfterCombat then self:ApplyPosition() end
+		self:ApplyClamping()
 	end)
 	self:QueueScaleRefresh(true)
 end
 
-function FrameSettings:QueueScaleRefresh(resetReference)
+function FrameSettings:QueueScaleRefresh(resetReference, refreshText)
 	self.resetScaleReference = self.resetScaleReference or resetReference
+	self.refreshDisplayText = self.refreshDisplayText or refreshText
 	if self.scaleRefreshPending then return end
 
 	self.scaleRefreshPending = true
@@ -164,6 +172,39 @@ function FrameSettings:QueueScaleRefresh(resetReference)
 			self.resetScaleReference = nil
 		end
 		self:ApplyScale()
+		if not self.scaleRefreshAfterCombat and not self.db.useUIPanelSystem then
+			self:ApplyPosition()
+		end
+		self:ApplyClamping()
+		if self.refreshDisplayText then
+			self.refreshDisplayText = nil
+			self:QueueDisplayTextRefresh()
+		end
+	end)
+end
+
+function FrameSettings:QueueDisplayTextRefresh()
+	self.displayTextRefreshGeneration = (self.displayTextRefreshGeneration or 0) + 1
+	local generation = self.displayTextRefreshGeneration
+	-- A mode switch can emit several scale/CVar events while native font metrics
+	-- are settling. Only the last request refreshes BFL's own text regions.
+	C_Timer.After(0.15, function()
+		if generation ~= self.displayTextRefreshGeneration then return end
+		if InCombatLockdown() then
+			self.displayTextRefreshAfterCombat = true
+			return
+		end
+		self.displayTextRefreshAfterCombat = nil
+		if BFL.FontManager and BFL.FontManager.RefreshDisplayFonts then
+			BFL.FontManager:RefreshDisplayFonts()
+		end
+		-- Measure group counters on the next frame, after button/font rebinding.
+		C_Timer.After(0, function()
+			if generation ~= self.displayTextRefreshGeneration then return end
+			if InCombatLockdown() then self.displayTextRefreshAfterCombat = true; return end
+			local list = BFL:GetModule("FriendsList")
+			if list and list.RefreshGroupHeadersAfterDisplayChange then list:RefreshGroupHeadersAfterDisplayChange() end
+		end)
 	end)
 end
 
@@ -185,16 +226,51 @@ function FrameSettings:ApplyClamping()
 		return
 	end
 
-	-- "Respect UI Hierarchy" (useUIPanelSystem) logic:
-	-- If TRUE: Frame is managed by Blizzard's UIPanel system (anchored to left/center automatically)
-	-- If FALSE: Frame is free-floating and user-movable.
-	-- We want to CLAMP it to screen only when it is free-floating to prevent losing it.
-	local useUIPanel = self.db.useUIPanelSystem
-
-	if not useUIPanel then
-		frame:SetClampedToScreen(true)
-	else
-		frame:SetClampedToScreen(false)
+	if InCombatLockdown() and frame:IsProtected() then return end
+	frame:SetClampedToScreen(true)
+	if not (frame.SetClampRectInsets and frame.GetRect and BFL.WindowGeometry) then return end
+	local geometry = BFL.WindowGeometry
+	local left, bottom, width, height = geometry:GetRect(frame)
+	if not left then return end
+	local minLeft, minBottom, maxRight, maxTop = left, bottom, left + width, bottom + height
+	local function Include(tab)
+		if not (tab and tab:IsShown()) then return end
+		if tab.GetAlpha and tab:GetAlpha() <= 0 then return end
+		local x, y, w, h = geometry:GetRect(tab)
+		if not x then return end
+		minLeft, minBottom = math.min(minLeft, x), math.min(minBottom, y)
+		maxRight, maxTop = math.max(maxRight, x + w), math.max(maxTop, y + h)
+	end
+	local friendsUI = BFL:GetModule("FriendsUI")
+	if friendsUI and friendsUI.IsModernActive and friendsUI:IsModernActive() then
+		for _, tab in ipairs(friendsUI.sideTabs or {}) do
+			if tab:IsShown() and tab:GetAlpha() > 0 then
+				Include(tab)
+				for _, key in ipairs({ "Background", "SelectedTexture", "HighlightTexture", "TabGlow", "ThemeGlow" }) do
+					Include(tab[key])
+				end
+			end
+		end
+	end
+	for index = 1, 5 do Include(frame["BottomTab" .. index]) end
+	local ratio = geometry:GetRatio(frame)
+	frame:SetClampRectInsets((minLeft - left) / ratio, (maxRight - left - width) / ratio,
+		(maxTop - bottom - height) / ratio, (minBottom - bottom) / ratio)
+	-- Updating the insets alone need not move an already positioned frame.
+	-- Re-read after native clamping so clients which apply it immediately do not move twice.
+	local currentLeft, currentBottom = geometry:GetRect(frame)
+	if not currentLeft then return end
+	local unionLeft = currentLeft + minLeft - left
+	local unionTop = currentBottom + maxTop - bottom
+	local fitLeft, fitTop = geometry:Fit(unionLeft, unionTop, maxRight - minLeft, maxTop - minBottom)
+	local dx, dy = fitLeft - unionLeft, fitTop - unionTop
+	if math.abs(dx) > .001 or math.abs(dy) > .001 then
+		if frame.AdjustPointsOffset then
+			-- Retain existing anchors, including Blizzard's UIPanel positioning.
+			frame:AdjustPointsOffset(dx / ratio, dy / ratio)
+		else
+			geometry:SetTopLeft(frame, currentLeft + dx, currentBottom + height + dy)
+		end
 	end
 end
 
@@ -287,7 +363,15 @@ function FrameSettings:ApplyScale(scale)
 	local settings = BFL:GetModule("SettingsDesigner")
 	self:ApplyAuxiliaryScale(settings and settings.GetFrame and settings:GetFrame())
 	local tagEditor = BFL:GetModule("FriendTagEditor")
-	self:ApplyAuxiliaryScale(tagEditor and tagEditor.frame)
+	if tagEditor and tagEditor.frame then
+		tagEditor:FitWindow()
+		self:ApplyAuxiliaryScale(tagEditor.frame)
+	end
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review and review.active then
+		self:FitSettingsWindow(review.frame)
+		BFL:GetModule("Settings"):RefreshVisibleWindowAnchor()
+	end
 end
 
 function FrameSettings:ApplyAuxiliaryScale(window)
@@ -302,20 +386,89 @@ function FrameSettings:ApplyAuxiliaryScale(window)
 	window:SetScale(math.min(BFL.MainFrame:GetScale(), fit))
 end
 
+function FrameSettings:FitSettingsWindow(frame)
+	local parentRatio = frame:GetParent():GetEffectiveScale() / UIParent:GetEffectiveScale()
+	frame:SetScale(math.min(1, (UIParent:GetWidth() - 24) / (640 * parentRatio),
+		(UIParent:GetHeight() - 42) / (520 * parentRatio)))
+	local ratio = BFL.WindowGeometry:GetRatio(frame)
+	local maxWidth = (UIParent:GetWidth() - 24) / ratio
+	local maxHeight = (UIParent:GetHeight() - 42) / ratio
+	local saved = self.db.settingsWindowSize or {}
+	local width = math.min(maxWidth, math.max(math.min(640, maxWidth), tonumber(saved.width) or 1170))
+	local height = math.min(maxHeight, math.max(math.min(520, maxHeight), tonumber(saved.height) or 800))
+	frame:SetResizeBounds(math.min(640, maxWidth), math.min(520, maxHeight), maxWidth, maxHeight)
+	frame:SetSize(width, height)
+	frame.CategoryList:SetWidth(width < 800 and 156 or 174)
+end
+
+function FrameSettings:InitializeSettingsWindow(frame)
+	if frame.BFL_ResizeGrip then return end
+	frame:SetResizable(true)
+	local grip = CreateFrame("Button", nil, frame)
+	grip:SetSize(20, 20)
+	grip:SetPoint("BOTTOMRIGHT", -3, 3)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	grip.BFL_DarkManagedSubtree = true
+	grip:SetScript("OnMouseDown", function(_, button)
+		if button ~= "LeftButton" then return end
+		frame.BFL_Resizing = true
+		frame:StartSizing("BOTTOMRIGHT")
+	end)
+	local function StopSizing()
+		if not frame.BFL_Resizing then return end
+		frame.BFL_Resizing = nil
+		frame:StopMovingOrSizing()
+		local db = BFL:GetModule("DB")
+		db:Set("settingsWindowSize", { width = math.floor(frame:GetWidth() + 0.5), height = math.floor(frame:GetHeight() + 0.5) })
+		local settings = BFL:GetModule("Settings")
+		if settings then settings:RefreshVisibleWindowAnchor() end
+	end
+	grip:SetScript("OnMouseUp", StopSizing)
+	frame.BFL_StopResize = StopSizing
+	frame:HookScript("OnHide", StopSizing)
+	frame:HookScript("OnSizeChanged", function()
+		frame.CategoryList:SetWidth(frame:GetWidth() < 800 and 156 or 174)
+	end)
+	frame.BFL_ResizeGrip = grip
+end
+
+function FrameSettings:ResetSettingsWindowSize()
+	BFL:GetModule("DB"):Set("settingsWindowSize", {})
+	local review = BFL:GetModule("LegacySettingsReview")
+	if review and review.active then
+		self:FitSettingsWindow(review.frame)
+		BFL:GetModule("Settings"):RefreshVisibleWindowAnchor()
+	end
+end
+
 function FrameSettings:ApplyPosition()
 	local frame = BFL.MainFrame
 	if not frame then
 		return
 	end
+	if self.db.useUIPanelSystem then return end
+	if InCombatLockdown() and frame:IsProtected() then
+		self.positionAfterCombat = true
+		return
+	end
+	self.positionAfterCombat = nil
 
 	local pos = self.db.mainFramePosition[self:GetPositionKey()]
 	if pos and pos.point then
 		frame:ClearAllPoints()
-		-- Safety check for bad coordinates
-		local x = pos.x or 0
-		local y = pos.y or 0
-		if math.abs(x) > 5000 or math.abs(y) > 5000 then
-			x, y = 0, 0
+		local x = tonumber(pos.x) or 0
+		local y = tonumber(pos.y) or 0
+		if x ~= x or math.abs(x) == math.huge then x = 0 end
+		if y ~= y or math.abs(y) == math.huge then y = 0 end
+		-- Valid offsets can exceed 5000 on wide screens or at a small UI scale.
+		if BFL.WindowGeometry and frame.GetEffectiveScale and UIParent.GetWidth then
+			local ratio = BFL.WindowGeometry:GetRatio(frame)
+			local limitX = UIParent:GetWidth() / ratio + frame:GetWidth()
+			local limitY = UIParent:GetHeight() / ratio + frame:GetHeight()
+			x = math.max(-limitX, math.min(limitX, x))
+			y = math.max(-limitY, math.min(limitY, y))
 		end
 		frame:SetPoint(pos.point, UIParent, pos.relativePoint or pos.point, x, y)
 	else
@@ -331,7 +484,18 @@ function FrameSettings:SavePosition()
 		return
 	end
 
+	-- UIPanel positions belong to Blizzard, not the user's floating-window layout.
+	if self.db.useUIPanelSystem then return end
 	local point, _, relativePoint, x, y = frame:GetPoint()
+	if frame.GetRect and BFL.WindowGeometry then
+		local geometry = BFL.WindowGeometry
+		local left, bottom, _, height = geometry:GetRect(frame)
+		if left then
+			local ratio = geometry:GetRatio(frame)
+			point, relativePoint = "TOPLEFT", "TOPLEFT"
+			x, y = left / ratio, (bottom + height - UIParent:GetHeight()) / ratio
+		end
+	end
 
 	if point then
 		self.db.mainFramePosition[self:GetPositionKey()] = {

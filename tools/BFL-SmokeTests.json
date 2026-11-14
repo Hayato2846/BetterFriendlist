@@ -3,16 +3,23 @@
   "sources": {
     "live": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "297d7aaaa736f346b3e036f38ee088eaf7f8c07f", "version": "12.1.5.70783" },
     "forever": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "4cd0ab752a77164f654ccbca9d0c1fe8dafceebe", "version": "1.60.1.70888" },
-    "classic": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "e5d9b3a22c3f0f6f41ebac0e454f4969594261cf", "version": "5.5.4.70631" }
+    "classic": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "e5d9b3a22c3f0f6f41ebac0e454f4969594261cf", "version": "5.5.4.70631" },
+    "classic_ptr": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "ea6f4ee4ce0d457c02f479787293b702c062f067", "version": "5.5.4.67849" },
+    "classic_era": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "4192ac60067fc55566182291bc67c85dd9b6794d", "version": "1.15.9.70576" },
+    "classic_anniversary": { "repository": "https://github.com/Gethe/wow-ui-source.git", "revision": "68e0a2ec559d9761dfc4e7f864c3944f9d758a49", "version": "2.5.6.70577" }
   },
   "tests": [
     { "file": "BFL-AutoRaidAssistSmoke.lua", "arguments": ["{repo}", "{forever}"] },
+    { "file": "BFL-AuxiliaryDockingSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-BufferedEditBoxSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ClassColorSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ClientSubIconSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ContextMenuSectionsSmoke.lua", "arguments": ["{repo}", "{forever}", "{classic}"] },
+    { "file": "BFL-CopyDialogSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-CrossClientClassColorDisplaySmoke.lua", "arguments": ["{repo}", "{live}"] },
+    { "file": "BFL-DisplayFontRefreshSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-EncodingSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-FormatFieldsSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ForeverFilterSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ForeverLocationDisplaySmoke.lua", "arguments": ["{repo}", "{live}", "{forever}"] },
     { "file": "BFL-ForeverPresentationSmoke.lua", "arguments": ["{repo}", "{forever}", "{live}"] },
@@ -21,6 +28,7 @@
     { "file": "BFL-FriendsListStartupSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-FriendTagPersistenceSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-GlobalSyncManagementSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-HelpFrameThemeSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-InviteCompatibilitySmoke.lua", "arguments": ["{repo}", "{forever}", "{classic}"] },
     { "file": "BFL-KnownCharactersSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-LegacySettingsReviewSmoke.lua", "arguments": ["{repo}"] },
@@ -40,7 +48,14 @@
     { "file": "BFL-RulesetInviteSmoke.lua", "arguments": ["{repo}", "{forever}"] },
     { "file": "BFL-RulesetInviteUISmoke.lua", "arguments": ["{repo}", "{forever}"] },
     { "file": "BFL-RulesetLocationSmoke.lua", "arguments": ["{repo}", "{forever}"] },
+    { "file": "BFL-ScrollbarStyleSmoke.lua", "arguments": ["{repo}", "{references}"] },
+    { "file": "BFL-SettingsNewFlagsSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-SettingsPresentationSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-SettingsPreviewDockSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-SettingsReliabilitySmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-SettingsScrollSmoke.lua", "arguments": ["{repo}", "{live}"] },
+    { "file": "BFL-SideTabContentSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-SideTabPositionSmoke.lua", "arguments": ["{repo}", "{live}", "{forever}"] },
     { "file": "BFL-SlicedBackdropSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-SmoothScrollSettingsSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-SmoothScrollSmoke.lua", "arguments": ["{repo}", "{references}"] },
@@ -48,6 +63,7 @@
     { "file": "BFL-TitleFriendGroupsSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-TitleFriendTooltipSmoke.lua", "arguments": ["{repo}", "{live}"] },
     { "file": "BFL-WhoNativeRoutingSmoke.lua", "arguments": ["{repo}", "{forever}"] },
-    { "file": "BFL-WhoOwnershipSmoke.lua", "arguments": ["{repo}", "{forever}"] }
+    { "file": "BFL-WhoOwnershipSmoke.lua", "arguments": ["{repo}", "{forever}"] },
+    { "file": "BFL-WindowGeometrySmoke.lua", "arguments": ["{repo}"] }
   ]
 }

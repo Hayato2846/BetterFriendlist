@@ -2,6 +2,7 @@
 -- Verify stable task routes and search keys against the real locale files.
 local root = (arg[1] or "."):gsub("[/\\]$", "")
 local BFL = {}
+function BFL:GetModule() end
 function GetLocale() return "enUS" end
 function wipe(target)
 	for key in pairs(target) do

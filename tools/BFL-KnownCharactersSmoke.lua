@@ -420,4 +420,49 @@ check(privateStore.observeBattleNet == false, "A foreign profile cannot silently
 check(privateStore.smokeCycle == privateStore, "Import preserves the original local graph without copying it")
 privateStore.smokeCycle = nil
 equal(env.BetterFriendlistDB.harmless, 7, "Normal profile imports remain functional")
+
+-- Tooltip filtering must not delete associations or treat a cached/offline
+-- character as the currently visible character.
+streamer, preview, combat, region = false, false, false, 3
+BFL.IsForever = false
+env.WOW_PROJECT_ID = 1
+BFL.AreRegionalUniqueNamesEnabled = function() return BFL.IsForever end
+env.BetterFriendlistDB.knownCharacters = nil
+known.validatedStore, known.validatedContacts = nil, nil
+known:SetSetting("enabled", true)
+local currentFriend = { type = "bnet", battleTag = "Current#1234", gameAccountInfo = game("Current", "Black Rock") }
+check(known:AddManual(currentFriend, "Current-BlackRock"), "Current-character fixture is stored")
+equal(known:GetTooltipLines(currentFriend), nil, "The current character alone adds no redundant tooltip section")
+equal(#known:GetEntries(currentFriend), 1, "Tooltip filtering preserves the stored character")
+currentFriend.gameAccountInfo.characterName = "CURRENT"
+equal(known:GetTooltipLines(currentFriend), nil, "Current-character comparison normalizes case and realm spaces")
+check(known:AddManual(currentFriend, "Alt-Home"), "A separate known character remains stored")
+known:SetSetting("maxTooltipCharacters", 1)
+local filtered = known:GetTooltipLines(currentFriend)
+equal(#filtered, 2, "The current character consumes neither the visible limit nor the remainder count")
+check(filtered[2]:find("Alt-Home", 1, true), "The remaining tooltip entry is the other character")
+currentFriend.gameAccountInfo.realmName = "OtherRealm"
+equal(#known:GetTooltipLines(currentFriend), 3, "An identically named character on another realm is not filtered")
+currentFriend.gameAccountInfo.realmName = "Black Rock"
+currentFriend.gameAccountInfo.isOnline = false
+equal(#known:GetTooltipLines(currentFriend), 3, "Offline Battle.net friends retain their stored known characters")
+currentFriend.gameAccountInfo.isOnline = true
+for _, field in ipairs({ "isOnline", "clientProgram", "wowProjectID", "regionID", "characterName", "realmName" }) do
+    local previous = currentFriend.gameAccountInfo[field]
+    currentFriend.gameAccountInfo[field] = secret
+    equal(#known:GetTooltipLines(currentFriend), 3, "Unreadable " .. field .. " cannot suppress a stored character")
+    currentFriend.gameAccountInfo[field] = previous
+end
+currentFriend.gameAccountInfo.wowProjectID = 2
+equal(#known:GetTooltipLines(currentFriend), 3, "A character in another WoW project cannot suppress a local identity")
+currentFriend.gameAccountInfo.wowProjectID, currentFriend.gameAccountInfo.regionID = 1, 5
+equal(#known:GetTooltipLines(currentFriend), 3, "A character in another region cannot suppress a local identity")
+currentFriend.gameAccountInfo.regionID = 3
+local wowFriend = { type = "wow", name = "Current-BlackRock" }
+check(known:AddManual(wowFriend, "Other-Home"), "A WoW friend's known-character fixture is stored")
+check(not table.concat(known:GetTooltipLines(wowFriend), "\n"):lower():find("current-blackrock", 1, true), "A WoW friend's visible name is not repeated in known characters")
+BFL.IsForever = true
+local foreverFriend = { type = "bnet", battleTag = "Forever#1234", gameAccountInfo = game("Ada Silver Moon", "IgnoredRealm") }
+check(known:AddManual(foreverFriend, "Ada Silver Moon"), "Forever surname fixture is stored")
+equal(known:GetTooltipLines(foreverFriend), nil, "Forever regional names exclude the current full surname without treating it as a realm")
 io.write("[OK] Known characters smoke: " .. assertions .. " assertions (production module/callbacks, mocked engine; live taint QA required)\n")

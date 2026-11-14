@@ -59,10 +59,10 @@ Catalog.comparisons = {
 		SETTINGS_COLOR_LEVEL_BY_DIFFICULTY = { "colorLevelByDifficulty", "Info", prerequisite = { "infoFormatPreset", "default" } },
 		SETTINGS_ENABLE_FAVORITE_ICON = { "enableFavoriteIcon", "favoriteIcon" },
 		SETTINGS_FAVORITE_ICON_STYLE = { "favoriteIconStyle", "favoriteIcon", prerequisite = { "enableFavoriteIcon", true } },
-		SETTINGS_NAME_FORMAT_HEADER = { "nameFormatPreset", "Name" },
-		SETTINGS_NAME_FORMAT_TOOLTIP = { "nameFormatCustom", "Name", prerequisite = { "nameFormatPreset", "custom" }, examples = { "%nickname% (%character%)", "%character% · %realm%" } },
-		SETTINGS_INFO_FORMAT_HEADER = { "infoFormatPreset", "Info" },
-		SETTINGS_INFO_FORMAT_TOOLTIP = { "infoFormatCustom", "Info", prerequisite = { "infoFormatPreset", "custom" }, examples = { "%level%, %zone%", "%class%, %realm%" } },
+		SETTINGS_NAME_FORMAT_HEADER = { "nameFormatPreset", "Name", formatFields = "name" },
+		SETTINGS_NAME_FORMAT_TOOLTIP = { "nameFormatCustom", "Name", formatFields = "name", prerequisite = { "nameFormatPreset", "custom" }, examples = { "%nickname% (%character%)", "%character% · %realm%" } },
+		SETTINGS_INFO_FORMAT_HEADER = { "infoFormatPreset", "Info", formatFields = "info" },
+		SETTINGS_INFO_FORMAT_TOOLTIP = { "infoFormatCustom", "Info", formatFields = "info", prerequisite = { "infoFormatPreset", "custom" }, examples = { "%level%, %zone%", "%class%, %realm%" } },
 		SETTINGS_COMPACT_MODE = { "compactMode", sampleOverrides = {
 			nameFormatPreset = "character", infoFormatPreset = "zone", showRealmName = false,
 			showFactionIcons = false, enableFavoriteIcon = false, showMultiAccountBadge = false, showMultiAccountInfo = false,
@@ -86,6 +86,16 @@ Catalog.comparisons = {
 			SETTINGS_FONT_SIZE_NUM = { "fontSizeFriendInfo", "Info", prerequisite = { "infoFormatPreset", "default" } },
 			SETTINGS_FONT_FLAGS = { "fontOutlineFriendInfo", "Info", prerequisite = { "infoFormatPreset", "default" } },
 			SETTINGS_FONT_COLOR = { "fontColorFriendInfo", "Info", prerequisite = { "infoFormatPreset", "default" } },
+		},
+	},
+	windowFonts = {
+		SETTINGS_WINDOW_TITLE_FONT = {
+			SETTINGS_FONT = { "fontWindowTitle", windowFont = "WindowTitle" },
+			SETTINGS_FONT_SIZE_NUM = { "fontSizeWindowTitle", windowFont = "WindowTitle", examples = { 12, 18 } },
+		},
+		SETTINGS_ACTION_BUTTON_FONT = {
+			SETTINGS_FONT = { "fontActionButton", windowFont = "ActionButton" },
+			SETTINGS_FONT_SIZE_NUM = { "fontSizeActionButton", windowFont = "ActionButton", examples = { 12, 18 } },
 		},
 	},
 	automatic = {
@@ -127,6 +137,7 @@ Catalog.comparisons = {
 		SETTINGS_LOCK_WINDOW = { "lockWindow", geometry = true },
 		SETTINGS_USE_UI_PANEL_SYSTEM = { "useUIPanelSystem", geometry = true, binary = true },
 		SETTINGS_SMOOTH_SCROLLING = { "enableSmoothScrolling", geometry = true },
+		SETTINGS_WINDOW_SMOOTH_SCROLLING = { "enableSettingsSmoothScrolling", geometry = true, helpOnly = true },
 		SETTINGS_SIMPLE_MODE = { "simpleMode", header = "layout", region = "legacyPortrait" },
 		SETTINGS_SIMPLE_MODE_SHOW_SEARCH = { "simpleModeShowSearch", header = "layout", region = "search", prerequisite = { "simpleMode", true } },
 	},
@@ -177,11 +188,10 @@ Catalog.comparisons = {
 		SETTINGS_SYNC_GROUPS_NOTE = { "syncGroupsToNote", outcome = "groupNotes" },
 		SETTINGS_EXTERNAL_MENU_BRIDGE = { "externalMenuBridgeEnabled", outcome = "menuBridge" },
 	},
-	help = {
+	advanced = {
 		SETTINGS_SHOW_WELCOME_MESSAGE = { "showWelcomeMessage", outcome = "welcome" },
 		SETTINGS_DEBUG_PRINT = { "debugPrintEnabled", outcome = "debug" },
 		SETTINGS_BETA_FEATURES_ENABLE = { "enableBetaFeatures", outcome = "beta" },
-		SETTINGS_ENABLE_SETTINGS_CENTER = { "enableSettingsCenterBeta", outcome = "settingsEntry" },
 	},
 	broker = {
 		BROKER_SETTINGS_ENABLE = { "brokerEnabled", brokerLine = true },
@@ -387,6 +397,8 @@ Catalog.guideSectionContext = {
 }
 
 Catalog.guideFontSections = {
+	SETTINGS_WINDOW_TITLE_FONT = true,
+	SETTINGS_ACTION_BUTTON_FONT = true,
 	SETTINGS_FRIEND_NAME_SETTINGS = true,
 	SETTINGS_FRIEND_INFO_SETTINGS = true,
 	SETTINGS_FONT_TABS_TITLE = true,
@@ -398,10 +410,11 @@ Catalog.categories = {
 	{ "home", "SETTINGS_LEGACY_HOME" },
 	{ "friends", "SETTINGS_CENTER_CATEGORY_FRIENDS", "rows", "rowFonts", "behavior", "friendTabs" },
 	{ "groups", "SETTINGS_LEGACY_GROUPS", "automatic", "headers", "tags", "filters" },
-	{ "appearance", "SETTINGS_TAB_APPEARANCE", "layout", "theme" },
+	{ "appearance", "SETTINGS_TAB_APPEARANCE", "layout", "windowFonts", "theme" },
 	{ "social", "SETTINGS_LEGACY_SOCIAL", "who", "guild", "raid", "raidFonts" },
 	{ "privacy", "SETTINGS_CENTER_CATEGORY_PRIVACY", "stream", "contacts", "knownCharacters" },
 	{ "data", "SETTINGS_LEGACY_DATA", "backups", "sync", "broker", "guildBroker" },
+	{ "advanced", "SETTINGS_TAB_ADVANCED", "advanced" },
 	{ "help", "SETTINGS_CENTER_CATEGORY_HELP", "help" },
 }
 
@@ -415,6 +428,7 @@ Catalog.tabs = {
 Catalog.pages = {
 	rows = { 1, "SETTINGS_DISPLAY_OPTIONS", sample = "friends" },
 	rowFonts = { 2, "SETTINGS_TAB_FONTS", sample = "friends" },
+	windowFonts = { 2, "SETTINGS_WINDOW_FONTS" },
 	behavior = { 1, "SETTINGS_BEHAVIOR_HEADER" },
 	friendTabs = { 15, "SETTINGS_CENTER_PAGE_FRIEND_TABS", sample = "friendTabs" },
 	automatic = { 1, "SETTINGS_GROUP_MANAGEMENT", sample = "groups" },
@@ -434,6 +448,7 @@ Catalog.pages = {
 	sync = { 6, "SETTINGS_TAB_GLOBAL_SYNC" },
 	broker = { 5, "SETTINGS_TAB_DATABROKER", sample = "broker" },
 	guildBroker = { 5, "GUILD_BROKER_SETTINGS_HEADER", sample = "guildBroker" },
+	advanced = { 4, "SETTINGS_TAB_ADVANCED" },
 	help = { 4, "SETTINGS_CENTER_CATEGORY_HELP" },
 }
 
@@ -445,11 +460,14 @@ Catalog.tabRoutes = {
 Catalog.sections = {
 	SETTINGS_FRIENDS_UI_STYLE_HEADER = "layout",
 	SETTINGS_FRAME_DIMENSIONS_HEADER = "layout",
+	SETTINGS_SETTINGS_WINDOW_SIZE = "layout",
+	SETTINGS_WINDOW_TITLE_FONT = "windowFonts",
+	SETTINGS_ACTION_BUTTON_FONT = "windowFonts",
 	SETTINGS_GROUP_MANAGEMENT = "automatic",
 	SETTINGS_BEHAVIOR_HEADER = "behavior",
 	SETTINGS_FONT_RAID_TITLE = "raidFonts",
-	SETTINGS_BETA_FEATURES_TITLE = "help",
-	SETTINGS_LEGACY_DIAGNOSTICS = "help",
+	SETTINGS_BETA_FEATURES_TITLE = "advanced",
+	SETTINGS_LEGACY_DIAGNOSTICS = "advanced",
 	KC_TITLE = "knownCharacters",
 	SETTINGS_THEME_BROKER_TOOLTIP_HEADER = "theme",
 	GUILD_BROKER_SETTINGS_HEADER = "guildBroker",
@@ -461,8 +479,7 @@ Catalog.details = {
 	SETTINGS_GROUP_FONT_HEADER = true,
 	FRIEND_TAGS_SETTINGS_SEARCH = true,
 	FRIEND_TAGS_SETTINGS_GROUPS = true,
-	SETTINGS_THEME_CUSTOM_HEADER = true,
-	SETTINGS_THEME_DARK_HEADER = true,
+	SETTINGS_THEME_BROKER_TOOLTIP_HEADER = true,
 	BROKER_SETTINGS_FONT_HEADER = true,
 	BROKER_SETTINGS_COLUMNS_HEADER = true,
 	BROKER_SETTINGS_COLUMN_COLORS = true,
@@ -481,7 +498,7 @@ Catalog.links = {
 	friendTagsVisibility = "tags",
 	friendTagsCompact = "tags",
 	privateNotesTooltips = "contacts",
-	betaFeatures = "help",
+	betaFeatures = "advanced",
 }
 
 -- Search terms refer to localized labels. The alias strings contain terms players
@@ -527,10 +544,16 @@ Catalog.themeSections = {
 -- Index by native tab section and localized control label. Dynamic editor
 -- records are indexed by their entry point, without including player data.
 Catalog.search = {
+	windowFonts = {
+		SETTINGS_WINDOW_TITLE_FONT = { "SETTINGS_WINDOW_TITLE_FONT", "SETTINGS_FONT", "SETTINGS_FONT_SIZE_NUM" },
+		SETTINGS_ACTION_BUTTON_FONT = { "SETTINGS_ACTION_BUTTON_FONT", "SETTINGS_FONT", "SETTINGS_FONT_SIZE_NUM" },
+	},
 	theme = {
 		SETTINGS_THEME_HEADER = {
 			"SETTINGS_THEME_HEADER",
 			"SETTINGS_THEME_DROPDOWN",
+			"SETTINGS_BFL_INPUT_DIALOGS",
+			"SETTINGS_THEME_HIDE_AVATAR",
 		},
 		SETTINGS_THEME_DARK_HEADER = {
 			"SETTINGS_THEME_DARK_HEADER",
@@ -563,6 +586,7 @@ Catalog.search = {
 	friendTabs = {
 		SETTINGS_FRIEND_TABS_ORDER = {
 			"SETTINGS_FRIEND_TABS_ORDER",
+			"SETTINGS_MODERN_TAB_POSITION",
 			"FRIENDS_UI_SECTION_FRIENDS",
 			"FRIENDS_UI_SECTION_RECENT_ALLIES",
 			"FRIENDS_UI_SECTION_QUICK_JOIN",
@@ -596,6 +620,7 @@ Catalog.search = {
 			"SETTINGS_FRAME_SCALE",
 			"SETTINGS_LOCK_WINDOW",
 		},
+		SETTINGS_SETTINGS_WINDOW_SIZE = { "SETTINGS_SETTINGS_WINDOW_SIZE", "SETTINGS_WINDOW_SMOOTH_SCROLLING" },
 	},
 	rows = {
 		SETTINGS_LEGACY_ROWS_IDENTITY = { "SETTINGS_LEGACY_ROWS_IDENTITY" },
@@ -804,14 +829,12 @@ Catalog.search = {
 		},
 	},
 	help = {
+		_page = { "CHANGELOG_TITLE", "SETTINGS_CENTER_HELP_SUPPORT" },
+	},
+	advanced = {
 		SETTINGS_BETA_FEATURES_TITLE = {
 			"SETTINGS_BETA_FEATURES_TITLE",
 			"SETTINGS_BETA_FEATURES_ENABLE",
-			"SETTINGS_ENABLE_SETTINGS_CENTER",
-		},
-		_page = {
-			"CHANGELOG_TITLE",
-			"SETTINGS_CENTER_HELP_SUPPORT",
 		},
 		SETTINGS_LEGACY_DIAGNOSTICS = {
 			"SETTINGS_LEGACY_DIAGNOSTICS",

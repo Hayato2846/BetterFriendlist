@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist
 ## Notes: Complete replacement for WoW Friends frame - Custom groups, Raid management, Quick Join, and more!
 ## Author: Hayato2846
-## Version: 3.1.1
+## Version: 3.1.2-dev
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## X-Curse-Project-ID: 1381771
 ## X-WoWI-ID: 26984
@@ -28,7 +28,6 @@ Core.lua
 # Private Library Forks (taint-isolated)
 Libs\BFL_CallbackHandler.lua
 Libs\BFL_QTip\BFL_QTip.xml
-Libs\LibSettingsDesigner\LibSettingsDesigner.xml
 Utils\ClassicCompat.lua
 Utils\SlicedBackdrop.lua
 Utils\IntlCompat.lua
@@ -58,6 +57,7 @@ Utils\ProfileCodec.lua
 Utils\BufferedEditBox.lua
 Utils\FriendNotes.lua
 Utils\FontManager.lua
+Utils\WindowGeometry.lua
 Utils\ColorManager.lua
 Utils\AnimationHelpers.lua
 Utils\PerformanceMonitor.lua
@@ -82,6 +82,7 @@ Modules\FriendTagEditor.lua
 Modules\ContactMemory.lua
 Modules\FilterSortRegistry.lua
 Modules\IconSelector.lua
+Modules\NewFeatureBadge.lua
 Modules\Changelog.lua
 Modules\HelpFrame.lua
 Modules\FrameSettings.lua
@@ -111,10 +112,12 @@ Modules\GuildBroker.lua
 Modules\GuildFrame.lua
 Modules\SettingsComponents.lua
 Modules\AutoRaidAssist.lua
-Modules\SettingsDesigner.lua
+Modules\SettingsScroll.lua
 Modules\Settings.lua
 Data\LegacySettingsCatalog.lua
 Modules\LegacySettingsSocialSamples.lua
+Modules\SettingsNewFlags.lua
+Modules\SettingsPreviewDock.lua
 Modules\LegacySettingsReview.lua
 Modules\LegacySettingsStyle.lua
 Modules\NoteSync.lua
@@ -140,6 +143,7 @@ TestData\PerformanceBenchmark.lua
 TestData\RegressionTests.lua
 Modules\TestSuite.lua
 Modules\ThemeManager.lua
+Modules\ScrollbarStyle.lua
 Modules\SkinEngine.lua
 Modules\DarkTheme.lua
 Modules\ElvUISkin.lua

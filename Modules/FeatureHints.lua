@@ -79,7 +79,6 @@ function FeatureHints:OpenEntry(entry)
 	if entry.onClick then entry.onClick(); return end
 	local Settings = BFL:GetModule("Settings")
 	if not Settings then return end
-	if Settings:IsSettingsCenterEnabled() and Settings:ShowSettingsCenter(entry.page, entry.control) then return end
 	Settings:ShowLegacy(entry.category, entry.legacySection)
 end
 
@@ -125,9 +124,12 @@ function FeatureHints:GetDockBounds()
 	local bounds = {
 		left = Edge(UIParent, "GetLeft"), right = Edge(UIParent, "GetRight"),
 		top = Edge(UIParent, "GetTop"), bottom = Edge(UIParent, "GetBottom"),
-		parentTop = Edge(parent, "GetTop"), parentRight = Edge(parent, "GetRight"), scale = scale,
+		parentTop = Edge(parent, "GetTop"), parentLeft = Edge(parent, "GetLeft"),
+		parentRight = Edge(parent, "GetRight"), scale = scale,
 	}
 	local friendsUI = BFL:GetModule("FriendsUI")
+	bounds.side = parent == _G.BetterFriendsFrame and friendsUI and friendsUI.GetSideTabPosition
+		and friendsUI:GetSideTabPosition() or "right"
 	if parent == _G.BetterFriendsFrame and friendsUI and friendsUI.sideTabs then
 		for _, tab in ipairs(friendsUI.sideTabs) do
 			if tab:IsVisible() then
@@ -145,7 +147,26 @@ end
 
 function FeatureHints:GetDockPlan(bounds, minimumHeight)
 	local width = math.min(BADGE_WIDTH, bounds.right - bounds.left - SCREEN_MARGIN * 2)
-	local left = self.anchor == UIParent and bounds.right - width - 24 or bounds.parentRight
+	local side = bounds.side
+	local onLeft = side == "left"
+	local left = self.anchor == UIParent and bounds.right - width - 24
+		or (onLeft and bounds.parentLeft - width or bounds.parentRight)
+	-- Leave room for a full expansion outside a left rail whenever possible.
+	-- The native connected border's shoulder is on the left, so do not mirror its artwork.
+	if onLeft and bounds.tabLeft and bounds.tabLeft - TAB_GAP - width >= bounds.left + SCREEN_MARGIN then
+		left = bounds.tabLeft - TAB_GAP - width
+	end
+	local function Fits(candidate)
+		return candidate >= bounds.left + SCREEN_MARGIN and candidate + width <= bounds.right - SCREEN_MARGIN
+	end
+	if self.anchor ~= UIParent and not Fits(left) then
+		local opposite = onLeft and bounds.parentRight or bounds.parentLeft - width
+		if Fits(opposite) then
+			left = opposite
+			side = onLeft and "right" or "left"
+			onLeft = side == "left"
+		end
+	end
 	left = math.max(bounds.left + SCREEN_MARGIN, math.min(left, bounds.right - width - SCREEN_MARGIN))
 	local top = self.anchor == UIParent and bounds.top - 120 or bounds.parentTop
 	top = math.min(bounds.top, top)
@@ -154,17 +175,18 @@ function FeatureHints:GetDockPlan(bounds, minimumHeight)
 	if overTabs then
 		local tabLimit = bounds.tabTop + TAB_GAP
 		local needsSide = minimumHeight and top - tabLimit < minimumHeight
-		if needsSide and bounds.tabLeft - TAB_GAP - width >= bounds.left + SCREEN_MARGIN then
-			-- Large text can make even the compact badge too tall for the gap.
-			-- Keep its title line and put the whole card clear of the tab rail.
-			left = bounds.tabLeft - TAB_GAP - width
-		elseif needsSide and bounds.tabRight + TAB_GAP + width <= bounds.right - SCREEN_MARGIN then
-			left = bounds.tabRight + TAB_GAP
+		local outside = onLeft and bounds.tabLeft - TAB_GAP - width or bounds.tabRight + TAB_GAP
+		local inside = onLeft and bounds.tabRight + TAB_GAP or bounds.tabLeft - TAB_GAP - width
+		if needsSide and outside >= bounds.left + SCREEN_MARGIN and outside + width <= bounds.right - SCREEN_MARGIN then
+			left = outside
+		elseif needsSide and inside >= bounds.left + SCREEN_MARGIN and inside + width <= bounds.right - SCREEN_MARGIN then
+			-- Neither side has room; retain a reachable card beside the rail.
+			left = inside
 		else
 			bottom = math.max(bottom, tabLimit)
 		end
 	end
-	return { left = left, top = top, width = width, maxHeight = math.max(1, top - bottom) }
+	return { left = left, top = top, width = width, side = side, maxHeight = math.max(1, top - bottom) }
 end
 
 local BORDER_PIECES = {
@@ -474,6 +496,9 @@ function FeatureHints:LayoutDetails(plan, bounds, badgeHeight)
 	local frame, details = self.frame, self.frame.details
 	local left = plan.left
 	if bounds.tabRight and left < bounds.tabRight + DETAIL_TAB_GAP and left + plan.width > bounds.tabLeft - DETAIL_TAB_GAP then
+		-- If neither side fits and the summary remains above a left rail,
+		-- keep its extra options reachable in the pager.
+		if bounds.side == "left" then return false end
 		left = bounds.tabRight + DETAIL_TAB_GAP
 	end
 	local indent = left - plan.left
@@ -594,7 +619,11 @@ function FeatureHints:LayoutBadge()
 	plan.bottom = plan.top - badgeHeight
 	frame.dockPlan = plan
 	frame:ClearAllPoints()
-	frame:SetPoint("TOPLEFT", self.anchor, "TOPRIGHT", plan.left - bounds.parentRight, plan.top - bounds.parentTop)
+	if plan.side == "left" then
+		frame:SetPoint("TOPRIGHT", self.anchor, "TOPLEFT", plan.left + plan.width - bounds.parentLeft, plan.top - bounds.parentTop)
+	else
+		frame:SetPoint("TOPLEFT", self.anchor, "TOPRIGHT", plan.left - bounds.parentRight, plan.top - bounds.parentTop)
+	end
 	frame.layoutBounds = bounds
 	self:ApplyAppearance()
 	frame.layoutInProgress = nil
@@ -794,7 +823,8 @@ function FeatureHints:CreateBadge(parent)
 		if owner.layoutElapsed >= 0.25 then
 			owner.layoutElapsed = 0
 			local bounds = self:GetDockBounds()
-			for _, key in ipairs({ "left", "right", "top", "bottom", "parentTop", "parentRight", "scale", "tabLeft", "tabRight", "tabTop" }) do
+			if owner.layoutBounds and owner.layoutBounds.side ~= bounds.side then self:LayoutBadge() end
+			for _, key in ipairs({ "left", "right", "top", "bottom", "parentTop", "parentLeft", "parentRight", "scale", "tabLeft", "tabRight", "tabTop" }) do
 				local previous, current = owner.layoutBounds and owner.layoutBounds[key], bounds[key]
 				if previous ~= current and (not previous or not current or math.abs(previous - current) > 0.001) then
 					self:LayoutBadge()

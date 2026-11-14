@@ -1023,6 +1023,11 @@ do
 	check(not sendMessage.highlighted, "hiding the click layer clears the highlight")
 	equal(sendMessage.buttonState, "NORMAL", "hiding a pressed click layer releases its button")
 	equal(sendLeaves, 2, "hiding forwards leave exactly once")
+	BFL.IsForever = true
+	friends:UpdateSendMessageButton()
+	check(sendHit.shown and sendCatch.shown, "Forever leaves offline Title Friend whisper routing to Blizzard")
+	equal(sendHit.font.args[2], selected.bnetAccountID, "Forever binds the offline Title Friend's account")
+	BFL.IsForever = false
 	selected.connected = true
 	friends:UpdateSendMessageButton()
 	check(sendHit.shown and sendCatch.shown, "an online Title friend can be whispered")
@@ -1243,7 +1248,7 @@ do
 	equal(#frames, countBefore + 1, "incomplete templates are not recreated on each row refresh")
 end
 
--- The native extension uses the existing Invite slot and keeps Whisper's responder.
+-- The native extension keeps Blizzard's Invite and Whisper responders.
 do
 	local actions = {
 		BFL_AddSetNoteButton = "Note",
@@ -1277,13 +1282,21 @@ do
 	}
 	env.MenuResponse = { Open = "open" }
 	env.PARTY_INVITE, env.REQUEST_INVITE = "Invite", "Request to Join"
-	env.GetDisplayedInviteType = function(guid) return guid == "request-guid" and "REQUEST_INVITE" or "INVITE" end
+	BFL.L.INVITE_ACCOUNT_PICKER_TITLE = "Invite Character"
+	local inCombat, targetInParty, targetAcceptsRequest = false, false, true
+	env.InCombatLockdown = function() return inCombat end
+	BFL.IsGUIDInGroup = function() return targetInParty end
+	env.GetDisplayedInviteType = function(guid)
+		return guid == "request-guid" and targetAcceptsRequest and "REQUEST_INVITE" or "INVITE"
+	end
 	local calls, lastAccount, failure = {}, nil, nil
-	env.FriendsFrame_InviteOrRequestToJoin = function(guid, id) calls[#calls + 1] = { guid, id } end
+	env.FriendsFrame_InviteOrRequestToJoin = function() error("BFL fallback called Blizzard's UI wrapper") end
+	env.BNRequestInviteFriend = function(id) calls[#calls + 1] = { "request", id } end
+	BFL.BNInviteFriend = function(id) calls[#calls + 1] = { "invite", id }; return true end
 	env.UIErrorsFrame.AddExternalErrorMessage = function(_, reason) failure = reason end
-	local allowed = true
-	BFL.ValidateForeverInviteTarget = function() return allowed, allowed and nil or "Different ruleset" end
-	local friend = { type = "bnet", uid = "bnet_Tag#1234", bnetAccountID = 42, index = 3, accountName = "Friend", connected = true }
+	local allowed, onlyOnline = true, true
+	local friend = { type = "bnet", uid = "bnet_Tag#1234", bnetAccountID = 42, index = 3, accountName = "Friend",
+		connected = true, totalGameAccounts = 1 }
 	local matching = { text = "Match", playerGuid = "request-guid", gameAccountID = 5, isInvitable = true }
 	local blocked = { text = "Mismatch", playerGuid = "invite-guid", gameAccountID = 6, isInvitable = false, restrictionText = "Different ruleset" }
 	local entries = { blocked }
@@ -1291,6 +1304,14 @@ do
 	function model:GetReadableInviteField(record, key) return record and record[key] end
 	function model:GetFriendUID(record) return record.uid end
 	function model:GetInviteAccountEntries() return entries end
+	function model:GetLiveMenuInviteAccount(entry)
+		if not allowed then return nil, "Different ruleset" end
+		return entry.gameAccountID and entry
+	end
+	function model:BuildAccountDisplay(entry) return entry end
+	function model:IsOnlyOnlineMenuInviteAccount(friendID, gameID)
+		return onlyOnline and friendID == 42 and gameID == 5
+	end
 	function model:SetLastInvitedAccountID(_, id) lastAccount = id end
 	env.GetFriendsList = function() return model end
 
@@ -1312,11 +1333,14 @@ do
 		return value
 	end
 	local function count(root, label)
-		local matches = 0
+		local matches, first = 0, nil
 		for _, item in ipairs(root.children) do
-			if item.text == label then matches = matches + 1 end
+			if item.text == label then
+				matches = matches + 1
+				first = first or item
+			end
 		end
-		return matches
+		return matches, first
 	end
 
 	execute(read(repo, "Modules/MenuBridge.lua"), "Modules/MenuBridge.lua")
@@ -1344,16 +1368,22 @@ do
 		.. between(legacy, "local function BFL_CreateFriendMenuContext(", "\n\t\t\tif Menu and Menu.ModifyMenu then")
 		.. "\nreturn BFL_AddNativeFriendMenu", "native menu extension")
 
-	local nativeWhisper = function() end
+	local nativeWhisper, nativeInvite = function() end, function() end
 	local row = {}
-	local function makeMenu(omitInvite)
+	local function makeMenu(omitInvite, disabled, nativeID)
 		local menu = menuElement("root")
 		local whisper = menu:CreateButton("Whisper", nativeWhisper)
-		local invite = not omitInvite and menu:CreateButton("Invite", function() error("unguarded native invite") end)
+		local invite = not omitInvite and menu:CreateButton("Invite", nativeInvite)
+		if disabled then invite:SetEnabled(false) end
 		menu:CreateButton("Report")
 		NativeAddon(row, menu)
-		populate(menu, nativeTag, row, friend, true)
+		populate(menu, nativeTag, row, friend, true, { accountInfo = { gameAccountInfo = { gameAccountID = nativeID } } })
 		check(whisper.callback == nativeWhisper, "Blizzard Whisper's responder stays intact")
+		if invite then
+			check(invite.callback == nativeInvite, "Blizzard Invite's responder stays intact")
+			equal(invite.enabled, not disabled, "Blizzard Invite's enabled state stays intact")
+			equal(#invite.children, 0, "Blizzard Invite remains a standalone action")
+		end
 		equal(count(menu, "Report"), 1, "existing standard action is not duplicated")
 		equal(count(menu, "Note"), 1, "missing list-only action is restored")
 		equal(count(menu, "BetterFriendlist"), 1, "BFL feature section appears once")
@@ -1362,29 +1392,70 @@ do
 		equal(count(menu, "Explicit provider"), 1, "provider-only actions work in the native menu")
 		return menu, invite
 	end
-	local menu, invite = makeMenu()
-	equal(count(menu, "Invite"), 1, "ruleset block uses the existing Invite slot")
-	equal(invite.enabled, false, "mismatched ruleset disables the native action")
-	check(type(invite.tooltip) == "function", "the disabled action carries a restriction tooltip")
-	invite.callback()
+	local menu = makeMenu(false, true)
+	equal(count(menu, "Invite"), 1, "a ruleset block preserves one native Invite")
+	local _, picker = count(menu, "Invite Character")
+	equal(picker.children[1].enabled, false, "the BFL action is disabled for the wrong ruleset")
+	check(type(picker.children[1].tooltip) == "function", "the disabled BFL action carries a restriction tooltip")
+	picker.children[1].callback()
 	equal(#calls, 0, "even direct dispatch cannot send a mismatched invite")
 
+	entries = {}
+	menu = makeMenu()
+	equal(count(menu, "Invite Character"), 0, "an empty cache cannot replace a usable native entry")
 	entries = { matching, blocked }
-	menu, invite = makeMenu()
-	equal(#invite.children, 2, "the native Invite slot becomes the account picker")
-	check(invite.children[1].enabled and not invite.children[2].enabled, "only the matching account can be invited")
+	menu = makeMenu()
+	_, picker = count(menu, "Invite Character")
+	equal(#picker.children, 2, "the BFL picker contains both characters")
+	check(picker.children[1].enabled and not picker.children[2].enabled, "only the matching account can be invited")
 	allowed = false
-	invite.children[1].callback()
+	picker.children[1].callback()
 	equal(#calls, 0, "a changed ruleset is rechecked at click time")
 	equal(failure, "Different ruleset", "a newly blocked request shows the reason")
 	allowed = true
-	invite.children[1].callback()
-	equal(calls[1][1], "request-guid", "the matching account uses Blizzard's invite/request dispatcher")
+	inCombat = true
+	picker.children[1].callback()
+	equal(#calls, 0, "the BFL callback stops in combat")
+	inCombat, targetInParty = false, true
+	picker.children[1].callback()
+	equal(#calls, 0, "the BFL callback stops for a member of the player's group")
+	targetInParty, targetAcceptsRequest = false, false
+	picker.children[1].callback()
+	equal(#calls, 0, "a Request to Join cannot turn into a direct invite before click")
+	targetAcceptsRequest = true
+	picker.children[1].callback()
+	equal(calls[1][1], "request", "the matching account uses the direct request API")
 	equal(lastAccount, 5, "a successful request preserves the last-account preference")
 
 	entries = { matching }
+	menu = makeMenu(false, true, 5)
+	equal(count(menu, "Invite Character"), 0, "an existing disabled action for the same target is not duplicated")
+	menu = makeMenu(false, true, 6)
+	equal(count(menu, "Invite Character"), 1, "BFL can offer the compatible character instead of the native target")
 	menu = makeMenu(true)
 	equal(count(menu, "Request to Join"), 1, "a missing native action is appended once with the right label")
+	entries, friend.gameAccountInfo = {}, matching
+	menu = makeMenu(true)
+	equal(count(menu, "Request to Join"), 1, "a readable primary account recovers a missing native action and empty cache")
+	friend.gameAccountInfo = nil
+	entries = { { text = "Match", gameAccountID = 5, isInvitable = true } }
+	local wasForever = BFL.IsForever
+	BFL.IsForever = true
+	menu = makeMenu(true)
+	local _, direct = count(menu, "Invite")
+	equal(direct.enabled, false, "Forever requires a readable character GUID")
+	BFL.IsForever = false
+	menu = makeMenu(true)
+	_, direct = count(menu, "Invite")
+	equal(direct.enabled, true, "Retail offers a direct invite for one account without a GUID")
+	onlyOnline = false
+	direct.callback()
+	equal(#calls, 1, "a second account appearing after menu open prevents a GUID-less invite")
+	onlyOnline = true
+	direct.callback()
+	equal(calls[2][1], "invite", "the unambiguous Retail account uses the direct invite API")
+	BFL.IsForever = wasForever
+	entries = { matching }
 	menu = menuElement("root")
 	bridge:PopulateMenu(row, menu, { bnetIDAccount = 42 }, "BN_FRIEND")
 	equal(count(menu, "Third-party action"), 1, "BFL-owned menus still replay captured registrations")

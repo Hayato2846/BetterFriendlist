@@ -36,6 +36,38 @@ function LegacySettingsStyle:OnSectionsLaidOut(frames)
 	self:Refresh()
 end
 
+function LegacySettingsStyle:RefreshSectionDivider(header, shown, border)
+	local divider = header.BFL_SectionDivider
+	if shown and not divider then
+		divider = header:CreateTexture(nil, "ARTWORK")
+		divider:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 7)
+		divider:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 7)
+		divider:SetTexelSnappingBias(0)
+		divider:SetSnapToPixelGrid(false)
+		if BFL.HasAtlas("perks-divider-short") and BFL.SetTextureOrAtlas(divider, "perks-divider-short") then
+			divider:SetHeight(3)
+		else
+			divider:SetColorTexture(1, 1, 1, 0.28)
+			divider:SetHeight(1)
+		end
+		header.BFL_SectionDivider = divider
+	end
+	if divider then
+		divider:SetShown(shown)
+		if shown then
+			divider:SetAlpha(1)
+			divider:SetVertexColor(unpack(border))
+		end
+	end
+end
+
+function LegacySettingsStyle:CreateRule(parent)
+	local rule = parent:CreateTexture(nil, "ARTWORK")
+	rule:SetHeight(1)
+	rule:SetColorTexture(1, 1, 1, 0.16)
+	return rule
+end
+
 function LegacySettingsStyle:RefreshSections(modern, palette)
 	local frame = _G.BetterFriendlistSettingsFrame
 	local content = frame and frame.ContentScrollFrame and frame.ContentScrollFrame.Content
@@ -45,28 +77,7 @@ function LegacySettingsStyle:RefreshSections(modern, palette)
 		for _, header in ipairs(frames) do
 			if header.BFL_SettingsSectionHeader and header:IsShown() then
 				local shown = modern and inLegacyWindow and not first
-				local divider = header.BFL_SectionDivider
-				if shown and not divider then
-					divider = header:CreateTexture(nil, "ARTWORK")
-					divider:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 7)
-					divider:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 7)
-					divider:SetTexelSnappingBias(0)
-					divider:SetSnapToPixelGrid(false)
-					if BFL.HasAtlas("perks-divider-short") and BFL.SetTextureOrAtlas(divider, "perks-divider-short") then
-						divider:SetHeight(3)
-					else
-						divider:SetColorTexture(1, 1, 1, 0.28)
-						divider:SetHeight(1)
-					end
-					header.BFL_SectionDivider = divider
-				end
-				if divider then
-					divider:SetShown(shown)
-					if shown then
-						divider:SetAlpha(1)
-						divider:SetVertexColor(unpack(palette.border))
-					end
-				end
+				self:RefreshSectionDivider(header, shown, modern and palette.border)
 				first = false
 			end
 		end
@@ -320,6 +331,26 @@ function LegacySettingsStyle:SkinComparison(review)
 	if skin then skin:SkinSettingsComparison(review) end
 end
 
+function LegacySettingsStyle:SkinAuxiliaryWindow(frame, inset, scroll)
+	local theme = BFL:GetEffectiveTheme()
+	local external = theme == "elvui" and BFL:GetModule("ElvUISkin")
+		or theme == "ellesmereui" and BFL:GetModule("EllesmereUISkin")
+	if external then
+		external:SkinSettingsWindow(frame, inset, scroll)
+		return
+	end
+	local engine = BFL:GetModule("SkinEngine")
+	if engine and engine:IsActive() then
+		BFL:GetModule("DarkTheme"):SkinSettingsWindowChrome(engine, frame)
+		BFL:GetModule("DarkTheme"):LayoutMainTitleButtons(engine, frame)
+		if inset then
+			engine:SkinFrame(inset, "inset", { stripTextures = true, textureAlpha = 0 })
+			engine:ClearNativeBackdrop(inset)
+		end
+		if scroll and scroll.ScrollBar then engine:SkinScrollBar(scroll.ScrollBar) end
+	end
+end
+
 function LegacySettingsStyle:SkinActions(buttons, editBox)
 	local theme = BFL:GetEffectiveTheme()
 	local external = theme == "elvui" and BFL:GetModule("ElvUISkin")
@@ -330,7 +361,19 @@ function LegacySettingsStyle:SkinActions(buttons, editBox)
 	end
 	local engine = BFL:GetModule("SkinEngine")
 	if engine and engine:IsActive() then
-		for _, button in ipairs(buttons or {}) do engine:SkinButton(button) end
+		for _, button in ipairs(buttons or {}) do
+			if button.BFL_SettingsIconButton then
+				engine:SkinIconButton(button, nil, { texture = button.Icon, size = 14 })
+			elseif button.BFL_SettingsIconTile then
+				engine:ClearNativeBackdrop(button)
+				engine:SetTextureAlpha(button, button.selectedTex, 0)
+				engine:SkinButton(button, { variant = "nav", insets = { left = 0, right = 0, top = 0, bottom = 0 } })
+			elseif button.isTopTab or button.LeftActive then
+				engine:SkinTab(button)
+			else
+				engine:SkinButton(button)
+			end
+		end
 		if editBox then engine:SkinEditBox(editBox) end
 	end
 end
@@ -358,15 +401,21 @@ function LegacySettingsStyle:RefreshScrollbar(frame, theme)
 	if theme == "blizzard" then bar:SetWidth(8) end
 end
 
-function LegacySettingsStyle:Refresh()
-	local frame = _G.BetterFriendlistSettingsFrame
-	if not (frame and frame.Bg and frame.MainInset) then return end
+function LegacySettingsStyle:GetWindowStyle()
 	local FriendsUI = BFL.IsMainline and BFL:GetModule("FriendsUI")
 	local theme = BFL.GetEffectiveTheme and BFL:GetEffectiveTheme() or "blizzard"
 	local supportedTheme = theme == "blizzard" or theme == "dark" or theme == "custom"
 	local modern = not not (FriendsUI and FriendsUI:IsModernActive() and supportedTheme)
-	local palette = modern and FriendsUI:GetModernThemeColors(theme)
+	return theme, modern, modern and FriendsUI:GetModernThemeColors(theme), FriendsUI
+end
+
+function LegacySettingsStyle:Refresh()
+	local frame = _G.BetterFriendlistSettingsFrame
+	if not (frame and frame.Bg and frame.MainInset) then return end
+	local theme, modern, palette, FriendsUI = self:GetWindowStyle()
 	local review = BFL:GetModule("LegacySettingsReview")
+	local dock = BFL:GetModule("SettingsPreviewDock")
+	if dock then dock:RefreshAppearance() end
 	local shell = review and review.previewShell
 	if shell then
 		local themedPreview = FriendsUI and (theme == "blizzard" or theme == "ellesmereui")
@@ -376,7 +425,7 @@ function LegacySettingsStyle:Refresh()
 		if review.active then
 			local elvui = BFL:GetModule("ElvUISkin")
 			if elvui and theme == "elvui" then elvui:SkinSettingsReview(review, false) end
-			self:SkinActions(review.supportButtons)
+			self:SkinActions(review.supportButtons, review.search)
 			if review.home and review.home:IsShown() then
 				BFL:GetModule("Changelog"):RefreshReleaseBadges(review.home.entries)
 			end
@@ -384,7 +433,12 @@ function LegacySettingsStyle:Refresh()
 		end
 	end
 	self:RefreshScrollbar(frame, theme)
-	if not modern and not frame.BFL_ModernSettingsBackgrounds then return end
+	self:RefreshWindowBackground(frame, theme, modern, palette)
+	self:RefreshSections(modern, palette)
+end
+
+function LegacySettingsStyle:RefreshWindowBackground(frame, theme, modern, palette)
+	if not frame.Bg or (not modern and not frame.BFL_ModernSettingsBackgrounds) then return end
 
 	local backgrounds = frame.BFL_ModernSettingsBackgrounds
 	if modern and not backgrounds then
@@ -423,14 +477,15 @@ function LegacySettingsStyle:Refresh()
 	-- The outer window supplies the native border, as in the Modern changelog.
 	if theme == "blizzard" then
 		frame.Bg:SetShown(not modern)
-		frame.MainInset:SetBackdropBorderColor(0.4, 0.4, 0.4, modern and 0 or 0.8)
+		if frame.MainInset then frame.MainInset:SetBackdropBorderColor(0.4, 0.4, 0.4, modern and 0 or 0.8) end
 	end
-	if frame.ButtonSeparator and supportedTheme then frame.ButtonSeparator:SetShown(not modern) end
+	if frame.ButtonSeparator and (theme == "blizzard" or theme == "dark" or theme == "custom") then
+		frame.ButtonSeparator:SetShown(not modern)
+	end
 	backgrounds.body:SetShown(modern)
 	local useAtlas = modern and theme == "blizzard"
 	backgrounds.topFade:SetShown(useAtlas and backgrounds.hasTopFade or false)
 	backgrounds.bottomFade:SetShown(useAtlas and backgrounds.hasBottomFade or false)
-	self:RefreshSections(modern, palette)
 	if backgrounds.navigationDivider then
 		backgrounds.navigationDivider:SetShown(modern)
 		if modern then
