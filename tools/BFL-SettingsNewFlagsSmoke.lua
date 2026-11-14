@@ -159,12 +159,17 @@ check(flags:IsUnread("useThemedDialogs"),"reset requires open settings")
 -- Menus attach through Blizzard's compositor rather than retaining custom
 -- child frames or skin markers on pooled menu rows.
 local pooled=region();pooled.GetTextWidth=function() return 24 end
+pooled.Label,pooled.BGLabel=region(),region()
+for _,text in ipairs({pooled.Label,pooled.BGLabel}) do text.SetFont=function() end end
+env.GameFontHighlight={GetFont=function() return "Fonts/test.ttf",12,"" end}
+env.GameFontNormal_NoShadow=env.GameFontHighlight
 local menuButton=region();menuButton.fontString=region(menuButton,"FontString")
+function menuButton:AttachTemplate(template) check(template=="BFLNewFeatureLabelMenuTemplate","menu badge uses a shared Blizzard font pool");return pooled end
 env.MenuTemplates={AttachNewFeatureFrame=function(parent) check(parent==menuButton,"badge attaches to another menu row");return pooled end}
 local description={AddInitializer=function(self,callback) self.initialize=callback end}
 modules.NewFeatureBadge:AttachToMenu(description)
 local beforeFrames=frameCreations;description.initialize(menuButton)
 check(frameCreations==beforeFrames,"menu badge allocates persistent child frames")
-check(pooled.scale==.8 and pooled.mouse==false and not pooled.BFL_DarkManagedSubtree,"menu badge leaves a BFL skin marker on a shared frame")
+check(pooled.scale==1 and pooled.mouse==false and not pooled.BFL_DarkManagedSubtree,"menu badge changes the compositor coordinate space or leaves skin state")
 check(pooled.points[1][2]==menuButton.fontString,"menu badge is detached from its item text")
 io.write(string.format("PASS: per-setting New flags, click reading and category aggregation (%d checks)\n",checks))

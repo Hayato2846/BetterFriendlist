@@ -35,6 +35,7 @@
     { "file": "BFL-LegacySettingsStyleSmoke.lua", "arguments": ["{repo}", "{live}"] },
     { "file": "BFL-LocalizationRuntimeSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-NativeFriendsSearchSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-NewFeatureBadgeMenuSmoke.lua", "arguments": ["{repo}", "{references}"] },
     { "file": "BFL-NicknameHintsSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-NoteSyncPerformanceSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-NoteSyncSettingsSmoke.lua", "arguments": ["{repo}"] },

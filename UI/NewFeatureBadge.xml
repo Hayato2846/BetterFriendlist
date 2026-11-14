@@ -1,0 +1,13 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- A separate template keeps the smaller font out of Blizzard's shared label pool. -->
+	<Frame name="BFLNewFeatureLabelMenuTemplate" inherits="NewFeatureLabelTemplate" virtual="true">
+		<Scripts>
+			<OnLoad inherit="append">
+				local font, size, flags = GameFontHighlight:GetFont();
+				self.Label:SetFont(font, size * .8, flags);
+				font, size, flags = GameFontNormal_NoShadow:GetFont();
+				self.BGLabel:SetFont(font, size * .8, flags);
+			</OnLoad>
+		</Scripts>
+	</Frame>
+</Ui>

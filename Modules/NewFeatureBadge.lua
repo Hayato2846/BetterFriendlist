@@ -23,10 +23,13 @@ function Badge:AttachToMenu(description)
 	description:AddInitializer(function(button)
 		-- Menu-owned attachments are released/reset with the pooled row. Never
 		-- leave a persistent BFL child or a skin hook on shared Blizzard menus.
-		local label = MenuTemplates.AttachNewFeatureFrame(button)
-		label:SetScale(SCALE)
+		local label = button:AttachTemplate("BFLNewFeatureLabelMenuTemplate")
+		label.noRecurseHierarchy = true
+		-- Menu measurement compares attachments' GetRect coordinates directly.
+		-- A separate scale mixes coordinate spaces and inflates the whole row.
+		label:SetScale(1)
 		label:EnableMouse(false)
 		label:ClearAllPoints()
-		label:SetPoint("CENTER", button.fontString, "RIGHT", label:GetTextWidth() / 2 + 8 / SCALE, 0)
+		label:SetPoint("CENTER", button.fontString, "RIGHT", label:GetTextWidth() / 2 + 8, 0)
 	end)
 end

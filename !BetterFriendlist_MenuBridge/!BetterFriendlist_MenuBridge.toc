@@ -2,7 +2,7 @@
 ## Title: BetterFriendlist Menu Bridge
 ## Notes: Companion for BetterFriendlist. Shows actions from compatible AddOns in supported BetterFriendlist context menus.
 ## Author: Hayato2846
-## Version: 3.1.2
+## Version: 3.1.3-dev
 ## IconTexture: Interface\AddOns\BetterFriendlist\Textures\PortraitIcon.blp
 ## OptionalDeps: Blizzard_Menu
 
