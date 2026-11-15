@@ -2,7 +2,7 @@
 
 Before visual Lua/XML or skin/theme edits, read the relevant sections of `docs/UI_CONVENTIONS.md`. If absent, check the same relative path in the main repo at `C:\Users\hofer\Documents\BFL\repos\BetterFriendlist`; if both are absent, report this and use available conventions.
 
-Its `SettingsComponents.lua` guidance applies to legacy settings. Settings Center controls follow `libsettingsdesigner-bfl`; do not migrate them back to legacy controls when applying old UI examples.
+For the unified Settings and editors matching it, follow `bfl-settings` and [Settings window principles](settings-windows.md). Reuse the current BFL controls and style owners identified there.
 
 Define the target state and geometry to inspect. Use supplied screenshots/references; if a low-risk request lacks them, state a narrow visual assumption and proceed. For ambiguous substantial redesigns, clarify the direction with a small annotated plan or throwaway mockup when useful.
 

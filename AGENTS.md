@@ -12,7 +12,7 @@
 - Logic in `Modules/`, helpers in `Utils/`, data in `Data/`; keep UI wiring thin.
 - No emojis in project files. Commits use `{type}: {description} ({context})` with existing BFL types.
 - Assess Retail and every supported Classic flavor for user-visible fixes/features; resolve affected regressions in the same task. Forever is Mainline-family. Verify changed native API/event/template contracts against relevant local sources. Prefer `BFL.Is*`, `BFL.Has*`, `BFL.Compat` over raw version checks.
-- Load `betterfriendlist` for runtime work, `bfl-feature` for implementation/releases/deployment, and `libsettingsdesigner-bfl` for Settings Center/library work only. Load relevant conditional references before their work, especially visual edits and changelog/releases.
+- Load `betterfriendlist` for runtime work, `bfl-feature` for implementation/releases/deployment, and `bfl-settings` for the unified Settings or editors matching its behavior. Load relevant conditional references before their work, especially visual edits and changelog/releases.
 - New strings and changed `enUS` values need real translations in all 10 non-English locales in the same change. Preserve printf placeholders, WoW markup, links and escaped newlines. Require `tools/BFL-LocalizationCheck.ps1 -Mode Changed -BaseRef <branch-base>`. Allowlist only justified exact locale/key or locale/value exceptions for product names, client keys or established UI terms; no substring/whole-locale exceptions.
 - Keep Perfy instrumentation out of normal source; inspect cleanup with `tools/BFL-PerfyCleanup.ps1`, never `git restore .`.
 

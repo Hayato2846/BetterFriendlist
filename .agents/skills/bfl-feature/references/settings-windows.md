@@ -1,6 +1,6 @@
 ## Settings Window Principles
 
-Use the redesigned default BetterFriendlist Settings as the interaction reference for BFL settings windows and editors. Choose patterns that fit the player's task and the available space.
+Use the unified modern BetterFriendlist Settings as the interaction reference for BFL settings windows and editors. Follow `bfl-settings` for current implementation owners. Choose patterns that fit the player's task and the available space.
 
 - **Make the common path the shortest.** Put frequent edits directly on the field they affect. Use a toggle for on/off, a choice control for mutually exclusive values, and a button for an action. Give the main action in each area a clear visual priority. Put a small set of fixed actions directly on the relevant item or section when they fit without crowding its label. Use a menu for larger sets or choices that depend on the current data, and offer recovery actions when there is something to recover.
 - **Organize around what players want to do.** Group controls by outcome and keep the current item or category easy to identify. When an entry point already identifies an item or option, select it and bring it into view. Add search or filtering when it helps players reach a target in a long list.

@@ -9,7 +9,7 @@ Follow the active checkout's `AGENTS.md` for workspace, authorization, localizat
 
 Before editing, identify the intended behavior, affected surface/flavors, and validation. A short paragraph is sufficient for a narrow fix; use a concise plan when dependencies or completion criteria need tracking. Resolve routine choices from the code and session; ask only for missing information that changes the result. Do not create a persistent Goal unless requested.
 
-Load `betterfriendlist` for runtime implementation. Load WoW-source skills for changed native contracts and `libsettingsdesigner-bfl` for Settings Center work, as routed there; do not load every companion for every task.
+Load `betterfriendlist` for runtime implementation. Load WoW-source skills for changed native contracts and `bfl-settings` for the unified Settings or editors matching its behavior; do not load every companion for every task.
 
 ## Conditional procedures
 
@@ -19,7 +19,7 @@ Read the matching reference before performing its work; skip unrelated reference
 | --- | --- |
 | Create/attach/name a worktree or resolve its setup | [Worktree setup](references/worktree.md) |
 | Change visual layout, templates, textures, fonts, colors, scrolling, strata, skins/themes | [Visual UI](references/visual-ui.md) and the relevant `docs/UI_CONVENTIONS.md` sections, before editing |
-| Change BFL settings windows/editors, including legacy Settings and Friend Tag Editor | [Settings window principles](references/settings-windows.md), in addition to the visual procedure |
+| Change BFL settings windows/editors, including the unified Settings and Friend Tag Editor | [Settings window principles](references/settings-windows.md), in addition to the visual procedure |
 | Edit public changelog/release notes, promote a version, tag/publish/correct a release | [Changelog and release](references/changelog-release.md) |
 | Deploy runtime implementation/fixes for QA, install a release ZIP, or test SavedVariables migrations | [Deployment](references/deployment.md) |
 
