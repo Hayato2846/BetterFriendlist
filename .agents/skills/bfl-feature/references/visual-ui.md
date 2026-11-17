@@ -9,8 +9,9 @@ Define the target state and geometry to inspect. Use supplied screenshots/refere
 ## Required captures
 
 1. Run `./tools/BFL-UISimCapture.ps1` from the active checkout before editing and after editing with the same fixture. Default: `/bfl preview friends_headers_i18n`. Select the changed surface with `-Profile`, e.g. `guild` or `friend_requests`.
-2. Open and compare both runs' `normal.png` and `narrow.png`. Check clipping, overlap, anchoring, and readable text. Use `normal.log`/`narrow.log` for resolved geometry. Fix problems and recapture before handoff.
-3. For unsupported surfaces, use a focused simulator scene or record why maintainer in-client capture is required. Give exact live-test steps; never automate the WoW client.
+2. Compare before and after at both widths. For each capture, record its width, phase, PNG SHA-256, and observations about clipping, overlap, anchoring, and readable text. Open each distinct image hash once for the review. Reuse the visual observations when a hash repeats across captures or retries. For older captures, get the hash with `Get-FileHash -LiteralPath <png>`. Fix problems and recapture before handoff.
+3. Start with the frame geometry printed by the runner. For specific widgets or diagnostics, use `-LogPattern` with a selector for the affected frame, assertion, or error. This prints up to 12 matching lines per variant. After capture, search the saved logs with bounded, specific queries such as `rg -n -m 12 -A 1 '^\s+\.HeaderText \[FontString\].* visible ' <run>/normal.log <run>/narrow.log`. Expand around a relevant match only when more context is needed.
+4. For unsupported surfaces, use a focused simulator scene or record why maintainer in-client capture is required. Give exact live-test steps; never automate the WoW client.
 
 The prepared Windows Retail kit is in `references/wow-ui-sim-v0.1.40` under the BFL hub. Use `-SimulatorHome` for another location of that kit. Outputs default to `diagnostics/bfl-ui-tests` in the hub.
 

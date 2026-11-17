@@ -52,6 +52,7 @@ installed game assets while WoW is closed.
 
 ```powershell
 .\tools\BFL-UISimCapture.ps1
+.\tools\BFL-UISimCapture.ps1 -LogPattern '^\s+\.HeaderText \[FontString\].* visible '
 .\tools\BFL-UISimCapture.ps1 -Scenario nickname_hint
 ```
 
@@ -61,8 +62,11 @@ nickname scenario renders four states, from `modern-collapsed` and
 `-Variant modern-expanded` to capture just that state. Add `-Fade` to capture
 the hint halfway through its fade-out. Each run writes PNGs and
 frame logs under `diagnostics/bfl-ui-tests`. Use the same scenario before and
-after a change to compare screenshots and geometry. The Retail simulator uses
-Retail artwork for both interface styles.
+after a change to compare screenshots and geometry at both widths. Match the
+reported SHA-256 hashes to reuse visual observations for identical PNGs.
+`-LogPattern` prints up to 12 case-sensitive regex matches per variant with
+line numbers in the saved log. The Retail simulator uses Retail artwork for
+both interface styles.
 
 ## Native friend menu
 

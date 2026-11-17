@@ -17,7 +17,13 @@ param(
     [ValidateSet('blizzard', 'dark', 'custom')]
     [string]$SideTabTheme,
     [switch]$ShowFriendTabSettings,
-    [switch]$Fade
+    [switch]$Fade,
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript({
+        [void][regex]::new($_)
+        $true
+    })]
+    [string[]]$LogPattern
 )
 
 $ErrorActionPreference = 'Stop'
@@ -230,6 +236,19 @@ foreach ($captureVariant in $variants) {
         }
         Write-Host "[BFL UI] $($frame.Line.Trim())"
         Write-Host "[BFL UI] $png"
+        $imageHash = (Get-FileHash -LiteralPath $png -Algorithm SHA256).Hash
+        Write-Host "[BFL UI] $captureVariant PNG SHA256 $imageHash"
+
+        if ($LogPattern) {
+            $logMatches = @(Select-String -LiteralPath $log -Pattern $LogPattern -CaseSensitive |
+                Select-Object -First 12)
+            if ($logMatches.Count -eq 0) {
+                Write-Host "[BFL UI] ${captureVariant}: no log matches"
+            }
+            foreach ($match in $logMatches) {
+                Write-Host "[BFL UI] ${captureVariant}:$($match.LineNumber) $($match.Line.Trim())"
+            }
+        }
     } finally {
         try {
             if ($capture) {
