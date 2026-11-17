@@ -27,6 +27,7 @@ local helpOnlySettings = {
 	SETTINGS_SIMPLE_MODE_SHOW_SEARCH = true,
 	SETTINGS_SYNC_GROUPS_NOTE = true,
 	SETTINGS_EXTERNAL_MENU_BRIDGE = true,
+	SETTINGS_SHOW_BLIZZARD = true,
 	BROKER_SETTINGS_CLICK_ACTION = true,
 	GUILD_BROKER_SETTINGS_CLICK_ACTION = true,
 }
@@ -69,7 +70,6 @@ Catalog.comparisons = {
 		} },
 	},
 	behavior = {
-		SETTINGS_SHOW_BLIZZARD = { "showBlizzardOption", outcome = "blizzardMenu" },
 		SETTINGS_FRIENDLIST_CLICK_WHISPER = { "friendListClickWhisperEnabled", outcome = "whisper" },
 		SETTINGS_FRIENDLIST_CLICK_WHISPER_MODE = { "friendListClickWhisperMode", outcome = "whisper",
 			prerequisite = { "friendListClickWhisperEnabled", true } },
@@ -657,9 +657,6 @@ Catalog.search = {
 		},
 	},
 	behavior = {
-		SETTINGS_DISPLAY_OPTIONS = {
-			"SETTINGS_SHOW_BLIZZARD",
-		},
 		SETTINGS_BEHAVIOR_HEADER = {
 			"SETTINGS_BEHAVIOR_HEADER",
 			"SETTINGS_FRIENDLIST_CLICK_WHISPER",
@@ -838,6 +835,7 @@ Catalog.search = {
 		},
 		SETTINGS_LEGACY_DIAGNOSTICS = {
 			"SETTINGS_LEGACY_DIAGNOSTICS",
+			"SETTINGS_SHOW_BLIZZARD",
 			"SETTINGS_SHOW_WELCOME_MESSAGE",
 			"SETTINGS_DEBUG_PRINT",
 		},

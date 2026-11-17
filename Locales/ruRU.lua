@@ -1584,7 +1584,9 @@ BFL:RegisterLocale("ruRU", function()
 	L.SETTINGS_GRAY_OTHER_FACTION_DESC = "Затемнять остальные"
 	L.SETTINGS_SHOW_MOBILE_AS_AFK_DESC = "Показывать мобильных как AFK"
 	L.SETTINGS_HIDE_MAX_LEVEL_DESC = "Скрывать максимальный лвл"
-	L.SETTINGS_SHOW_BLIZZARD_DESC = "Показывать кнопку Blizzard"
+	L.SETTINGS_SHOW_BLIZZARD_DESC = "Диагностический доступ к списку друзей Blizzard. BetterFriendlist полностью заменяет его и не поддерживает одновременное использование обоих списков."
+	L.DIALOG_SHOW_BLIZZARD_WARNING = "|cffff2020ТОЛЬКО для диагностики.|r\n\nBetterFriendlist полностью заменяет список друзей Blizzard. Одновременное использование обоих списков друзей не поддерживается.\n\nВключить этот диагностический доступ?"
+	L.DIALOG_SHOW_BLIZZARD_ACCEPT = "Понятно"
 	L.SETTINGS_SHOW_FAVORITES_DESC = "Показывать Избранное"
 	L.SETTINGS_ACCORDION_GROUPS_DESC =
 		"Открытие одной группы сворачивает остальные"

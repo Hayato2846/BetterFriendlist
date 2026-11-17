@@ -1509,7 +1509,9 @@ function BFL:InstallWhoSlashRedirect()
 		whoModule:ShowWhoResults()
 
 		local editBox = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.EditBox
-		if editBox and type(editBox.SetText) == "function" then
+		-- Keep the displayed query paired with its results when the send is
+		-- rejected by the cooldown. SendWhoRequest still supplies its feedback.
+		if not whoModule:IsOnCooldown() and editBox and type(editBox.SetText) == "function" then
 			editBox:SetText(query)
 		end
 
@@ -2854,25 +2856,12 @@ SlashCmdList["BETTERFRIENDLIST"] = function(msg)
 		end
 
 	-- Legacy commands (from old BetterFriendlist.lua slash handler)
-	elseif msg == "show" then
-		if BFL.DB then
-			BFL.DB:Set("showBlizzardOption", true)
-			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_ENABLED)
-		end
-	elseif msg == "hide" then
-		if BFL.DB then
-			BFL.DB:Set("showBlizzardOption", false)
-			print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_DISABLED)
-		end
-	elseif msg == "toggle" then
-		if BFL.DB then
-			local current = BFL.DB:Get("showBlizzardOption", false)
-			BFL.DB:Set("showBlizzardOption", not current)
-			if not current then
-				print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_ENABLED)
-			else
-				print("|cff00ff00BetterFriendlist:|r " .. BFL.L.CORE_SHOW_BLIZZARD_DISABLED)
-			end
+	elseif msg == "show" or msg == "hide" or msg == "toggle" then
+		local Settings = BFL:GetModule("Settings")
+		local DB = BFL:GetModule("DB")
+		if Settings and DB then
+			local enabled = msg == "show" or (msg == "toggle" and not DB:Get("showBlizzardOption", false))
+			Settings:OnShowBlizzardOptionChanged(enabled, true)
 		end
 
 	-- Settings

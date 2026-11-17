@@ -32,6 +32,14 @@ local env = setmetatable({ SlashCmdList = {}, StaticPopupDialogs = {},
 	GetLocale = function() return "enUS" end,
 }, { __index = _G })
 env._G = env
+-- This generic persistence sweep models explicit consent. Dedicated diagnostic
+-- tests separately exercise pending, cancellation and stale confirmations.
+env.StaticPopup_Show = function(name)
+	if name == "BETTERFRIENDLIST_BLIZZARD_DIAGNOSTICS_CONFIRM" then
+		env.StaticPopupDialogs[name].OnAccept()
+	end
+	return {}
+end
 function env.wipe(target) for key in pairs(target) do target[key] = nil end; return target end
 function env.CopyTable(value)
 	if type(value) ~= "table" then return value end

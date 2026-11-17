@@ -3,6 +3,8 @@
 This repository is the development workspace. The WoW `Interface\AddOns\BetterFriendlist`
 folders are deployment targets only.
 
+For the Who fixes based on 3.1.3, see the German [Who regression test guide](WHO_REGRESSION_TESTING.md), including normal UI test steps, reachability findings, and the limits of simulated evidence.
+
 ## Layout
 
 Recommended local layout:

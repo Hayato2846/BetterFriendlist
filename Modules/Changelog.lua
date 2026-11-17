@@ -74,6 +74,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [DRAFT]
+
+### All WoW Versions
+
+#### Improved
+- **Blizzard Friendlist Access** - Moved the option to Advanced under Diagnostics and disabled it once for the 3.1.4 update. Re-enabling requires confirmation that this is for diagnostics only; BetterFriendlist fully replaces Blizzard's friends list and does not support running both lists in parallel.
+
+### WoW Retail & WoW Forever
+
+#### Fixed
+- **Who Searches** - A /who command rejected during the search cooldown no longer overwrites the text in the Who search box.
+
+### WoW Forever
+
+#### Improved
+- **Who Searches** - Blizzard's wait messages appear in the Who tab in your game client's language. Searches with no result or recognized wait message still show the timeout notice.
+
+### WoW Classic
+
+#### Fixed
+- **Who Sorting** - The Name, Level, and Class sort order is kept when Who results refresh or the Who tab is reopened.
+
+---
+
 ## [3.1.3]        - 2026-11-15
 
 ### All WoW Versions
@@ -347,85 +371,6 @@ BetterFriendlist 3.0.0 adds saved Who searches, an option to show friends' alts 
 
 #### Compatibility
 - **PTR Support** - Updated BetterFriendlist and the Menu Bridge for the 12.1.7 PTR.
-
----
-
-## [2.9.2]        - 2026-10-11
-
-BetterFriendlist 2.9.2 adds a WoW Forever filter and fixes greyed-out group invites, along with a few smaller fixes.
-
-### All WoW Versions
-
-#### Fixed
-- **Group Invites** - Fixed cases where Invite was greyed out in a Battle.net friend's right-click menu, including friends on other realms in WoW Forever. The character picker also handles friends with multiple WoW accounts.
-- **Remove Friend** - The confirmation now uses the correct wording for WoW, BattleTag, and Real ID friends.
-- **Changelog** - The current version's draft notes now appear in both in-game changelog views.
-- **Invite Tooltip** - Offline friends now show a red offline message. Fixed incorrect faction warnings and added available group activity details when requesting to join.
-- **Context Menu** - Empty Interact headings are no longer shown when no actions are available, including offline Title friends.
-- **Friend List** - Fixed missing updates when reopening the friends list after changes while it was closed.
-- **Who Class Filters** - Fixed missing class options on some clients, including Druids on Classic.
-- **Settings and Skins** - Fixed errors that could occur when Settings, Who, or an addon skin accessed UI details restricted by Blizzard.
-
-### Retail Midnight & WoW Forever
-
-#### Fixed
-- **Battle.net Blocking** - Block actions are now hidden for Title friends or when the required account details are missing. Friend requests are checked again before an account is blocked.
-- **Title Friend Colors** - Online Title friends also use class colors in name-only layouts when enabled. Offline names stay gray.
-
-### WoW Forever
-
-#### Added
-- **WoW Forever Filter** - A new quick filter shows friends playing WoW Forever in the friends list and Data Broker.
-
-#### Fixed
-- **Character Names** - Friends' character menus, Copy Character Name, and Quick Join no longer add unnecessary realm names. Forever surnames are kept in player links.
-- **Add Friend** - BFL now opens Blizzard's Add Friend window in Forever, including its handling of Title friend requests.
-- **Title Friend Names** - Title friends show the character name once in the default layout and friend tooltip. Custom names are still shown in the list if they differ from the character name.
-- **Friend List** - Fixed an empty friend list after login or reloading when a title friend appeared first.
-
----
-
-## [2.9.1]        - 2026-09-27
-
-BetterFriendlist 2.9.1 adds new Guild tools, updates the Settings Center, and fixes several Who and Group Finder problems.
-
-### All WoW Versions
-
-#### Added
-- **Raid PvP Icons** - Raid and party rows can now show PvP faction or prestige icons when available.
-
-#### Improved
-- **Private Notes** - Private Notes are no longer a Beta feature. They remain disabled until you turn them on.
-- **Settings Center** - Updated the Settings Center library. It now uses direct links to features, two-column pages, and grouped option rows.
-- **Themes** - Dark and Custom themes now update faster when you change their colors.
-- **Auto Raid Assist** - Search results now show Battle.net friends first, followed by WoW and Title friends, and then guild members. Battle.net results and targets use Battle.net blue, while WoW, Title, and Guild entries use class colors.
-- **External AddOn Menu Bridge** - The bridge is no longer a Beta feature and is switched on once when upgrading to v2.9.1. You can turn it off again at any time. If the companion addon is disabled, the option is greyed out and explains why.
-
-#### Fixed
-- **Blocked Actions** - Fixed errors caused when BFL or an addon skin tried to recolor a UI element locked by Blizzard.
-- **Search and Sorting** - Search and sorting now skip names or text hidden by Blizzard.
-
-### Retail Midnight & WoW Forever
-
-#### Added
-- **Guild Roster** - Profession filters now sit inside the main Guild filter and work together with Online, All, and Offline. Message of the Day, Guild News, and Guild Information share one larger area. Guild News is always available when supported and includes filters, a scrollable history, and links for achievements and items.
-- **Guild Member Menu** - Right-click a guild member to add them as a friend, ignore them, or view their house when available. The unused Who option has been removed.
-- **Quick Join** - Tooltips can now show the group leader's level.
-
-### WoW Forever
-
-#### Added
-- **BattleTag Friend Requests** - Title friends can now be added as Battle.net friends from their right-click menu.
-
-#### Improved
-- **Character Names** - Forever surnames are now kept in Who searches, right-click menus, and Recent Allies notes.
-- **Context Menus** - Block and remove actions are now shown in red.
-
-#### Fixed
-- **Group Finder** - Fixed blocked-action errors that could appear after using BFL's Who tab.
-- **Who During Combat** - Typing or pressing Escape in the Who tab during combat no longer causes blocked-action errors.
-- **Blocking** - Battle.net blocking works again, and Title friends no longer show an unusable Block Invites option.
-- **Restricted Chat** - Whisper actions are disabled and show Blizzard's reason when the account is not allowed to chat.
 
 ---
 

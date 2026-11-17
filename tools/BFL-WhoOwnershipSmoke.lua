@@ -31,7 +31,7 @@ local function fixture(flavor, lateNative, eventRegistry)
 		equal(tab, 2, "Who opens only the addon Who tab")
 		state.addonOpens = state.addonOpens + 1
 	end
-	function BFL:IsSecret(value) return rawequal(value, state.secret) end
+	function BFL:IsSecret(value) return state.secret ~= nil and rawequal(value, state.secret) end
 	BFL.IsSocialActionRestricted = function() return state.restricted == true end
 	local function timer(delay, callback)
 		local value = { at = state.now + delay, callback = callback }
@@ -99,6 +99,7 @@ local function fixture(flavor, lateNative, eventRegistry)
 	env.C_FriendList.SendWho = function(...)
 		if state.sendError then error("send rejected") end
 		state.calls[#state.calls + 1] = table.pack(...)
+		if state.synchronousSystemMessage then state.callbacks.CHAT_MSG_SYSTEM(state.synchronousSystemMessage) end
 		if state.synchronousResult then state:emit() end
 		for _, callback in ipairs(state.hooks) do callback(...) end
 	end

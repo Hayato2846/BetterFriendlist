@@ -623,6 +623,7 @@ function WhoFrame:OnNativeWhoRequestSent(showResults)
 	if self.nativeWhoSendInProgress then
 		return false
 	end
+	if self.nativeWhoRequestGuard then self.nativeWhoRequestGuard.externalWhoSent = true end
 	if not self:ShouldOwnNativeWhoRequests() then
 		self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
 		self:RestoreNativeWhoListUpdates()
@@ -636,6 +637,7 @@ function WhoFrame:OnNativeWhoRequestSent(showResults)
 	-- An explicit native UI action already sent the query. Its result may
 	-- already be available, so show the shared list without starting a timeout.
 	self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
+	self.whoWaitMessage = nil
 	self.lastWhoSendTime = GetTime()
 	self:StartRefreshButtonCooldown()
 	self:StartBuilderSearchButtonCooldown()
@@ -778,6 +780,9 @@ function WhoFrame:Initialize()
 	BFL:RegisterEventCallback("WHO_LIST_UPDATE", function(...)
 		self:OnWhoListUpdate(...)
 	end, 10)
+	BFL:RegisterEventCallback("CHAT_MSG_SYSTEM", function(message)
+		self:OnWhoSystemMessage(message)
+	end, 10)
 	BFL:RegisterEventCallback("ADDON_LOADED", function(addonName)
 		self:OnNativeWhoListAddonLoaded(addonName)
 	end, 10)
@@ -793,7 +798,6 @@ function WhoFrame:Initialize()
 					if _G.BetterWhoFrame_Update then
 						_G.BetterWhoFrame_Update(true)
 					end
-					needsRenderOnShow = false
 				end
 			end
 		end)
@@ -1420,6 +1424,7 @@ function WhoFrame:OnWhoListUpdate(...)
 
 	-- Clear pending state - results arrived successfully
 	self.whoPending = false
+	self.whoWaitMessage = nil
 	if self.whoTimeoutTimer then
 		self.whoTimeoutTimer:Cancel()
 		self.whoTimeoutTimer = nil
@@ -2137,12 +2142,14 @@ end
 function WhoFrame:BeginWhoRequest()
 	self.lastWhoSendTime = GetTime()
 	self.whoPending = true
+	self.whoWaitMessage = nil
 	local requestGuard = {}
 	self.nativeWhoRequestGuard = requestGuard
 	self:StartRefreshButtonCooldown()
 	self:StartBuilderSearchButtonCooldown()
 	if self.whoTimeoutTimer then self.whoTimeoutTimer:Cancel() end
 	self.whoTimeoutTimer = C_Timer.NewTimer(WHO_TIMEOUT, function()
+		if self:ApplyWhoWaitMessage(requestGuard) then return end
 		if self:ReleaseNativeWhoRequest(requestGuard) then self:ShowThrottleHint() end
 	end)
 	self:ShowPendingState()
@@ -2199,6 +2206,7 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 	local ok, sent = pcall(function()
 		-- Keep routing and the send together, before the hardware event unwinds.
 		C_FriendList.SetWhoToUi(true)
+		requestGuard.dispatchStarted = true
 		return self:DispatchWhoRequest(text, origin, filters)
 	end)
 	self.nativeWhoSendInProgress = wasSending
@@ -2245,27 +2253,75 @@ function WhoFrame:ShowPendingState()
 	end
 end
 
--- Show a brief hint that the search may have been throttled
-function WhoFrame:ShowThrottleHint()
+local function IsWhoWaitMessage(message)
+	local short = _G.WHO_COOLDOWN_SHORT
+	if not (BFL.IsSecret and BFL:IsSecret(short)) and type(short) == "string"
+		and short ~= "" and message == short then
+		return true
+	end
+
+	local timed = _G.WHO_COOLDOWN
+	if not (BFL.IsSecret and BFL:IsSecret(timed)) and type(timed) == "string" then
+		-- There is only one argument. Accept both spellings of its format specifier.
+		timed = timed:gsub("%%1%$d", "%%d")
+		if timed:find("%d", 1, true) then
+			for digits in message:gmatch("%d+") do
+				local ok, expected = pcall(string.format, timed, tonumber(digits))
+				if ok and message == expected then return true end
+			end
+		end
+	end
+
+	-- Some client flavors do not provide these GlobalStrings.
+	return message == "You must wait a moment longer before using /who again."
+		or message:match("^You must wait %d+ seconds? before using /who again%.$") ~= nil
+end
+
+function WhoFrame:OnWhoSystemMessage(message)
+	local requestGuard = self.nativeWhoRequestGuard
+	if not self.whoPending or not requestGuard or not requestGuard.dispatchStarted
+		or requestGuard.externalWhoSent or requestGuard.waitMessage then
+		return
+	end
+	if (BFL.IsSecret and BFL:IsSecret(message)) or type(message) ~= "string" then return end
+	if not IsWhoWaitMessage(message) then return end
+	requestGuard.waitMessage = message
+	-- A system event can fire inside SendWho. Let its post-hook identify any
+	-- intervening external send before treating this notice as our response.
+	C_Timer.After(0, function() self:ApplyWhoWaitMessage(requestGuard) end)
+end
+
+function WhoFrame:ApplyWhoWaitMessage(requestGuard)
+	if not self.whoPending or not requestGuard.waitMessage or requestGuard.externalWhoSent then return false end
+	if not self:ReleaseNativeWhoRequest(requestGuard) then return false end
+	self.whoWaitMessage = requestGuard.waitMessage
+	self:ShowWhoStatus(self.whoWaitMessage)
+	return true
+end
+
+function WhoFrame:ShowWhoStatus(message)
 	local frame = BetterFriendsFrame and BetterFriendsFrame.WhoFrame
 	if not frame then
 		return
 	end
 	self:SetLoadingSpinnerShown(frame, false)
 
-	local L = BFL.L
-	local timeoutText = L and L.WHO_SEARCH_TIMEOUT or "No response. Try again."
 	local totalsElement = frame.ListInset and frame.ListInset.Totals or frame.Totals
 	if totalsElement and totalsElement.Text then
-		totalsElement.Text:SetText(timeoutText)
+		totalsElement.Text:SetText(message)
 	elseif totalsElement and totalsElement.SetText then
-		totalsElement:SetText(timeoutText)
+		totalsElement:SetText(message)
 	end
 
-	-- A timeout is not a completed empty result, so keep the empty-state text hidden.
+	-- This status represents a search without a completed result list.
 	if self.emptyStateText then
 		self.emptyStateText:Hide()
 	end
+end
+
+function WhoFrame:ShowThrottleHint()
+	local L = BFL.L
+	self:ShowWhoStatus(L and L.WHO_SEARCH_TIMEOUT or "No response. Try again.")
 end
 
 -- Start the Refresh button cooldown with countdown text
@@ -2414,6 +2470,14 @@ function WhoFrame:Update(forceRebuild)
 		needsRenderOnShow = true
 		return
 	end
+	if self.whoWaitMessage then
+		self:ShowWhoStatus(self.whoWaitMessage)
+		return
+	end
+	-- Consume hidden result changes only when Who itself can render. Opening
+	-- Contacts must not discard the rebuild needed by an equal-sized result.
+	forceRebuild = forceRebuild or needsRenderOnShow
+	needsRenderOnShow = false
 
 	local numWhos, totalCount = GetWhoResultCounts()
 
@@ -2442,6 +2506,21 @@ function WhoFrame:Update(forceRebuild)
 	-- Empty state message
 	self:UpdateEmptyState(numWhos)
 
+	-- Hidden result changes and WHO_LIST_UPDATE force a rebuild, even when
+	-- the count matches. Ordinary modern refreshes can still reuse their rows.
+	if not isClassicMode and not forceRebuild then
+		local currentSize = whoDataProvider:GetSize()
+		if currentSize == numWhos and currentSize > 0 then
+			return
+		end
+	end
+
+	-- Both renderers must preserve the active sort on ordinary updates, too.
+	if frame.currentSort then
+		self:SortByColumn(frame.currentSort, true)
+		return
+	end
+
 	-- PERFORMANCE: Cache fontObject reference instead of string lookup
 	local fontObj = "BetterFriendlistFontNormalSmall"
 
@@ -2466,18 +2545,6 @@ function WhoFrame:Update(forceRebuild)
 			end
 		end
 		self:RenderClassicWhoButtons()
-		return
-	end
-
-	-- Retail mode: PERFORMANCE: Only rebuild if count changed OR if forced
-	local currentSize = whoDataProvider:GetSize()
-	if not forceRebuild and currentSize == numWhos and currentSize > 0 then
-		return
-	end
-
-	-- If a sort is active, delegate to SortByColumn instead of building unsorted
-	if BetterFriendsFrame.WhoFrame.currentSort then
-		self:SortByColumn(BetterFriendsFrame.WhoFrame.currentSort, true)
 		return
 	end
 
@@ -2569,9 +2636,6 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 
 	-- Client-side sort: Get all WHO data and sort it locally
 	local numWhos = GetWhoResultCounts()
-	if numWhos == 0 then
-		return
-	end
 
 	-- Collect all WHO data
 	local whoData = {}
@@ -2593,7 +2657,7 @@ function WhoFrame:SortByColumn(sortType, preserveDirection)
 		elseif type == "zone" then
 			return entry.info.area or ""
 		elseif type == "guild" then
-			return entry.info.guild or ""
+			return entry.info.fullGuildName or ""
 		elseif type == "race" then
 			return entry.info.raceStr or ""
 		end

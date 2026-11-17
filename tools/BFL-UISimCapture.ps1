@@ -5,7 +5,7 @@ param(
     [string]$Profile = 'friends_headers_i18n',
     [ValidateSet('friends', 'nickname_hint', 'tag_editor', 'settings_feedback')]
     [string]$Scenario = 'friends',
-[ValidateSet('normal', 'narrow', 'modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded', 'settings', 'settings-dark-de', 'narrow-dark-de', 'stacked', 'tag-picker', 'custom', 'custom-picker', 'groups', 'theme', 'format', 'help', 'performance', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow')]
+[ValidateSet('normal', 'narrow', 'modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded', 'settings', 'settings-dark-de', 'narrow-dark-de', 'stacked', 'tag-picker', 'custom', 'custom-picker', 'groups', 'theme', 'format', 'help', 'performance', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow', 'diagnostics', 'diagnostics-narrow', 'diagnostics-warning', 'diagnostics-warning-narrow', 'behavior', 'behavior-narrow')]
     [string]$Variant,
     [string]$SimulatorHome,
     [string]$WowRoot,
@@ -50,7 +50,7 @@ if ($Scenario -eq 'tag_editor') {
     $crop = '1600x900+0+0'
 }
 if ($Scenario -eq 'settings_feedback') {
-    $variants = @('groups', 'theme', 'format', 'help', 'performance', 'narrow', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow')
+    $variants = @('groups', 'theme', 'format', 'help', 'performance', 'narrow', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow', 'diagnostics', 'diagnostics-narrow', 'diagnostics-warning', 'diagnostics-warning-narrow', 'behavior', 'behavior-narrow')
     $crop = '1600x900+0+0'
 }
 if ($Variant) {
@@ -126,7 +126,7 @@ foreach ($extraPath in $ExtraAddonPath) {
 }
 $scene = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'BFL-UISimCapture.lua') -Raw
 foreach ($captureVariant in $variants) {
-    $narrow = ($captureVariant -in @('narrow', 'scale-narrow', 'scroll-narrow', 'skin-hover', 'format-narrow', 'scrollbars-narrow', 'filters-narrow')).ToString().ToLowerInvariant()
+    $narrow = ($captureVariant -in @('narrow', 'scale-narrow', 'scroll-narrow', 'skin-hover', 'format-narrow', 'scrollbars-narrow', 'filters-narrow', 'diagnostics-narrow', 'diagnostics-warning-narrow', 'behavior-narrow')).ToString().ToLowerInvariant()
     $hintStyle = if ($Scenario -eq 'nickname_hint') { "'$($captureVariant.Split('-')[0])'" } else { 'nil' }
     $hintExpanded = $captureVariant.EndsWith('-expanded').ToString().ToLowerInvariant()
     $hintFade = $Fade.IsPresent.ToString().ToLowerInvariant()
@@ -144,6 +144,10 @@ foreach ($captureVariant in $variants) {
         if ($captureVariant -eq 'input-layer') { $targetFrame = 'UIParent' }
         if ($captureVariant -eq 'skin-footer') { $targetFrame = 'BetterFriendsFrame' }
         if ($captureVariant -eq 'format-narrow') { $feedbackScene = "'format'" }
+        if ($captureVariant -match '^(diagnostics(?:-warning)?|behavior)(?:-narrow)?$') {
+            $feedbackScene = "'$($Matches[1])'"
+            if ($Matches[1] -eq 'diagnostics-warning') { $targetFrame = 'UIParent' }
+        }
     }
     if ($Scenario -eq 'tag_editor') {
         $tagScene = "'$captureVariant'"
@@ -244,3 +248,6 @@ foreach ($captureVariant in $variants) {
         }
     }
 }
+
+# Successful robocopy staging can return 1; only capture failures should fail callers.
+$global:LASTEXITCODE = 0

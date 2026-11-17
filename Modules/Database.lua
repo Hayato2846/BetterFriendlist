@@ -25,6 +25,7 @@ local defaults = {
 	friendGroups = {},
 	titleFriendNotes = { enabled = true, notes = {}, backups = {}, active = {}, originals = {} },
 	showBlizzardOption = false, -- Show "Show Blizzard's Friendlist" in menu
+	blizzardDiagnosticsMigrationVersion = 1, -- 3.1.4 resets legacy access once; later opt-ins remain untouched
 	showWelcomeMessage = true, -- Show the welcome message on login
 	enableSmoothScrolling = false, -- Mainline friends list animation is opt-in
 	enableSettingsSmoothScrolling = false,
@@ -631,6 +632,7 @@ function DB:PrepareImportedProfile(importData)
 	end
 	-- Run supported pre-default migrations on the detached profile only.
 	self:ApplyExternalMenuBridgeDefaultMigration(staged)
+	self:ApplyBlizzardDiagnosticsMigration(staged)
 	if staged.theme == nil and staged.enableElvUISkin ~= nil then staged.theme = staged.enableElvUISkin == true and "elvui" or "blizzard" end
 	if staged.showNotesAsName ~= nil or staged.showNicknameAsName ~= nil or staged.showNicknameInName ~= nil then
 		for _, key in ipairs({ "showNotesAsName", "showNicknameAsName", "showNicknameInName" }) do
@@ -778,6 +780,20 @@ local VALID_THEMES = {
 
 local THEME_SETTINGS_INDEPENDENT_DEFAULTS_VERSION = 1
 local EXTERNAL_MENU_BRIDGE_DEFAULT_MIGRATION_VERSION = 1
+local BLIZZARD_DIAGNOSTICS_MIGRATION_VERSION = 1
+
+function DB:ApplyBlizzardDiagnosticsMigration(database)
+	database = database or BetterFriendlistDB
+	if type(database) ~= "table" then return false end
+	if (tonumber(database.blizzardDiagnosticsMigrationVersion) or 0) >= BLIZZARD_DIAGNOSTICS_MIGRATION_VERSION then
+		return false
+	end
+	-- 3.1.4 moves native-list access to Diagnostics and requires a fresh opt-in.
+	-- Run before defaults on login and old imports, preserving later user choices.
+	database.showBlizzardOption = false
+	database.blizzardDiagnosticsMigrationVersion = BLIZZARD_DIAGNOSTICS_MIGRATION_VERSION
+	return true
+end
 
 function DB:ApplyExternalMenuBridgeDefaultMigration(database)
 	database = database or BetterFriendlistDB
@@ -969,6 +985,7 @@ function DB:Initialize()
 
 	BetterFriendlistDB.taintFreeWhisper = nil
 	self:ApplyExternalMenuBridgeDefaultMigration(BetterFriendlistDB)
+	self:ApplyBlizzardDiagnosticsMigration(BetterFriendlistDB)
 
 	-- The short-lived Appear Offline Broker action moved into the existing
 	-- Battle.net status dropdown. Keep old profiles from retaining a dead click action.

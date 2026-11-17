@@ -1676,6 +1676,7 @@ function Settings:DoReset()
 		return
 	end
 
+	self:InvalidatePendingBlizzardOptionConfirmation()
 	self:OnThemeChanged("blizzard")
 	DB:Set("showBlizzardOption", false)
 	DB:Set("compactMode", false)
@@ -2706,6 +2707,7 @@ function Settings:ImportSettings(importString)
 	if not importData then return false, L.ERROR_IMPORT_DESERIALIZE end
 	local prepared, staged, errorKey = pcall(DB.PrepareImportedProfile, DB, importData)
 	if not prepared or not staged then return false, L[errorKey or "ERROR_EXPORT_STRUCTURE"] end
+	self:InvalidatePendingBlizzardOptionConfirmation()
 
 	-- Save original references, not another deep copy: modules retain references
 	-- to the DB and some nested settings tables. Failed imports restore both.
@@ -3016,16 +3018,54 @@ function Settings:OnSmoothScrollingChanged(checked)
 end
 
 -- Callback for ShowBlizzardOption checkbox
-function Settings:OnShowBlizzardOptionChanged(checked)
-	local DB = GetDB()
-	if not DB then
-		return
+function Settings:InvalidatePendingBlizzardOptionConfirmation()
+	self.blizzardOptionConfirmationGeneration = (self.blizzardOptionConfirmationGeneration or 0) + 1
+	if type(StaticPopup_Hide) == "function" then
+		StaticPopup_Hide("BETTERFRIENDLIST_BLIZZARD_DIAGNOSTICS_CONFIRM")
 	end
+end
 
-	DB:Set("showBlizzardOption", checked)
-
-	-- Force full display refresh for immediate update
-	BFL:ForceRefreshFriendsList()
+function Settings:OnShowBlizzardOptionChanged(checked, reportToChat)
+	local DB = GetDB()
+	if not DB then return false end
+	self:InvalidatePendingBlizzardOptionConfirmation()
+	local generation, profile = self.blizzardOptionConfirmationGeneration, BetterFriendlistDB
+	local function RefreshControls()
+		self:RefreshAdvancedTab()
+	end
+	local function Apply(enabled)
+		DB:Set("showBlizzardOption", enabled)
+		BFL:ForceRefreshFriendsList()
+		RefreshControls()
+		if reportToChat and DEFAULT_CHAT_FRAME then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00BetterFriendlist:|r "
+				.. (enabled and L.CORE_SHOW_BLIZZARD_ENABLED or L.CORE_SHOW_BLIZZARD_DISABLED))
+		end
+	end
+	if checked ~= true then
+		Apply(false)
+		return true
+	end
+	if DB:Get("showBlizzardOption", false) == true then
+		RefreshControls()
+		return true
+	end
+	-- Rebuild the clicked checkbox from the still-disabled saved value. Only
+	-- accepting the warning may commit activation, including slash entrypoints.
+	RefreshControls()
+	StaticPopupDialogs["BETTERFRIENDLIST_BLIZZARD_DIAGNOSTICS_CONFIRM"] = {
+		text = L.DIALOG_SHOW_BLIZZARD_WARNING,
+		button1 = L.DIALOG_SHOW_BLIZZARD_ACCEPT,
+		button2 = CANCEL,
+		OnAccept = function()
+			if self.blizzardOptionConfirmationGeneration ~= generation or BetterFriendlistDB ~= profile then return end
+			Apply(true)
+		end,
+		OnCancel = RefreshControls,
+		timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+	}
+	StaticPopup_Show("BETTERFRIENDLIST_BLIZZARD_DIAGNOSTICS_CONFIRM")
+	return false
 end
 
 -- Callback for ColorClassNames checkbox
@@ -4765,19 +4805,6 @@ function Settings:RefreshGeneralTab()
 		favoriteStyle.BFL_FriendRowSection = "favorites"
 	end
 	RegisterLegacySection(self, "enableFavoriteIcon", row7)
-
-	-- Row 8: Blizzard Option
-	local row8 = Components:CreateCheckbox(tab, {
-		label = L.SETTINGS_SHOW_BLIZZARD,
-		initialValue = DB:Get("showBlizzardOption", false),
-		callback = function(val)
-			self:OnShowBlizzardOptionChanged(val)
-		end,
-		tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
-		tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC or "Shows the original Blizzard Friends button in the social menu",
-	})
-	row8.BFL_LegacyRoute = "behavior"
-	table.insert(allFrames, row8)
 
 	if ShouldShowLegacyElvUISkinSetting() then
 		local elvUISkinToggle = Components:CreateCheckbox(tab, {
@@ -7512,6 +7539,13 @@ function Settings:RefreshAdvancedTab()
 	if IsLegacyReviewActive() then
 		local DB = GetDB()
 		table.insert(allFrames, Components:CreateHeader(tab, L.SETTINGS_LEGACY_DIAGNOSTICS, "SETTINGS_LEGACY_DIAGNOSTICS"))
+		table.insert(allFrames, Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_SHOW_BLIZZARD,
+			initialValue = DB:Get("showBlizzardOption", false),
+			callback = function(val) self:OnShowBlizzardOptionChanged(val) end,
+			tooltipTitle = L.SETTINGS_SHOW_BLIZZARD,
+			tooltipDesc = L.SETTINGS_SHOW_BLIZZARD_DESC,
+		}))
 		table.insert(allFrames, Components:CreateCheckbox(tab, {
 			label = L.SETTINGS_SHOW_WELCOME_MESSAGE,
 			initialValue = DB:Get("showWelcomeMessage", true),

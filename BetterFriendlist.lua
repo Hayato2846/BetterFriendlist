@@ -5873,8 +5873,6 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		-- Simple Mode ONLY: Include "Quick Filter" and "Sort" menus here
 		local DB = GetDB()
 		local simpleMode = DB and DB:Get("simpleMode", false) or false
-		local FriendsUI = BFL.FriendsUI or BFL:GetModule("FriendsUI")
-		local modern = FriendsUI and FriendsUI.IsModernActive and FriendsUI:IsModernActive()
 		if simpleMode then
 			-- Both layouts expose the same option. Modern renders it as a single
 			-- full-width search row while filter/sort actions remain in this menu.
@@ -5912,7 +5910,7 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 		end
 
 		-- Show Blizzard's Friendlist option (conditional based on setting)
-		if modern or (DB and DB:Get("showBlizzardOption", false)) then
+		if DB and DB:Get("showBlizzardOption", false) then
 			-- Check combat state
 			local inCombat = InCombatLockdown()
 

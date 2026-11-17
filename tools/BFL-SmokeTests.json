@@ -11,6 +11,7 @@
   "tests": [
     { "file": "BFL-AutoRaidAssistSmoke.lua", "arguments": ["{repo}", "{forever}"] },
     { "file": "BFL-AuxiliaryDockingSmoke.lua", "arguments": ["{repo}"] },
+    { "file": "BFL-BlizzardDiagnosticsSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-BufferedEditBoxSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ClassColorSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-ClientSubIconSmoke.lua", "arguments": ["{repo}"] },
@@ -65,6 +66,7 @@
     { "file": "BFL-TitleFriendTooltipSmoke.lua", "arguments": ["{repo}", "{live}"] },
     { "file": "BFL-WhoNativeRoutingSmoke.lua", "arguments": ["{repo}", "{forever}"] },
     { "file": "BFL-WhoOwnershipSmoke.lua", "arguments": ["{repo}", "{forever}"] },
+    { "file": "BFL-WhoResultsSmoke.lua", "arguments": ["{repo}"] },
     { "file": "BFL-WindowGeometrySmoke.lua", "arguments": ["{repo}"] }
   ]
 }

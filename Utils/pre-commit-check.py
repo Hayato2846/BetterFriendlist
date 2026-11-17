@@ -310,6 +310,8 @@ class BugChecker:
     
     def run_all_checks(self):
         for lua_file in LUA_FILES:
+            if lua_file.relative_to(ADDON_ROOT).parts[0] == 'reference':
+                continue  # External simulator/source fixtures are not addon code.
             if 'Libs' in str(lua_file) or 'WoW UI Source' in str(lua_file):
                 continue  # Skip library and reference files
             

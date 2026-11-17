@@ -408,7 +408,8 @@ if feedbackScene then
 	local review = BFL:GetModule("LegacySettingsReview")
 	local themes = BFL:GetModule("ThemeManager")
 	if feedbackScene == "window-fonts" or feedbackScene == "input" or feedbackScene == "scroll"
-		or (feedbackScene == "filters" and narrow) then BFL:SetLocale("deDE") end
+		or ((feedbackScene == "filters" or feedbackScene == "diagnostics" or feedbackScene == "diagnostics-warning"
+			or feedbackScene == "behavior") and narrow) then BFL:SetLocale("deDE") end
 	local function Advance()
 		for _ = 1, 10 do A_Admin.AdvanceTime(0.016) end
 	end
@@ -439,7 +440,8 @@ if feedbackScene then
 	elseif feedbackScene == "format" then
 		db:Set("nameFormatPreset", "custom")
 		db:Set("infoFormatPreset", "custom")
-	elseif feedbackScene == "performance" or feedbackScene == "filters" then
+	elseif feedbackScene == "performance" or feedbackScene == "filters" or feedbackScene == "diagnostics"
+		or feedbackScene == "diagnostics-warning" or feedbackScene == "behavior" then
 		db:Set("enableBetaFeatures", true)
 		db:Set("settingsWindowSize", narrow and { width = 760, height = 620 } or { width = 1170, height = 800 })
 	elseif feedbackScene == "skin-tabs" then
@@ -518,7 +520,18 @@ if feedbackScene then
 		review:Layout()
 	end
 
-	if feedbackScene == "groups" then
+	if feedbackScene == "diagnostics" or feedbackScene == "diagnostics-warning" or feedbackScene == "behavior" then
+		review:Navigate(feedbackScene == "behavior" and "behavior" or "advanced")
+		Advance()
+		if feedbackScene == "diagnostics-warning" then
+			local row = FindRow(BFL.L.SETTINGS_SHOW_BLIZZARD)
+			assert(row.checkBox, "The diagnostic setting is not a checkbox")
+			row.checkBox:Click()
+			Advance()
+			assert(db:Get("showBlizzardOption", false) == false, "The diagnostic setting enabled before confirmation")
+			assert(StaticPopup_Visible("BETTERFRIENDLIST_BLIZZARD_DIAGNOSTICS_CONFIRM"), "The diagnostic warning did not appear")
+		end
+	elseif feedbackScene == "groups" then
 		review:Navigate("automatic")
 		Advance()
 		local unit = FindRow(BFL.L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT)
