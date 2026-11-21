@@ -2194,6 +2194,7 @@ function BFL:FireEventCallbacks(event, ...)
 				self.pendingUpdateTicker:Cancel()
 				self.pendingUpdateTicker = nil
 			end
+			self.pendingWoWFriendAddition = nil
 			if self.callbackTicker then
 				self.callbackTicker:Cancel()
 				self.callbackTicker = nil
@@ -2213,14 +2214,19 @@ function BFL:FireEventCallbacks(event, ...)
 			return
 		end
 
-		-- Debounce: Cancel pending update
+		-- A confirmed addition can wait one frame; status bursts still use the debounce.
+		if self.pendingWoWFriendAddition then
+			return
+		end
+		local friendAdded = FriendsList:HasWoWFriendListGrown()
 		if self.pendingUpdateTicker then
 			self.pendingUpdateTicker:Cancel()
 		end
 
-		-- Schedule new update (0.2s delay to coalesce rapid updates)
-		self.pendingUpdateTicker = C_Timer.NewTimer(0.2, function()
+		self.pendingWoWFriendAddition = friendAdded
+		self.pendingUpdateTicker = C_Timer.NewTimer(friendAdded and 0 or 0.2, function()
 			self.pendingUpdateTicker = nil
+			self.pendingWoWFriendAddition = nil
 
 			-- Cancel any previously running callback ticker to prevent double execution
 			if self.callbackTicker then

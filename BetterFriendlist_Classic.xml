@@ -527,7 +527,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="BACKGROUND" textureSubLevel="1">
-				<Texture parentKey="ClassColorTint">
+				<Texture parentKey="ClassColorTint" hidden="true">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="1" y="-1"/>
 						<Anchor point="BOTTOMRIGHT" x="-1" y="1"/>

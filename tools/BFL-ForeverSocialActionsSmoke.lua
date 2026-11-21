@@ -434,17 +434,132 @@ for _, test in ipairs({ { level = 3, prompt = "WoW friend: Alias" }, { level = 1
 	equal(popupArgs[1], test.prompt, "Fresh friend type selects the correct removal wording")
 	equal(popupArgs[3], 42, "Removal retains the raw account ID")
 end
-env.BFL_GetContextFullName = function() return "Ada-Realm" end
+-- Legacy character friends must use the API's exact name after the list changes.
+local friendListSource = read(repo, "Modules/FriendsList.lua")
+env.FriendsList = friends
+execute(between(friendListSource, "function FriendsList:IsReadableInviteRecord(", "function FriendsList:GetGameAccountInviteRestriction("), "friend record guards")
+execute(between(friendListSource, "function FriendsList:ResolveWoWFriendIndex(", "-- Resolve current friend data by stable UID"), "friend resolution")
+function BFL:NormalizeWoWFriendName(name) return self.NormalizePlayerIdentityName(name, nil, "Realm") end
+env.BFL_GetContextFullName = function(context) return context.name end
 env.BFL_HasFriendListContext = function() return true end
-root = element("root")
-addRemove(root, {}, false)
-root.children[1].callback()
-equal(shownPopup, "BFL_CONFIRM_REMOVE_WOW_FRIEND", "Legacy WoW removal keeps its separate confirmation")
-equal(popupArgs[1], "Remove Ada-Realm from your friends list?", "Legacy WoW confirmation does not call the player a Real ID friend")
+env.ERR_FRIEND_NOT_FOUND = "Friend not found"
 local removedName
-BFL.RemoveFriend = function(name) removedName = name; return true end
+local nativeResult = true
+env.C_FriendList.RemoveFriend = function(name)
+	removedName = name
+	return nativeResult
+end
+local function characterRemoveCallback(name)
+	local menu = element("root")
+	addRemove(menu, { name = name }, false)
+	return assert(menu.children[1].callback)
+end
+
+regional = false
+titleEnabled = false
+local rowsForRemoval = { { name = "Ada" }, { name = "Grace-OtherRealm" } }
+env.C_FriendList.GetNumFriends = function() return #rowsForRemoval end
+env.C_FriendList.GetFriendInfoByIndex = function(index) return rowsForRemoval[index] end
+env.StaticPopupDialogs.CONFIRM_REMOVE_WOW_FRIEND = {}
+local remove = characterRemoveCallback("Ada-Realm")
+rowsForRemoval[1], rowsForRemoval[2] = rowsForRemoval[2], rowsForRemoval[1]
+remove()
+equal(shownPopup, "CONFIRM_REMOVE_WOW_FRIEND", "Character removal uses Blizzard's confirmation when available")
+equal(popupArgs[3].name, "Ada", "Same-realm removal passes the exact API name after the roster reorders")
+equal(removedName, nil, "Opening the confirmation does not remove a friend")
+characterRemoveCallback("Grace-OtherRealm")()
+equal(popupArgs[3].name, "Grace-OtherRealm", "A different realm remains part of the API name")
+
+regional = true
+rowsForRemoval[2] = { name = "Ada-Lovelace" }
+characterRemoveCallback("Ada-Lovelace")()
+equal(popupArgs[3].name, "Ada-Lovelace", "Regional character removal retains the full surname")
+local errorCount = #errors
+rowsForRemoval[2] = { name = secret }
+shownPopup = nil
+characterRemoveCallback("Ada-Lovelace")()
+equal(shownPopup, nil, "A removed or unreadable character does not open a confirmation")
+equal(#errors, errorCount + 1, "An unavailable character is reported")
+
+env.StaticPopupDialogs.CONFIRM_REMOVE_WOW_FRIEND = nil
+regional = false
+rowsForRemoval[2] = { name = "Ada" }
+characterRemoveCallback("Ada-Realm")()
+equal(shownPopup, "BFL_CONFIRM_REMOVE_WOW_FRIEND", "Older clients retain the addon confirmation fallback")
+equal(popupArgs[1], "Remove Ada from your friends list?", "The fallback shows the same character")
+nativeResult = false
+errorCount = #errors
 env.StaticPopupDialogs.BFL_CONFIRM_REMOVE_WOW_FRIEND.OnAccept()
-equal(removedName, "Ada-Realm", "Legacy removal keeps the raw realm-qualified identity")
+equal(removedName, "Ada", "The fallback also keeps the raw friend-list identity")
+equal(#errors, errorCount + 1, "The fallback reports the native API's failed removal")
+regional = true
+titleEnabled = true
+
+-- Exercise the BFL callback with Blizzard's real note read and save handlers.
+do
+	local addNote = execute(between(legacy, "local function BFL_AddSetNoteButton(", "local function BFL_GetPopupEditBox(")
+		.. "\nreturn BFL_AddSetNoteButton", "set note menu")
+	local showPopup = env.StaticPopup_Show
+	local observedNote, focus
+	local editBox = {
+		SetText = function(_, text) observedNote = text end,
+		GetText = function() return observedNote end,
+		SetFocus = function() focus = true end,
+	}
+	local noteDialog = { GetEditBox = function() return editBox end }
+	local callbackRoot = element("root")
+	addNote(callbackRoot, { name = "Ada-Realm" }, false)
+	local editNote = assert(callbackRoot.children[1].callback)
+	local savedName
+	local available = true
+	env.FriendsFrame = {}
+	env.C_FriendList.GetFriendInfo = function(name)
+		if available and name == "Ada" then return rowsForRemoval[2] end
+	end
+	env.C_FriendList.SetFriendNotes = function(name, note)
+		local info = env.C_FriendList.GetFriendInfo(name)
+		if not info then return false end
+		savedName, info.notes = name, note
+		return true
+	end
+	env.StaticPopup_Show = function(id, ...)
+		showPopup(id, ...)
+		env.StaticPopupDialogs[id].OnShow(noteDialog)
+	end
+	for _, client in ipairs({ { forever, "Mainline" }, { classic, "Classic" } }) do
+		local prefix = "Interface/AddOns/Blizzard_StaticPopup_Game/"
+		local popupKey = 'StaticPopupDialogs["SET_FRIENDNOTE"]'
+		execute(between(read(client[1], prefix .. "GameDialogDefs.lua"),
+			popupKey .. " = {", 'StaticPopupDialogs["SET_BNFRIENDNOTE"]'), "Blizzard note dialog")
+		execute(between(read(client[1], prefix .. client[2] .. "/GameDialogDefs.lua"),
+			popupKey .. ".OnShow = ", "\nend;") .. "\nend;", "Blizzard note OnShow")
+		regional, titleEnabled = false, false
+		rowsForRemoval[2].notes = "Original note"
+		observedNote, focus, savedName = nil, false, nil
+		local beforeErrors = #errors
+		editNote()
+		equal(shownPopup, "SET_FRIENDNOTE", "The character note opens Blizzard's editor")
+		equal(env.FriendsFrame.NotesID, "Ada", "The editor reads and writes by the raw API name")
+		equal(observedNote, "Original note", "The existing note is populated without an OnShow error")
+		check(focus, "The native editor focuses its input")
+		equal(savedName, nil, "Opening the editor does not write a note")
+		observedNote = "Edited note"
+		env.StaticPopupDialogs.SET_FRIENDNOTE.OnAccept(noteDialog)
+		equal(savedName, "Ada", "Accepting edits the selected character")
+		equal(rowsForRemoval[2].notes, "Edited note", "Blizzard persists the new note")
+		equal(#errors, beforeErrors, "A successful note edit does not show a red error")
+	end
+	available, shownPopup = false, nil
+	editNote()
+	equal(shownPopup, nil, "A missing lookup does not reach Blizzard's nil dereference")
+	available = true
+	editNote()
+	equal(observedNote, "Edited note", "The note can be reopened when the lookup recovers")
+	env.StaticPopup_Show, env.FriendsFrame = showPopup, nil
+	env.C_FriendList.GetFriendInfo, env.C_FriendList.SetFriendNotes = nil, nil
+	env.StaticPopupDialogs.SET_FRIENDNOTE = nil
+	regional, titleEnabled = true, true
+end
 
 -- Modern and Legacy buttons both route through the shared opener.
 check(read(repo, "BetterFriendlist.xml"):find("BFL.ShowAddFriendDialog()", 1, true), "Legacy button routes through the shared opener")

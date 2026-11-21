@@ -3520,12 +3520,21 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						if not FriendsFrame and C_AddOns and C_AddOns.LoadAddOn then
 							pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
 						end
-						if FriendsFrame then
-							FriendsFrame.NotesID = fullName
-							StaticPopup_Show("SET_FRIENDNOTE", fullName)
-							if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE then
-								PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
-							end
+						local friends = GetFriendsList()
+						if not (FriendsFrame and friends) then
+							return
+						end
+
+						local _, friendListName = friends:ResolveWoWFriendIndex(fullName)
+						-- Blizzard's OnShow assumes its name lookup returns a record.
+						if not friendListName or not friends:IsReadableInviteRecord(BFL.GetWoWFriendInfo(friendListName)) then
+							return
+						end
+
+						FriendsFrame.NotesID = friendListName
+						StaticPopup_Show("SET_FRIENDNOTE", friendListName)
+						if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE then
+							PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
 						end
 					end)
 				end
@@ -3787,15 +3796,32 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			local function BFL_ShowRemoveWoWFriendPrompt(fullName)
-				local ok, text = pcall(string.format, L.DIALOG_REMOVE_FRIEND_CONFIRMATION, fullName)
-				local prompt = ok and text or fullName
+				local friends = GetFriendsList()
+				local _, friendListName
+				if friends then
+					_, friendListName = friends:ResolveWoWFriendIndex(fullName)
+				end
+				if not friendListName then
+					if UIErrorsFrame then
+						UIErrorsFrame:AddExternalErrorMessage(ERR_FRIEND_NOT_FOUND)
+					end
+					return
+				end
+
+				if C_FriendList and C_FriendList.RemoveFriend and StaticPopupDialogs["CONFIRM_REMOVE_WOW_FRIEND"] then
+					StaticPopup_Show("CONFIRM_REMOVE_WOW_FRIEND", nil, nil, { name = friendListName })
+					return
+				end
+
+				local ok, text = pcall(string.format, L.DIALOG_REMOVE_FRIEND_CONFIRMATION, friendListName)
+				local prompt = ok and text or friendListName
 
 				StaticPopupDialogs["BFL_CONFIRM_REMOVE_WOW_FRIEND"] = {
 					text = "%s",
 					button1 = ACCEPT,
 					button2 = CANCEL,
 					OnAccept = function()
-						if not (BFL.RemoveFriend and BFL.RemoveFriend(fullName)) and UIErrorsFrame then
+						if not (BFL.RemoveFriend and BFL.RemoveFriend(friendListName)) and UIErrorsFrame then
 							UIErrorsFrame:AddExternalErrorMessage(ERR_FRIEND_NOT_FOUND)
 						end
 					end,

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.5]        - 2026-11-21
+
+### All WoW Versions
+
+#### Fixed
+- **Remove Friend** - Character friends can be removed from the right-click menu using Blizzard's confirmation dialog.
+- **Friend Notes** - Editing a character friend's note no longer shows an erroneous player-not-found message.
+- **Friends List** - Newly added character friends and accepted friend requests appear sooner once the game delivers their details.
+
+### WoW Retail & WoW Forever
+
+#### Fixed
+- **Modern Raid Tab** - Online raid and party members have class-colored row backgrounds again.
+
+---
+
 ## [3.1.4]        - 2026-11-17
 
 ### All WoW Versions

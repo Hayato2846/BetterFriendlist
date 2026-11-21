@@ -224,13 +224,18 @@ local needsRenderOnShow = true
 -- ========================================
 
 local function EventCallback_FriendListUpdate()
-	BFL.FriendsList:OnFriendListUpdate()
+	local friends = BFL.FriendsList
+	if friends:HasWoWFriendListGrown() then
+		friends:ScheduleRefresh("wow-friend-added", 0)
+	else
+		friends:OnFriendListUpdate()
+	end
 end
 
 local function EventCallback_BNetFriendListSizeChanged()
 	local DB = GetDB()
 	if DB and DB.ClearTitleFriendGroupKeys then DB:ClearTitleFriendGroupKeys() end
-	BFL.FriendsList:OnFriendListUpdate()
+	BFL.FriendsList:ScheduleRefresh("bnet-list-size", 0)
 end
 
 local function EventCallback_BNetAccountOnline()
@@ -371,6 +376,7 @@ local function Timer_ScheduledFriendsListRefresh()
 	self.scheduledRefreshTimer = nil
 	self.scheduledRefreshIgnoreVisibility = nil
 	self.scheduledRefreshRenderOnly = nil
+	self.scheduledRefreshNextFrame = nil
 	if self.UpdateFontCache then
 		self:UpdateFontCache()
 	end
@@ -3647,7 +3653,7 @@ function FriendsList:ResolveBNetFriendIndex(bnetAccountID, battleTag)
 	return nil
 end
 
--- Resolve current WoW friend index by name (index is not persistent)
+-- Resolve the current index and API name from a stable WoW friend identity.
 function FriendsList:ResolveWoWFriendIndex(name)
 	if not name then
 		return nil
@@ -3665,11 +3671,9 @@ function FriendsList:ResolveWoWFriendIndex(name)
 
 	for i = 1, numFriends do
 		local info = BFL.GetWoWFriendInfoByIndex(i)
-		if info and info.name then
-			local normalizedInfo = BFL:NormalizeWoWFriendName(info.name)
-			if normalizedInfo == targetName then
-				return i
-			end
+		local friendListName = self:GetReadableInviteField(info, "name")
+		if friendListName and BFL:NormalizeWoWFriendName(friendListName) == targetName then
+			return i, friendListName
 		end
 	end
 
@@ -5058,8 +5062,16 @@ function FriendsList:OnBNetFriendInfoChanged(friendIndex)
 	end
 end
 
+function FriendsList:HasWoWFriendListGrown()
+	if self.wowFriendCount == nil or not BFL.GetNumWoWFriends then
+		return false
+	end
+	local count = BFL.GetNumWoWFriends()
+	return not BFL:IsSecret(count) and type(count) == "number" and count > self.wowFriendCount
+end
+
 function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Micro-Throttling)
-	-- Instead of updating immediately for every event, we schedule an update for the next frame.
+	-- Batch ordinary friend status changes.
 	-- This handles "event bursts" (e.g. 50 friends coming online at once) by updating only once.
 	-- Visibility is the first gate: BNet readiness is only relevant when the list
 	-- can be rendered. Keeping this ahead of the readiness fast path prevents a
@@ -5071,8 +5083,11 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 		return
 	end
 
-	-- Phase 2: Allow bypassing throttle for critical UI interactions (Invites)
-	-- Also bypass until BNet data is fully ready (battleTags loaded) for instant population
+	if self.scheduledRefreshNextFrame and forceImmediate ~= true then
+		return
+	end
+
+	-- Allow a forced refresh or immediate startup population while BattleTags are loading.
 	if forceImmediate == true or not self.bnetDataReady then
 		if self.updateTimer then
 			self.updateTimer:Cancel()
@@ -5084,7 +5099,7 @@ function FriendsList:OnFriendListUpdate(forceImmediate) -- Event Coalescing (Mic
 	end
 
 	if self.updateTimer then
-		-- Timer already running, update will happen next frame
+		-- Another status refresh is already queued.
 		return
 	end
 
@@ -5101,6 +5116,7 @@ function FriendsList:CancelScheduledRefresh()
 	self.scheduledRefreshTimer = nil
 	self.scheduledRefreshIgnoreVisibility = nil
 	self.scheduledRefreshRenderOnly = nil
+	self.scheduledRefreshNextFrame = nil
 end
 
 function FriendsList:ScheduleRefresh(reason, delay, ignoreVisibility)
@@ -5111,14 +5127,22 @@ function FriendsList:ScheduleRefresh(reason, delay, ignoreVisibility)
 		return
 	end
 	local renderOnly = IsRenderOnlyRefresh(reason)
+	local nextFrame = delay == 0
+	if nextFrame and not renderOnly and self.updateTimer then
+		self.updateTimer:Cancel()
+		self.updateTimer = nil
+	end
 	self.scheduledRefreshIgnoreVisibility = self.scheduledRefreshIgnoreVisibility or ignoreVisibility == true
 	if self.scheduledRefreshTimer then
-		if not renderOnly then
-			self.scheduledRefreshRenderOnly = false
+		self.scheduledRefreshRenderOnly = self.scheduledRefreshRenderOnly and renderOnly
+		if not nextFrame or self.scheduledRefreshNextFrame then
+			return
 		end
-		return
+		self.scheduledRefreshTimer:Cancel()
+	else
+		self.scheduledRefreshRenderOnly = renderOnly
 	end
-	self.scheduledRefreshRenderOnly = renderOnly
+	self.scheduledRefreshNextFrame = nextFrame
 	delay = delay or 0.05
 	if C_Timer and C_Timer.NewTimer then
 		self.scheduledRefreshTimer = C_Timer.NewTimer(delay, Timer_ScheduledFriendsListRefresh)
@@ -6197,8 +6221,8 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 	-- This ensures BuildDisplayList cache is only invalidated when data actually changed
 	BFL.FriendsListVersion = (BFL.FriendsListVersion or 0) + 1
 
-	-- CRITICAL FIX: Render the display after building list
-	-- Without this, UI never updates after friend offline/online events
+	-- Record the size only after completing the data snapshot.
+	self.wowFriendCount = numWoWFriends
 	self:RenderDisplay(ignoreVisibility)
 
 	-- Update Send Message button state based on current selection status

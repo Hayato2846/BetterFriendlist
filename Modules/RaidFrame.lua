@@ -590,9 +590,6 @@ function RaidFrame:LayoutGroupVisuals(group, width, newButtonHeight, groupHeader
 				slot.ClassColorTint:ClearAllPoints()
 				slot.ClassColorTint:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
 				slot.ClassColorTint:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
-				slot.ClassColorTint:SetShown(
-					not modernLayout or (slot.memberData and slot.memberData._isMock == true)
-				)
 			end
 
 			if slot.CombatOverlay then
@@ -2208,7 +2205,7 @@ function RaidFrame:UpdateMemberButton(button, memberData, settingsSample)
 		else
 			button.ClassColorTint:SetColorTexture(0.1, 0.1, 0.1, 0.5)
 		end
-		button.ClassColorTint:SetShown(not IsModernRaidLayout() or memberData._isMock == true)
+		button.ClassColorTint:Show()
 	end
 
 	local isEveryoneAssist = self.everyoneIsAssistant

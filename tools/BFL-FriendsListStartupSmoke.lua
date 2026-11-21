@@ -14,6 +14,10 @@ if arg[2] == "--reproduce" then
 		"if firstInfo and firstInfo.battleTag and firstInfo.battleTag ~= \"\" then", 1)
 	assert(replacements == 1, "production readiness guard anchor missing")
 end
+local coreSource = read("Core.lua")
+local eventStart = assert(coreSource:find("function BFL:FireEventCallbacks(", 1, true))
+local eventEnd = assert(coreSource:find("-- Normalize a WoW friend identity.", eventStart, true))
+local eventSource = coreSource:sub(eventStart, eventEnd - 1)
 local mainSource = read("BetterFriendlist.lua")
 local uidStart = assert(mainSource:find("function GetFriendUID(", 1, true))
 local uidEnd = assert(mainSource:find("-- DISPLAY MANAGEMENT", uidStart, true))
@@ -48,7 +52,14 @@ local function setup(accounts, options)
 	function BFL:StripAccents(text) return text:lower() end
 	function BFL:GetSafeAccountName(name, tag) return name or tag or "Unknown" end
 	local timers, eventCallbacks, hooks = {}, {}, {}
-	function BFL:RegisterEventCallback(event, callback) eventCallbacks[event] = callback end
+	BFL.EventCallbacks = {}
+	function BFL:RegisterEventCallback(event, callback)
+		eventCallbacks[event] = callback
+		self.EventCallbacks[event] = { { callback = callback } }
+	end
+	function BFL:NormalizeWoWFriendName(name, playerRealm)
+		return self.NormalizePlayerIdentityName(name, nil, playerRealm)
+	end
 	BFL.FontManager = { ResolveFontPath = function() return "TestFont" end, GetFontFlags = function() return "" end }
 	local settings = { quickFilter = "all", primarySort = "status", secondarySort = "name", colorClassNames = options.colorClassNames == true,
 		showFactionIcons = options.showFactionIcons == true, compactMode = options.compact == true,
@@ -112,6 +123,7 @@ local function setup(accounts, options)
 	execute(read("Utils/ClassUtils.lua"), "Utils/ClassUtils.lua")
 	execute(read("Modules/FilterSortRegistry.lua"), "Modules/FilterSortRegistry.lua")
 	execute(globalUIDSource, "BetterFriendlist global UID helper")
+	execute(eventSource, "Core event dispatcher")
 	execute(source, "Modules/FriendsList.lua")
 	local list = BFL.FriendsList
 	local paints = 0
@@ -378,6 +390,76 @@ for _, modern in ipairs({ false, true }) do
 	equal(visibleCount(chunked), 150, "Large Title-first lists reach all visible rows")
 	check(chunked.list.chunkedFriendsListUpdate == nil, "The chunked worker completes")
 end
+-- Character additions bypass both timers without expediting status events.
+for _, classic in ipairs({ false, true }) do
+	local context = setup({ normal("Existing#1234") }, { classic = classic, modern = not classic })
+	context.env.RegionalUniqueNamesEnabled = function() return false end
+	context.BFL.IsForever = false
+	local characterFriends = {}
+	context.env.C_FriendList.GetNumFriends = function() return #characterFriends end
+	context.env.C_FriendList.GetFriendInfoByIndex = function(index) return characterFriends[index] end
+	context.list:UpdateFriendsList()
+
+	context.BFL:FireEventCallbacks("FRIENDLIST_UPDATE")
+	local status = context.timers[#context.timers]
+	equal(status.delay, 0.2, "An ordinary status event still waits for the Core debounce")
+	characterFriends[1] = { name = "Newfriend", connected = true, level = 30, className = "Warrior", area = "Elwynn" }
+	context.BFL:FireEventCallbacks("FRIENDLIST_UPDATE")
+	local addition = context.timers[#context.timers]
+	check(status.cancelled, "A new character friend supersedes the pending status debounce")
+	equal(addition.delay, 0, "A confirmed character addition dispatches the callbacks next frame")
+	context.BFL:FireEventCallbacks("FRIENDLIST_UPDATE")
+	equal(context.timers[#context.timers], addition, "Event bursts do not postpone the queued addition")
+	addition.callback()
+
+	local rosterRefresh = context.timers[#context.timers]
+	equal(rosterRefresh.delay, 0, "The confirmed character addition also bypasses the list's status timer")
+	rosterRefresh.callback()
+	equal(visibleCount(context), 2, "The new character is visible through the production render path")
+end
+
+-- Accepted Battle.net and Title invitations publish when the roster has the friend.
+for _, friend in ipairs({ normal("New#1234"), title(42) }) do
+	local context = setup({ title(99) }, { modern = true })
+	context.list:UpdateFriendsList()
+	context.list:OnFriendListUpdate()
+	local status = context.timers[#context.timers]
+	equal(status.delay, 0.1, "The list batches ordinary status updates")
+	context.BFL:FireEventCallbacks("BN_FRIEND_INVITE_REMOVED")
+	local requestRefresh = context.timers[#context.timers]
+	equal(requestRefresh.delay, 0.05, "An invite disappearing alone keeps the ordinary fallback")
+	equal(visibleCount(context), 1, "The invite event alone does not invent a friend")
+
+	context.accounts[2] = friend
+	local previousPaints = context.paints()
+	context.BFL:FireEventCallbacks("BN_FRIEND_LIST_SIZE_CHANGED")
+	local rosterRefresh = context.timers[#context.timers]
+	check(status.cancelled and requestRefresh.cancelled, "The confirmed roster change subsumes pending refreshes")
+	equal(rosterRefresh.delay, 0, "Both friend types refresh the next frame after the size change")
+	equal(context.paints(), previousPaints, "A synchronous accept event cannot rebuild the list in its responder")
+	context.BFL:FireEventCallbacks("BN_FRIEND_INVITE_REMOVED")
+	context.BFL:FireEventCallbacks("BN_FRIEND_LIST_SIZE_CHANGED")
+	equal(context.timers[#context.timers], rosterRefresh, "Coalesced invite and size events share one refresh")
+	rosterRefresh.callback()
+	equal(visibleCount(context), 2, "The accepted Battle.net or Title friend is visible")
+	equal(context.paints(), previousPaints + 1, "One roster change produces one display update")
+end
+
+do
+	local options = { count = 1 }
+	local context = setup({ normal("Existing#1234") }, options)
+	context.list:UpdateFriendsList()
+	options.count = 2
+	context.BFL:FireEventCallbacks("BN_FRIEND_LIST_SIZE_CHANGED")
+	context.timers[#context.timers].callback()
+	equal(visibleCount(context), 1, "A reported addition without data retains the complete old list")
+	local retry = context.timers[#context.timers]
+	equal(retry.delay, 0.2, "An incomplete snapshot keeps the bounded retry")
+	context.accounts[2] = title()
+	retry.callback()
+	equal(visibleCount(context), 2, "A Title friend appears once its account record is available")
+end
+
 -- Faction decoration belongs to the rendered row, not the presence of a
 -- particular name-format token. Run the real Modern/Legacy text path.
 for _, modern in ipairs({ false, true }) do

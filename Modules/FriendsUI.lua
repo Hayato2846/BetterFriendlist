@@ -7176,15 +7176,13 @@ function FriendsUI:RegisterTests()
 			V:Assert(firstSlot._bflMainTankTooltip ~= nil, "Main Tank icon owns a Blizzard-style hover tooltip hitbox")
 			V:Assert(firstSlot._bflMainAssistTooltip ~= nil, "Main Assist icon owns a Blizzard-style hover tooltip hitbox")
 			V:Assert(not firstSlot.Background:IsShown(), "Modern Raid member rows do not restore the legacy black background")
+			V:AssertEqual(firstSlot.ClassColorTint:IsShown(), firstSlot.memberData ~= nil, "Modern Raid only shows the background tint on occupied rows")
 			if firstSlot.memberData and firstSlot.memberData._isMock then
-				V:Assert(firstSlot.ClassColorTint:IsShown(), "Raid preview rows expose their class-color background tint")
 				if firstSlot.memberData.rank == 2 and firstSlot.RankIcon.GetAtlas then
 					V:AssertEqual(firstSlot.RankIcon:GetAtlas(), "friends-icon-raidLead", "Raid leader uses the 12.1 SocialUI atlas")
 				elseif firstSlot.memberData.rank == 1 and firstSlot.RankIcon.GetAtlas then
 					V:AssertEqual(firstSlot.RankIcon:GetAtlas(), "friends-icon-raidAssist", "Raid assistant uses the 12.1 SocialUI atlas")
 				end
-			else
-				V:Assert(not firstSlot.ClassColorTint:IsShown(), "Live Modern Raid rows use the group card background")
 			end
 			local _, groupLabelSize = firstGroup.GroupTitle:GetFont()
 			local _, nativeLabelSize = GameFontHighlight:GetFont()

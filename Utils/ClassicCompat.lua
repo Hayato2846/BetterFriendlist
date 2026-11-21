@@ -3190,8 +3190,7 @@ function Compat.RemoveFriend(nameOrID)
 		return false
 	end
 	if C_FriendList and C_FriendList.RemoveFriend then
-		C_FriendList.RemoveFriend(nameOrID)
-		return true
+		return C_FriendList.RemoveFriend(nameOrID)
 	elseif RemoveFriend then
 		RemoveFriend(nameOrID)
 		return true
