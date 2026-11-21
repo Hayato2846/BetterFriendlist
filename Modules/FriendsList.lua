@@ -873,6 +873,7 @@ local GAME_ACCOUNT_COMPARE_FIELDS = {
 	"realmName",
 	"realmDisplayName",
 	"realmID",
+	"hasRealmInfo",
 	"factionName",
 	"raceName",
 	"classID",
@@ -3331,7 +3332,7 @@ end
 
 function FriendsList:GetGameAccountInviteRestriction(gameAccountInfo, playerFactionGroup, playerRealmID)
 	if not self:IsReadableInviteRecord(gameAccountInfo) then return INVITE_RESTRICTION_INFO end
-	for _, key in ipairs({ "clientProgram", "wowProjectID", "realmID", "isInCurrentRegion", "factionName", "classID", "isOnline", "gameAccountID", "playerGuid" }) do
+	for _, key in ipairs({ "clientProgram", "wowProjectID", "isInCurrentRegion", "factionName", "classID", "isOnline", "gameAccountID", "playerGuid" }) do
 		if BFL.IsSecret and BFL:IsSecret(gameAccountInfo[key]) then return INVITE_RESTRICTION_INFO end
 	end
 	if gameAccountInfo.clientProgram ~= BNET_CLIENT_WOW then return INVITE_RESTRICTION_CLIENT end
@@ -3340,9 +3341,8 @@ function FriendsList:GetGameAccountInviteRestriction(gameAccountInfo, playerFact
 		if gameAccountInfo.wowProjectID == WOW_PROJECT_MAINLINE then return INVITE_RESTRICTION_WOW_PROJECT_MAINLINE end
 		return INVITE_RESTRICTION_WOW_PROJECT_ID
 	end
-	if gameAccountInfo.realmID == 0 or (BFL.IsForever and
-		(type(gameAccountInfo.realmID) ~= "number" or gameAccountInfo.realmID <= 0
-		or gameAccountInfo.realmID >= math.huge or gameAccountInfo.realmID % 1 ~= 0 or gameAccountInfo.isOnline ~= true
+	if not BFL.HasBNetInviteRealmInfo(gameAccountInfo) or (BFL.IsForever and
+		(gameAccountInfo.isOnline ~= true
 		or type(gameAccountInfo.gameAccountID) ~= "number" or gameAccountInfo.gameAccountID <= 0
 		or gameAccountInfo.gameAccountID >= math.huge or gameAccountInfo.gameAccountID % 1 ~= 0
 		or type(gameAccountInfo.playerGuid) ~= "string" or gameAccountInfo.playerGuid == "")) then
@@ -3382,7 +3382,6 @@ function FriendsList:GetGameAccountInviteRestriction(gameAccountInfo, playerFact
 		local reason = BFL.GetForeverRulesetInviteRestriction(gameAccountInfo)
 		if reason then return BFL.INVITE_RESTRICTION_RULESET, reason end
 	end
-	if not gameAccountInfo.wowProjectID and not gameAccountInfo.realmID then return INVITE_RESTRICTION_NO_GAME_ACCOUNTS end
 	return INVITE_RESTRICTION_NONE
 end
 
@@ -3523,11 +3522,10 @@ function FriendsList:IsOnlyOnlineMenuInviteAccount(bnetAccountID, gameAccountID)
 	local account = C_BattleNet.GetFriendGameAccountInfo(index, 1)
 	if not self:IsReadableInviteRecord(account) then return false end
 	local guid = account.playerGuid
-	local realmID = self:GetReadableInviteField(account, "realmID")
 	return self:GetReadableInviteField(account, "gameAccountID") == gameAccountID
 		and self:GetReadableInviteField(account, "isOnline") == true
 		and self:GetReadableInviteField(account, "wowProjectID") == WOW_PROJECT_ID
-		and type(realmID) == "number" and realmID > 0
+		and BFL.HasBNetInviteRealmInfo(account)
 		and not BFL:IsSecret(guid) and (guid == nil or guid == "")
 end
 

@@ -1476,15 +1476,6 @@ function Compat.SetBNetBlocked(bnetIDAccount, blocked)
 	return ok == true
 end
 
--- Native Classic FriendsFrame forbids cross-realm invites in every Classic
--- flavor. Camelot uses Mainline rules instead, so it must not inherit that gate.
-function Compat.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID)
-	if not gameAccountInfo or not playerRealmID then
-		return false
-	end
-	return BFL.IsClassic == true and gameAccountInfo.realmID ~= playerRealmID
-end
-
 -- Older FriendsFrame helpers depend on faction/realm locals initialized by
 -- its OnShow. BFL keeps that frame hidden, so prefer the stateless native API.
 local IsReadableGameAccountInfo
@@ -1781,6 +1772,25 @@ end
 local function IsReadableAccountID(value)
 	return not (BFL.IsSecret and BFL:IsSecret(value)) and type(value) == "number"
 		and value > 0 and value < math.huge and value % 1 == 0
+end
+
+function Compat.HasBNetInviteRealmInfo(gameAccountInfo)
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return false end
+	local hasRealmInfo = gameAccountInfo.hasRealmInfo
+	if BFL.IsSecret and BFL:IsSecret(hasRealmInfo) then return false end
+	if hasRealmInfo ~= nil then
+		return hasRealmInfo == true
+	end
+	return IsReadableAccountID(gameAccountInfo.realmID)
+end
+
+-- Classic uses the actual realm ID to restrict cross-realm invites.
+function Compat.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID)
+	if BFL.IsClassic ~= true or not IsReadableGameAccountInfo(gameAccountInfo) then return false end
+	if BFL.IsSecret and BFL:IsSecret(playerRealmID) then return true end
+	if playerRealmID == nil then return false end
+	local realmID = gameAccountInfo.realmID
+	return not IsReadableAccountID(realmID) or realmID ~= playerRealmID
 end
 
 local function ReadPlayerForeverRuleset(getter)
@@ -4123,6 +4133,7 @@ BFL.ValidateForeverInviteTarget = Compat.ValidateForeverInviteTarget
 Compat.IsReadableGameAccountInfo = IsReadableGameAccountInfo
 BFL.IsReadableGameAccountInfo = IsReadableGameAccountInfo
 BFL.GetSafeFrameStrata = Compat.GetSafeFrameStrata
+BFL.HasBNetInviteRealmInfo = Compat.HasBNetInviteRealmInfo
 BFL.IsBNetInviteRealmRestricted = Compat.IsBNetInviteRealmRestricted
 BFL.GetBNetInviteTooltipInfo = Compat.GetBNetInviteTooltipInfo
 BFL.IsBattleNetFriendsListSupported = Compat.IsBattleNetFriendsListSupported

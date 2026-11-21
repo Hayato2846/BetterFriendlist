@@ -5104,7 +5104,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			or numGameAccounts < 0 or numGameAccounts >= math.huge or numGameAccounts % 1 ~= 0
 		then return end
 		local accountFields = {
-			"isOnline", "clientProgram", "wowProjectID", "realmID", "isInCurrentRegion",
+			"isOnline", "clientProgram", "wowProjectID", "isInCurrentRegion",
 			"factionName", "classID", "playerGuid", "gameAccountID",
 		}
 		local validGameAccounts = {}
@@ -5146,7 +5146,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 				and gameAccountInfo.isOnline ~= false
 				and gameAccountInfo.clientProgram == BNET_CLIENT_WOW
 				and gameAccountInfo.wowProjectID == WOW_PROJECT_ID
-				and gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0
+				and BFL.HasBNetInviteRealmInfo(gameAccountInfo)
 				and not BFL.IsBNetInviteRealmRestricted(gameAccountInfo, playerRealmID)
 				and gameAccountInfo.isInCurrentRegion
 				and gameAccountInfo.gameAccountID
@@ -5235,11 +5235,9 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 	for i = 1, numGameAccounts do
 		local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, i)
 		if
-			gameAccountInfo
+			BFL.HasBNetInviteRealmInfo(gameAccountInfo)
 			and gameAccountInfo.clientProgram == BNET_CLIENT_WOW
 			and gameAccountInfo.isOnline
-			and gameAccountInfo.realmID
-			and gameAccountInfo.realmID ~= 0
 			and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo))
 		then
 			BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
@@ -5249,7 +5247,9 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 	-- Single game account fallback
 	local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, 1)
-	if gameAccountInfo and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo)) and gameAccountInfo.gameAccountID then
+	if BFL.HasBNetInviteRealmInfo(gameAccountInfo)
+		and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo)) and gameAccountInfo.gameAccountID
+	then
 		BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
 	end
 end
@@ -5525,7 +5525,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 						end
 					elseif factionRestriction then
 						restriction = factionRestriction
-					elseif gameAccountInfo.realmID == 0 then
+					elseif not BFL.HasBNetInviteRealmInfo(gameAccountInfo) then
 						-- No realm info
 						if not restriction then
 							restriction = BFL_INVITE_RESTRICTION_INFO
@@ -5547,7 +5547,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 					end
 				elseif factionRestriction then
 					restriction = factionRestriction
-				elseif gameAccountInfo.realmID == 0 then
+				elseif not BFL.HasBNetInviteRealmInfo(gameAccountInfo) then
 					-- No realm info
 					if not restriction then
 						restriction = BFL_INVITE_RESTRICTION_INFO
@@ -5561,7 +5561,7 @@ function BetterFriendsList_TravelPassButton_OnEnter(self)
 					restriction = BFL_INVITE_RESTRICTION_GAME_MODE
 				elseif BFL.GetForeverRulesetInviteRestriction(gameAccountInfo) then
 					restriction = BFL.INVITE_RESTRICTION_RULESET
-				elseif gameAccountInfo.realmID and gameAccountInfo.realmID ~= 0 then
+				else
 					-- Valid WoW account (no project ID check needed)
 					restriction = BFL_INVITE_RESTRICTION_NONE
 					displayedGuid = gameAccountInfo.playerGuid or displayedGuid

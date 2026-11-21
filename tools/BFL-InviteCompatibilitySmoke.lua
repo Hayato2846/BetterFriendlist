@@ -177,6 +177,17 @@ check("Forever cross realm, single login", 18, { account() }, true, 1)
 check("Forever same realm", 18, { account({ realmID = 100 }) }, true, 1)
 check("Retail cross realm", 1, { account({ wowProjectID = 1 }) }, true, 1)
 do
+	local app = account({ clientProgram = "App", gameAccountID = 100 })
+	local forever = account({ hasRealmInfo = true })
+	forever.realmID = nil
+	check("Forever with realm availability flag and an app session", 18, { app, forever }, true, 1)
+	local retail = account({ wowProjectID = 1, hasRealmInfo = true })
+	retail.realmID = nil
+	check("Retail with realm availability flag and no numeric realm ID", 1, { retail }, true, 1)
+	V:AssertEqual(BFL.HasBNetInviteRealmInfo(account({ hasRealmInfo = false })), false,
+		"An explicit missing realm cannot be overridden by a numeric ID")
+end
+do
 	local function retailWithoutGUID(overrides)
 		local gameAccount = account({ wowProjectID = 1 })
 		gameAccount.playerGuid = nil
