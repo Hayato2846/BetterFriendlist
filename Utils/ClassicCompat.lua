@@ -1660,19 +1660,26 @@ local FOREVER_PRESENCE_RULESET_TOKENS = {
 -- Blizzard's BattleNetFriendPartyInviteRestrictionType or priority tables.
 BFL.INVITE_RESTRICTION_RULESET = 14
 
+-- Exact aliases for display. Battle.net may supply a localized ruleset from
+-- another region, so recognize it independently of the viewer's locale.
+local FOREVER_DISPLAY_RULESETS = {
+	NORMAL = "PVE", PVE = "PVE", NORMALE = "PVE", ["Обычный"] = "PVE",
+	["일반"] = "PVE", ["普通"] = "PVE", ["一般"] = "PVE",
+	PVP = "PVP", JCJ = "PVP", JXJ = "PVP", ["전쟁"] = "PVP",
+	RP = "RP", ROLEPLAY = "RP", ROLEPLAYING = "RP", ROLLENSPIEL = "RP",
+	JDR = "RP", ["JEUDERôLE"] = "RP", JUEGODEROL = "RP", ["INTERPRETAçãO"] = "RP",
+	GDR = "RP", GIOCODIRUOLO = "RP", ["РП"] = "RP", ["Ролеваяигра"] = "RP",
+	["역할극"] = "RP", ["角色扮演"] = "RP",
+	RPPVP = "RPPVP", RPVP = "RPPVP", ROLEPLAYPVP = "RPPVP", ROLEPLAYINGPVP = "RPPVP",
+	ROLLENSPIELPVP = "RPPVP", JDRJCJ = "RPPVP", ["JEUDERôLEJCJ"] = "RPPVP",
+	JUEGODEROLJCJ = "RPPVP", JUEGODEROLCONJCJ = "RPPVP", RPJXJ = "RPPVP",
+	["INTERPRETAçãOJXJ"] = "RPPVP", GDRPVP = "RPPVP", GIOCODIRUOLOPVP = "RPPVP",
+	["РПPVP"] = "RPPVP", ["РолеваяиграPVP"] = "RPPVP", ["РолевойPVP"] = "RPPVP",
+	["역할극전쟁"] = "RPPVP", ["역할극PVP"] = "RPPVP", ["角色扮演PVP"] = "RPPVP",
+}
+
 local function HasForeverRulesetToken(text, token)
 	return text:find("%f[%w_]" .. token .. "%f[^%w_]") ~= nil
-end
-
-function Compat.IsWoWAccountRulesetLocation(gameAccountInfo)
-	if not IsReadableGameAccountInfo(gameAccountInfo) then
-		return BFL.IsForever == true
-	end
-	local projectID = gameAccountInfo.wowProjectID
-	if (BFL.IsSecret and BFL:IsSecret(projectID)) or projectID == nil then
-		return BFL.IsForever == true
-	end
-	return projectID == FOREVER_PROJECT_ID
 end
 
 local function GetForeverRealmRuleset(realmName)
@@ -1745,6 +1752,88 @@ local function GetForeverAccountRuleset(gameAccountInfo)
 	return token, realm, area
 end
 
+local function GetForeverDisplayRuleset(text)
+	if not IsSafeNameValue(text) then return nil end
+	local key = text:gsub(" ", " "):gsub(" ", " "):gsub("‐", "-"):gsub("‑", "-")
+		:gsub("–", "-"):gsub("—", "-"):gsub("[%s,%-]+", ""):upper()
+	return FOREVER_DISPLAY_RULESETS[key]
+end
+
+Compat.GetForeverRulesetSearchToken = GetForeverDisplayRuleset
+
+local function GetForeverDisplayShardRuleset(realm)
+	if not IsSafeNameValue(realm) then return nil end
+	local suffix = realm:upper():match("^%s*CAMWOW%s*[A-Z]+%d+%s*REALM%s*%d+%s*(.+)$")
+	if suffix then return GetForeverDisplayRuleset(suffix) or GetForeverRealmRuleset(realm) end
+end
+
+local function IsForeverPresenceProduct(product)
+	if not product then return false end
+	product = product:gsub(" ", " "):gsub(" ", " "):match("^%s*(.-)%s*$"):upper()
+	return product == "FOREVER" or product == "WOW FOREVER" or product == "WOW: FOREVER"
+end
+
+local function SplitForeverPresenceField(text)
+	local first, last = text:find("%s+%-%s+")
+	local dotFirst, dotLast = text:find("%s*·%s*")
+	if dotFirst and (not first or dotFirst < first) then first, last = dotFirst, dotLast end
+	if first then return text:sub(1, first - 1), text:sub(last + 1) end
+end
+
+-- A recognized product marker keeps the activity separate even if its ruleset
+-- is unknown. An empty area means the presence identifies a ruleset without a zone.
+local function GetStructuredForeverPresence(presence)
+	local product, detail = SplitForeverPresenceField(presence)
+	if not IsForeverPresenceProduct(product) then return nil end
+	local ruleset, area = SplitForeverPresenceField(detail)
+	if area and area:find("%s+·%s+") then return nil end
+	local token = GetForeverDisplayRuleset(ruleset or detail)
+	area = (area or ""):match("^%s*(.-)%s*$")
+	if not token and ruleset and area ~= "" then
+		ruleset = ruleset:match("^%s*(.-)%s*$")
+		-- An unfamiliar label needs an explicit zone and an unambiguous three-field presence.
+		if ruleset ~= "" and #ruleset <= 96 and not ruleset:find("|", 1, true)
+			and not ruleset:upper():match("^CAMWOW") and not SplitForeverPresenceField(area)
+		then return nil, area, ruleset end
+	end
+	return token, area
+end
+
+local function GetForeverDisplayPresence(presence)
+	if not IsSafeNameValue(presence) or #presence > 2048 or presence:find("[%c]") then return nil end
+	local token, area, rawLabel = GetStructuredForeverPresence(presence)
+	if area then return token, nil, area, rawLabel end
+
+	local start = presence:upper():find(" %- CAMWOW.+$")
+	if start then
+		local realm = presence:sub(start + 3)
+		token = GetForeverDisplayShardRuleset(realm)
+		if token then return token, realm, presence:sub(1, start - 1):match("^%s*(.-)%s*$") end
+	end
+end
+
+local function IsForeverDisplayAccount(gameAccountInfo, projectID, client)
+	if client ~= nil and client ~= (BNET_CLIENT_WOW or "WoW") then return false end
+	if projectID and projectID ~= 0 then return projectID == FOREVER_PROJECT_ID end
+	if client == (BNET_CLIENT_WOW or "WoW") then
+		local icon = gameAccountInfo.subIcon
+		if IsSafeNameValue(icon) and icon == "WoWF" then return true end
+		if GetForeverDisplayShardRuleset(gameAccountInfo.realmName)
+			or GetForeverDisplayShardRuleset(gameAccountInfo.realmDisplayName)
+		then return true end
+		local _, _, area = GetForeverDisplayPresence(gameAccountInfo.richPresence)
+		if area then return true end
+	end
+	return projectID == nil and BFL.IsForever == true
+end
+
+function Compat.IsWoWAccountRulesetLocation(gameAccountInfo)
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return BFL.IsForever == true end
+	local projectID, client = gameAccountInfo.wowProjectID, gameAccountInfo.clientProgram
+	if BFL.IsSecret and (BFL:IsSecret(projectID) or BFL:IsSecret(client)) then return BFL.IsForever == true end
+	return IsForeverDisplayAccount(gameAccountInfo, projectID, client)
+end
+
 -- Display only. Ignore a recognized Forever status when the account's project
 -- already identifies another WoW client, even if its area is still missing.
 function Compat.GetGameAccountRichPresence(gameAccountInfo)
@@ -1754,19 +1843,36 @@ function Compat.GetGameAccountRichPresence(gameAccountInfo)
 	local project, client = gameAccountInfo.wowProjectID, gameAccountInfo.clientProgram
 	if BFL.IsSecret and (BFL:IsSecret(project) or BFL:IsSecret(client)) then return nil end
 	if client == (BNET_CLIENT_WOW or "WoW") and type(project) == "number"
-		and project ~= FOREVER_PROJECT_ID and GetForeverPresenceRuleset(presence)
-	then return nil end
+		and project ~= 0 and project ~= FOREVER_PROJECT_ID
+	then
+		local _, _, area = GetForeverDisplayPresence(presence)
+		if area then return nil end
+	end
 	return presence
 end
 
 local function GetForeverRulesetLabel(gameAccountInfo)
-	local token, realm, area = GetForeverAccountRuleset(gameAccountInfo)
+	local presenceToken, presenceRealm, presenceArea, rawLabel = GetForeverDisplayPresence(gameAccountInfo.richPresence)
+	local realm = gameAccountInfo.realmName
+	local token = GetForeverDisplayShardRuleset(realm)
+	if not token then
+		-- An explicit presence ruleset takes precedence over a display label.
+		token, realm = presenceToken, presenceRealm
+	end
+	if not token then
+		realm = gameAccountInfo.realmName
+		token = GetForeverDisplayRuleset(realm) or GetForeverRealmRuleset(realm)
+	end
+	if not token then
+		realm = gameAccountInfo.realmDisplayName
+		token = GetForeverDisplayShardRuleset(realm) or GetForeverDisplayRuleset(realm) or GetForeverRealmRuleset(realm)
+	end
 	-- RealmList's native labels belong to GlueXML and are not guaranteed in
 	-- the in-game addon environment. Use BFL's always-loaded locale catalog.
 	local key = token and FOREVER_RULESET_LABEL_KEYS[token]
 	local label = key and BFL.L and BFL.L[key]
-	if IsSafeNameValue(label) then return label, realm, area end
-	return "", nil
+	if IsSafeNameValue(label) then return label, realm, presenceArea, token end
+	return rawLabel or "", nil, presenceArea, token
 end
 
 local function IsReadableAccountID(value)
@@ -1801,6 +1907,26 @@ end
 
 local function GetPlayerForeverRuleset()
 	return ReadPlayerForeverRuleset(GetRealmName) or ReadPlayerForeverRuleset(GetNormalizedRealmName)
+end
+
+local function ReadForeverGameRule(ruleName)
+	local rule = Enum and Enum.GameRule and Enum.GameRule[ruleName]
+	local evaluate = C_GameRules and C_GameRules.IsGameRuleActive
+	if (BFL.IsSecret and BFL:IsSecret(rule)) or type(rule) ~= "number" or type(evaluate) ~= "function" then return nil end
+	local ok, active = pcall(evaluate, rule)
+	if ok and not (BFL.IsSecret and BFL:IsSecret(active)) and type(active) == "boolean" then return active end
+end
+
+-- The local ruleset is used for social filters. Invite eligibility keeps its
+-- existing realm-based check and never consumes display-only labels.
+function Compat.GetPlayerForeverSocialRuleset()
+	if BFL.IsForever ~= true then return nil end
+	local realmRuleset = GetPlayerForeverRuleset()
+	if realmRuleset then return realmRuleset end
+	local pvp, rp = ReadForeverGameRule("PvPRuleset"), ReadForeverGameRule("RPRuleset")
+	if pvp == nil or rp == nil or ReadForeverGameRule("HardcoreRuleset") ~= false then return nil end
+	if pvp then return rp and "RPPVP" or "PVP" end
+	return rp and "RP" or "PVE"
 end
 
 -- Default calls only inspect the supplied target snapshot. Dispatch callers
@@ -1892,9 +2018,10 @@ end
 
 -- Display only: never substitute this result for a realm in character names,
 -- contact keys, invites or account identity. Forever publishes no target
--- ruleset field; recognize the user-verified type tokens in that account's
--- own realm or structured presence text instead. The optional fourth result
--- is that presence's area. Unknown text stays empty, without player-rule data.
+-- ruleset field; use that account's realm or structured presence. The optional
+-- third result is raw realm evidence. The fourth is a parsed area, which can
+-- be empty when a structured presence names the ruleset but has no zone.
+-- The fifth result is a recognized ruleset token for social search and filters.
 function Compat.GetWoWAccountLocation(gameAccountInfo, fallbackRealm)
 	local kind = Compat.IsWoWAccountRulesetLocation(gameAccountInfo) and "ruleset" or "realm"
 	if BFL.IsSecret and BFL:IsSecret(gameAccountInfo) then
@@ -1913,9 +2040,9 @@ function Compat.GetWoWAccountLocation(gameAccountInfo, fallbackRealm)
 		end
 	end
 	if kind == "ruleset" then
-		local label, realm, area
-		if gameAccountInfo then label, realm, area = GetForeverRulesetLabel(gameAccountInfo) end
-		return label or "", kind, realm, area
+		local label, realm, area, token
+		if gameAccountInfo then label, realm, area, token = GetForeverRulesetLabel(gameAccountInfo) end
+		return label or "", kind, realm, area, token
 	end
 	if gameAccountInfo then
 		if IsSafeNameValue(gameAccountInfo.realmDisplayName) then

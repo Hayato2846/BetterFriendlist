@@ -74,6 +74,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.7]        - 2026-11-22
+
+### All WoW Versions
+
+#### Improved
+- **Ruleset Search** - Find Forever friends by ruleset using names such as RP, Roleplay, RP-PvP, or Roleplay PvP. Searching for PvP also finds friends on RP-PvP.
+- **Quick Filters** - WoW Forever Only is now called Forever Only.
+
+#### Fixed
+- **Forever Ruleset Display** - Battle.net friends show Normal, PvP, RP, or RP-PvP when their game status identifies the ruleset, including when realm information is unavailable. The ruleset also appears for additional game accounts. Unfamiliar ruleset labels are shown as supplied by Battle.net.
+
+### WoW Forever
+
+#### Added
+- **My Ruleset Only** - This quick filter shows online friends playing on your own Forever ruleset.
+
+---
+
 ## [3.1.6]        - 2026-11-21
 
 ### WoW Retail & WoW Forever
@@ -297,54 +315,6 @@ BetterFriendlist 3.0.2 brings back Blizzard's friend menu, fixes chat taint when
 
 #### Fixed
 - **Who Searches** - The friends list stays put when another addon runs a Who search in the background.
-
----
-
-## [3.0.1]        - 2026-11-06
-
-BetterFriendlist 3.0.1 improves group note sync and backups, adds ruleset checks for invites in WoW Forever, and makes smooth scrolling optional.
-
-### All WoW Versions
-
-#### Added
-- **Full Backups** - Exports now include private contact notes and saved note backups. Both backup windows explain that the exported data can contain private information and friend names.
-- **Global Sync Database** - Use Delete All to clear saved Global Sync entries and their notes for this client after confirmation, without removing anyone from your Blizzard friends list.
-
-#### Improved
-- **Group Note Sync** - Large syncs send queued updates without waiting for each note to appear or repeatedly sending changes already awaiting confirmation. Progress shows what is queued and what is waiting, with fewer repeated friend-list reads and window refreshes.
-- **Note Cleanup** - The wizard keeps its recovery copy across retries, waits for delayed note changes, and lets you stop cleanup while keeping the backup. Title friend backups can be restored during the same game session.
-- **Backup Text Fields** - Large pastes in the import and export windows are buffered to reduce pauses. Selections and text after the insertion point are preserved.
-
-#### Fixed
-- **Group Assignments** - Existing note tags are read before syncing starts, and assignments stay intact when groups are renamed or changed during a sync. Group names containing # are supported, though other FriendGroups addons may display their escaped form.
-- **Settings Imports** - Backups are checked before replacing your data, and the previous settings are restored if applying an import fails. Nested filters and older group colors are preserved.
-- **Global Sync Backups** - Saved friends and Global Sync options are restored only into the same WoW client type, keeping Retail, Forever, and Classic separate. Imports from another client or older backups without this information keep your existing Global Sync data.
-- **Game Icons** - Friends playing WoW Forever show Blizzard's matching game icon in the friends list, tooltips, account menus, and the Data Broker.
-- **Friend Tags** - Removed patch-number references from the Blizzard handoff heading and description.
-
-### Retail Midnight & WoW Forever
-
-#### Improved
-- **Scrolling** - Immediate scrolling is the default again, matching the behavior before 3.0.0. Enable Smooth Scrolling in General settings to animate scrolling in either the Modern or Legacy layout.
-
-### WoW Forever
-
-#### Added
-- **Ruleset Display** - Friend details show Normal, PvP, RP, or RP-PvP instead of internal realm names. The default info line includes the ruleset, and custom name and info formats can use %ruleset%.
-- **Ruleset Invites** - Invite and Request to Join now check rulesets as well as faction. The party button is disabled for a different ruleset and explains why on hover; friends with several online characters can still use a compatible character.
-
-#### Fixed
-- **Class Colors** - Retail friends keep their Monk, Death Knight, Demon Hunter, and Evoker colors when viewed in Forever, including in tooltips, account menus, and the Data Broker.
-- **Character Names** - Auto Raid Assist keeps complete first and last names when finding, saving, and promoting Title friends. Raid, guild, and Quick Join displays also preserve surnames.
-- **Who Searches** - Who searches open in BetterFriendlist instead of Blizzard's Who or Looking For Group window, including searches from /who and character links. Looking For Group remains available for its normal group activities.
-- **Global Sync** - Saved entries can be removed from the sync database without removing Blizzard friends. The invite list opens horizontally centered over the friends list.
-
-### WoW Classic
-
-#### Fixed
-- **Backups and Notes** - Fixed missing characters at the end of some backup strings. Non-English group names can use the full note length supported by the client.
-
----
 
 ---
 

@@ -145,7 +145,9 @@ account.realmName = "CAMWOW EU5 Realm 6 PvP"
 BFL.IsForever = false
 equal(list:FormatInfoLine(friend), "Elwynn, PvP", "Retail displays a known Forever target ruleset in the default info line")
 for _, modern in ipairs({ false, true }) do
-	for _, variant in ipairs({ { "Normal", "Normal" }, { "PvP", "PvP" }, { "RP", "RP" }, { "RP-PvP", "RP-PvP" } }) do
+	for _, variant in ipairs({ { "Normal", "Normal" }, { "PvP", "PvP" }, { "RP", "RP" }, { "RP-PvP", "RP-PvP" },
+		{ "Roleplay", "RP" }, { "Roleplay PvP", "RP-PvP" }, { "Rollenspiel-PvP", "RP-PvP" },
+		{ "Unfamiliar Ruleset", "Unfamiliar Ruleset" } }) do
 		local snapshot = normal("Ada#1234")
 		local game = snapshot.gameAccountInfo
 		game.realmName, game.realmDisplayName, game.areaName = nil, nil, nil
@@ -188,6 +190,8 @@ for _, modern in ipairs({ false, true }) do
 			{ 1, 456, nil, "Forever - PvP - Ashenvale", nil, "Online", "" },
 			{ 1, 456, "PvP", "Forever · PvP · Ashenvale", "Valdrakken", "Valdrakken", "" },
 			{ 18, 789, nil, "Forever · RP · Elwynn", nil, "Elwynn", "RP" },
+			{ 0, 789, nil, "Forever - Roleplay PvP - Elwynn", nil, "Elwynn", "RP-PvP" },
+			{ 2, 789, nil, "Forever - Roleplay PvP - Elwynn", nil, "Online", "" },
 			{ 1, 456, "Retail Realm", "Stormwind - Retail Realm", "Stormwind", "Stormwind", "" },
 		}) do
 			local nextAccount = game(true)
@@ -217,6 +221,78 @@ for _, modern in ipairs({ false, true }) do
 			current.list.settingsCache.infoFormatPreset = "default"
 		end
 	end
+end
+
+do
+	local snapshot = normal("Reduced#1234")
+	local game = snapshot.gameAccountInfo
+	game.wowProjectID, game.realmName, game.realmDisplayName, game.areaName = 0, nil, nil, nil
+	game.richPresence = "Forever - Roleplay PvP"
+	local current = setup({ snapshot }, { nameFormat = "%character% [%ruleset%]" })
+	current.BFL.IsForever, current.env.WOW_PROJECT_ID = false, 1
+	current.list:UpdateFriendsList()
+	local row = current.list.friendsList[1]
+	equal(row.areaName, "", "Presence without a zone does not use the product name as the zone")
+	equal(row.realmName, nil, "Presence without a zone does not copy the ruleset into the realm")
+	equal(current.list:GetDisplayName(row), "Ada Lovelace [RP-PvP]", "A reduced Battle.net record displays its ruleset")
+
+	local applyAccount = assert(load(between(broker, "local function ApplyGameAccountToFriend(", "local function GetPreviewFriendGameInfo(")
+		.. "\nreturn ApplyGameAccountToFriend", "@production broker account model", "t", current.env))()
+	local brokerFriend = {}
+	game.richPresence = "Forever - Roleplay PvP - Tirisfal Glades"
+	applyAccount(brokerFriend, game)
+	equal(brokerFriend.area, "Tirisfal Glades", "Broker uses the same parsed zone as the list")
+	equal(brokerFriend.realmName, "", "Broker keeps the ruleset separate from the realm")
+	game.wowProjectID = 1
+	applyAccount(brokerFriend, game)
+	equal(brokerFriend.area, "", "Broker discards stale Forever presence after a client switch")
+end
+
+-- Exercise name and ruleset queries through the production friend predicate.
+do
+	local function account(presence, project, online)
+		return { clientProgram = "WoW", wowProjectID = project, isOnline = online ~= false, richPresence = presence }
+	end
+	local function contact(primary, secondary)
+		return { type = "bnet", connected = true, accountName = "Ada Lovelace",
+			gameAccountInfo = primary, gameAccounts = secondary and { primary, secondary } or nil }
+	end
+	local pvp = contact(account("Forever - PvP - Elwynn", 18))
+	local rp = contact(account("Forever · Roleplay · Elwynn", 18))
+	local both = contact(account("Forever - Roleplay PvP - Elwynn", 0))
+	local fallback = contact(account("Forever - Unfamiliar Ruleset - Elwynn", 18))
+	local retail = contact(account("Forever - Roleplay PvP - Elwynn", 1))
+	local multi = contact(account("Stormwind - Retail Realm", 1), account("Forever - Roleplay PvP - Elwynn", 18))
+	local offline = contact(account("Forever - Roleplay PvP - Elwynn", 18, false))
+	local friends = { pvp, rp, both, fallback, retail, multi, offline }
+	for _, viewer in ipairs({ 1, 2, 18 }) do
+		local current = setup({}, { classic = viewer == 2 })
+		current.BFL.IsForever, current.env.WOW_PROJECT_ID = viewer == 18, viewer
+		for _, test in ipairs({
+			{ "pvp", { true, false, true, false, false, true, false } },
+			{ "RP", { false, true, true, false, false, true, false } },
+			{ "Roleplay", { false, true, true, false, false, true, false } },
+			{ "RP-PvP", { false, false, true, false, false, true, false } },
+			{ " Roleplay PvP ", { false, false, true, false, false, true, false } },
+			{ "roleplay‑pvp", { false, false, true, false, false, true, false } },
+			{ "unfamiliar", { false, false, false, true, false, false, false } },
+			{ "Ada", { true, true, true, true, true, true, true } },
+		}) do
+			current.list:SetSearchText(test[1], true)
+			for index, friend in ipairs(friends) do
+				equal(current.list:PassesFilters(friend), test[2][index],
+					"Ruleset search " .. test[1] .. " for contact " .. index .. " on project " .. viewer)
+			end
+		end
+	end
+
+	local current = setup({})
+	current.list:SetSearchText("rp-pvp", true)
+	local changing = contact(account("Forever - Roleplay PvP - Elwynn", 18))
+	check(current.list:PassesFilters(changing), "Initial ruleset search fills the cache")
+	changing.gameAccountInfo.richPresence = "Forever - Roleplay - Elwynn"
+	current.BFL.FriendsListVersion = (current.BFL.FriendsListVersion or 0) + 1
+	check(not current.list:PassesFilters(changing), "The old ruleset stops matching after a friend refresh")
 end
 
 -- Selecting a preferred active account must override the focused account in
@@ -281,10 +357,10 @@ local friend = { type = "bnet", index = 1, bnetAccountID = 42, friendLevel = 1, 
 	battleTag = "Ada#1234", connected = true, gameAccountInfo = primary, totalGameAccounts = 2, gameAccounts = { primary, secondary } }
 showSafe({}, {}, friend)
 equal(env.FriendsTooltipGameAccount1Info.text, "Zone: Stormwind\nRealm: Retail Realm", "primary Retail tooltip keeps realm")
-equal(env.FriendsTooltipGameAccount2Info.text, "Elwynn Forest - PvP", "secondary Forever rich presence uses target ruleset")
+equal(env.FriendsTooltipGameAccount2Info.text, "Elwynn Forest\nRuleset: PvP", "secondary Forever rich presence uses target ruleset")
 secondary.richPresence = "Elwynn Forest - " .. secondary.realmName:lower()
 showSafe({}, {}, friend)
-equal(env.FriendsTooltipGameAccount2Info.text, "Elwynn Forest - PvP", "realm replacement tolerates native capitalization differences")
+equal(env.FriendsTooltipGameAccount2Info.text, "Elwynn Forest\nRuleset: PvP", "realm replacement tolerates native capitalization differences")
 env.WOW_PROJECT_ID = 18
 friend.gameAccountInfo, friend.totalGameAccounts, friend.gameAccounts = secondary, 1, nil
 showSafe({}, {}, friend)
@@ -308,7 +384,7 @@ equal(env.FriendsTooltipGameAccount1Info.text, "In the world - PvP", "presence-o
 secondary.realmName = nil
 secondary.richPresence = "Elwynn Forest - CAMWOW EU5 Realm 9 RP PvP"
 showSafe({}, {}, friend)
-equal(env.FriendsTooltipGameAccount1Info.text, "Elwynn Forest - RP-PvP", "realm evidence from target presence is replaced without leaking CAMWOW")
+equal(env.FriendsTooltipGameAccount1Info.text, "Elwynn Forest\nRuleset: RP-PvP", "realm evidence from target presence is replaced without leaking CAMWOW")
 env.WOW_PROJECT_ID = 1
 BFL.IsForever = false
 secondary.realmName, secondary.realmDisplayName, secondary.areaName = nil, nil, nil
@@ -318,12 +394,16 @@ equal(env.FriendsTooltipGameAccount1Info.text, "Ashenvale\nRuleset: Normal", "Re
 secondary.richPresence = "Forever - PvP - Lune-d’Argent"
 showSafe({}, {}, friend)
 equal(env.FriendsTooltipGameAccount1Info.text, "Lune-d’Argent\nRuleset: PvP", "ASCII presence keeps the zone and avoids duplicate rulesets")
+secondary.richPresence = "Forever - Roleplay PvP"
+showSafe({}, {}, friend)
+equal(env.FriendsTooltipGameAccount1Info.text, "Ruleset: RP-PvP", "An identified ruleset without a zone has no blank first line")
 for _, replaceSnapshot in ipairs({ false, true }) do
 	for _, state in ipairs({
 		{ 18, nil, nil, "Forever · Normal · Ashenvale", "Ashenvale\nRuleset: Normal" },
 		{ 1, nil, nil, "Forever · Normal · Ashenvale", "" },
 		{ 1, "Normal", "Stormwind", "Forever · Normal · Ashenvale", "Zone: Stormwind\nRealm: Normal" },
 		{ 18, nil, nil, "Forever · PvP · Elwynn", "Elwynn\nRuleset: PvP" },
+		{ 0, nil, nil, "Forever - Roleplay PvP - Elwynn", "Elwynn\nRuleset: RP-PvP" },
 		{ 1, nil, nil, "Forever - PvP - Elwynn", "" },
 		{ 1, "PvP", "Valdrakken", "Valdrakken - PvP", "Zone: Valdrakken\nRealm: PvP" },
 	}) do

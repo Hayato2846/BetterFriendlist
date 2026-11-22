@@ -420,12 +420,19 @@ local function ShouldSafeGameAccountShowRichPresence(gameAccountInfo)
 	return not areaName
 end
 
+local function FormatGameAccountAreaAndRuleset(area, ruleset)
+	if ruleset == "" then return area end
+	local detail = BFL.L.RULESET_LABEL .. " " .. ruleset
+	return area ~= "" and (area .. "\n" .. detail) or detail
+end
+
 local function GetSafeGameAccountPresence(gameAccountInfo)
 	local presence = BFL.GetGameAccountRichPresence(gameAccountInfo) or ""
 	if not BFL.IsWoWAccountRulesetLocation(gameAccountInfo) then return presence end
 	local location, _, realmEvidence, presenceArea = BFL.GetWoWAccountLocation(gameAccountInfo)
-	if presenceArea and location ~= "" then
-		return presenceArea .. "\n" .. BFL.L.RULESET_LABEL .. " " .. location
+	if presenceArea then
+		local area = SafeString(GetGameAccountField(gameAccountInfo, "areaName", nil), presenceArea)
+		return FormatGameAccountAreaAndRuleset(area ~= "" and area or presenceArea, location)
 	end
 	local replaced = 0
 	for _, realm in ipairs({
@@ -451,10 +458,10 @@ local function GetSafeGameAccountPresence(gameAccountInfo)
 end
 
 local function GetSafeGameAccountAreaAndRuleset(gameAccountInfo)
-	local text = SafeString(GetGameAccountField(gameAccountInfo, "areaName", nil), UNKNOWN or "")
-	local location = BFL.GetWoWAccountLocation(gameAccountInfo)
-	if location ~= "" then text = text .. "\n" .. BFL.L.RULESET_LABEL .. " " .. location end
-	return text
+	local location, _, _, presenceArea = BFL.GetWoWAccountLocation(gameAccountInfo)
+	local area = SafeString(GetGameAccountField(gameAccountInfo, "areaName", nil), "")
+	if area == "" then area = presenceArea or UNKNOWN or "" end
+	return FormatGameAccountAreaAndRuleset(area, location)
 end
 
 local function GetSafeGameAccountCharacterLine(gameAccountInfo, battleTag)

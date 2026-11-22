@@ -223,8 +223,11 @@ end
 local function GetVisibleGameAccounts(friend)
 	local accounts = {}
 	local seen = {}
+	local readable = BFL.IsReadableGameAccountInfo
 	local function AddAccount(gameAccountInfo)
-		if type(gameAccountInfo) ~= "table" or seen[gameAccountInfo] then
+		if IsSecretValue(gameAccountInfo) or type(gameAccountInfo) ~= "table"
+			or (readable and not readable(gameAccountInfo)) or seen[gameAccountInfo]
+		then
 			return
 		end
 		seen[gameAccountInfo] = true
@@ -232,7 +235,9 @@ local function GetVisibleGameAccounts(friend)
 	end
 
 	AddAccount(GetGameInfo(friend))
-	if friend and type(friend.gameAccounts) == "table" then
+	if friend and not IsSecretValue(friend.gameAccounts) and type(friend.gameAccounts) == "table"
+		and (not readable or readable(friend.gameAccounts))
+	then
 		for _, gameAccountInfo in ipairs(friend.gameAccounts) do
 			AddAccount(gameAccountInfo)
 		end
@@ -244,6 +249,7 @@ local function IsGameAccountOnline(friend, gameAccountInfo)
 	if not gameAccountInfo then
 		return false
 	end
+	if IsSecretValue(gameAccountInfo.isOnline) then return false end
 	if gameAccountInfo.isOnline ~= nil then
 		return gameAccountInfo.isOnline and true or false
 	end
@@ -942,6 +948,26 @@ local function BuiltinQuickFilter_Forever(friend)
 	end)
 end
 
+function Registry:GetPlayerForeverRuleset()
+	local compat = BFL.Compat
+	if not BFL.IsForever or not (compat and compat.GetPlayerForeverSocialRuleset) then return nil end
+	local friendsVersion = BFL.FriendsListVersion or 0
+	if self.playerRulesetFriendsVersion ~= friendsVersion then
+		self.playerRuleset = compat.GetPlayerForeverSocialRuleset()
+		self.playerRulesetFriendsVersion = friendsVersion
+	end
+	return self.playerRuleset
+end
+
+local function BuiltinQuickFilter_ForeverRuleset(friend)
+	local ownRuleset = Registry:GetPlayerForeverRuleset()
+	if not ownRuleset or not friend then return false end
+	if friend.type == "wow" then return IsFriendOnline(friend) end
+	return HasOnlineGameAccount(friend, function(account)
+		return ownRuleset == select(5, BFL.GetWoWAccountLocation(account))
+	end)
+end
+
 local function BuiltinQuickFilter_InGame(friend)
 	if friend and friend.type == "wow" then
 		return IsFriendOnline(friend)
@@ -1040,6 +1066,15 @@ local BUILTIN_QUICK_FILTERS = {
 		icon = "logo-wow-forever",
 		order = 85,
 		evaluator = BuiltinQuickFilter_Forever,
+	},
+	{
+		id = "foreverruleset",
+		labelKey = "FILTER_FOREVER_RULESET",
+		descriptionKey = "FILTER_FOREVER_RULESET_DESC",
+		icon = "logo-wow-forever",
+		order = 86,
+		evaluator = BuiltinQuickFilter_ForeverRuleset,
+		isSupported = function() return BFL.IsForever == true end,
 	},
 	{
 		id = "ingame",
@@ -1239,6 +1274,18 @@ end
 function Registry:Initialize()
 	self:NormalizeDB()
 	self:NormalizeCurrentSelections()
+	if BFL.IsForever and BFL.RegisterEventCallback then
+		BFL:RegisterEventCallback("GAME_RULES_CHANGED", function()
+			local previous = self.playerRuleset
+			self.playerRulesetFriendsVersion = nil
+			if previous ~= self:GetPlayerForeverRuleset() then
+				self:InvalidateCaches()
+				if BFL.ForceRefreshFriendsList and (not IsLoggedIn or IsLoggedIn()) then
+					BFL:ForceRefreshFriendsList()
+				end
+			end
+		end)
+	end
 end
 
 function Registry:NormalizeDB()

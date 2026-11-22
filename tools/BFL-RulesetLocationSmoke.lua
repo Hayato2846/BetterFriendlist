@@ -50,11 +50,11 @@ end
 execute(read(repo, "Locales/enUS.lua"), "English locale")
 execute(read(repo, "Utils/ClassicCompat.lua"), "ClassicCompat")
 execute(read(forever, "Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua"), "native Camelot NameUtil")
-local function location(info, fallback, text, kind, message)
+local function location(info, fallback, text, kind, message, noRealmEvidence)
 	local actual, actualKind, evidence = BFL.GetWoWAccountLocation(info, fallback)
 	equal(actual, text, message)
 	equal(actualKind, kind, message .. " kind")
-	if kind == "ruleset" and text ~= "" then
+	if kind == "ruleset" and text ~= "" and not noRealmEvidence then
 		equal(type(evidence), "string", message .. " has readable target realm evidence")
 	else
 		equal(evidence, nil, message .. " has no unverified realm evidence")
@@ -93,7 +93,8 @@ for _, example in ipairs({
 	{ "CAMWOWUS2Realm1PVE", "Normal" },
 	{ "CAMWOWUS1Realm9RPPVP", "RP-PvP" },
 	{ "CAMWOWAU1Realm3RP", "RP" },
-	{ "PVE", "Normal" }, { "Realm RP-PVP", "RP-PvP" },
+	{ "PVE", "Normal" }, { "Normal", "Normal" }, { "Realm RP-PVP", "RP-PvP" },
+	{ "Roleplay PvP", "RP-PvP" }, { "CAMWOW EU5 Realm 9 RP-PvP", "RP-PvP" },
 	{ "PVP_SUFFIX", "" }, { "PrefixPVP", "" }, { "PVP2", "" },
 	{ "XRP", "" }, { "RPPVPX", "" }, { "PVE PVP", "" },
 	{ "OtherRealm9RPPVP", "" }, { "PrefixCAMWOWEU5Realm9RPPVP", "" },
@@ -139,16 +140,26 @@ end
 local unknownTarget = game(18)
 for _, separator in ipairs({ " - ", " · " }) do
 	for _, variant in ipairs({ { "Normal", "Normal" }, { "PvE", "Normal" }, { "PvP", "PvP" },
-		{ "RP", "RP" }, { "RP-PvP", "RP-PvP" }, { "RP PvP", "RP-PvP" } }) do
+		{ "RP", "RP" }, { "RP-PvP", "RP-PvP" }, { "RP PvP", "RP-PvP" },
+		{ "Roleplay", "RP" }, { "Roleplaying", "RP" }, { "Roleplay PvP", "RP-PvP" },
+		{ "Roleplay-PvP", "RP-PvP" }, { "Roleplay‑PvP", "RP-PvP" },
+		{ "Rollenspiel", "RP" }, { "Rollenspiel-PvP", "RP-PvP" }, { "JcJ", "PvP" },
+		{ "Jeu de rôle", "RP" }, { "Jeu de rôle JcJ", "RP-PvP" }, { "JdR-JcJ", "RP-PvP" },
+		{ "Juego de rol con JcJ", "RP-PvP" }, { "Interpretação JxJ", "RP-PvP" },
+		{ "Normale", "Normal" }, { "GdR-PvP", "RP-PvP" }, { "Обычный", "Normal" },
+		{ "Ролевая игра, PvP", "RP-PvP" }, { "역할극-전쟁", "RP-PvP" },
+		{ "普通", "Normal" }, { "角色扮演-PvP", "RP-PvP" } }) do
 		local account = game(18)
 		account.realmName, account.realmDisplayName = nil, nil
 		account.richPresence = "Forever" .. separator .. variant[1] .. separator .. "Ashenvale"
-		location(account, "CAMWOW EU5 Realm 6 PvP", variant[2], "ruleset", "Structured Forever presence supplies the exact target ruleset")
+		location(account, "CAMWOW EU5 Realm 6 PvP", variant[2], "ruleset", "Structured ruleset: " .. variant[1], true)
 		equal(select(4, BFL.GetWoWAccountLocation(account)), "Ashenvale", "Presence area is separate from ruleset evidence")
 		equal(account.realmName, nil, "Presence parsing never invents a realm name")
 	end
 end
-for _, presence in ipairs({ "Forever · Heroic · Ashenvale", "Forever · Normal · ", "Forever · Normal", "WoW · PvP · Ashenvale",
+for _, presence in ipairs({ "Forever · Unknown activity", "Forever · Unknown · ", "WoW · PvP · Ashenvale",
+	"Forever - |cffff0000Unknown|r - Ashenvale", "Forever - CAMWOWEU5Realm12NewRule - Ashenvale",
+	"Forever - Unknown - Ashenvale - Extra",
 	"Battlefield PvP", "Ashenvale - PvP", "Forever · Normal · Ashenvale · Extra" }) do
 	local account = game(18)
 	account.realmName, account.realmDisplayName, account.richPresence = nil, nil, presence
@@ -157,9 +168,43 @@ end
 local statusAccount = game(18)
 statusAccount.realmName, statusAccount.realmDisplayName = nil, nil
 statusAccount.richPresence = "Forever · Normal · PvP Arena"
-location(statusAccount, nil, "Normal", "ruleset", "PvP in the zone cannot override the explicit Normal segment")
+location(statusAccount, nil, "Normal", "ruleset", "PvP in the zone cannot override the explicit Normal segment", true)
 statusAccount.richPresence = "Forever - RP-PvP - Lune-d’Argent"
 equal(select(4, BFL.GetWoWAccountLocation(statusAccount)), "Lune-d’Argent", "Zone hyphens and glyphs are preserved")
+statusAccount.richPresence = "WoW: Forever · Roleplay PvP · A - B"
+location(statusAccount, nil, "RP-PvP", "ruleset", "A recognized product variant keeps the combined ruleset", true)
+equal(select(4, BFL.GetWoWAccountLocation(statusAccount)), "A - B", "Zone text after the ruleset retains a spaced hyphen")
+statusAccount.richPresence = "Forever - RP-PvP - Porte·Nuit"
+location(statusAccount, nil, "RP-PvP", "ruleset", "A middle dot inside an area name is not a separator", true)
+equal(select(4, BFL.GetWoWAccountLocation(statusAccount)), "Porte·Nuit", "The recovered area retains its original punctuation")
+for _, presence in ipairs({ "Forever · RP-PvP", "Forever · RP-PvP · ", "Forever - Roleplay PvP" }) do
+	statusAccount.richPresence = presence
+	location(statusAccount, nil, "RP-PvP", "ruleset", "An identified ruleset can arrive without a zone", true)
+	equal(select(4, BFL.GetWoWAccountLocation(statusAccount)), "", "A missing zone cannot inherit the product text")
+end
+statusAccount.richPresence = "Forever - Unfamiliar Ruleset - Ashenvale"
+location(statusAccount, nil, "Unfamiliar Ruleset", "ruleset", "A structured unfamiliar ruleset keeps its original label", true)
+equal(select(4, BFL.GetWoWAccountLocation(statusAccount)), "Ashenvale", "An unfamiliar ruleset does not replace a real zone")
+equal(select(5, BFL.GetWoWAccountLocation(statusAccount)), nil, "A display-only label has no recognized ruleset token")
+statusAccount.realmDisplayName = "Normal"
+location(statusAccount, nil, "Normal", "ruleset", "An established label takes precedence over display-only text")
+statusAccount.realmDisplayName, statusAccount.richPresence = "Normal", "Forever - Roleplay PvP - Ashenvale"
+location(statusAccount, nil, "RP-PvP", "ruleset", "Explicit presence wins over a generic display label", true)
+statusAccount.realmName = "CAMWOWEU5Realm10RP"
+location(statusAccount, nil, "RP", "ruleset", "A readable shard wins when presence and shard disagree")
+statusAccount.realmName, statusAccount.realmDisplayName = nil, nil
+for _, account in ipairs({
+	{ clientProgram = "WoW", wowProjectID = 0, richPresence = "Forever · Roleplay PvP · Ashenvale" },
+	{ clientProgram = "WoW", subIcon = "WoWF", realmDisplayName = "Roleplay PvP" },
+	{ clientProgram = "WoW", realmName = "CAMWOWEU5Realm9RPPvP" },
+}) do
+	location(account, nil, "RP-PvP", "ruleset", "Reduced accounts with Forever evidence retain their ruleset", account.richPresence ~= nil)
+end
+location({ clientProgram = "WoW", wowProjectID = 0, realmName = "Moon Guard" },
+	nil, "Moon Guard", "realm", "A zero project identifier alone is not Forever evidence")
+location({ clientProgram = "WoW", wowProjectID = 1, subIcon = "WoWF", realmName = "Retail Realm",
+	richPresence = "Forever - Roleplay PvP - Ashenvale" },
+	nil, "Retail Realm", "realm", "An explicit non-Forever project wins over stale Forever indicators")
 statusAccount.wowProjectID = 1
 location(statusAccount, nil, "", "realm", "The presence format cannot classify a normal Retail account as Forever")
 statusAccount.wowProjectID, statusAccount.richPresence = 18, secret
@@ -196,7 +241,7 @@ location(regular, secret, "", "realm", "Secret strings are never formatted or re
 -- Reuse one native record across client changes, including inconsistent
 -- presence data until the next Battle.net update. Never mutate its contents.
 local changingAccount = game(18)
-for _, presence in ipairs({ "Forever · Normal · Ashenvale", "Forever - PvP - Elwynn",
+for _, presence in ipairs({ "Forever · Normal · Ashenvale", "Forever - PvP - Elwynn", "Forever - Roleplay PvP - Elwynn",
 	"Westfall - CAMWOW EU5 Realm 9 RP PvP" }) do
 	changingAccount.richPresence, changingAccount.wowProjectID = presence, 18
 	equal(BFL.GetGameAccountRichPresence(changingAccount), presence, "Forever keeps its own presence")
@@ -222,6 +267,13 @@ equal(BFL.GetGameAccountRichPresence({ clientProgram = "D3", wowProjectID = 1, r
 	"Adventure Mode", "Other games retain their normal status")
 
 BFL.IsForever = true
+env.GetRealmName = function() return "CAMWOW EU5 Realm 5 PvE" end
+local inviteAccount = { clientProgram = "WoW", wowProjectID = 18, richPresence = "Forever - Roleplay PvP - Ashenvale" }
+equal(select(2, BFL.GetForeverRulesetInviteRestriction(inviteAccount)), nil, "Display-only aliases do not change invite decisions")
+inviteAccount.richPresence = "Forever - RP-PvP - Ashenvale"
+equal(select(2, BFL.GetForeverRulesetInviteRestriction(inviteAccount)), "RPPVP", "Existing canonical invite evidence still works")
+inviteAccount.richPresence = "Forever - Unfamiliar Ruleset - Ashenvale"
+equal(BFL.GetForeverRulesetInviteRestriction(inviteAccount), nil, "An unfamiliar display label never affects invitations")
 location(game(18), "Fallback", "", "ruleset", "Forever friends have no invented ruleset")
 location(game(nil), "Fallback", "", "ruleset", "Projectless data in Forever has no realm")
 location(nil, "Fallback", "", "ruleset", "Local Forever friends have no guessed realm")

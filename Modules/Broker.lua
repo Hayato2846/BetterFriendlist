@@ -16,6 +16,10 @@ end
 local function GetDisplayLocation(friend)
 	return BFL.GetWoWAccountLocation(friend.gameAccountInfo or friend, friend.realmName)
 end
+local function IsForeverFilter(id)
+	return id == "forever" or id == "foreverruleset"
+end
+
 local function GetFriendsList()
 	return BFL:GetModule("FriendsList")
 end
@@ -492,15 +496,19 @@ local function ApplyGameAccountToFriend(friend, gameInfo)
 		friend.guildName = gameInfo.guildName or ""
 		friend.gameName = nil
 
-		if (friend.area == "") and gameInfo.richPresence then
-			local sep = string.find(gameInfo.richPresence, " - ", 1, true)
-			if sep then
-				friend.area = strtrim(string.sub(gameInfo.richPresence, 1, sep - 1))
+		local presence = BFL.GetGameAccountRichPresence(gameInfo)
+		if friend.area == "" and presence then
+			local _, _, _, presenceArea = BFL.GetWoWAccountLocation(gameInfo)
+			local sep = string.find(presence, " - ", 1, true)
+			if presenceArea then
+				friend.area = presenceArea
+			elseif sep then
+				friend.area = strtrim(string.sub(presence, 1, sep - 1))
 				if friend.realmName == "" then
-					friend.realmName = strtrim(string.sub(gameInfo.richPresence, sep + 3))
+					friend.realmName = strtrim(string.sub(presence, sep + 3))
 				end
 			else
-				friend.area = strtrim(gameInfo.richPresence)
+				friend.area = strtrim(presence)
 			end
 		end
 	elseif client == "BSAp" then
@@ -551,7 +559,7 @@ local function IsPreviewFriendOnline(friend, treatMobileAsOffline)
 	if not friend then
 		return false
 	end
-	if BetterFriendlistDB and BetterFriendlistDB.quickFilter == "forever" then
+	if BetterFriendlistDB and IsForeverFilter(BetterFriendlistDB.quickFilter) then
 		local registry = GetFilterSortRegistry()
 		if registry and registry.EvaluateQuickFilter and registry.NormalizeQuickFilterId
 			and registry:NormalizeQuickFilterId("forever") == "forever"
@@ -724,7 +732,7 @@ local function GetFilteredFriendCounts()
 	end
 
 	local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
-	local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or currentFilter == "forever")
+	local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or IsForeverFilter(currentFilter))
 
 	local wowFiltered, wowTotal, bnetFiltered, bnetTotal
 	if previewData and previewData.friends then
@@ -832,7 +840,7 @@ local function GetFilteredFriendCounts()
 							gameName = gameInfo.richPresence,
 							numGameAccounts = accountInfo.numGameAccounts,
 						}
-						if currentFilter == "forever" then
+						if IsForeverFilter(currentFilter) then
 							friendForRegistry.gameAccounts = GetBNetFilterGameAccounts(i)
 						end
 						passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
@@ -2204,7 +2212,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 							friend.numGameAccounts = isOnline and 1 or 0
 						end
 
-						if settings and settings.quickFilter == "forever" and not friend.gameAccounts then
+						if settings and IsForeverFilter(settings.quickFilter) and not friend.gameAccounts then
 							friend.gameAccounts = GetBNetFilterGameAccounts(i)
 						end
 
@@ -2264,7 +2272,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 			currentFilter = Registry:NormalizeQuickFilterId(currentFilter)
 		end
 		local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
-		local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or currentFilter == "forever")
+		local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or IsForeverFilter(currentFilter))
 		if currentFilter ~= "all" then
 			for groupId, groupFriends in pairs(groupedFriends) do
 				local filteredFriends = {}

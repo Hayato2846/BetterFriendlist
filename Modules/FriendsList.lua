@@ -3394,7 +3394,7 @@ function FriendsList:BuildAccountDisplay(gameAccountInfo)
 	end
 
 	local charName = BFL.FormatPlayerDisplayName(gameAccountInfo.characterName) or UNKNOWN or "Unknown"
-	local locationText = BFL.GetWoWAccountLocation(gameAccountInfo)
+	local locationText, locationKind, _, presenceArea = BFL.GetWoWAccountLocation(gameAccountInfo)
 
 	local classFile = GetAccountClassFile(gameAccountInfo)
 
@@ -3445,6 +3445,8 @@ function FriendsList:BuildAccountDisplay(gameAccountInfo)
 		coloredName = coloredName,
 		realmName = self:GetReadableInviteField(gameAccountInfo, "realmName"),
 		locationText = locationText,
+		ruleset = locationKind == "ruleset" and locationText or nil,
+		presenceArea = presenceArea,
 		classFile = classFile,
 		isInvitable = isInvitable and true or false,
 		restriction = restriction,
@@ -3874,6 +3876,7 @@ local function BuildMultiAccountInfoLine(self, friend)
 	for _, ga in ipairs(additionalAccounts) do
 		local display = self.BuildAccountDisplay and self:BuildAccountDisplay(ga)
 		local nameText = display and (display.coloredName or display.text)
+		if display and display.ruleset and display.ruleset ~= "" then nameText = display.text end
 		if not nameText or nameText == "" then
 			nameText = ga.characterName or ga.richPresence or ga.gameAccountName or ga.name
 		end
@@ -3927,6 +3930,8 @@ local function BuildMultiAccountRowData(self, friend)
 			nameText = ga.richPresence or ""
 		end
 		if nameText and nameText ~= "" then
+			local zone = ga.areaName
+			if BFL:IsSecret(zone) or zone == nil or zone == "" then zone = display and display.presenceArea or "" end
 			entries[#entries + 1] = {
 				name = nameText,
 				clientProgram = ga.clientProgram,
@@ -3934,7 +3939,8 @@ local function BuildMultiAccountRowData(self, friend)
 				previewTitleIcon = ga._previewTitleIcon,
 				classFile = display and display.classFile,
 				level = ga.characterLevel,
-				zone = ga.areaName or "",
+				zone = zone,
+				ruleset = display and display.ruleset,
 				className = ga.className or "",
 				raceName = ga.raceName or "",
 				richPresence = ga.richPresence or "",
@@ -6508,26 +6514,36 @@ local function NormalizeSearchValue(text)
 	return nil
 end
 
-local function GetGameAccountSearchText(gameAccounts)
-	if type(gameAccounts) ~= "table" then
-		return nil
+local function GetGameAccountSearchData(friend)
+	if friend.type ~= "bnet" then return nil end
+	local searchParts, rulesets = {}, {}
+	local readable = BFL.IsReadableGameAccountInfo
+	local function AddRuleset(account)
+		if not readable(account) then return end
+		local online = account.isOnline
+		if BFL:IsSecret(online) or not (online == true or (online == nil and account == friend.gameAccountInfo and friend.connected)) then
+			return
+		end
+		local label, kind, _, _, token = BFL.GetWoWAccountLocation(account)
+		if kind ~= "ruleset" or label == "" then return end
+		if token then rulesets[token] = true end
+		rulesets[#rulesets + 1] = NormalizeSearchValue(label)
 	end
 
-	local searchParts = {}
-	for _, gameAccountInfo in ipairs(gameAccounts) do
-		if type(gameAccountInfo) == "table" then
-			local characterName = NormalizeSearchValue(gameAccountInfo.characterName)
-			local realmName = NormalizeSearchValue(gameAccountInfo.realmName)
-			if characterName then
-				searchParts[#searchParts + 1] = characterName
-			end
-			if realmName then
-				searchParts[#searchParts + 1] = realmName
+	AddRuleset(friend.gameAccountInfo)
+	if readable(friend.gameAccounts) then
+		for _, gameAccountInfo in ipairs(friend.gameAccounts) do
+			if readable(gameAccountInfo) then
+				local characterName = NormalizeSearchValue(gameAccountInfo.characterName)
+				local realmName = NormalizeSearchValue(gameAccountInfo.realmName)
+				if characterName then searchParts[#searchParts + 1] = characterName end
+				if realmName then searchParts[#searchParts + 1] = realmName end
+				if gameAccountInfo ~= friend.gameAccountInfo then AddRuleset(gameAccountInfo) end
 			end
 		end
 	end
 
-	return #searchParts > 0 and table.concat(searchParts, "\n") or nil
+	return #searchParts > 0 and table.concat(searchParts, "\n") or nil, next(rulesets) and rulesets or nil
 end
 
 local function SearchCacheContains(normalizedText, searchNormalized)
@@ -6548,6 +6564,7 @@ local function GetNormalizedSearchText(self)
 		local compat = BFL.IntlCompat
 		self._normalizedSearchText = compat and compat.NormalizeForSearch and compat.NormalizeForSearch(searchText)
 			or BFL:StripAccents(searchText)
+		self._searchRulesetToken = BFL.Compat.GetForeverRulesetSearchToken(searchText)
 	end
 	return self._normalizedSearchText
 end
@@ -6561,17 +6578,19 @@ local function RefreshFriendSearchCache(self, friend)
 	if
 		friend._bfl_search_friend_version == friendsVersion
 		and friend._bfl_search_nickname_version == nicknameVersion
+		and friend._bfl_search_locale == BFL.ConfiguredLocale
 	then
 		return
 	end
 
 	friend._bfl_search_friend_version = friendsVersion
 	friend._bfl_search_nickname_version = nicknameVersion
+	friend._bfl_search_locale = BFL.ConfiguredLocale
 	friend._bfl_search_accountName = NormalizeSearchValue(friend.accountName)
 	friend._bfl_search_titleCustomName = NormalizeSearchValue(friend.titleCustomName)
 	friend._bfl_search_battleTag = NormalizeSearchValue(friend.battleTag)
 	friend._bfl_search_characterName = NormalizeSearchValue(friend.characterName)
-	friend._bfl_search_gameAccounts = GetGameAccountSearchText(friend.gameAccounts)
+	friend._bfl_search_gameAccounts, friend._bfl_search_rulesets = GetGameAccountSearchData(friend)
 	friend._bfl_search_realmName = NormalizeSearchValue(friend.realmName)
 	friend._bfl_search_note = NormalizeSearchValue(friend.note)
 	friend._bfl_search_name = NormalizeSearchValue(friend.name)
@@ -6610,6 +6629,25 @@ local function GetFriendTagSearchCache(friend)
 	return friend._bfl_search_tag_text
 end
 
+function FriendsList:MatchesRulesetSearch(friend, query)
+	local token = self._searchRulesetToken
+	if friend.type == "wow" then
+		if not (BFL.IsForever and friend.connected and token) then return false end
+		local registry = GetFilterSortRegistry()
+		local own = registry and registry:GetPlayerForeverRuleset()
+		return own == token or (own == "RPPVP" and (token == "PVP" or token == "RP"))
+	end
+	local rulesets = friend._bfl_search_rulesets
+	if not rulesets then return false end
+	if token then
+		if rulesets[token] or ((token == "PVP" or token == "RP") and rulesets.RPPVP) then return true end
+	end
+	for _, label in ipairs(rulesets) do
+		if SearchCacheContains(label, query) then return true end
+	end
+	return false
+end
+
 -- Check if friend passes current filters
 function FriendsList:PassesFilters(friend) -- Search text filter
 	if self.searchText and self.searchText ~= "" then
@@ -6633,6 +6671,7 @@ function FriendsList:PassesFilters(friend) -- Search text filter
 				or SearchCacheContains(friend._bfl_search_note, searchNormalized)
 		end
 
+		if not found then found = self:MatchesRulesetSearch(friend, searchNormalized) end
 		if not found then
 			found = SearchCacheContains(GetFriendTagSearchCache(friend), searchNormalized)
 		end
@@ -6851,9 +6890,10 @@ function FriendsList:ShowGameAccountPicker(anchorFrame, friend)
 			if isWoW then
 				local display = self:BuildAccountDisplay(ga)
 				label = display and (display.coloredName or display.text) or ga.characterName or "Unknown"
-				if ga.areaName and ga.areaName ~= "" then
-					label = label .. " - " .. ga.areaName
-				end
+				if display and display.ruleset and display.ruleset ~= "" then label = display.text end
+				local area = ga.areaName
+				if BFL:IsSecret(area) or area == nil or area == "" then area = display and display.presenceArea end
+				if area and area ~= "" then label = label .. " - " .. area end
 				if display and display.restrictionText then label = label .. " (" .. display.restrictionText .. ")" end
 			else
 				-- Non-WoW: just richPresence, no character name
@@ -9476,6 +9516,9 @@ function FriendsList:UpdateMultiAccountRow(button, friend, availableWidth)
 			end
 			if zone and zone ~= "" then
 				infoParts[#infoParts + 1] = zone
+			end
+			if entryData.ruleset and entryData.ruleset ~= "" then
+				infoParts[#infoParts + 1] = entryData.ruleset
 			end
 			if #infoParts > 0 then
 				displayText = displayText .. " - " .. table.concat(infoParts, ", ")

@@ -13,7 +13,9 @@ local function between(source, first, last)
 	local finish = assert(source:find(last, start + #first, true), "missing source anchor: " .. last)
 	return source:sub(start, finish - 1)
 end
-local BFL = { L = { FILTER_FOREVER = "WoW Forever Only" }, modules = {}, BrokerUtils = {} }
+local BFL = { L = { FILTER_FOREVER = "Forever Only", FILTER_FOREVER_RULESET = "My Ruleset Only",
+	RULESET_TYPE_NORMAL = "Normal", RULESET_TYPE_PVP = "PvP", RULESET_TYPE_RP = "RP", RULESET_TYPE_RPPVP = "RP-PvP" },
+	modules = {}, BrokerUtils = {} }
 function BFL:RegisterModule(name, module) self.modules[name] = module; return module end
 function BFL:GetModule(name) return self.modules[name] end
 local env = setmetatable({ BFL = BFL, SlashCmdList = {}, BetterFriendlistDB = {}, BNET_CLIENT_WOW = "WoW",
@@ -60,15 +62,19 @@ menu = function()
 end
 local root = menu()
 quickFilters:PopulateMenu(root)
-local foreverRadio
-for _, radio in ipairs(root.children[1].radios) do if radio.id == "forever" then foreverRadio = radio end end
+local foreverRadio, ownRulesetRadio
+for _, radio in ipairs(root.children[1].radios) do
+	if radio.id == "forever" then foreverRadio = radio end
+	if radio.id == "foreverruleset" then ownRulesetRadio = radio end
+end
 V:Assert(foreverRadio ~= nil, "The existing quick-filter submenu exposes Forever")
-V:Assert(foreverRadio.label:find("WoW Forever Only", 1, true), "The submenu uses the localized label")
+V:Assert(foreverRadio.label:find("Forever Only", 1, true), "The submenu uses the renamed label")
 V:Assert(foreverRadio.selected("forever"), "The menu reflects a restored Forever selection")
 env.BetterFriendlistDB.quickFilter = "all"
 foreverRadio.select("forever")
 V:AssertEqual(env.BetterFriendlistDB.quickFilter, "forever", "Selecting Forever saves the stable ID")
-V:AssertEqual(quickFilters:GetFilterText(), "WoW Forever Only", "The header/tooltip label reflects Forever")
+V:AssertEqual(quickFilters:GetFilterText(), "Forever Only", "The header/tooltip label reflects Forever")
+V:Assert(ownRulesetRadio and ownRulesetRadio.label:find("My Ruleset Only", 1, true), "Forever exposes the own-ruleset filter")
 
 -- Exercise the list's actual predicate without search UI dependencies.
 env.FriendsList = { filterMode = "forever" }
@@ -109,7 +115,8 @@ V:Assert(env.FriendsList:PassesFilters(multi), "FriendsList agrees with the brok
 V:Assert(not env.FriendsList:PassesFilters({ type = "bnet", connected = true, gameAccountInfo = allAccounts[3][1] }), "FriendsList rejects App-only presence")
 
 -- The grouped tooltip must use the same evaluator for the new built-in.
-local tooltipFilter = execute("return function(groupedFriends, sample)\nlocal settings = sample and sample.settings or BetterFriendlistDB\n"
+local tooltipFilter = execute(between(brokerSource, "local function IsForeverFilter(", "local function GetFriendsList(")
+	.. "return function(groupedFriends, sample)\nlocal settings = sample and sample.settings or BetterFriendlistDB\n"
 	.. between(brokerSource, "\t\t-- Apply current filter (to online friends only)", "\t\t-- Apply current sort mode")
 	.. "\nreturn groupedFriends\nend", "Broker grouped tooltip filter")
 local grouped = tooltipFilter({ nogroup = { multi, { type = "bnet", connected = true, gameAccountInfo = focused } } })
@@ -136,9 +143,46 @@ V:AssertEqual(#getFilterAccounts(1), 2, "Legacy count APIs remain usable with th
 env.C_BattleNet.GetFriendNumGameAccounts = oldCountAPI
 env.BNGetNumFriendGameAccounts = nil
 
+-- No local realm name is needed when all ruleset flags are readable.
+local rules = { PvPRuleset = 1, RPRuleset = 2, HardcoreRuleset = 3 }
+local activeRules = { true, true, false }
+env.Enum = { GameRule = rules }
+env.C_GameRules = { IsGameRuleActive = function(rule) return activeRules[rule] end }
+local gameRulesChanged
+function BFL:RegisterEventCallback(event, handler) if event == "GAME_RULES_CHANGED" then gameRulesChanged = handler end end
+registry:Initialize()
+ownRulesetRadio.select("foreverruleset")
+V:AssertEqual(quickFilters:GetFilterText(), "My Ruleset Only", "The real dropdown selects the own-ruleset filter")
+secondary.realmName = nil
+secondary.richPresence = "Forever - Roleplay PvP - Tirisfal Glades"
+env.FriendsList.filterMode = "foreverruleset"
+V:Assert(env.FriendsList:PassesFilters(multi), "A secondary RP-PvP session matches the combined player flags")
+V:Assert(registry:EvaluateQuickFilter("foreverruleset", { type = "wow", connected = true }), "Local character friends are included when online")
+local other = { type = "bnet", connected = true,
+	gameAccountInfo = { clientProgram = "WoW", wowProjectID = 18, isOnline = true, richPresence = "Forever - Roleplay - Elwynn" } }
+V:Assert(not env.FriendsList:PassesFilters(other), "RP and RP-PvP are different rulesets for filtering")
+wowOnline, _, bnetOnline = getCounts()
+V:AssertEqual(wowOnline, 1, "The broker includes online native character friends")
+V:AssertEqual(bnetOnline, 1, "The broker matches a secondary account on the player's ruleset")
+grouped = tooltipFilter({ nogroup = { multi, other } })
+V:AssertEqual(#grouped.nogroup, 1, "The broker tooltip agrees with the friends list for own ruleset")
+V:AssertEqual(grouped.nogroup[1], multi, "The combined ruleset retains the right contact")
+activeRules[1] = false
+assert(gameRulesChanged)()
+V:Assert(not env.FriendsList:PassesFilters(multi), "A ruleset change invalidates cached filter results")
+V:Assert(env.FriendsList:PassesFilters(other), "Current RP flags match the RP account")
+activeRules[3] = true
+gameRulesChanged()
+V:Assert(not env.FriendsList:PassesFilters(other), "An unsupported local ruleset cannot be mistaken for another ruleset")
+activeRules[3], activeRules[1] = false, nil
+gameRulesChanged()
+V:Assert(not env.FriendsList:PassesFilters(other), "Unavailable native flags cannot invent a match")
+foreverRadio.select("forever")
+
 -- Retail/Classic do not treat local WoW friends as Forever; BNet can still match.
 env.WOW_PROJECT_ID, env.WOW_PROJECT_CAMELOT, BFL.IsForever = 1, nil, false
 registry:InvalidateCaches()
+V:AssertEqual(registry:NormalizeQuickFilterId("foreverruleset"), "all", "Other clients fall back from the Forever-only filter")
 wowOnline, _, bnetOnline = getCounts()
 V:AssertEqual(wowOnline, 0, "Retail local friends do not leak into Forever counts")
 V:AssertEqual(bnetOnline, 1, "Retail can still filter Battle.net Forever friends")

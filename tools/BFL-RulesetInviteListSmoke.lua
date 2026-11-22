@@ -199,6 +199,22 @@ end
 local rowData = assert(rowBuilder)(focus.list, focus.friend)
 equal(rowData.entries[1].restrictionText, focus.list:BuildAccountDisplay(focus.current[2]).restrictionText,
 	"Multi-account row model carries the exact Ruleset detail")
+local alternate = focus.current[2]
+alternate.realmName, alternate.realmDisplayName, alternate.areaName = nil, nil, nil
+alternate.richPresence = "Forever - Roleplay PvP - Tirisfal Glades"
+local additionalDisplay = focus.list:BuildAccountDisplay(alternate)
+equal(additionalDisplay.ruleset, "RP-PvP", "Account picker model receives the ruleset from the alternate account")
+focus.list:ShowGameAccountPicker({}, focus.friend)
+local foundAlternate = false
+for _, item in ipairs(capturedItems) do
+	if item.value == 2 then
+		foundAlternate = item.text:find("RP-PvP", 1, true) and item.text:find("Tirisfal Glades", 1, true)
+	end
+end
+check(foundAlternate, "Alternate focus choices display the correct ruleset and zone")
+rowData = assert(rowBuilder)(focus.list, focus.friend)
+equal(rowData.entries[1].ruleset, "RP-PvP", "Additional row carries its own ruleset")
+equal(rowData.entries[1].zone, "Tirisfal Glades", "Additional row keeps the ruleset separate from its zone")
 
 local retail = scenario({ ga(1, "PvE", { wowProjectID = 1, factionName = "Horde" }) },
 	{ forever = false, project = 1, crossFaction = true })

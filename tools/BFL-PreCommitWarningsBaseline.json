@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T16:23:41.8768687+01:00",
+  "generatedAt": "2026-11-22T10:14:42.7409297+01:00",
   "source": "Utils/pre-commit-check.py",
   "warningCount": 705,
   "warnings": [
@@ -72,8 +72,8 @@
     {
       "Type": "DEBUG-PRINT",
       "Path": "ClassicCompat.lua",
-      "Line": 2334,
-      "Signature": "DEBUG-PRINT|ClassicCompat.lua|2334"
+      "Line": 2461,
+      "Signature": "DEBUG-PRINT|ClassicCompat.lua|2461"
     },
     {
       "Type": "DEBUG-PRINT",
@@ -690,14 +690,14 @@
     {
       "Type": "DEBUG-PRINT",
       "Path": "FriendsList.lua",
-      "Line": 10622,
-      "Signature": "DEBUG-PRINT|FriendsList.lua|10622"
+      "Line": 10665,
+      "Signature": "DEBUG-PRINT|FriendsList.lua|10665"
     },
     {
       "Type": "DEBUG-PRINT",
       "Path": "FriendsList.lua",
-      "Line": 10681,
-      "Signature": "DEBUG-PRINT|FriendsList.lua|10681"
+      "Line": 10724,
+      "Signature": "DEBUG-PRINT|FriendsList.lua|10724"
     },
     {
       "Type": "DEBUG-PRINT",
