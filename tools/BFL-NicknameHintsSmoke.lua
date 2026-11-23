@@ -954,7 +954,7 @@ do
 	local quickFilters = BFL:RegisterModule("QuickFilters", {})
 	local selectedTags, member, assignedUID = {}, nil, nil
 	local canAssign, createdGroups = true, 0
-	local db = { RequireFriendGroupKey = function() return canAssign end }
+	local db = { RequireFriendGroupKey = function(_, _, key) return canAssign and key ~= "stale" end }
 	function groups:ValidateGroupName(name) return name ~= "" end
 	function groups:Create(name)
 		createdGroups = createdGroups + 1
@@ -1032,6 +1032,8 @@ do
 	assert(createdGroups == groupsBefore and not assignedUID and not dialog.hidden,
 		"a missing link does not create an empty group or close the Enter dialog")
 	canAssign = true
+	assignedPopup.OnAccept(dialog, { uid = dialog.data, groupKey = "stale" })
+	assert(createdGroups == groupsBefore and not assignedUID, "a dialog with a replaced link cannot create a group")
 	assignedPopup.EditBoxOnEnterPressed(dialog.EditBox)
 	equal(assignedUID, dialog.data, "Enter keeps the assigned friend from popup data")
 	assert(not hints:IsShown(), "assigned visible online friend makes the new group visible")

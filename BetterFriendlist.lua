@@ -3080,14 +3080,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				-- Add "Create Group" option at the top
+				local expectedGroupKey = DB and DB:GetTitleFriendGroupActionKey(friendUID)
 				groupsButton:CreateButton(L.MENU_CREATE_GROUP, function()
-					BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, friendUID)
+					local data = friendUID
+					if expectedGroupKey ~= nil then
+						data = { uid = friendUID, groupKey = expectedGroupKey }
+					end
+					BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND", nil, nil, data)
 				end)
 
 				-- Add "Remove from All Groups" button immediately after Create Group (User request)
 				if next(friendCurrentGroups) then
 					groupsButton:CreateButton(L.MENU_REMOVE_ALL_GROUPS, function()
-						if DB and DB:SetFriendGroups(friendUID, nil, true) then
+						if DB and DB:SetFriendGroups(friendUID, nil, true, expectedGroupKey) then
 							BFL:ForceRefreshFriendsList()
 						end
 					end)
@@ -3141,8 +3146,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							end,
 							function()
 								local Groups = GetGroups()
-								if Groups then
-									Groups:ToggleFriendInGroup(friendUID, groupId)
+								if Groups and Groups:ToggleFriendInGroup(friendUID, groupId, expectedGroupKey) then
 									-- Force full display refresh - group membership affects display structure
 									BFL:ForceRefreshFriendsList()
 								end

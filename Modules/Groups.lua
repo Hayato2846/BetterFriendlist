@@ -916,7 +916,7 @@ function Groups:IsFriendInGroup(friendUID, groupId)
 end
 
 -- Toggle friend in group (add if not present, remove if present)
-function Groups:ToggleFriendInGroup(friendUID, groupId)
+function Groups:ToggleFriendInGroup(friendUID, groupId, expectedKey)
 	if not friendUID or not groupId then
 		return false
 	end
@@ -928,7 +928,7 @@ function Groups:ToggleFriendInGroup(friendUID, groupId)
 
 	local DB = BFL:GetModule("DB")
 
-	return DB:ToggleFriendInGroup(friendUID, groupId)
+	return DB:ToggleFriendInGroup(friendUID, groupId, expectedKey)
 end
 
 -- Remove friend from group

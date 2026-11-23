@@ -270,8 +270,8 @@
     {
       "Type": "DEBUG-PRINT",
       "Path": "Dialogs.lua",
-      "Line": 547,
-      "Signature": "DEBUG-PRINT|Dialogs.lua|547"
+      "Line": 552,
+      "Signature": "DEBUG-PRINT|Dialogs.lua|552"
     },
     {
       "Type": "DEBUG-PRINT",
@@ -690,14 +690,14 @@
     {
       "Type": "DEBUG-PRINT",
       "Path": "FriendsList.lua",
-      "Line": 10672,
-      "Signature": "DEBUG-PRINT|FriendsList.lua|10672"
+      "Line": 10437,
+      "Signature": "DEBUG-PRINT|FriendsList.lua|10437"
     },
     {
       "Type": "DEBUG-PRINT",
       "Path": "FriendsList.lua",
-      "Line": 10731,
-      "Signature": "DEBUG-PRINT|FriendsList.lua|10731"
+      "Line": 10496,
+      "Signature": "DEBUG-PRINT|FriendsList.lua|10496"
     },
     {
       "Type": "DEBUG-PRINT",

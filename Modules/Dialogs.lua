@@ -360,9 +360,14 @@ end
 local function CreateGroupFromDialog(editBox, friendUID)
 	local groups = BFL:GetModule("Groups")
 	local friends = BFL:GetModule("FriendsList")
+	local expectedGroupKey
+	if type(friendUID) == "table" then
+		expectedGroupKey = friendUID.groupKey
+		friendUID = friendUID.uid
+	end
 	local name = editBox:GetText()
 	if groups and friends and groups:ValidateGroupName(name) then
-		return friends:CreateGroup(name, friendUID)
+		return friends:CreateGroup(name, friendUID, expectedGroupKey)
 	end
 end
 

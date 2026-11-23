@@ -1616,14 +1616,19 @@ local function ReportUnavailableTitleGroupKey()
 	if BFL.TitleFriendNotes then BFL.TitleFriendNotes:Schedule() end
 end
 
-local function GetGroupMutationKey(uid, showError)
+local function GetGroupMutationKey(uid, showError, expectedKey)
 	local key = GetFriendGroupKey(uid, true)
 	if not key and uid and showError then ReportUnavailableTitleGroupKey() end
-	return key
+	if expectedKey == nil or key == expectedKey then return key end
 end
 
-function DB:RequireFriendGroupKey(uid)
-	return GetGroupMutationKey(uid, true) ~= nil
+function DB:GetTitleFriendGroupActionKey(uid)
+	if IsTitleFriendGroupUID(uid) then return GetFriendGroupKey(uid, true) or false end
+end
+
+function DB:RequireFriendGroupKey(uid, expectedKey)
+	local key = GetGroupMutationKey(uid, true, expectedKey)
+	return key ~= nil, key
 end
 
 local function OnFriendGroupsChanged(uid)
@@ -1645,7 +1650,7 @@ function DB:GetFriendGroups(friendUID)
 end
 
 -- Set friend's groups
-function DB:SetFriendGroups(friendUID, groups, showError)
+function DB:SetFriendGroups(friendUID, groups, showError, expectedKey)
 	local sanitizedGroups = {}
 	local seenGroups = {}
 	for _, groupId in ipairs(groups or {}) do
@@ -1659,7 +1664,7 @@ function DB:SetFriendGroups(friendUID, groups, showError)
 		end
 	end
 
-	local key = GetGroupMutationKey(friendUID, showError)
+	local key = GetGroupMutationKey(friendUID, showError, expectedKey)
 	if not key then return false end
 
 	if #sanitizedGroups == 0 then
@@ -1672,11 +1677,11 @@ function DB:SetFriendGroups(friendUID, groups, showError)
 	return true
 end
 
-local function UpdateFriendGroup(friendUID, groupId, showError, toggle)
+local function UpdateFriendGroup(friendUID, groupId, showError, toggle, expectedKey)
 	if not friendUID or type(groupId) ~= "string" or NON_PERSISTED_FRIEND_GROUPS[groupId] then
 		return false
 	end
-	local key = GetGroupMutationKey(friendUID, showError)
+	local key = GetGroupMutationKey(friendUID, showError, expectedKey)
 	if not key then return false end
 
 	local groups = BetterFriendlistDB.friendGroups[key] or {}
@@ -1696,12 +1701,12 @@ local function UpdateFriendGroup(friendUID, groupId, showError, toggle)
 	return true
 end
 
-function DB:AddFriendToGroup(friendUID, groupId, showError)
-	return UpdateFriendGroup(friendUID, groupId, showError, false)
+function DB:AddFriendToGroup(friendUID, groupId, showError, expectedKey)
+	return UpdateFriendGroup(friendUID, groupId, showError, false, expectedKey)
 end
 
-function DB:ToggleFriendInGroup(friendUID, groupId)
-	return UpdateFriendGroup(friendUID, groupId, true, true)
+function DB:ToggleFriendInGroup(friendUID, groupId, expectedKey)
+	return UpdateFriendGroup(friendUID, groupId, true, true, expectedKey)
 end
 
 -- Remove friend from group

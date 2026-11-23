@@ -182,3 +182,135 @@ titleNotes:Process()
 check(writes == 14 and not token(blank), "disabled mode never recreates IDs")
 check(db:GetFriendGroups("bnet_Friend#1234")[1] == "regular", "ordinary group keys are untouched")
 io.write("Title Friend note and group migration smoke passed.\n")
+
+-- Use the production drag callbacks and database together. Friend rows carry
+-- their group ID too, so relying on that field alone accepts invisible drops.
+store.enabled = true
+titleNotes = relog()
+blank.note = notes.AppendTitleGroupToken("", blankToken)
+roster = { blank, regular }
+loadProduction("Modules/FriendsList.lua")
+local list = modules.FriendsList
+local hovered, shift = nil, false
+local refreshes = 0
+BFL.GetDragGhost = function() end
+BFL.IsRegionMouseOver = function(_, frame) return hovered == frame end
+BFL.ForceRefreshFriendsList = function() refreshes = refreshes + 1 end
+env.GetCursorPosition = function() return 0, 0 end
+env.UIParent = { GetEffectiveScale = function() return 1 end }
+env.BFL_Tooltip = { Hide = function() end }
+env.IsShiftKeyDown = function() return shift end
+local function region()
+	return {
+		Show = function(self) self.shown = true end,
+		Hide = function(self) self.shown = false end,
+		IsShown = function(self) return self.shown ~= false end,
+		IsVisible = function(self) return self:IsShown() and not self.parentHidden end,
+	}
+end
+local function groupHeader(id)
+	local header = region()
+	header.groupId, header.elementData, header.dropHighlight = id, { count = 1 }, region()
+	header.dropHighlight:Hide()
+	return header
+end
+local function friendRow(friend)
+	local row = region()
+	row.friendData, row.dragOverlay, row.scripts = friend, region(), {}
+	row.dragOverlay:Hide()
+	function row:SetAlpha(alpha) self.alpha = alpha end
+	function row:SetScript(event, handler) self.scripts[event] = handler end
+	return row
+end
+local first, second, noGroup = groupHeader("group1"), groupHeader("group2"), groupHeader("nogroup")
+local favorites = groupHeader("favorites")
+local tagHeader = groupHeader("tag:inherited")
+local titleRow = friendRow({ type = "bnet", name = "Title Friend", friendLevel = 3, bnetAccountID = blank.bnetAccountID })
+local otherRow = friendRow({ type = "bnet", name = "BattleTag Friend", battleTag = regular.battleTag })
+otherRow.groupId = "group1"
+local frames = { first, second, noGroup, favorites, tagHeader, titleRow, otherRow }
+modules.Groups = { GetAll = function()
+	return { group1 = { name = "First" }, group2 = { name = "Second" },
+		nogroup = { name = "No Group", builtin = true }, favorites = { name = "Favorites", builtin = true } }
+end }
+list.scrollBox = { GetFrames = function() return frames end }
+function list:UpdateGroupHeaderButton(header) header.restored = true end
+local function drag(row, target, keepExisting)
+	hovered, shift = target, keepExisting
+	list.OnDragStart(row)
+	list.OnDragUpdate(row)
+	list.OnDragStop(row)
+end
+local uid = "bnet_" .. blank.bnetAccountID
+check(db:SetFriendGroups(uid, { "group1", "group2" }), "prepare two group assignments")
+drag(titleRow, otherRow, false)
+check(#db:GetFriendGroups(uid) == 2 and refreshes == 0, "dropping over a friend row never replaces memberships")
+drag(titleRow, second, false)
+check(#db:GetFriendGroups(uid) == 1 and db:IsFriendInGroup(uid, "group2"), "dropping on a group header moves the Title Friend")
+drag(titleRow, first, true)
+check(#db:GetFriendGroups(uid) == 2, "Shift-drop adds a Title Friend without removing the previous membership")
+drag(titleRow, favorites, false)
+check(#db:GetFriendGroups(uid) == 2, "built-in favorites is not a drop target")
+drag(titleRow, tagHeader, false)
+drag(titleRow, nil, false)
+check(#db:GetFriendGroups(uid) == 2, "virtual tag groups and empty space are not drop targets")
+first.parentHidden = true
+drag(titleRow, first, false)
+check(#db:GetFriendGroups(uid) == 2, "a header under a hidden parent is not a drop target")
+first.parentHidden = nil
+drag(titleRow, noGroup, true)
+check(#db:GetFriendGroups(uid) == 0, "dropping on No Group clears every membership, even with Shift")
+
+check(db:AddFriendToGroup(uid, "group2"), "prepare a group before the row is recycled")
+hovered = first
+first.restored = nil
+list.OnDragStart(titleRow)
+list.OnDragUpdate(titleRow)
+check(first.dropHighlight:IsShown(), "the hovered custom group is highlighted")
+list.OnDragStop(otherRow)
+check(first.dropHighlight:IsShown() and titleRow.scripts.OnUpdate, "release from a different row leaves the real drag intact")
+local originalFriend = titleRow.friendData
+titleRow.friendData = otherRow.friendData
+list.OnDragStop(titleRow)
+check(not first.dropHighlight:IsShown() and first.restored and not titleRow.scripts.OnUpdate
+	and titleRow.alpha == 1 and not titleRow.dragOverlay:IsShown(), "a recycled source clears all drag feedback")
+check(db:IsFriendInGroup(uid, "group2") and db:IsFriendInGroup("bnet_Friend#1234", "regular"),
+	"a recycled source cannot change either friend")
+titleRow.friendData = originalFriend
+
+local originalNote = blank.note
+local menuKey = db:GetTitleFriendGroupActionKey(uid)
+list.OnDragStart(titleRow)
+blank.note = notes.AppendTitleGroupToken("", "BBBBBBBB")
+list.OnDragStop(titleRow)
+check(#db:GetFriendGroups(uid) == 0, "a replacement Title link on the same numeric ID cannot receive the old drop")
+check(not db:ToggleFriendInGroup(uid, "group1", menuKey) and not db:SetFriendGroups(uid, nil, true, menuKey)
+	and not db:RequireFriendGroupKey(uid, menuKey), "an open menu or create dialog cannot act on a replacement link")
+blank.note = originalNote
+check(db:RequireFriendGroupKey(uid) and db:IsFriendInGroup(uid, "group2"), "rejected drop preserves the original linked membership")
+
+hovered = first
+list.OnDragStart(titleRow)
+list.OnDragUpdate(titleRow)
+list.CancelFriendDrag(titleRow) -- OnHide is wired to this handler in both list paths.
+list.OnDragStop(titleRow)
+check(not first.dropHighlight:IsShown() and db:IsFriendInGroup(uid, "group2"), "hiding the source cancels even over a valid target")
+
+BFL.IsForever = false
+drag(otherRow, first, false)
+drag(otherRow, second, true)
+check(#db:GetFriendGroups("bnet_Friend#1234") == 2, "Retail ScrollBox uses the BattleTag for move and Shift-add")
+drag(otherRow, noGroup, false)
+check(#db:GetFriendGroups("bnet_Friend#1234") == 0, "Retail ScrollBox supports ungrouping")
+
+-- Classic uses the header pool and persistent character UIDs.
+BFL.IsClassic = true
+BFL.NormalizeWoWFriendName = function(_, name) return name end
+list.classicHeaderPool = { first, second, noGroup }
+local character = friendRow({ type = "wow", name = "Character-Realm" })
+drag(character, first, false)
+drag(character, second, true)
+check(#db:GetFriendGroups("wow_Character-Realm") == 2, "Classic pool supports move and Shift-add")
+drag(character, noGroup, false)
+check(#db:GetFriendGroups("wow_Character-Realm") == 0, "Classic pool supports ungrouping")
+io.write("Friend row drag and drop smoke passed.\n")

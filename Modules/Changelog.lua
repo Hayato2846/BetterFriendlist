@@ -76,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.1.8]        - 2026-11-23
 
+### All WoW Versions
+
+#### Fixed
+- **Dragging Friends** - Drop a friend on a group header to move them, hold Shift to add them to another group, or drop them on No Group to clear their assignments. Releasing over another friend leaves your groups alone.
+
 ### WoW Forever
 
 #### Fixed

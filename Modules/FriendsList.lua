@@ -2361,6 +2361,7 @@ local function CreateElementFactory(friendsList) -- Capture friendsList referenc
 				button:RegisterForDrag("LeftButton")
 				button:SetScript("OnDragStart", Button_OnDragStart)
 				button:SetScript("OnDragStop", Button_OnDragStop)
+				button:HookScript("OnHide", FriendsList.CancelFriendDrag)
 			end
 
 			-- PERFY OPTIMIZATION (Phase 2A): Use pre-defined handler
@@ -3041,6 +3042,7 @@ function FriendsList:InitializeClassicScrollFrame(scrollFrame) -- Store referenc
 		button:RegisterForDrag("LeftButton")
 		button:SetScript("OnDragStart", Button_OnDragStart)
 		button:SetScript("OnDragStop", Button_OnDragStop)
+		button:HookScript("OnHide", FriendsList.CancelFriendDrag)
 
 		-- FIX: Responsive Layout (Phase 28) - Classic Implementation
 		-- Ensure text width updates when button width changes (e.g. resizing frame)
@@ -7386,17 +7388,17 @@ function FriendsList:ToggleGroup(groupId)
 end
 
 -- Create a new custom group
-function FriendsList:CreateGroup(groupName, friendUID)
+function FriendsList:CreateGroup(groupName, friendUID, expectedGroupKey)
 	local Groups = GetGroups()
 	if not Groups then
 		return false, "Groups module not available"
 	end
 	local DB = GetDB()
-	if friendUID and DB and not DB:RequireFriendGroupKey(friendUID) then return false end
+	if friendUID and DB and not DB:RequireFriendGroupKey(friendUID, expectedGroupKey) then return false end
 
 	local success, result = Groups:Create(groupName)
 	if success then
-		local assigned = friendUID and Groups:ToggleFriendInGroup(friendUID, result)
+		local assigned = friendUID and Groups:ToggleFriendInGroup(friendUID, result, expectedGroupKey)
 		self:SyncGroups()
 		BFL:ForceRefreshFriendsList()
 		local hints = BFL:GetModule("NewGroupHints")
@@ -8470,7 +8472,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 
 	-- Tooltips for group headers
 	button:SetScript("OnEnter", function(self) -- Check if we're currently dragging a friend
-		local isDragging = BetterFriendsList_DraggedFriend ~= nil
+		local isDragging = FriendsList.activeFriendDrag ~= nil
 
 		local Groups = GetGroups()
 		local friendGroups = Groups and Groups:GetAll() or {}
@@ -8594,391 +8596,154 @@ end
 -- Drag & Drop Handlers (Hoisted - Phase 9.2)
 -- ========================================
 
--- Drag OnUpdate Handler
-Button_OnDragUpdate = function(self)
-	-- Get cursor position (used for Ghost positioning mainly)
-	local cursorX, cursorY = GetCursorPosition()
-	local scale = UIParent:GetEffectiveScale()
-	cursorX = cursorX / scale
-	cursorY = cursorY / scale
-
-	-- Move Ghost
-	local ghost = BFL:GetDragGhost()
-	if ghost and ghost:IsShown() then
-		ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX, cursorY)
-	end
-
-	-- Get all visible group header buttons from ScrollBox
-	local Groups = GetGroups()
-	local friendGroups = Groups and Groups:GetAll() or {}
-
-	-- Universal Frame Iteration (Retail + Classic)
-	local framesToCheck
-	if BFL.IsClassic or FriendsList.classicHeaderPool then
-		framesToCheck = FriendsList.classicHeaderPool
-	else
-		-- Robust ScrollBox Retrieval
-		local scrollBox = FriendsList.scrollBox -- Use module reference
-		if not scrollBox and self.GetParent then
-			-- Fallback: Traverse parents (Button -> ScrollTarget -> ScrollBox)
-			local parent = self:GetParent()
-			if parent then
-				scrollBox = parent:GetParent()
+do
+	local function FindFriendDropTarget(button)
+		local groups = GetGroups()
+		if not groups then return end
+		local groupsByID = groups:GetAll()
+		local frames = FriendsList.classicHeaderPool
+		if not frames then
+			local scrollBox = FriendsList.scrollBox
+			if not scrollBox then
+				local parent = button:GetParent()
+				scrollBox = parent and parent:GetParent()
 			end
+			frames = scrollBox and scrollBox.GetFrames and scrollBox:GetFrames()
 		end
-
-		if scrollBox and scrollBox.GetFrames then
-			framesToCheck = scrollBox:GetFrames()
-		end
-	end
-
-	-- Add Broker Tooltip Headers if available (Broker Drag & Drop)
-	-- Helper to append tables without overhead
-	local Broker = BFL:GetModule("Broker")
-	local brokerTargets = Broker and Broker.GetDropTargets and Broker:GetDropTargets()
-
-	if framesToCheck then
-		-- Iterate frames (Universal)
-		for _, frame in pairs(framesToCheck) do
-			-- Check IsShown() for Classic pooling safety
-			if frame:IsShown() and frame.groupId and frame.dropHighlight then
-				local groupData = friendGroups[frame.groupId]
-				if groupData and not groupData.builtin then
-					-- Region:IsMouseOver is shared by Retail and supported Classic clients.
-					local isOver = BFL:IsRegionMouseOver(frame)
-
-					if isOver and BetterFriendsList_DraggedFriend then
-						-- Show highlight and update text
-						frame.dropHighlight:Show()
-						local headerText =
-							string.format(BFL.L.HEADER_ADD_FRIEND, BetterFriendsList_DraggedFriend, groupData.name)
-						local align = (
-							FriendsList
-							and FriendsList.settingsCache
-							and FriendsList.settingsCache.groupHeaderAlign
-						) or "LEFT"
-						ApplyGroupHeaderSingleText(frame, headerText, align)
-					else
-						-- Hide highlight and restore original text
-						frame.dropHighlight:Hide()
-						-- Optimization: Use cached count from elementData if available
-						local memberCount = 0
-
-						-- Universal access to data (Classic property vs Retail method)
-						local elementData = frame.elementData
-						if not elementData and frame.GetElementData then
-							elementData = frame:GetElementData()
-						end
-
-						if elementData and elementData.count then
-							memberCount = elementData.count
-						else
-							-- Fallback (should not happen with ScrollBox)
-							if BetterFriendlistDB.friendGroups then
-								for _, groups in pairs(BetterFriendlistDB.friendGroups) do
-									for _, gid in ipairs(groups) do
-										if gid == frame.groupId then
-											memberCount = memberCount + 1
-											break
-										end
-									end
-								end
-							end
-						end
-
-						if FriendsList and FriendsList.UpdateGroupHeaderButton and frame.elementData then
-							FriendsList:UpdateGroupHeaderButton(frame, frame.elementData)
-						else
-							local headerText = string.format("%s (%d)", groupData.name, memberCount)
-							local align = (
-								FriendsList
-								and FriendsList.settingsCache
-								and FriendsList.settingsCache.groupHeaderAlign
-							) or "LEFT"
-							ApplyGroupHeaderSingleText(frame, headerText, align)
-						end
-					end
-				end
+		for _, frame in pairs(frames or EMPTY_TABLE) do
+			local groupID = frame.groupId
+			local group = groupID and groupsByID[groupID]
+			if frame.dropHighlight and group and (groupID == "nogroup" or not group.builtin)
+				and frame:IsVisible() and BFL:IsRegionMouseOver(frame) then
+				return frame, group
 			end
 		end
 	end
 
-	-- Check Broker Targets
-	if brokerTargets then
-		for _, frame in pairs(brokerTargets) do
-			if frame:IsShown() and frame.groupId and frame.dropHighlight then
-				local groupData = friendGroups[frame.groupId]
-				if groupData and not groupData.builtin then
-					local isOver = BFL:IsRegionMouseOver(frame)
-					if isOver and BetterFriendsList_DraggedFriend then
-						frame.dropHighlight:Show()
-						-- Note: LibQTip lines use custom cell setting, so SetText might not work directly/cleanly
-						-- We'll assume the Broker module sets up a compatible SetText or we just trust the highlight
-						if frame.SetText then
-							local headerText =
-								string.format(BFL.L.HEADER_ADD_FRIEND, BetterFriendsList_DraggedFriend, groupData.name)
-							frame:SetText("  " .. headerText) -- Indent for Broker style
-						end
-					else
-						frame.dropHighlight:Hide()
-						-- Restore original text is complex for Broker lines.
-						-- Better to let Broker module handle restore?
-						-- Or simpler: Just rely on highlight for Broker, don't change text to avoid "flicker" complexity or state loss
-						-- Ideally we replicate the logic.
-						if frame.SetText and frame.originalText then
-							frame:SetText(frame.originalText)
-						end
-					end
-				end
-			end
+	local function ClearFriendDropHighlight(drag)
+		local header = drag.header
+		if not header then return end
+		header.dropHighlight:Hide()
+		drag.header, drag.headerGroupID = nil, nil
+		if header:IsShown() and header.elementData then
+			FriendsList:UpdateGroupHeaderButton(header, header.elementData)
 		end
 	end
-end
 
--- Drag OnStart Handler
-Button_OnDragStart = function(self)
-	if self.friendData then
-		-- Store friend name for header text updates
-		-- [STREAMER MODE CHECK] Never expose Real ID in drag ghost text
-		local dragName
-		if BFL.StreamerMode and BFL.StreamerMode:IsActive() and self.friendData.type == "bnet" then
-			dragName = FriendsList:GetDisplayName(self.friendData)
-		else
-			dragName = self.friendData.name
-				or BFL:GetSafeAccountName(self.friendData.accountName, self.friendData.battleTag)
-				or "Unknown"
+	FriendsList.CancelFriendDrag = function(button)
+		local drag = FriendsList.activeFriendDrag
+		if not drag or drag.button ~= button then return end
+		FriendsList.activeFriendDrag = nil
+		button:SetScript("OnUpdate", nil)
+		button.dragOverlay:Hide()
+		button:SetAlpha(1.0)
+		if drag.ghost then
+			drag.ghost:Hide()
+			drag.ghost:ClearAllPoints()
 		end
-		BetterFriendsList_DraggedFriend = dragName
-		-- Store UID for validation (Fix for Phantom DragStop events during list refresh)
-		BetterFriendsList_DraggedUID = FriendsList:GetFriendUID(self.friendData)
+		ClearFriendDropHighlight(drag)
+	end
 
-		-- Init Ghost with Visuals
-		local ghost = BFL:GetDragGhost()
-		if ghost then
-			-- Format text nicely (including class color if available)
-			local text = BetterFriendsList_DraggedFriend
-			local colorR, colorG, colorB = 1, 0.82, 0 -- Default Gold
-			if BFL.GetThemeAccentColor then
-				colorR, colorG, colorB = BFL:GetThemeAccentColor(colorR, colorG, colorB, 1)
-			end
+	Button_OnDragUpdate = function(button)
+		local drag = FriendsList.activeFriendDrag
+		if not drag or drag.button ~= button then return end
+		if drag.uid ~= FriendsList:GetFriendUID(button.friendData) then
+			FriendsList.CancelFriendDrag(button)
+			return
+		end
 
-			-- Reset base text color to Gold to prevent tinting issues from previous drags
-			ghost.text:SetTextColor(colorR, colorG, colorB)
-
-			do
-				local classFile = GetClassFileForFriend(self.friendData)
-
-				local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
-				if classColor then
-					text = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(self.friendData)) .. text .. "|r"
-					colorR, colorG, colorB = classColor.r, classColor.g, classColor.b
-				end
-			end
-
-			ghost.text:SetText(text)
-			ghost.stripe:SetColorTexture(colorR, colorG, colorB)
-
-			-- Calculate width based on text length + padding
-			local width = ghost.text:GetStringWidth() + 30
-			ghost:SetSize(width, 24)
-
-			ghost:Show()
-			local cursorX, cursorY = GetCursorPosition()
+		local ghost = drag.ghost
+		if ghost and ghost:IsShown() then
+			local x, y = GetCursorPosition()
 			local scale = UIParent:GetEffectiveScale()
-			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
+			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
 		end
 
-		-- Show drag overlay
-		self.dragOverlay:Show()
-		self:SetAlpha(0.5)
+		local header, group = FindFriendDropTarget(button)
+		local groupID = header and header.groupId
+		if drag.header == header and drag.headerGroupID == groupID then return end
+		ClearFriendDropHighlight(drag)
+		if header then
+			drag.header, drag.headerGroupID = header, groupID
+			header.dropHighlight:Show()
+			if groupID ~= "nogroup" then
+				local text = string.format(L.HEADER_ADD_FRIEND, drag.name, group.name)
+				local align = FriendsList.settingsCache and FriendsList.settingsCache.groupHeaderAlign or "LEFT"
+				ApplyGroupHeaderSingleText(header, text, align, false)
+			end
+		end
+	end
 
-		-- Hide tooltip
+	Button_OnDragStart = function(button)
+		local friend = button.friendData
+		if FriendsList.activeFriendDrag or not friend or not button.dragOverlay then return end
+		local uid = FriendsList:GetFriendUID(friend)
+		if not uid then return end
+
+		local groupKey
+		if BFL.IsForever and uid:match("^bnet_%d+$") then
+			-- A recycled account ID alone cannot identify a Title Friend at drop time.
+			local db = GetDB()
+			if not db then return end
+			local ready
+			ready, groupKey = db:RequireFriendGroupKey(uid)
+			if not ready then return end
+		end
+
+		local name
+		if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friend.type == "bnet" then
+			name = FriendsList:GetDisplayName(friend)
+		else
+			name = friend.name or BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or "Unknown"
+		end
+		local ghost = BFL:GetDragGhost()
+		FriendsList.activeFriendDrag = { button = button, uid = uid, key = groupKey, name = name, ghost = ghost }
+		if ghost then
+			local text = name
+			local r, g, b = 1, 0.82, 0
+			if BFL.GetThemeAccentColor then r, g, b = BFL:GetThemeAccentColor(r, g, b, 1) end
+			ghost.text:SetTextColor(r, g, b)
+			local classColor = BFL.ClassUtils:GetClassColorByFile(GetClassFileForFriend(friend))
+			if classColor then
+				text = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(friend)) .. text .. "|r"
+				r, g, b = classColor.r, classColor.g, classColor.b
+			end
+			ghost.text:SetText(text)
+			ghost.stripe:SetColorTexture(r, g, b)
+			ghost:SetSize(ghost.text:GetStringWidth() + 30, 24)
+			ghost:Show()
+			local x, y = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+		end
+		button.dragOverlay:Show()
+		button:SetAlpha(0.5)
 		BFL_Tooltip:Hide()
-
-		-- Enable OnUpdate
-		self:SetScript("OnUpdate", Button_OnDragUpdate)
-	end
-end
-
--- Drag OnStop Handler
-Button_OnDragStop = function(self)
-	-- Disable OnUpdate
-	self:SetScript("OnUpdate", nil)
-
-	-- Hide Ghost
-	local ghost = BFL:GetDragGhost()
-	if ghost then
-		ghost:Hide()
-		ghost:ClearAllPoints()
+		button:SetScript("OnUpdate", Button_OnDragUpdate)
 	end
 
-	-- Hide drag overlay
-	if self.dragOverlay then
-		self.dragOverlay:Hide()
-	end
-	self:SetAlpha(1.0)
-
-	-- Guard Phase
-	local currentUID = FriendsList:GetFriendUID(self.friendData)
-	if not BetterFriendsList_DraggedUID or BetterFriendsList_DraggedUID ~= currentUID then
-		return
-	end
-
-	-- Get Groups and reset all header highlights and texts
-	local Groups = GetGroups()
-	local friendGroups = Groups and Groups:GetAll() or {}
-
-	-- Universal Frame Iteration (Retail + Classic)
-	local framesToCheck
-	if BFL.IsClassic or FriendsList.classicHeaderPool then
-		framesToCheck = FriendsList.classicHeaderPool
-	else
-		-- Robust ScrollBox Retrieval
-		local scrollBox = FriendsList.scrollBox -- Use module reference
-		if not scrollBox and self.GetParent then
-			-- Fallback: Traverse parents (Button -> ScrollTarget -> ScrollBox)
-			local parent = self:GetParent()
-			if parent then
-				scrollBox = parent:GetParent()
-			end
+	Button_OnDragStop = function(button)
+		local drag = FriendsList.activeFriendDrag
+		if not drag or drag.button ~= button then return end
+		local header
+		if button:IsVisible() and drag.uid == FriendsList:GetFriendUID(button.friendData) then
+			header = FindFriendDropTarget(button)
 		end
+		local groupID = header and header.groupId
+		FriendsList.CancelFriendDrag(button)
 
-		if scrollBox and scrollBox.GetFrames then
-			framesToCheck = scrollBox:GetFrames()
+		local db = groupID and GetDB()
+		if not db then return end
+		local changed
+		if groupID == "nogroup" then
+			changed = db:SetFriendGroups(drag.uid, nil, true, drag.key)
+		elseif IsShiftKeyDown() then
+			changed = db:AddFriendToGroup(drag.uid, groupID, true, drag.key)
+		else
+			changed = db:SetFriendGroups(drag.uid, { groupID }, true, drag.key)
 		end
+		if changed then BFL:ForceRefreshFriendsList() end
 	end
-
-	-- Reset Highlights
-	if framesToCheck then
-		for _, frame in pairs(framesToCheck) do
-			if frame:IsShown() and frame.groupId and frame.dropHighlight then
-				frame.dropHighlight:Hide()
-				local groupData = friendGroups[frame.groupId]
-				if groupData then
-					local memberCount = 0
-
-					-- Universal access to data
-					local elementData = frame.elementData
-					if not elementData and frame.GetElementData then
-						elementData = frame:GetElementData()
-					end
-
-					if elementData and elementData.count then
-						memberCount = elementData.count
-					else
-						-- Fallback for counting members
-						if BetterFriendlistDB.friendGroups then
-							for _, groups in pairs(BetterFriendlistDB.friendGroups) do
-								for _, gid in ipairs(groups) do
-									if gid == frame.groupId then
-										memberCount = memberCount + 1
-										break
-									end
-								end
-							end
-						end
-					end
-
-					if FriendsList and FriendsList.UpdateGroupHeaderButton and elementData then
-						FriendsList:UpdateGroupHeaderButton(frame, elementData)
-					else
-						local headerText = string.format("%s (%d)", groupData.name, memberCount)
-						local align = (
-							FriendsList
-							and FriendsList.settingsCache
-							and FriendsList.settingsCache.groupHeaderAlign
-						) or "LEFT"
-						ApplyGroupHeaderSingleText(frame, headerText, align)
-					end
-				end
-			end
-		end
-	end
-
-	-- Detect Drop Target using the frame's Region mouse-over method.
-	local droppedOnGroup = nil
-	if framesToCheck then
-		for _, frame in pairs(framesToCheck) do
-			if frame:IsShown() and frame.groupId then
-				if BFL:IsRegionMouseOver(frame) then
-					droppedOnGroup = frame.groupId
-					break
-				end
-			end
-		end
-	end
-
-	-- Check Broker Targets (Broker Drag & Drop)
-	if not droppedOnGroup then
-		local Broker = BFL:GetModule("Broker")
-		local brokerTargets = Broker and Broker.GetDropTargets and Broker:GetDropTargets()
-		if brokerTargets then
-			for _, frame in pairs(brokerTargets) do
-				if frame:IsShown() and frame.groupId then
-					if BFL:IsRegionMouseOver(frame) then
-						droppedOnGroup = frame.groupId
-						break
-					end
-				end
-			end
-		end
-	end
-
-	-- If dropped on a group, add friend to that group
-	-- Pcall protection for logic
-	local success = pcall(function()
-		if droppedOnGroup and self.friendData then
-			local friendUID = FriendsList:GetFriendUID(self.friendData)
-			local targetGroup = friendGroups[droppedOnGroup]
-
-			if friendUID and targetGroup then
-				-- "No Group" is derived from having no custom assignments. Dropping
-				-- here therefore means ungrouping the friend, never persisting nogroup.
-				if droppedOnGroup == "nogroup" then
-					local DB = GetDB()
-					if DB then
-						DB:SetFriendGroups(friendUID, nil, true)
-					end
-					BFL:ForceRefreshFriendsList()
-					return
-				end
-
-				-- Other built-in groups are computed from friend state and are not
-				-- valid drag-and-drop assignment targets.
-				if targetGroup.builtin then
-					return
-				end
-
-				-- Without Shift, replace the custom memberships in one write.
-				local DB = GetDB()
-				if DB then
-					if IsShiftKeyDown() then
-						DB:AddFriendToGroup(friendUID, droppedOnGroup, true)
-					else
-						DB:SetFriendGroups(friendUID, { droppedOnGroup }, true)
-					end
-				end
-				BFL:ForceRefreshFriendsList()
-			end
-		end
-	end)
-
-	if not success then
-		return
-	end
-
-	-- Clear dragged friend name
-	BetterFriendsList_DraggedFriend = ""
-	BetterFriendsList_DraggedUID = nil
-end
-
--- Wrapper for use by other modules (e.g. Broker)
-function FriendsList:OnDragStart(button)
-	Button_OnDragStart(button)
-end
-
-function FriendsList:OnDragStop(button)
-	Button_OnDragStop(button)
 end
 
 -- ========================================
@@ -10959,7 +10724,7 @@ function FriendsList:GetFriendTagRowRightInset()
 	return GetFriendTagRowRightInset(controlLaneHeight, modern)
 end
 
--- Expose Drag Handlers for other modules (Broker)
+-- Expose the friend-row drag handlers
 FriendsList.OnDragStart = Button_OnDragStart
 FriendsList.OnDragStop = Button_OnDragStop
 FriendsList.OnDragUpdate = Button_OnDragUpdate
