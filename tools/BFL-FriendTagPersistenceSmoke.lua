@@ -734,35 +734,69 @@ do
 	io.write("[OK] Existing tag contracts: " .. contracts .. " cases\n")
 end
 do
-	local _, env = make()
-	local source = read("Modules/FriendTagEditor.lua")
-	local helpers = assert(source:match("(local function SetActionIcon.-)\nlocal function DeleteTagLabel"))
-	local noop, seen, lastText = function() end, 0
-	local texture = setmetatable({}, { __index = function() return noop end })
-	env.IconButtonMixin = { OnMouseDown = noop, OnMouseUp = noop }
-	env.CreateFrame = function()
-		return setmetatable({ Icon = texture, hooks = {},
-			GetHighlightTexture = function() return texture end,
-			HookScript = function(self, event, callback) self.hooks[event] = callback end,
-		}, { __index = function() return noop end })
-	end
-	env.BFL_Tooltip = { SetOwner = noop, Show = noop, Hide = noop,
-		SetText = function(_, text)
-			assert(type(text) == "string", "native GameTooltip:SetText requires text")
-			seen, lastText = seen + 1, text
-		end,
-	}
-	local create = assert(load(helpers .. "\nreturn CreateIconAction", "@production icon action", "t", env))()
-	local button = create({}, "chevron-down", nil, noop)
-	button.hooks.OnEnter(button)
-	for _, label in ipairs({ false, 0, "" }) do
-		button.actionLabel = label
-		button.hooks.OnEnter(button)
-	end
-	equal(seen, 0, "unlabelled action buttons never pass nil or invalid text to the tooltip")
-	button.actionLabel = "Collapse Section"
-	button.hooks.OnEnter(button)
-	equal(seen, 1, "labelled action buttons show their tooltip")
-	equal(lastText, "Collapse Section", "the tooltip receives the action label")
+	local BFL,env=make()
+	local tags=BFL.modules.FriendTags
+	equal(tags:GetSetting("dynamicTagGroupFilter"),"all","existing profiles retain all contacts by default")
+	tags:SetSetting("dynamicTagGroupFilter","same_flavor_online")
+	equal(tags:GetSetting("dynamicTagGroupFilter"),"same_flavor_online","new grouping preference persists")
+	equal(env.BetterFriendlistDB.friendTagSettings.dynamicTagGroupFilter,"same_flavor_online","preference is stored in the friend tag profile")
+	local imported=assert(BFL.modules.DB:PrepareImportedProfile({exportVersion=3,customGroups={},friendGroups={},friendTagSettings={dynamicTagGroupFilter="same_flavor_online"}}))
+	equal(imported.friendTagSettings.dynamicTagGroupFilter,"same_flavor_online","profile imports retain the grouping preference")
+	tags:SetSetting("dynamicTagGroupFilter","unknown-future-value")
+	equal(tags:GetSetting("dynamicTagGroupFilter"),"all","invalid imported modes preserve the established behavior")
 end
+-- Broker cells use the shared tag visibility and group preferences.
+do
+	local BFL, env, execute = make()
+	local tags = BFL.modules.FriendTags
+	tags:Initialize()
+	execute("Modules/TagChips.lua")
+	BFL.modules.FriendsList = {
+		settingsCache = {},
+		GetDisplayName = function(_, friend) return friend.name end,
+	}
+	local chips = BFL.modules.TagChips
+	local friend = { type = "bnet", name = "Test", uid = "bnet_Test#1234", battleTag = "Test#1234", connected = true }
+	local groupTag = assert(tags:CreateCustomTag("Group Tag"))
+	local hiddenTag = assert(tags:CreateCustomTag("Hidden Tag"))
+	local section = assert(tags:CreateTagSection("Broker test section"))
+	assert(tags:SetChipProfile(hiddenTag, { section = section, rowVisible = false }))
+	assert(tags:SetCustomTagForFriend(friend, groupTag, true))
+	assert(tags:SetCustomTagForFriend(friend, hiddenTag, true))
+	local groupId = "tag:" .. groupTag
+	assert(tags:SetChipProfile(hiddenTag, { rowVisible = true }))
+	tags:SetSetting("hideDynamicGroupTagChip", true)
+	assert(tags:SetTagSectionHidden(section, true))
+	env.BetterFriendlistDB.streamerModeActive = true
+	tags:SetSetting("showTagsInStreamerMode", true)
+	local function BrokerTags(group)
+		return chips:GetVisibleRowTags(friend, {}, group, "broker")
+	end
+	tags:SetSetting("hideAllDynamicGroupTagChips", false)
+	equal(#BrokerTags("nogroup"), 1, "broker cells use the same section visibility as rows")
+	equal(#BrokerTags(groupId), 0, "broker cells can hide their group tag without changing its assignment")
+	tags:SetSetting("enableDynamicTagGroups", true)
+	env.BetterFriendlistDB.groupStates = { [groupId] = true }
+	local groups, ids = tags:GetDynamicGroups("broker")
+	equal(ids[groupTag], groupId, "broker uses the roster's stable tag group ID")
+	equal(ids[hiddenTag], nil, "hidden sections do not create broker groups")
+	local collapsed
+	for _, group in ipairs(groups) do if group.id == groupId then collapsed = group.collapsed end end
+	equal(collapsed, true, "the broker uses the same collapsed tag group state as the roster")
+	assert(tags:SetChipProfile(groupTag, { brokerVisible = false }))
+	equal(#BrokerTags("nogroup"), 0, "per-tag broker visibility hides chips")
+	groups, ids = tags:GetDynamicGroups("broker")
+	equal(ids[groupTag], nil, "per-tag broker visibility hides its dynamic group")
+	equal(#chips:GetVisibleRowTags(friend, { settingsCache = {} }, "nogroup", "row"), 1,
+		"broker visibility leaves roster rows alone")
+	assert(tags:SetChipProfile(groupTag, { brokerVisible = true }))
+	tags:SetSetting("showTagsInStreamerMode", false)
+	equal(#BrokerTags("nogroup"), 0, "streamer mode hides broker chips")
+	equal(#tags:GetDynamicGroups("broker"), 0, "streamer mode hides tag group names")
+	tags:SetSetting("showTagsInStreamerMode", true)
+	tags:SetSetting("showBrokerChips", false)
+	equal(#BrokerTags("nogroup"), 0, "the broker setting independently hides broker chips")
+	equal(#tags:GetDynamicGroups("broker"), 0, "the broker setting also hides broker tag groups")
+end
+
 io.write("[OK] Friend tag persistence: " .. checks .. " checks\n")

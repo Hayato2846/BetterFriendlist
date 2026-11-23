@@ -33,6 +33,17 @@ local function GetFilterSortRegistry()
 	return BFL:GetModule("FilterSortRegistry")
 end
 
+local function GetRosterComparator(settings)
+	local registry = GetFilterSortRegistry()
+	if not registry or not registry.CreateSortPlan or not registry.CompareFriendsWithSortPlan then return nil end
+	local primary = settings and settings.primarySort or "status"
+	local secondary = settings and settings.secondarySort or "name"
+	local plan = registry:CreateSortPlan(primary, secondary)
+	return function(a, b)
+		return registry:CompareFriendsWithSortPlan(a, b, plan)
+	end
+end
+
 -- ========================================
 -- Local Variables
 -- ========================================
@@ -274,12 +285,14 @@ local function ApplyBrokerColumnColor(text, settingKey, settings)
 end
 
 local function CopyFriendTags(friendTags)
-	if type(friendTags) ~= "table" then
+	if (BFL.IsSecret and BFL:IsSecret(friendTags)) or type(friendTags) ~= "table"
+		or (type(issecrettable) == "function" and issecrettable(friendTags))
+	then
 		return nil
 	end
 	local copy = {}
-	for index, tag in ipairs(friendTags) do
-		copy[index] = tag
+	for _, tag in ipairs(friendTags) do
+		if not (BFL.IsSecret and BFL:IsSecret(tag)) then copy[#copy + 1] = tag end
 	end
 	return copy
 end
@@ -692,6 +705,8 @@ local function BuildFriendCountsCacheSignature(currentFilter)
 		BFL.FriendsListVersion or 0,
 		BFL.FilterSortRegistryVersion or 0,
 		BFL.FriendTagsVersion or 0,
+		BFL.FriendTagsAssignmentVersion or 0,
+		Broker.tagSearch or "",
 		BFL.SettingsVersion or 0,
 		BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline and 1 or 0,
 		friendCountsEventVersion or 0,
@@ -718,6 +733,27 @@ local function GetBNetFilterGameAccounts(friendIndex)
 	return accounts
 end
 
+local function NormalizeTagSearch(value)
+	local intl = BFL.IntlCompat
+	return intl and intl.NormalizeForSearch and intl.NormalizeForSearch(value) or BFL:StripAccents(value)
+end
+
+local function GetBrokerTagFilter()
+	local quickFilters = GetQuickFilters()
+	local tags = BFL:GetModule("FriendTags")
+	local query = tags and tags:CanDisplayTags("broker") and Broker.tagSearch or nil
+	local selected = quickFilters and quickFilters.GetActiveTagFilterDefinitions
+		and #quickFilters:GetActiveTagFilterDefinitions() > 0
+	if not query and not selected then return nil end
+	local normalized = query and NormalizeTagSearch(query)
+	return function(friend)
+		if selected and not quickFilters:PassesTagFilters(friend) then return false end
+		if not normalized then return true end
+		local text = tags:GetSearchText(friend)
+		return text ~= nil and NormalizeTagSearch(text):find(normalized, 1, true) ~= nil
+	end
+end
+
 local function GetFilteredFriendCounts()
 	local currentFilter = BetterFriendlistDB and BetterFriendlistDB.quickFilter or "all"
 	local Registry = GetFilterSortRegistry()
@@ -739,11 +775,12 @@ local function GetFilteredFriendCounts()
 
 	local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
 	local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or IsForeverFilter(currentFilter))
+	local tagFilter = GetBrokerTagFilter()
 
 	local wowFiltered, wowTotal, bnetFiltered, bnetTotal
 	if previewData and previewData.friends then
 		wowFiltered, wowTotal, bnetFiltered, bnetTotal = GetPreviewFriendCounts(currentFilter)
-	elseif not useRegistryFilter and (currentFilter == "all" or currentFilter == "online") then
+	elseif not useRegistryFilter and not tagFilter and (currentFilter == "all" or currentFilter == "online") then
 		wowFiltered, wowTotal, bnetFiltered, bnetTotal = GetFriendCounts()
 	else
 		local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
@@ -762,7 +799,7 @@ local function GetFilteredFriendCounts()
 				local passes = false
 				local friendForRegistry
 
-				if useRegistryFilter then
+				if useRegistryFilter or tagFilter then
 					friendForRegistry = {
 						type = "wow",
 						index = i,
@@ -778,7 +815,11 @@ local function GetFilteredFriendCounts()
 						afk = friendInfo.afk,
 						dnd = friendInfo.dnd,
 					}
+				end
+				if useRegistryFilter then
 					passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
+				elseif currentFilter == "all" or currentFilter == "online" then
+					passes = connected
 				elseif currentFilter == "offline" then
 					passes = not connected
 				elseif currentFilter == "wowonline" then
@@ -798,7 +839,7 @@ local function GetFilteredFriendCounts()
 					passes = connected
 				end
 
-				if passes then
+				if passes and (not tagFilter or tagFilter(friendForRegistry)) then
 					wowFiltered = wowFiltered + 1
 				end
 			end
@@ -808,6 +849,7 @@ local function GetFilteredFriendCounts()
 		if BNConnected() and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled()) then
 			local numBNetTotal, numBNetOnline = BNGetNumFriends()
 			bnetTotal = numBNetTotal or 0
+			local nativeTags = tagFilter and BFL.AreBattleNetFriendTagsEnabled and BFL.AreBattleNetFriendTagsEnabled()
 
 			for i = 1, bnetTotal do
 				local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
@@ -822,9 +864,10 @@ local function GetFilteredFriendCounts()
 					end
 
 					local passes = false
+					local friendForRegistry
 
-					if useRegistryFilter then
-						local friendForRegistry = {
+					if useRegistryFilter or tagFilter then
+						friendForRegistry = {
 							type = "bnet",
 							index = i,
 							bnetAccountID = accountInfo.bnetAccountID,
@@ -845,11 +888,16 @@ local function GetFilteredFriendCounts()
 							factionName = gameInfo.factionName,
 							gameName = gameInfo.richPresence,
 							numGameAccounts = accountInfo.numGameAccounts,
+							friendTags = nativeTags and CopyFriendTags(accountInfo.friendTags) or nil,
 						}
 						if IsForeverFilter(currentFilter) then
 							friendForRegistry.gameAccounts = GetBNetFilterGameAccounts(i)
 						end
+					end
+					if useRegistryFilter then
 						passes = Registry:EvaluateQuickFilter(currentFilter, friendForRegistry)
+					elseif currentFilter == "all" or currentFilter == "online" then
+						passes = isOnline
 					elseif currentFilter == "offline" then
 						passes = not isOnline
 					elseif currentFilter == "wowonline" then
@@ -869,7 +917,7 @@ local function GetFilteredFriendCounts()
 						passes = isOnline and client ~= "" and client ~= "App" and client ~= "BSAp"
 					end
 
-					if passes then
+					if passes and (not tagFilter or tagFilter(friendForRegistry)) then
 						bnetFiltered = bnetFiltered + 1
 					end
 				end
@@ -1002,6 +1050,7 @@ local function IsBrokerTooltipObserved()
 	if tooltip.IsMouseOver and tooltip:IsMouseOver() then
 		return true
 	end
+	if tooltip.bflBrokerFilterOpen and BFL.BrokerUtils.IsMenuOpen() then return true end
 
 	local anchor = tooltip.anchorFrame
 	return anchor and anchor.IsMouseOver and anchor:IsMouseOver() or false
@@ -1126,9 +1175,14 @@ local function CreateAdvancedTooltip(gameTooltip)
 						and ("bnet_" .. accountInfo.battleTag)
 					or ("bnet_" .. tostring(accountInfo.bnetAccountID))
 				local gameInfo = accountInfo.gameAccountInfo
+				local name = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag)
 				table.insert(friends, {
 					id = friendUID,
 					type = "bnet",
+					index = i,
+					gameAccountInfo = gameInfo,
+					realmName = gameInfo.realmName,
+					name = name,
 					isFavorite = accountInfo.isFavorite,
 					friendLevel = accountInfo.friendLevel,
 					friendTags = friendTagsEnabled and CopyFriendTags(accountInfo.friendTags) or nil,
@@ -1136,7 +1190,7 @@ local function CreateAdvancedTooltip(gameTooltip)
 					wowProjectID = gameInfo.wowProjectID,
 					connected = true,
 					info = {
-						name = BFL:GetSafeAccountName(accountInfo.accountName, accountInfo.battleTag),
+						name = name,
 						level = gameInfo.characterLevel or "??",
 						className = gameInfo.className or "UNKNOWN",
 						area = gameInfo.areaName or "Unknown",
@@ -1156,6 +1210,8 @@ local function CreateAdvancedTooltip(gameTooltip)
 			table.insert(friends, {
 				id = friendUID,
 				type = "wow",
+				index = i,
+				name = fullName,
 				client = "WoW",
 				connected = true,
 				info = {
@@ -1242,6 +1298,12 @@ local function CreateAdvancedTooltip(gameTooltip)
 				table.insert(ungrouped, friend)
 			end
 		end
+	end
+
+	local compareFriends = GetRosterComparator(BetterFriendlistDB)
+	if compareFriends then
+		for _, groupFriends in pairs(groupedFriends) do table.sort(groupFriends, compareFriends) end
+		table.sort(ungrouped, compareFriends)
 	end
 
 	local displayedCount = 0
@@ -1604,6 +1666,34 @@ local function FormatBrokerClickHint()
 	return C("ltblue", L("BROKER_HINT_LEFT_CLICK")) .. L("BROKER_HINT_TOGGLE")
 end
 
+local function ShowBrokerTagSearch()
+	local key = "BFL_BROKER_TAG_SEARCH"
+	if not StaticPopupDialogs[key] then
+		local function Apply(text)
+			text = text:match("^%s*(.-)%s*$")
+			Broker.tagSearch = text ~= "" and text or nil
+			Broker:ScheduleObservedTooltipRefresh()
+		end
+		StaticPopupDialogs[key] = {
+			text = L("BROKER_TAG_SEARCH"), button1 = ACCEPT, button2 = CANCEL, hasEditBox = true,
+			OnShow = function(frame)
+				local editBox = frame.EditBox or frame.editBox
+				editBox:SetMaxLetters(64)
+				editBox:SetText(Broker.tagSearch or "")
+				editBox:SetFocus()
+				editBox:HighlightText()
+			end,
+			OnAccept = function(frame) Apply((frame.EditBox or frame.editBox):GetText()) end,
+			EditBoxOnEnterPressed = function(editBox)
+				Apply(editBox:GetText())
+				editBox:GetParent():Hide()
+			end,
+			timeout = 0, whileDead = true, hideOnEscape = true,
+		}
+	end
+	StaticPopup_Show(key)
+end
+
 local function RenderFixedFooter(footerFrame, sampleFriends, settings)
 	settings = settings or BetterFriendlistDB
 	-- Clear previous content (both own .content and cross-module .lines)
@@ -1671,7 +1761,9 @@ local function RenderFixedFooter(footerFrame, sampleFriends, settings)
 	else
 		wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 	end
-	local totalText = string.format(L("BROKER_TOTAL_ONLINE"), wowOnline + bnetOnline, wowTotal + bnetTotal)
+	local totalText = settings.quickFilter == "offline"
+		and string.format("%s · %d / %d", L("FILTER_OFFLINE"), wowOnline + bnetOnline, wowTotal + bnetTotal)
+		or string.format(L("BROKER_TOTAL_ONLINE"), wowOnline + bnetOnline, wowTotal + bnetTotal)
 	local totalLine = AddLine(totalText, "GameTooltipText", 1, 1, 1)
 	totalLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
 	totalLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
@@ -1680,6 +1772,8 @@ local function RenderFixedFooter(footerFrame, sampleFriends, settings)
 	-- Filter
 	local currentFilter = settings and settings.quickFilter or "all"
 	local QuickFilters = not sampleFriends and GetQuickFilters()
+	local tags = not sampleFriends and BFL:GetModule("FriendTags")
+	local tagsVisible = tags and tags:CanDisplayTags("broker")
 	local filterText = L("FILTER_ALL")
 	local filterIcon = "Interface\\AddOns\\BetterFriendlist\\Icons\\filter-all"
 	local Registry = GetFilterSortRegistry()
@@ -1695,12 +1789,39 @@ local function RenderFixedFooter(footerFrame, sampleFriends, settings)
 		filterText = Registry:GetQuickFilterText(currentFilter) or filterText
 		filterIcon = Registry:GetQuickFilterIcon(currentFilter) or filterIcon
 	end
+	if tagsVisible and Broker.tagSearch then
+		filterText = filterText .. " · " .. Broker.tagSearch:gsub("|", "||")
+	end
 
 	local filterIconText = Registry and Registry:FormatIcon(filterIcon, 16) or string.format("|T%s:16:16:0:0|t", filterIcon)
 	local filterDisplay = filterIconText .. " " .. C("ltyellow", filterText)
 	local filterLine = AddLine(L("BROKER_FILTER_LABEL") .. filterDisplay, "GameTooltipText")
 	filterLine:SetPoint("TOPLEFT", footerFrame, "TOPLEFT", 10, yOffset)
 	filterLine:SetPoint("RIGHT", footerFrame, "RIGHT", -10, yOffset)
+	local filterButton = footerFrame.tagFilterButton
+	if tagsVisible and QuickFilters and BFL.CreateContextMenu then
+		if not filterButton then
+			filterButton = CreateFrame("Button", nil, footerFrame)
+			filterButton:RegisterForClicks("LeftButtonUp")
+			footerFrame.tagFilterButton = filterButton
+		end
+		filterButton:ClearAllPoints()
+		filterButton:SetAllPoints(filterLine)
+		filterButton:SetScript("OnEnter", function() filterLine:SetAlpha(0.8) end)
+		filterButton:SetScript("OnLeave", function() filterLine:SetAlpha(1) end)
+		filterButton:SetScript("OnClick", function(button)
+			BFL.CreateContextMenu(button, function(_, root)
+				QuickFilters:PopulateMenu(root)
+				root:CreateButton(L("BROKER_TAG_SEARCH"), ShowBrokerTagSearch)
+				root:CreateButton(L("FRIEND_TAGS_EDITOR_TITLE"), function() tags:OpenSettings() end)
+			end)
+			footerFrame:GetParent().bflBrokerFilterOpen = true
+		end)
+		filterLine:SetAlpha(1)
+		filterButton:Show()
+	elseif filterButton then
+		filterButton:Hide()
+	end
 	yOffset = yOffset - 18
 
 	-- Sort
@@ -1796,7 +1917,16 @@ local IsMenuOpen = BFL.BrokerUtils.IsMenuOpen
 
 -- Wrapper: SetupTooltipAutoHide with module-specific upvalues (detailTooltip, LQT)
 local function SetupTooltipAutoHide(tt, anchorFrame)
-	BFL.BrokerUtils.SetupTooltipAutoHide(tt, anchorFrame, LQT, function() return detailTooltip end)
+	BFL.BrokerUtils.SetupTooltipAutoHide(tt, anchorFrame, LQT, function() return detailTooltip end, function()
+		if not tt.bflBrokerFilterOpen then return false end
+		if BFL.BrokerUtils.IsMenuOpen() then return true end
+		tt.bflBrokerFilterOpen = nil
+		if tt.bflBrokerFilterDirty then
+			tt.bflBrokerFilterDirty = nil
+			Broker:ScheduleObservedTooltipRefresh()
+		end
+		return false
+	end)
 end
 
 local CreateDetailTooltip
@@ -1810,6 +1940,7 @@ local RemoveElvUISkin = BFL.BrokerUtils.RemoveElvUISkin
 
 local function TooltipCleanup(tt)
 	if not tt then return end
+	tt.bflBrokerFilterOpen, tt.bflBrokerFilterDirty = nil, nil
 
 	ReleaseDetailTooltip()
 	RemoveElvUISkin(tt)
@@ -1845,12 +1976,73 @@ local function ActivateLiveTooltip(tt)
 	brokerTooltipEventGate.active = true
 end
 
+local tagCellProvider
+local function SetBrokerTagCell(row, index, lineTags, comparison, columns, tagSettings)
+	local chips = BFL:GetModule("TagChips")
+	if not chips or not LQT.CreateCellProvider or #lineTags == 0 then return end
+	if not tagCellProvider then
+		local provider = LQT:CreateCellProvider()
+		local cell, base = provider.newCellPrototype, provider.baseCellPrototype
+		function cell:GetSize()
+			if self.tagWidth then return self.tagWidth, self.tagHeight end
+			return base.GetSize(self)
+		end
+		function cell:GetContentHeight()
+			return self.tagHeight or base.GetContentHeight(self)
+		end
+		function cell:OnRelease()
+			if self.tagHolder then self.tagHolder:Hide() end
+			self.tagWidth, self.tagHeight = nil, nil
+			base.OnRelease(self)
+		end
+		tagCellProvider = provider.newCellProvider
+	end
+	local cell = row:GetCell(index, tagCellProvider)
+	BFL.BrokerUtils.SizeSettingsComparisonCell(cell, comparison, columns, false)
+	local width = cell:GetMaxWidth() or 150
+	local holder = cell.tagHolder
+	if not holder then
+		holder = CreateFrame("Frame", nil, cell)
+		holder:SetPoint("LEFT", cell, "LEFT", 4, 0)
+		cell.tagHolder = holder
+	end
+	local height = chips:LayoutCellTags(lineTags, width - 8, true, holder, 0, 0, tagSettings)
+	holder:SetSize(width - 8, math.max(1, height))
+	holder:SetShown(height > 0)
+	cell.tagWidth = width
+	cell.tagHeight = height + 2
+	cell:OnContentChanged()
+end
+
+local function GetBrokerTagGroupHeader(group, style)
+	local profile = group.tagProfile
+	if not profile or style == "standard" then return group.name end
+	local name = group.name
+	if style == "chip" and profile.iconType ~= "none" then
+		local atlas = profile.atlas or (profile.iconType == "atlas" and profile.iconValue)
+		local texture = profile.texture or profile.icon or (profile.iconType == "texture" and profile.iconValue)
+		local icon = BFL.GetAtlasOrTextureMarkup and BFL.GetAtlasOrTextureMarkup(atlas, texture, 13, 13)
+		if icon and icon ~= "" then name = icon .. " " .. name end
+	end
+	local color = profile.color
+	if color then
+		name = string.format("|cff%02x%02x%02x%s|r", math.floor(color.r * 255), math.floor(color.g * 255), math.floor(color.b * 255), name)
+	end
+	return name
+end
+
 local function CreateLibQTipTooltip(anchorFrame, sample)
 	if not sample and BetterFriendlistDB and BetterFriendlistDB.brokerTooltipMode == "basic" then
 		return RenderBasicQTipTooltip(anchorFrame)
 	end
 	local settings = sample and sample.settings or BetterFriendlistDB
 	local comparison = sample and sample.comparison
+	local friendTags = BFL:GetModule("FriendTags")
+	local tagChips = BFL:GetModule("TagChips")
+	local sampleTagSettings = sample and friendTags and (sample.tagSettings or friendTags:GetSettings())
+	local showTags = friendTags and friendTags:CanDisplayTags("broker", nil, sample and settings.streamerModeActive, sampleTagSettings)
+	local tagRenderer = { settingsSample = sample ~= nil, settingsSampleTagSettings = sampleTagSettings,
+		settingsSampleStreamerMode = sample and settings.streamerModeActive }
 	local function AddSeparator(tt)
 		local color = BFL.BrokerUtils.GetBrokerSeparatorColor(settings)
 		return AddTooltipSeparator(tt, color.r, color.g, color.b, color.a)
@@ -1875,6 +2067,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		{ key = "Zone", label = L("BROKER_COLUMN_ZONE"), align = "LEFT", default = true },
 		{ key = "Realm", label = L(BFL.IsForever and "BROKER_COLUMN_RULESET" or "BROKER_COLUMN_REALM"), align = "LEFT", default = true },
 		{ key = "Notes", label = L("BROKER_COLUMN_NOTES"), align = "LEFT", default = true },
+		{ key = "Tags", label = L("FRIEND_TAGS_SETTINGS_TAG_LIST"), align = "LEFT", default = true },
 	}
 
 	-- Get user-defined column order from DB
@@ -1883,6 +2076,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 	local orderedColumns = {}
 
 	local function IsColumnVisible(col)
+		if col.key == "Tags" and not showTags then return false end
 		if comparison and not comparison.columns[col.key] then return false end
 		local settingKey = "brokerShowCol" .. col.key
 		local visible = settings and settings[settingKey]
@@ -1928,11 +2122,12 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		table.insert(activeColumns, columns[2]) -- Fallback: Name column
 	end
 
-	local hasStatusColumn = false
-	for _, col in ipairs(activeColumns) do
+	local hasStatusColumn, tagColumn = false, nil
+	for index, col in ipairs(activeColumns) do
 		if col.key == "Status" then
 			hasStatusColumn = true
-			break
+		elseif col.key == "Tags" then
+			tagColumn = index
 		end
 	end
 
@@ -2014,7 +2209,17 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		AddSeparator(tt)
 
 		local Groups = not sample and GetGroups()
-		local groupsData = sample and sample.groups or Groups and Groups:GetAll() or {}
+		local groupsData = {}
+		for id, group in pairs(sample and sample.groups or Groups and Groups:GetAll() or {}) do groupsData[id] = group end
+		local roster = not sample and GetFriendsList()
+		local dynamicGroups, tagGroupIds = {}, {}
+		if showTags and roster and not previewData then
+			dynamicGroups, tagGroupIds = friendTags:GetDynamicGroups("broker")
+			for _, group in ipairs(dynamicGroups) do groupsData[group.id] = group end
+		end
+		local tagGroupMode = #dynamicGroups > 0 and friendTags:GetSetting("dynamicTagGroupFilter", "all")
+		local prioritizeTags = tagGroupMode and friendTags:GetSetting("prioritizeDynamicTagGroups", false)
+		local groupHeaderStyle = tagGroupMode and friendTags:GetSetting("dynamicTagGroupHeaderStyle", "standard")
 
 		-- Check if mobile should be treated as offline
 		local treatMobileAsOffline = settings and settings.treatMobileAsOffline
@@ -2040,92 +2245,67 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		local BNET_CLIENT_WOW = BNET_CLIENT_WOW or "WoW"
 
 		-- Helper to process a friend (add to groups and counts)
+		local filterMode = settings and settings.quickFilter or "all"
+		local filterRegistry = GetFilterSortRegistry()
+		local showOffline = filterRegistry and filterRegistry:NormalizeQuickFilterId(filterMode) == "offline"
+			or filterMode == "offline"
+
 		local function ProcessFriend(friend)
 			local customGroups = not sample and DB and friend.id and DB:GetFriendGroups(friend.id) or {}
 			local assigned = false
 			local isOnline = IsPreviewFriendOnline(friend, treatMobileAsOffline)
 
-			-- Favorites group (BNet only)
-			if friend.type == "bnet" and friend.isFavorite then
-				if groupsData["favorites"] then
-					groupCounts["favorites"].total = groupCounts["favorites"].total + 1
-					if isOnline then
-						groupCounts["favorites"].online = groupCounts["favorites"].online + 1
-						table.insert(groupedFriends["favorites"], friend)
+			local function PlaceInGroup(groupId)
+				local counts = groupCounts[groupId]
+				counts.total = counts.total + 1
+				if isOnline then counts.online = counts.online + 1 end
+				if isOnline ~= showOffline then
+					table.insert(groupedFriends[groupId], friend)
+				end
+				assigned = true
+			end
+
+			if friend.type == "bnet" and friend.isFavorite and groupsData.favorites then
+				PlaceInGroup("favorites")
+			end
+
+			if enableInGameGroup and groupsData.ingame and friend.connected then
+				local client = friend.client
+				local inGame = friend.type == "wow"
+				if not inGame and friend.type == "bnet" then
+					if inGameGroupMode == "any_game" then
+						inGame = client and client ~= "" and client ~= "App" and client ~= "BSAp"
+					else
+						inGame = client == BNET_CLIENT_WOW and friend.wowProjectID == WOW_PROJECT_ID
 					end
-					assigned = true
+				end
+				if inGame then PlaceInGroup("ingame") end
+			end
+
+			if not sample and enableRecentlyAdded and groupsData.recentlyadded then
+				local recentlyAdded = BFL:GetModule("RecentlyAdded")
+				if recentlyAdded and recentlyAdded:IsFriendRecentlyAdded(friend.id) then
+					PlaceInGroup("recentlyadded")
 				end
 			end
 
-			-- In-Game group (dynamic, parity with FriendsList)
-			if enableInGameGroup and groupsData["ingame"] then
-				local isInGame = false
-
-				if inGameGroupMode == "any_game" then
-					if friend.type == "wow" and friend.connected then
-						isInGame = true
-					elseif friend.type == "bnet" and friend.connected then
-						local client = friend.client
-						if client and client ~= "" and client ~= "App" and client ~= "BSAp" then
-							isInGame = true
-						end
-					end
-				else
-					-- Same Game (Default): WoW friends OR BNet friends in SAME WoW version
-					if friend.type == "wow" and friend.connected then
-						isInGame = true
-					elseif friend.type == "bnet" and friend.connected and friend.client == BNET_CLIENT_WOW then
-						if friend.wowProjectID == WOW_PROJECT_ID then
-							isInGame = true
-						end
-					end
-				end
-
-				if isInGame then
-					groupCounts["ingame"].total = groupCounts["ingame"].total + 1
-					if isOnline then
-						groupCounts["ingame"].online = groupCounts["ingame"].online + 1
-						table.insert(groupedFriends["ingame"], friend)
-					end
-					assigned = true
-				end
-			end
-
-			-- Recently Added group (dynamic, parity with FriendsList)
-			if not sample and enableRecentlyAdded and groupsData["recentlyadded"] then
-				local RecentlyAddedModule = BFL:GetModule("RecentlyAdded")
-				if RecentlyAddedModule and RecentlyAddedModule:IsFriendRecentlyAdded(friend.id) then
-					groupCounts["recentlyadded"].total = groupCounts["recentlyadded"].total + 1
-					if isOnline then
-						groupCounts["recentlyadded"].online = groupCounts["recentlyadded"].online + 1
-						table.insert(groupedFriends["recentlyadded"], friend)
-					end
-					assigned = true
-				end
-			end
-
-			-- Custom groups
 			for _, groupId in ipairs(customGroups) do
 				if groupsData[groupId] and not groupsData[groupId].builtin then
-					groupCounts[groupId].total = groupCounts[groupId].total + 1
-					if isOnline then
-						groupCounts[groupId].online = groupCounts[groupId].online + 1
-						table.insert(groupedFriends[groupId], friend)
-					end
-					assigned = true
+					PlaceInGroup(groupId)
 				end
 			end
 
-			-- Fallback: No Group
-			if not assigned then
-				if groupCounts["nogroup"] then
-					groupCounts["nogroup"].total = groupCounts["nogroup"].total + 1
-					if isOnline then
-						groupCounts["nogroup"].online = groupCounts["nogroup"].online + 1
-						table.insert(groupedFriends["nogroup"], friend)
+			if tagGroupMode and roster:PassesDynamicTagGroupFilter(friend, tagGroupMode) then
+				for _, tag in ipairs(friendTags:GetTagsForFriend(friend, "broker")) do
+					local groupId = tagGroupIds[tag.id]
+					if groupId then
+						PlaceInGroup(groupId)
+						if prioritizeTags then break end
 					end
 				end
 			end
+
+			if not assigned then PlaceInGroup("nogroup") end
 		end
 
 		if sample then
@@ -2271,7 +2451,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 			end
 		end
 
-		-- Apply current filter (to online friends only)
+		-- Apply the roster filter and the shared tag selections.
 		local currentFilter = settings and settings.quickFilter or "all"
 		local Registry = GetFilterSortRegistry()
 		if Registry and Registry.NormalizeQuickFilterId then
@@ -2279,7 +2459,8 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		end
 		local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
 		local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or IsForeverFilter(currentFilter))
-		if currentFilter ~= "all" then
+		local tagFilter = not sample and not previewData and GetBrokerTagFilter()
+		if currentFilter ~= "all" or tagFilter then
 			for groupId, groupFriends in pairs(groupedFriends) do
 				local filteredFriends = {}
 				for _, friend in ipairs(groupFriends) do
@@ -2287,10 +2468,10 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 
 					if useRegistryFilter and Registry and Registry.EvaluateQuickFilter then
 						include = Registry:EvaluateQuickFilter(currentFilter, friend)
-					elseif currentFilter == "online" then
+					elseif currentFilter == "all" or currentFilter == "online" then
 						include = true
 					elseif currentFilter == "offline" then
-						include = false
+						include = true
 					elseif currentFilter == "wowonline" then
 						include = friend.connected and (friend.type == "wow" or friend.client == BNET_CLIENT_WOW)
 					elseif currentFilter == "wow" then
@@ -2310,7 +2491,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 						end
 					end
 
-					if include then
+					if include and (not tagFilter or tagFilter(friend)) then
 						table.insert(filteredFriends, friend)
 					end
 				end
@@ -2322,8 +2503,9 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		local primarySort = settings and settings.primarySort or "status"
 		local secondarySort = settings and settings.secondarySort or "name"
 
-		local function CompareFriends(a, b)
-			local SortRegistry = GetFilterSortRegistry()
+		local compareFriends = GetRosterComparator(settings)
+		local SortRegistry = GetFilterSortRegistry()
+		local function CompareFallback(a, b)
 			if SortRegistry and SortRegistry.CompareFriends then
 				return SortRegistry:CompareFriends(a, b, primarySort, secondarySort)
 			end
@@ -2421,8 +2603,8 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		end
 
 		-- Sort each group
-		for groupId, groupFriends in pairs(groupedFriends) do
-			table.sort(groupFriends, CompareFriends)
+		for _, groupFriends in pairs(groupedFriends) do
+			table.sort(groupFriends, compareFriends or CompareFallback)
 		end
 
 		local displayedCount = 0
@@ -2430,7 +2612,8 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		local rowIconSize = BFL.BrokerUtils.GetBrokerRowIconSize(settings)
 
 		-- Helper to render a friend row
-		local function RenderFriendRow(friend, indentation)
+		local rulesetDimmedCells = {}
+		local function RenderFriendRow(friend, indentation, groupId)
 			local statusIcon = GetStatusIcon(friend.isAFK, friend.isDND, friend.isMobile)
 			local showClassIcons = settings and settings.brokerShowClassIcons
 			local classIcon = showClassIcons and GetClassIconForFriend(friend, rowIconSize) or ""
@@ -2456,7 +2639,12 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 			local isOppositeFaction = friend.factionName
 				and friend.factionName ~= playerFactionGroup
 				and friend.factionName ~= ""
-			local shouldGray = grayOtherFaction and isOppositeFaction
+			local grayRuleset
+			if BFL.IsForever and settings and settings.grayOtherRuleset then
+				local registry = GetFilterSortRegistry()
+				grayRuleset = registry and registry:IsOtherForeverRuleset(friend, friend.gameAccountInfo, sample and "PVP" or nil)
+			end
+			local shouldGray = grayRuleset or (grayOtherFaction and isOppositeFaction)
 
 			-- Read fontColorFriendName from settings as fallback color
 			local fontColorName = settings and settings.fontColorFriendName
@@ -2491,14 +2679,17 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 				if col.key == "Nickname" then
 					local nick = GetBrokerNickname(friend)
 					if nick ~= "" then
-						val = ApplyBrokerColumnColor(nick, "brokerNicknameColor", settings)
+						val = grayRuleset and (nameColor .. nick:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "|r")
+							or ApplyBrokerColumnColor(nick, "brokerNicknameColor", settings)
 						if val == nick then
 							val = defaultNameColor .. nick .. "|r"
 						end
 					end
 				elseif col.key == "Name" then
 					local statusPrefix = hasStatusColumn and "" or (statusIcon .. " ")
-					val = indentation .. statusPrefix .. nameColor .. GetFriendDisplayName(friend) .. "|r"
+					local displayName = GetFriendDisplayName(friend)
+					if grayRuleset then displayName = displayName:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
+					val = indentation .. statusPrefix .. nameColor .. displayName .. "|r"
 				elseif col.key == "Status" then
 					val = statusIcon
 				elseif col.key == "Level" then
@@ -2541,6 +2732,17 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 			end
 
 			local row = BFL.BrokerUtils.AddSettingsComparisonRow(tt, comparison, cellValues)
+			if grayRuleset then
+				for index, column in ipairs(activeColumns) do
+					if column.key == "Name" or column.key == "Character" or column.key == "Nickname" then
+						rulesetDimmedCells[#rulesetDimmedCells + 1] = row:GetCell(index)
+					end
+				end
+			end
+			if tagColumn and tagChips then
+				local tags = tagChips:GetVisibleRowTags(friend, tagRenderer, groupId, "broker")
+				SetBrokerTagCell(row, tagColumn, tags, comparison, numColumns, sampleTagSettings)
+			end
 
 			row:SetColor(0, 0, 0, 0)
 			if sample then
@@ -2577,8 +2779,22 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		end
 
 		-- Get sorted group IDs for consistent display order (INCLUDE "nogroup" now)
-		local sortedGroupIds = sample and sample.groupOrder
+		local groupOrder = sample and sample.groupOrder
 			or Groups and Groups.GetSortedGroupIds and Groups:GetSortedGroupIds(true) or {}
+		local sortedGroupIds = {}
+		local tagIndex, hasFallback = 1, false
+		for _, groupId in ipairs(groupOrder) do
+			local group = groupsData[groupId]
+			local order = group and group.order or 999
+			while dynamicGroups[tagIndex] and dynamicGroups[tagIndex].order < order do
+				sortedGroupIds[#sortedGroupIds + 1] = dynamicGroups[tagIndex].id
+				tagIndex = tagIndex + 1
+			end
+			sortedGroupIds[#sortedGroupIds + 1] = groupId
+			hasFallback = hasFallback or groupId == "nogroup"
+		end
+		for index = tagIndex, #dynamicGroups do sortedGroupIds[#sortedGroupIds + 1] = dynamicGroups[index].id end
+		if not hasFallback then sortedGroupIds[#sortedGroupIds + 1] = "nogroup" end
 
 		-- Display grouped friends (BNet and WoW) in configured order
 		for _, groupId in ipairs(sortedGroupIds) do
@@ -2618,7 +2834,8 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 						headerAlign = "LEFT"
 					end
 
-					local headerText = string.format("|c%s%s%s|r (%s)", colorCode, prefix, groupInfo.name, countText)
+					local headerName = GetBrokerTagGroupHeader(groupInfo, groupHeaderStyle)
+					local headerText = string.format("|c%s%s%s|r (%s)", colorCode, prefix, headerName, countText)
 					groupCell:SetColSpan(numColumns)
 					BFL.BrokerUtils.SizeSettingsComparisonCell(groupCell, comparison, numColumns, true)
 					groupCell:SetJustifyH(headerAlign)
@@ -2639,12 +2856,14 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 							local actualButton = button or (GetMouseButtonClicked and GetMouseButtonClicked())
 
 							if actualButton == "LeftButton" then
-								if Groups and Groups.Toggle then
+								if groupInfo.virtualTagGroup then
+									roster:ToggleGroup(groupId)
+								elseif Groups and Groups.Toggle then
 									Groups:Toggle(groupId)
-									if Broker.RefreshTooltip then
-										Broker:RefreshTooltip()
-									end
+								else
+									return
 								end
+								Broker:RefreshTooltip()
 							elseif actualButton == "RightButton" then
 								if BFL.OpenSimpleContextMenu then
 									local items = {
@@ -2653,7 +2872,15 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 											text = groupInfo.name,
 										},
 									}
-									if not groupInfo.builtin then
+									if groupInfo.virtualTagGroup then
+										items[#items + 1] = { text = L("FRIEND_TAGS_EDITOR_EDIT"), func = function() friendTags:OpenSettings(groupInfo.tagId) end }
+										items[#items + 1] = { text = L("MENU_CREATE_GROUP"), func = function() BFL.ShowInputDialog("BETTER_FRIENDLIST_CREATE_GROUP") end }
+										local count = roster:GetInvitableCount(groupId)
+										if count > 0 then
+											items[#items + 1] = { text = L("MENU_INVITE_GROUP") .. " (" .. count .. ")",
+												func = function() roster:InviteGroupToParty(groupId) end }
+										end
+									elseif not groupInfo.builtin then
 										table.insert(items, {
 											text = L("MENU_RENAME_GROUP"),
 											func = function()
@@ -2686,7 +2913,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 				-- Render friends ONLY if not collapsed
 				if groupInfo and not groupInfo.collapsed then
 					for _, friend in ipairs(groupFriends) do
-						RenderFriendRow(friend, comparison and not comparison.groups and "" or "    ")
+						RenderFriendRow(friend, comparison and not comparison.groups and "" or "    ", groupId)
 						displayedCount = displayedCount + 1
 						if comparison and displayedCount >= comparison.rowBudget then break end
 					end
@@ -2696,17 +2923,18 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		end
 
 		-- Footer (Empty check only)
-		if displayedCount == 0 then
+		if displayedCount == 0 and displayedGroupCount == 0 then
 			AddSeparator(tt)
 			local emptyRow = tt:AddRow()
 			local emptyCell = emptyRow:GetCell(1)
 			emptyCell:SetColSpan(numColumns)
 			BFL.BrokerUtils.SizeSettingsComparisonCell(emptyCell, comparison, numColumns, true)
 			emptyCell:SetJustifyH("CENTER")
-			emptyCell:SetText(C("gray", L("BROKER_NO_FRIENDS_ONLINE")))
+			emptyCell:SetText(C("gray", L((showOffline or tagFilter) and "AUTO_RAID_ASSIST_NO_RESULTS" or "BROKER_NO_FRIENDS_ONLINE")))
 		end
 
 		BFL.BrokerUtils.ApplyBrokerFontToTooltip(tt, nil, settings)
+		for _, cell in ipairs(rulesetDimmedCells) do cell:SetTextColor(0.5, 0.5, 0.5) end
 
 		local maxContentHeight = MAX_TOOLTIP_HEIGHT - footerHeight
 		tt:SetMaxHeight(maxContentHeight)
@@ -2851,6 +3079,10 @@ end
 -- Refresh the tooltip (re-create it) to update content
 function Broker:RefreshTooltip()
 	if LQT and tooltip and tooltip:IsShown() then
+		if tooltip.bflBrokerFilterOpen and BFL.BrokerUtils.IsMenuOpen() then
+			tooltip.bflBrokerFilterDirty = true
+			return
+		end
 		local anchor = tooltip.anchorFrame
 		local scrollOffset = self:GetTooltipScrollOffset(tooltip)
 
@@ -2873,6 +3105,15 @@ function Broker:RefreshTooltip()
 			self:RestoreTooltipScrollOffset(tooltip, scrollOffset)
 		end
 	end
+end
+
+function Broker:OnPrivacyChanged()
+	InvalidateFriendCountsCache()
+	if LQT and tooltip then
+		LQT:ReleaseTooltip(tooltip)
+		tooltip = nil
+	end
+	if StaticPopup_Hide then StaticPopup_Hide("BFL_BROKER_TAG_SEARCH") end
 end
 
 -- ========================================
@@ -2958,7 +3199,8 @@ function CreateDetailTooltip(cell, data)
 	end
 
 	local FriendTags = BFL:GetModule("FriendTags")
-	local tagText = FriendTags and FriendTags.GetBrokerTextForFriend and FriendTags:GetBrokerTextForFriend(data)
+	local tagText = FriendTags and FriendTags.GetBrokerTextForFriend and FriendTags:CanDisplayTags("tooltip")
+		and FriendTags:GetBrokerTextForFriend(data)
 	if tagText and tagText ~= "" then
 		tt2:AddLine(" ")
 		tt2:AddLine(C("ltblue", (BFL.L and BFL.L.FRIEND_TAGS_TOOLTIP_TITLE) or "Friend Tags"))

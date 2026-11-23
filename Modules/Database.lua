@@ -117,6 +117,7 @@ local defaults = {
 	showFactionIcons = false, -- Show faction icons next to character names (default: OFF)
 	showRealmName = false, -- Show realm name for cross-realm friends (default: OFF)
 	grayOtherFaction = false, -- Gray out friends from other faction (default: OFF)
+	grayOtherRuleset = false,
 	showMobileAsAFK = false, -- Show mobile friends with AFK status icon (default: OFF)
 	treatMobileAsOffline = false, -- Treat mobile friends as offline (display in Offline group) (default: OFF)
 	nameDisplayFormat = "%name%", -- LEGACY: Migrated to nameFormatPreset/nameFormatCustom
@@ -197,6 +198,7 @@ local defaults = {
 		chipFontFlags = "SLUG",
 		maxTooltipChips = 8,
 		enableDynamicTagGroups = false,
+		dynamicTagGroupFilter = "all",
 		prioritizeDynamicTagGroups = false,
 		dynamicTagGroupHeaderStyle = "standard",
 		includeCustomTagsInSearch = true,
@@ -261,6 +263,7 @@ local defaults = {
 		ellesmereui = {},
 	}, -- Per-theme broker tooltip background overrides; nil values inherit theme defaults
 	brokerShowColStatus = false, -- Column: Status icon (default: OFF)
+	brokerShowColTags = true,
 	brokerGroupHeaderAlign = "LEFT", -- Friends Broker group header alignment: LEFT/CENTER/RIGHT
 	-- Guild Data Broker Settings
 	guildBrokerEnabled = false, -- Enable Guild Data Broker plugin (default: OFF)
@@ -371,7 +374,7 @@ end
 local LEGACY_V2_PROFILE_KEYS = {
 	"compactMode", "theme", "darkThemeSettings", "customTheme", "enableElvUISkin", "fontSize", "windowScale",
 	"hideMaxLevel", "accordionGroups", "showFavoritesGroup", "colorClassNames", "hideEmptyGroups", "headerCountFormat",
-	"groupHeaderAlign", "showGroupArrow", "groupArrowAlign", "showFactionIcons", "showRealmName", "grayOtherFaction",
+	"groupHeaderAlign", "showGroupArrow", "groupArrowAlign", "showFactionIcons", "showRealmName", "grayOtherFaction", "grayOtherRuleset",
 	"showMobileAsAFK", "treatMobileAsOffline", "nameDisplayFormat", "enableInGameGroup", "inGameGroupMode",
 	"fontFriendName", "fontSizeFriendName", "fontOutlineFriendName", "fontShadowFriendName", "fontColorFriendName",
 	"fontFriendInfo", "fontSizeFriendInfo", "fontOutlineFriendInfo", "fontShadowFriendInfo", "fontColorFriendInfo",
@@ -1258,41 +1261,37 @@ function DB:Initialize()
 		lib.RegisterCallback(self, "Name_Removed", function(_, name)
 			self:SetNicknameInternal(name, nil)
 		end)
+
+		-- BattleTag writes can succeed without an Add/Update callback when no characters are linked.
+		if type(hooksecurefunc) == "function" and self.customNamesHooked ~= lib then
+			hooksecurefunc(lib, "Set", function(name, nickname)
+				if CustomNamesLib ~= lib or (BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(nickname))) then
+					return
+				end
+				-- BattleTag removals already emit Name_Removed, even without linked characters.
+				if type(name) ~= "string" or not name:match("^[^#%s]+#%d+$") or type(nickname) ~= "string" or nickname == "" then
+					return
+				end
+				local ok, stored = pcall(lib.Get, name)
+				if ok and not (BFL.IsSecret and BFL:IsSecret(stored)) and stored == nickname and stored ~= name then
+					self:SetNicknameInternal(name, stored)
+				end
+			end)
+			self.customNamesHooked = lib
+		end
 	else
 		-- BFL:DebugPrint("Database: CustomNames Library NOT detected.")
 	end
 end
 
 function DB:GetLibKey(friendUID)
-	if not friendUID then
-		return nil
+	if (BFL.IsSecret and BFL:IsSecret(friendUID)) or type(friendUID) ~= "string" or friendUID == "" then return end
+	local tag = friendUID:match("^bnet_(.*)$")
+	if tag then
+		-- Numeric account IDs belong to the current session and can be reassigned.
+		return tag:match("^[^#%s]+#%d+$")
 	end
-
-	if friendUID:match("^wow_") then
-		-- WoW: Strip "wow_" prefix for Lib (Name-Realm)
-		return friendUID:gsub("^wow_", "")
-	elseif friendUID:match("^bnet_%d+") then
-		-- BNet ID: Try to resolve to BattleTag for Lib
-		local bnetID = tonumber(friendUID:match("^bnet_(%d+)"))
-		if bnetID then
-			local accountInfo = C_BattleNet.GetAccountInfoByID(bnetID)
-			if accountInfo and accountInfo.battleTag then
-				return accountInfo.battleTag
-			end
-		end
-		-- CRITICAL: If resolution fails, return nil (not the ID!)
-		-- This prevents storing nicknames under inconsistent keys
-		return nil
-	elseif friendUID:match("^bnet_") then
-		-- BNet Tag: Strip "bnet_" prefix
-		return friendUID:gsub("^bnet_", "")
-	elseif friendUID:match("#") then
-		-- Already a BattleTag
-		return friendUID
-	end
-
-	-- Fallback: Assume it's a WoW name without prefix (shouldn't happen with BFL UIDs but safe to return)
-	return friendUID
+	return (friendUID:gsub("^wow_", ""))
 end
 
 -- Internal setter for DB only (used by Sync and SetNickname)
@@ -1318,7 +1317,7 @@ end
 
 -- Callback handler for CustomNames Sync
 function DB:SetNicknameInternal(name, nickname)
-	if not name then
+	if (BFL.IsSecret and (BFL:IsSecret(name) or BFL:IsSecret(nickname))) or type(name) ~= "string" or name == "" then
 		return
 	end
 	-- BFL:DebugPrint("DB:SetNicknameInternal (Sync) for " .. tostring(name) .. " to " .. tostring(nickname))
@@ -1331,6 +1330,7 @@ function DB:SetNicknameInternal(name, nickname)
 	else
 		-- It's a BattleTag -> Use as is (matches our BNet storage strategy)
 		dbKey = name
+		if BetterFriendlistDB.nicknames then BetterFriendlistDB.nicknames["bnet_" .. name] = nil end
 	end
 
 	self:SetNicknameInternalDB(dbKey, nickname)
@@ -1347,9 +1347,14 @@ function DB:SetNicknameInternal(name, nickname)
 		end
 	end
 
-	-- Force UI Refresh to show new nickname immediately
-	if BFL and BFL.ForceRefreshFriendsList then
+	if BFL.ScheduleFriendsListRefresh then
+		BFL:ScheduleFriendsListRefresh("customnames")
+	elseif BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
+	end
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then
+		broker:ScheduleObservedTooltipRefresh()
 	end
 end
 
@@ -1546,7 +1551,10 @@ end
 
 function DB:ClearTitleFriendGroupKeys()
 	titleGroupKeysReady = false
-	if next(titleTokens) then BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1 end
+	if next(titleTokens) then
+		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+		BFL.NicknameCacheVersion = (BFL.NicknameCacheVersion or 0) + 1
+	end
 	titleTokens = {}
 end
 
@@ -1580,7 +1588,10 @@ function DB:RefreshTitleFriendGroupKeys(accounts)
 	end
 	titleTokens = keys
 	titleGroupKeysReady = true
-	if changed then BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1 end
+	if changed then
+		BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+		BFL.NicknameCacheVersion = (BFL.NicknameCacheVersion or 0) + 1
+	end
 end
 
 function DB:GetVerifiedTitleFriendToken(uid, fresh)
@@ -1768,9 +1779,22 @@ function DB:GetAllFriendUIDs()
 	return uids
 end
 
+function DB:GetNicknameKey(friendUID, fresh)
+	local libKey = self:GetLibKey(friendUID)
+	if libKey and libKey ~= "" then
+		local key = friendUID:match("^bnet_") and libKey or friendUID
+		return key, libKey
+	end
+	if not (BFL.IsSecret and BFL:IsSecret(friendUID)) and type(friendUID) == "string"
+		and BFL.IsForever and friendUID:match("^bnet_%d+$")
+	then
+		return GetFriendGroupKey(friendUID, fresh)
+	end
+end
+
 -- Get nickname
 function DB:GetNickname(friendUID)
-	if not friendUID then
+	if (BFL.IsSecret and BFL:IsSecret(friendUID)) or type(friendUID) ~= "string" then
 		return nil
 	end
 	local PreviewMode = BFL and BFL:GetModule("PreviewMode")
@@ -1781,43 +1805,29 @@ function DB:GetNickname(friendUID)
 		end
 	end
 
-	local libKey = self:GetLibKey(friendUID)
+	local dbKey, libKey = self:GetNicknameKey(friendUID)
 
 	-- 1. Try CustomNames Lib (Optimized Cache)
 	if CustomNamesLib and libKey then
 		local customName = CustomNamesLib.Get(libKey)
-		if customName and customName ~= libKey then
+		if not (BFL.IsSecret and BFL:IsSecret(customName)) and type(customName) == "string"
+			and customName ~= "" and customName ~= libKey
+		then
 			return customName
 		end
 	end
 
-	-- 2. Fallback to Internal DB
-	-- For WoW friends, we use the original UID (wow_Name-Realm) as key
-	-- For BNet friends, we prefer BattleTag (libKey) but fallback to friendUID for legacy support
-
-	local dbKey = friendUID
-	if friendUID:match("^bnet_") and libKey then
-		dbKey = libKey -- Use BattleTag for BNet storage
+	local nicknames = BetterFriendlistDB.nicknames
+	if dbKey and nicknames then
+		-- A historical UID with the full BattleTag is safe to read.
+		return nicknames[dbKey] or (libKey and nicknames[friendUID]) or nil
 	end
-
-	local nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[dbKey]
-
-	-- FALLBACK: If not found with primary key and this is a BNet friend, try friendUID
-	-- (for backwards compatibility with nicknames stored under "bnet_12345" format)
-	if not nickname and friendUID:match("^bnet_") and dbKey ~= friendUID then
-		nickname = BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID]
-	end
-
-	return nickname
 end
 
 -- Set nickname
-function DB:SetNickname(friendUID, nickname)
-	if not friendUID then
-		return
-	end
-
-	local libKey = self:GetLibKey(friendUID)
+function DB:SetNickname(friendUID, nickname, expectedKey)
+	local dbKey, libKey = self:GetNicknameKey(friendUID, true)
+	if not dbKey or (expectedKey and dbKey ~= expectedKey) then return false end
 
 	-- 1. Update CustomNames Lib
 	if CustomNamesLib and libKey then
@@ -1828,22 +1838,14 @@ function DB:SetNickname(friendUID, nickname)
 		end
 	end
 
-	-- 2. Update Internal DB
-	-- Determine DB Key (same logic as GetNickname)
-	local dbKey = friendUID
-	if friendUID:match("^bnet_") and libKey then
-		dbKey = libKey
-	end
-
-	-- CLEANUP: If this is a BNet friend and we're using libKey as dbKey,
-	-- remove any legacy entry under friendUID to avoid duplicates
-	if friendUID:match("^bnet_") and libKey and dbKey ~= friendUID then
-		if BetterFriendlistDB.nicknames and BetterFriendlistDB.nicknames[friendUID] then
-			BetterFriendlistDB.nicknames[friendUID] = nil
-		end
+	if libKey and dbKey ~= friendUID and BetterFriendlistDB.nicknames then
+		BetterFriendlistDB.nicknames[friendUID] = nil
 	end
 
 	self:SetNicknameInternalDB(dbKey, nickname)
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
+	return true
 end
 
 -- Get guild member nickname (keyed by "Name-Realm")

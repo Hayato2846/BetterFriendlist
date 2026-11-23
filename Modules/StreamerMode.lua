@@ -44,8 +44,13 @@ function StreamerMode:Initialize()
 end
 
 function StreamerMode:Toggle()
+	local wasActive = self:IsActive()
 	BetterFriendlistDB.streamerModeActive = not BetterFriendlistDB.streamerModeActive
 	self:UpdateState()
+	if self:IsActive() ~= wasActive then
+		local broker = BFL:GetModule("Broker")
+		if broker and broker.OnPrivacyChanged then broker:OnPrivacyChanged() end
+	end
 	local review = BFL:GetModule("LegacySettingsReview")
 	if review then
 		review:QueueSample()
@@ -224,6 +229,8 @@ function StreamerMode:UpdateState()
 		-- Auto-disable Streamer Mode if button is hidden
 		if BetterFriendlistDB.streamerModeActive then
 			BetterFriendlistDB.streamerModeActive = false
+			local broker = BFL:GetModule("Broker")
+			if broker and broker.OnPrivacyChanged then broker:OnPrivacyChanged() end
 			if friendMenu then friendMenu:RefreshClickRouting() end
 			-- Restore original header if it was changed
 			if

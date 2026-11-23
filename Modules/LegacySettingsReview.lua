@@ -1742,13 +1742,21 @@ local function BuildTagGroupComparison(renderer, entry, tags, settings)
 	local first, second = sampleTags[1], sampleTags[2]
 	entry.friend.settingsTagDefinitions = { first, second }
 	if not settings.enableDynamicTagGroups then return { entry } end
+	if not renderer:PassesDynamicTagGroupFilter(entry.friend, settings.dynamicTagGroupFilter) then
+		local row = {}
+		for key, value in pairs(entry) do row[key] = value end
+		row.groupId = "nogroup"
+		return { { groupId = "nogroup", name = Text("GROUP_NO_GROUP"), count = 1,
+			onlineCount = entry.friend.connected and 1 or 0, totalCount = 1, collapsed = false,
+			exampleFriends = { row } } }
+	end
 
 	local groups, groupByTag = {}, {}
 	for _, tag in ipairs({ first, second }) do
 		local id = "tag:" .. tag.id
 		groupByTag[tag.id] = id
 		groups[id] = { groupId = id, name = tag.name, tagProfile = tag.chipProfile, virtualTagGroup = true,
-			count = 1, onlineCount = 1, totalCount = 1, collapsed = false }
+			count = 1, onlineCount = entry.friend.connected and 1 or 0, totalCount = 1, collapsed = false }
 	end
 	local matching = {}
 	renderer:AppendDynamicTagGroups(entry.friend.settingsTagDefinitions, groupByTag, groups, {}, matching,
@@ -1911,7 +1919,7 @@ function Review:RenderComparisonLane(lane, guide, db, value, width, top)
 	if filterExample then PrepareFilterSamples(friends) end
 	local data = { friends[guide.friend or 1] }
 	if guide.tagGroups then
-		data = BuildTagGroupComparison(renderer, friends[2], tags, renderer.settingsSampleTagSettings)
+		data = BuildTagGroupComparison(renderer, friends[guide.friend or 2], tags, renderer.settingsSampleTagSettings)
 	elseif guide.filterEditor then
 		local registry = BFL:GetModule("FilterSortRegistry")
 		local secondary = db:Get("secondarySort", registry.FALLBACK_SECONDARY_SORT)
@@ -3506,7 +3514,7 @@ function Review:ShowResults(query)
 						end
 						local context = sectionName and section ~= key and sectionName or ""
 						local terms = Normalize(table.concat({ label, localizedDescription, alias, context }, " "))
-						local ruleset = key == "SETTINGS_SHOW_RULESET_NAME" or key == "BROKER_COLUMN_RULESET"
+						local ruleset = key == "SETTINGS_SHOW_RULESET_NAME" or key == "SETTINGS_GRAY_OTHER_RULESETS" or key == "BROKER_COLUMN_RULESET"
 							or key == "BROKER_SETTINGS_RULESET_COLOR"
 						local realm = key == "SETTINGS_SHOW_REALM_NAME" or key == "BROKER_COLUMN_REALM"
 							or key == "BROKER_SETTINGS_REALM_COLOR"

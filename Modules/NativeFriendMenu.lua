@@ -781,6 +781,10 @@ function FriendMenu:GetMenuFriend(context, isBNet)
 	if isBNet and friend.type == "bnet" then
 		local id = context.bnetIDAccount
 		if BFL:IsSecret(id) or (type(id) ~= "number" and type(id) ~= "string") then return nil, nil, true end
+		local account = friends:GetReadableInviteField(context, "accountInfo")
+		local tag = friends:GetReadableInviteField(context, "battleTag")
+			or (account and friends:GetReadableInviteField(account, "battleTag"))
+		if SafeName(tag) and tag ~= friends:GetReadableInviteField(friend, "battleTag") then return nil, nil, true end
 		if tonumber(id) == friend.bnetAccountID then return row, friend end
 	elseif not isBNet and friend.type == "wow" then
 		local name = context.name

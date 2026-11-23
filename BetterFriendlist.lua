@@ -2706,7 +2706,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end)
 			end
 
-			local function AddGroupsToFriendMenu(owner, rootDescription, contextData, verifiedFriend)
+			local function AddGroupsToFriendMenu(owner, rootDescription, contextData, verifiedFriend, isBNetMenu)
 				if not contextData or not rootDescription or not rootDescription.CreateButton then
 					return
 				end
@@ -2730,22 +2730,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				local contextUID = BFL_SafeContextValue(contextData, "uid")
 				local streamerDisplayName = BFL_SafeContextValue(contextData, "bfl_streamerDisplayName")
 
-				if not bnetIDAccount then
-					local accountInfo = BFL_SafeContextValue(contextData, "accountInfo")
-					if accountInfo then
-						bnetIDAccount = BFL_NumberOrNil(BFL_SafeFieldValue(accountInfo, "bnetAccountID"))
-					end
-				end
+				local accountInfo = BFL_SafeContextValue(contextData, "accountInfo")
+				bnetIDAccount = bnetIDAccount or BFL_NumberOrNil(BFL_SafeFieldValue(accountInfo, "bnetAccountID"))
+				battleTag = battleTag or BFL_SafeFieldValue(accountInfo, "battleTag")
+				battleTag = type(battleTag) == "string" and battleTag:match("^[^#%s]+#%d+$") or nil
+				isBNetMenu = isBNetMenu or bnetIDAccount ~= nil or battleTag ~= nil
 
 				local DB = BFL:GetModule("DB")
-				if contextUID and DB and #DB:GetFriendGroups(contextUID) > 0 then
-					contextUID = tostring(contextUID)
-				else
-					contextUID = nil
-				end
+				contextUID = isOwnMenu and type(contextUID) == "string" and contextUID or nil
 
 				if
-					not bnetIDAccount
+					not verifiedFriend
+					and not bnetIDAccount
 					and not battleTag
 					and not contextName
 					and not contextIndex
@@ -2762,40 +2758,45 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				-- Prefer BFL's already-cached FriendsList data. This is the only resolver used by
 				-- native secret-value menus.
 				local FriendsList = GetFriendsList()
-				if FriendsList and FriendsList.friendsList then
-					if verifiedFriend then
-						friendUID = FriendsList:GetFriendUID(verifiedFriend)
-					elseif contextUID then
-						for _, friend in ipairs(FriendsList.friendsList) do
-							local cachedUID = friend.uid or FriendsList:GetFriendUID(friend)
-							if cachedUID == contextUID then
-								friendData = friend
-								friendUID = cachedUID
-								break
-							end
-						end
+				if FriendsList and verifiedFriend then
+					friendUID = FriendsList:GetFriendUID(verifiedFriend)
+				elseif FriendsList and FriendsList.friendsList then
+					if contextUID and not isBNetMenu and FriendsList.ResolveFriendByUID then
+						friendData = FriendsList:ResolveFriendByUID(contextUID)
+						if friendData then friendUID = contextUID end
 					end
 
-					if not friendUID and (bnetIDAccount or battleTag or contextGUID) then
+					if not friendUID and isBNetMenu then
 						for _, friend in ipairs(FriendsList.friendsList) do
-							local idMatch = bnetIDAccount and friend.type == "bnet" and friend.bnetAccountID == bnetIDAccount
-							local tagMatch = battleTag
-								and battleTag ~= ""
-								and friend.type == "bnet"
-								and friend.battleTag == battleTag
+							if friend.type == "bnet" then
+								local cachedID = BFL_NumberOrNil(BFL_SafeFieldValue(friend, "bnetAccountID"))
+								local cachedTag = BFL_SafeFieldValue(friend, "battleTag")
+								local idMatches = bnetIDAccount and bnetIDAccount == cachedID
+								local tagMatches = battleTag and battleTag == cachedTag
+								local idConflicts = bnetIDAccount and cachedID and not idMatches
+								local tagConflicts = battleTag and type(cachedTag) == "string" and cachedTag ~= "" and not tagMatches
+								if (idMatches or tagMatches) and not idConflicts and not tagConflicts then
+									if friendData then return end -- An ambiguous match must not pick the first account.
+									friendData = friend
+									friendUID = FriendsList:GetFriendUID(friend)
+								end
+							end
+						end
+					elseif not friendUID and contextGUID then
+						for _, friend in ipairs(FriendsList.friendsList) do
 							local friendGUID = friend.gameAccountInfo and friend.gameAccountInfo.playerGuid
 							local guidMatch = contextGUID
 								and friend.type == "bnet"
 								and not BFL:IsSecret(friendGUID)
 								and friendGUID == contextGUID
-							if idMatch or tagMatch or guidMatch then
+							if guidMatch then
 								friendData = friend
 								friendUID = FriendsList:GetFriendUID(friend)
 								break
 							end
 						end
 					end
-					if not friendUID and (contextIndex or contextFriendsList or contextName or contextGUID) then
+					if not friendUID and not isBNetMenu and (contextIndex or contextFriendsList or contextName or contextGUID) then
 						local resolvedIndex = contextIndex or contextFriendsList
 						if contextName and FriendsList.ResolveWoWFriendIndex then
 							resolvedIndex = FriendsList:ResolveWoWFriendIndex(contextName) or resolvedIndex
@@ -2826,37 +2827,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- BFL-created menus may still use API fallbacks. Native secret-value menus must not.
 				if not friendUID and allowApiFallbacks then
-					if bnetIDAccount then
-						local accountInfo
-						if C_BattleNet and C_BattleNet.GetAccountInfoByID then
-							accountInfo = C_BattleNet.GetAccountInfoByID(bnetIDAccount)
-						end
-						if accountInfo and accountInfo.battleTag and accountInfo.isFriend then
-							friendUID = "bnet_" .. accountInfo.battleTag
-						end
-
-						if not friendUID and battleTag and battleTag ~= "" then
-							if accountInfo and accountInfo.isFriend then
-								friendUID = "bnet_" .. battleTag
-							end
-						end
-
-						if
-							not friendUID
-							and BNGetNumFriends
-							and (not BFL.IsBattleNetFriendsListEnabled or BFL.IsBattleNetFriendsListEnabled())
-						then
-							local numBNet = BNGetNumFriends()
-							for i = 1, numBNet do
-								local bnInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
-								if bnInfo and bnInfo.bnetAccountID == bnetIDAccount then
-									if bnInfo.battleTag and bnInfo.battleTag ~= "" then
-										friendUID = "bnet_" .. bnInfo.battleTag
-									else
-										friendUID = "bnet_" .. tostring(bnetIDAccount)
-									end
-									break
-								end
+					if isBNetMenu then
+						local getAccount = C_BattleNet and C_BattleNet.GetAccountInfoByID
+						if bnetIDAccount and getAccount then
+							local liveAccount = getAccount(bnetIDAccount)
+							local liveTag = BFL_SafeFieldValue(liveAccount, "battleTag")
+							if BFL_SafeFieldValue(liveAccount, "isFriend") == true
+								and type(liveTag) == "string" and liveTag:match("^[^#%s]+#%d+$")
+								and (not battleTag or liveTag == battleTag)
+							then
+								friendUID = "bnet_" .. liveTag
 							end
 						end
 					elseif type(contextName) == "string" and contextName ~= "" then
@@ -2937,15 +2917,21 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				rootDescription:CreateTitle(L.MENU_TITLE)
 
 				local menuDisplayName = BFL_FirstSafeText(streamerDisplayName, contextName, battleTag)
-				rootDescription:CreateButton(L.MENU_SET_NICKNAME, function()
-					local DB = BFL:GetModule("DB")
-					local currentNickname = DB and DB:GetNickname(friendUID)
-
-					StaticPopup_Show("BETTER_FRIENDLIST_SET_NICKNAME", menuDisplayName or "Friend", nil, {
-						uid = friendUID,
-						nickname = currentNickname,
-					})
-				end)
+				local nicknameKey = DB and DB:GetNicknameKey(friendUID, true)
+				if nicknameKey and (expectedGroupKey == nil or nicknameKey == expectedGroupKey) then
+					rootDescription:CreateButton(L.MENU_SET_NICKNAME, function()
+						local nicknameLabel = menuDisplayName
+						local streamer = BFL.StreamerMode
+						if streamer and streamer:IsActive() then
+							nicknameLabel = streamerDisplayName or streamer:GetFriendMenuLabel(friendData) or L.UNKNOWN
+						end
+						StaticPopup_Show("BETTER_FRIENDLIST_SET_NICKNAME", nicknameLabel or "Friend", nil, {
+							uid = friendUID,
+							key = nicknameKey,
+							nickname = DB:GetNickname(friendUID),
+						})
+					end)
+				end
 
 				local FriendTags = BFL:GetModule("FriendTags")
 				local tagFriendData
@@ -4150,7 +4136,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					end
 
 					if isFriendMenu then
-						AddGroupsToFriendMenu(ownerRegion, rootDescription, contextData, verifiedFriend)
+						AddGroupsToFriendMenu(ownerRegion, rootDescription, contextData, verifiedFriend, isBNet)
 					end
 
 					if MenuBridge and MenuBridge.PopulateMenu then
@@ -4305,13 +4291,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				BFL_AddReportButtons(missing, context, isBNet, false)
 				if not isBNet then BFL_AddPvpReportAfkButton(missing, context) end
 				BFL_ReplaceCopyNameButton(row, root, context, nil, true)
-				AddGroupsToFriendMenu(row, root, context, friend)
+				AddGroupsToFriendMenu(row, root, context, friend, isBNet)
 
 				local bridge = BFL:GetModule("MenuBridge")
 				if bridge then
 					local menuType = isBNet and "BN_FRIEND" or "FRIEND"
 					if context.isOffline then menuType = menuType .. "_OFFLINE" end
-					bridge:PopulateMenu(row, root, context, menuType, tag)
+					bridge:PopulateMenu(row, root, context, menuType, tag, nativeContext)
 				end
 			end
 
@@ -4370,10 +4356,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 								BFL_AddNativeFriendMenu(root, menuTag, row, friend, isBNet, context)
 								return
 							end
-							AddGroupsToFriendMenu(owner, root, context)
+							AddGroupsToFriendMenu(owner, root, context, nil, isBNet)
 						end)
 					else
-						Menu.ModifyMenu(tag, AddGroupsToFriendMenu)
+						Menu.ModifyMenu(tag, function(owner, root, context)
+							AddGroupsToFriendMenu(owner, root, context, nil, isBNet)
+						end)
 					end
 				end
 			end

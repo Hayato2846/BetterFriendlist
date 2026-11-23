@@ -39,8 +39,7 @@ function MenuSystem:Initialize()
 		OnAccept = function(self, data)
 			local text = self.EditBox:GetText()
 			local DB = BFL:GetModule("DB")
-			if DB then
-				DB:SetNickname(data.uid, text)
+			if DB and DB:SetNickname(data.uid, text, data.key) ~= false then
 				BFL:ForceRefreshFriendsList()
 				local hints = BFL:GetModule("NicknameHints")
 				if hints then hints:OnNicknameSaved(text, data.nickname, "friends", data.uid) end
@@ -49,8 +48,7 @@ function MenuSystem:Initialize()
 		EditBoxOnEnterPressed = function(self, data)
 			local text = self:GetText()
 			local DB = BFL:GetModule("DB")
-			if DB then
-				DB:SetNickname(data.uid, text)
+			if DB and DB:SetNickname(data.uid, text, data.key) ~= false then
 				BFL:ForceRefreshFriendsList()
 				local hints = BFL:GetModule("NicknameHints")
 				if hints then hints:OnNicknameSaved(text, data.nickname, "friends", data.uid) end

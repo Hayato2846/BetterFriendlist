@@ -1687,6 +1687,7 @@ function Settings:DoReset()
 	DB:Set("showFactionBg", false)
 	DB:Set("showRealmName", false)
 	DB:Set("grayOtherFaction", false)
+	DB:Set("grayOtherRuleset", false)
 	DB:Set("showMobileAsAFK", false)
 	DB:Set("treatMobileAsOffline", false) -- NEW: Feature Request
 	DB:Set("showNotesAsName", false) -- NEW: Feature Request
@@ -4622,6 +4623,23 @@ function Settings:RefreshGeneralTab()
 	row2.BFL_FriendRowSection = "identity"
 	table.insert(allFrames, row2)
 
+	if BFL.IsForever then
+		local rulesetRow = Components:CreateCheckbox(tab, {
+			label = L.SETTINGS_GRAY_OTHER_RULESETS,
+			initialValue = DB:Get("grayOtherRuleset", false),
+			callback = function(checked)
+				DB:Set("grayOtherRuleset", checked)
+				BFL:ForceRefreshFriendsList()
+				local broker = BFL:GetModule("Broker")
+				if broker then broker:ScheduleObservedTooltipRefresh() end
+			end,
+			tooltipTitle = L.SETTINGS_GRAY_OTHER_RULESETS,
+			tooltipDesc = L.SETTINGS_GRAY_OTHER_RULESETS_DESC,
+		})
+		rulesetRow.BFL_FriendRowSection = "identity"
+		table.insert(allFrames, rulesetRow)
+	end
+
 	-- Row 2b: Multi-Account Badge
 	local row2b = Components:CreateCheckbox(tab, {
 		label = L.SETTINGS_SHOW_MULTI_ACCOUNT_BADGE,
@@ -5937,6 +5955,18 @@ function Settings:RefreshFriendTagsTab()
 		tooltipTitle = L.FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS,
 		tooltipDesc = L.FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS_DESC,
 	}, nil))
+
+	local groupFilter = Components:CreateDropdown(tab, L.FRIEND_TAGS_DYNAMIC_GROUP_FILTER, {
+		labels = { L.FRIEND_TAGS_DYNAMIC_GROUP_FILTER_ALL, L.FRIEND_TAGS_DYNAMIC_GROUP_FILTER_SAME_FLAVOR },
+		values = { "all", "same_flavor_online" },
+	}, function(value)
+		return FriendTags:GetSetting("dynamicTagGroupFilter", "all") == value
+	end, function(value)
+		FriendTags:SetSetting("dynamicTagGroupFilter", value, RefreshFriendTagsSettings)
+	end)
+	if not FriendTags:GetSetting("enableDynamicTagGroups", false) then DisableLegacyDropdown(groupFilter) end
+	groupFilter:SetTooltip(L.FRIEND_TAGS_DYNAMIC_GROUP_FILTER, L.FRIEND_TAGS_DYNAMIC_GROUP_FILTER_DESC)
+	table.insert(allFrames, groupFilter)
 
 	local headerStyleDropdown = Components:CreateDropdown(
 		tab,
@@ -9982,6 +10012,7 @@ function Settings:RefreshBrokerTab()
 			{ key = "Zone", label = L.BROKER_COLUMN_ZONE, default = true },
 			{ key = "Realm", label = BFL.IsForever and L.BROKER_COLUMN_RULESET or L.BROKER_COLUMN_REALM, default = true },
 			{ key = "Notes", label = L.BROKER_COLUMN_NOTES, default = true },
+			{ key = "Tags", label = L.FRIEND_TAGS_SETTINGS_TAG_LIST, default = true },
 		}
 
 		local currentOrder = DB:Get("brokerColumnOrder")

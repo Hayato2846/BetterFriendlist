@@ -11,11 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### All WoW Versions
 
+#### Added
+- **Nickname Sorting** - Sort by nickname first or use it to break ties in the friends list and detailed broker tooltip.
+- **Broker Friend Tags** - The detailed tooltip can show a Tags column and the same tag groups as your friends list. Use the filter menu to pick or search for tags. Right-click a friend to manage their tags or a tag group to edit it.
+- **Dynamic Tag Groups** - You can limit tag groups to online friends playing your version of WoW or using only the Battle.net app. Your other friends keep their tags and still appear in the friends list.
+
 #### Fixed
+- **Nicknames** - Editing a nickname stays with the friend you picked, even if two friends have the same display name. Changes made in CustomNames show up in the friends list and broker tooltip, including for BattleTags with no linked characters.
 - **Drag and Drop** - Letting go over a friend row no longer moves the friend you were dragging.
 - **Friends List** - Fixed cases where a list update could make you whisper, invite, favorite, or remove the wrong friend.
 
+### WoW Retail & WoW Forever
+
+#### Fixed
+- **CustomNames** - The CustomNames option shows up in the right-click menu for Battle.net friends when Menu Bridge is enabled.
+
 ### WoW Forever
+
+#### Added
+- **Gray Out Other Rulesets** - Dim online friends playing on a different Forever ruleset in the friends list and detailed broker tooltip.
+- **Ruleset Sorting** - Sort by Forever ruleset first or use it to break ties in the friends list and detailed broker tooltip.
 
 #### Fixed
 - **Title Friend Groups** - Fixed a bug that could leave you stuck with the "link isn't ready" message when trying to put a Title Friend in a group.

@@ -86,9 +86,15 @@ check(next(store.backups) ~= nil and store.notes[legacyToken] == "old text", "ba
 check(#db:GetFriendGroups("bnet_150") == 0 and db:GetFriendGroups("bnet_82")[1] == "group2", "keep only marker-backed assignments")
 titleNotes:Process()
 check(writes == 1, "an in-memory backup cannot authorize replacement")
+env.BetterFriendlistDB.nicknames = { bnet_77 = "Unverified previous-session nickname" }
 local blankToken = token(blank)
 check(db:AddFriendToGroup("bnet_77", "group1"), "assign a group by ID")
 check(env.BetterFriendlistDB.friendGroups["bnet_title_" .. blankToken][1] == "group1", "persist the group against the marker")
+check(db:GetNickname("bnet_77") == nil, "a session-only ID cannot supply an old nickname")
+check(db:SetNickname("bnet_unknown", "Wrong target") == false, "an unknown contact cannot receive a shared nickname")
+local blankNicknameKey = db:GetNicknameKey("bnet_77")
+check(db:SetNickname("bnet_77", "Verified nickname", blankNicknameKey), "save the nickname with the same unique marker")
+check(db:GetNickname("bnet_77") == "Verified nickname", "the verified Title Friend displays its nickname")
 
 titleNotes = relog()
 long.bnetAccountID, blank.bnetAccountID = 199, 150
@@ -108,6 +114,12 @@ titleNotes = relog()
 check(notes.GetBNetDisplayNote(long) == fullNote, "recover exact original text from the previously saved backup")
 titleNotes:Process()
 check(db:GetFriendGroups("bnet_150")[1] == "group1" and #db:GetFriendGroups("bnet_199") == 0, "new session IDs don't change group identity")
+check(db:GetNickname("bnet_150") == "Verified nickname" and db:GetNickname("bnet_199") == nil,
+	"the nickname follows the Title Friend across session ID changes")
+check(db:SetNickname("bnet_199", "Wrong contact", blankNicknameKey) == false,
+	"confirming the edit cannot overwrite a different Title Friend's nickname")
+check(env.BetterFriendlistDB.nicknames.bnet_77 == "Unverified previous-session nickname",
+	"ambiguous old nicknames stay stored")
 check(env.BetterFriendlistDB.friendGroups.bnet_150[1] == "orphan", "keep ambiguous old data for recovery")
 check(notes.GetBNetDisplayNote(regular) == "unrelated", "normal friends keep their native notes")
 check(titleNotes:ShowEditor(199, "Title Friend"), "normal menu opens the BFL note editor")

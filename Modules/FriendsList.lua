@@ -49,6 +49,52 @@ function FriendsList:IsFriendInGameForGroup(friend, mode)
 	return client == BNET_CLIENT_WOW and account.wowProjectID == WOW_PROJECT_ID
 end
 
+do
+	local function GetTagGroupAccountState(self, account, primary)
+		if BFL.IsSecret and BFL:IsSecret(account) then return "unknown" end
+		if account == nil then return "offline" end
+		if not self:IsReadableInviteRecord(account) then return "unknown" end
+		if BFL.IsSecret and BFL:IsSecret(account.isOnline) then return "unknown" end
+		local online = account.isOnline
+		if online == nil then online = primary end
+		if not online then return "offline" end
+		local client = self:GetReadableInviteField(account, "clientProgram")
+		if client == (BNET_CLIENT_WOW or "WoW") then
+			local project = self:GetReadableInviteField(account, "wowProjectID")
+			if project == nil then return "unknown" end
+			return project == WOW_PROJECT_ID and "same_flavor" or "other"
+		end
+		if client == "App" or client == "BSAp" or client == "CLNT" then return "app" end
+		return type(client) == "string" and client ~= "" and "other" or "unknown"
+	end
+
+	function FriendsList:PassesDynamicTagGroupFilter(friend, mode)
+		if mode ~= "same_flavor_online" then return true end
+		if self:GetReadableInviteField(friend, "connected") ~= true then return false end
+		local friendType = self:GetReadableInviteField(friend, "type")
+		if friendType == "wow" then return true end
+		if friendType ~= "bnet" then return false end
+		local state = GetTagGroupAccountState(self, friend.gameAccountInfo, true)
+		if state == "same_flavor" then return true end
+		local hasApp = state == "app"
+		local hasOtherGame = state == "other" or state == "unknown"
+		local accounts = friend.gameAccounts
+		if BFL.IsSecret and BFL:IsSecret(accounts) then return false end
+		if accounts ~= nil then
+			if not self:IsReadableInviteRecord(accounts) then return false end
+			for _, account in ipairs(accounts) do
+				state = GetTagGroupAccountState(self, account, false)
+				if state == "same_flavor" then return true end
+				hasApp = hasApp or state == "app"
+				hasOtherGame = hasOtherGame or state == "other" or state == "unknown"
+			end
+		end
+		-- App sessions often accompany games. Only app-only friends qualify here;
+		-- any readable online account in this WoW flavor already qualified above.
+		return hasApp and not hasOtherGame
+	end
+end
+
 local function GetLocaleSortKey(value)
 	if BFL.IsSecret and BFL:IsSecret(value) then
 		return ""
@@ -1799,6 +1845,7 @@ local function BuildDisplayList(self)
 		and FriendTags.GetSetting
 		and FriendTags:GetSetting("enableDynamicTagGroups", false) == true
 	local prioritizeTagGroups = enableDynamicTagGroups and FriendTags:GetSetting("prioritizeDynamicTagGroups", false) == true
+	local tagGroupFilter = enableDynamicTagGroups and FriendTags:GetSetting("dynamicTagGroupFilter", "all") or "all"
 	local tagAssignmentsAffectDisplay = (self.searchText or "") ~= "" or enableDynamicTagGroups == true
 	local QuickFilters = BFL:GetModule("QuickFilters")
 	if not tagAssignmentsAffectDisplay and QuickFilters and QuickFilters.GetActiveTagFilterDefinitions then
@@ -1942,35 +1989,11 @@ local function BuildDisplayList(self)
 	end
 
 	if enableDynamicTagGroups then
-		for _, tag in ipairs(FriendTags:GetAllTagDefinitions()) do
-			tag.chipProfile = FriendTags:GetChipProfile(tag)
-			if FriendTags:ShouldIncludeTagOnSurface(tag, "group") then
-				local groupId = "tag:" .. tag.id
-				local profile = tag.chipProfile or {}
-				local label = FriendTags:GetChipLabel(tag)
-				if not label or label == "" then
-					label = tag.name or tag.id
-				end
-				local order = tonumber(profile.order) or tonumber(tag.order) or 0
-				local groupData = {
-					id = groupId,
-					tagId = tag.id,
-					tagProfile = profile,
-					tagRank = #virtualTagGroups + 1,
-					name = label,
-					builtin = true,
-					virtualTagGroup = true,
-					order = 900 + (order / 1000),
-					collapsed = BetterFriendlistDB
-						and BetterFriendlistDB.groupStates
-						and BetterFriendlistDB.groupStates[groupId] == true,
-				}
-				virtualTagGroups[#virtualTagGroups + 1] = groupData
-				virtualTagGroupByTagId[tag.id] = groupId
-				groupedFriends[groupId] = groupedFriends[groupId] or {}
-				totalGroupCounts[groupId] = 0
-				onlineGroupCounts[groupId] = 0
-			end
+		virtualTagGroups, virtualTagGroupByTagId = FriendTags:GetDynamicGroups()
+		for _, group in ipairs(virtualTagGroups) do
+			groupedFriends[group.id] = {}
+			totalGroupCounts[group.id] = 0
+			onlineGroupCounts[group.id] = 0
 		end
 	end
 
@@ -2046,7 +2069,7 @@ local function BuildDisplayList(self)
 			end
 		end
 
-		if enableDynamicTagGroups then
+		if enableDynamicTagGroups and self:PassesDynamicTagGroupFilter(friend, tagGroupFilter) then
 			local previousCount = #friendGroupIds
 			self:AppendDynamicTagGroups(FriendTags:GetTagsForFriend(friend, "group"), virtualTagGroupByTagId,
 				groupedFriends, assignedGroups, friendGroupIds, prioritizeTagGroups)
@@ -4900,6 +4923,7 @@ function FriendsList:UpdateSettingsCache()
 
 	-- Visual Settings
 	self.settingsCache.grayOtherFaction = DB:Get("grayOtherFaction", false)
+	self.settingsCache.grayOtherRuleset = BFL.IsForever and DB:Get("grayOtherRuleset", false)
 	self.settingsCache.showFactionIcons = DB:Get("showFactionIcons", false)
 	self.settingsCache.colorClassNames = DB:Get("colorClassNames", true)
 	self.settingsCache.hideMaxLevel = DB:Get("hideMaxLevel", false)
@@ -7115,6 +7139,7 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 	local FriendTags = BFL:GetModule("FriendTags")
 	local tagGroupsEnabled = FriendTags and FriendTags:IsEnabled()
 		and FriendTags:GetSetting("enableDynamicTagGroups", false)
+	local tagGroupFilter = tagGroupsEnabled and FriendTags:GetSetting("dynamicTagGroupFilter", "all") or "all"
 
 	for _, friend in ipairs(self.friendsList) do
 		-- Apply filters first
@@ -7200,7 +7225,7 @@ function FriendsList:GetFriendsForGroup(targetGroupId)
 				end
 			end
 
-			if tagGroupsEnabled then
+			if tagGroupsEnabled and self:PassesDynamicTagGroupFilter(friend, tagGroupFilter) then
 				for _, tag in ipairs(FriendTags:GetTagsForFriend(friend, "group")) do
 					isInAnyGroup = true
 					if targetGroupId == "tag:" .. tag.id then isInTargetGroup = true end
@@ -8867,6 +8892,11 @@ function FriendsList:GetFormattedButtonText(friend)
 		if friend.connected then
 			local isOppositeFaction = factionName and factionName ~= playerFactionGroup
 			local shouldGray = grayOtherFaction and isOppositeFaction
+			if not shouldGray and self.settingsCache.grayOtherRuleset then
+				local registry = GetFilterSortRegistry()
+				shouldGray = registry and registry:IsOtherForeverRuleset(friend, friend.gameAccountInfo,
+					self.settingsSample and "PVP" or nil)
+			end
 
 			if shouldGray then
 				-- The setting remains authoritative even when FriendListColors

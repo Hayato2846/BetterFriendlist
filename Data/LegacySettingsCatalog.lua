@@ -34,7 +34,7 @@ local helpOnlySettings = {
 
 function Catalog.ShowIndividualPreview(route, section, key, comparison)
 	return comparison ~= nil and not (
-		helpOnlyPages[route] or helpOnlySections[section] or helpOnlySettings[key]
+		helpOnlyPages[route] or (helpOnlySections[section] and not comparison.previewInHelpSection) or helpOnlySettings[key]
 		or comparison.helpOnly
 	)
 end
@@ -49,6 +49,7 @@ Catalog.comparisons = {
 		SETTINGS_SHOW_FACTION_ICONS = { "showFactionIcons", "Name", friend = 2, prerequisite = { "nameFormatPreset", "character" } },
 		SETTINGS_SHOW_FACTION_BG = { "showFactionBg", friend = 2 },
 		SETTINGS_GRAY_OTHER_FACTION = { "grayOtherFaction", "Name", friend = 2 },
+		SETTINGS_GRAY_OTHER_RULESETS = { "grayOtherRuleset", "Name", friend = 1 },
 		SETTINGS_SHOW_MULTI_ACCOUNT_BADGE = { "showMultiAccountBadge", "gameAccountBadge", prerequisite = { "showGameIcon", true } },
 		SETTINGS_SHOW_MULTI_ACCOUNT_INFO = { "showMultiAccountInfo", "multiAccountRow", sampleOverrides = { compactMode = false, infoFormatPreset = "default" } },
 		SETTINGS_SHOW_RULESET_NAME = { "showRealmName", "Info", prerequisite = { "infoFormatPreset", "default" } },
@@ -167,6 +168,7 @@ Catalog.comparisons = {
 		FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG = { "hideDynamicGroupTagChip", tags = true, tagGroups = true, binary = true, friend = 2 },
 		FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS = { "hideAllDynamicGroupTagChips", tags = true, tagGroups = true, binary = true, friend = 2 },
 		FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS = { "prioritizeDynamicTagGroups", tags = true, tagGroups = true, binary = true },
+		FRIEND_TAGS_DYNAMIC_GROUP_FILTER = { "dynamicTagGroupFilter", tags = true, tagGroups = true, friend = 4, previewInHelpSection = true },
 		FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE = { "dynamicTagGroupHeaderStyle", tags = true, tagGroups = true },
 		FRIEND_TAGS_SHOW_ROW_CHIPS = { "showRowChips", "friendTagRow", friend = 2, tags = true, binary = true },
 		FRIEND_TAGS_STREAMER_MODE = { "showTagsInStreamerMode", "friendTagRow", friend = 2, tags = true, binary = true, streamer = true },
@@ -632,6 +634,7 @@ Catalog.search = {
 			"SETTINGS_SHOW_FACTION_ICONS",
 			"SETTINGS_SHOW_FACTION_BG",
 			"SETTINGS_GRAY_OTHER_FACTION",
+			"SETTINGS_GRAY_OTHER_RULESETS",
 			"SETTINGS_SHOW_MULTI_ACCOUNT_BADGE",
 			"SETTINGS_SHOW_MULTI_ACCOUNT_INFO",
 			"SETTINGS_SHOW_RULESET_NAME",
@@ -734,6 +737,7 @@ Catalog.search = {
 			"FRIEND_TAGS_HIDE_DYNAMIC_GROUP_TAG",
 			"FRIEND_TAGS_HIDE_ALL_DYNAMIC_GROUP_TAGS",
 			"FRIEND_TAGS_PRIORITIZE_DYNAMIC_GROUPS",
+			"FRIEND_TAGS_DYNAMIC_GROUP_FILTER",
 			"FRIEND_TAGS_DYNAMIC_GROUP_HEADER_STYLE",
 			"FRIEND_TAGS_SYNC_LOCAL_BUTTON",
 		},
@@ -898,6 +902,7 @@ Catalog.search = {
 			"BROKER_COLUMN_REALM",
 			"BROKER_COLUMN_RULESET",
 			"BROKER_COLUMN_NOTES",
+			"FRIEND_TAGS_SETTINGS_TAG_LIST",
 		},
 	},
 	guildBroker = {

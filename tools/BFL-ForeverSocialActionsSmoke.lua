@@ -1550,7 +1550,11 @@ do
 	bridge._testCompanionAddOnLoaded = true
 	local nativeTag = "MENU_UNIT_BN_FRIEND"
 	local function NativeAddon(_, root) root:CreateButton("Third-party action") end
+	local function CustomNames(_, root, context)
+		if context.battleTag == "Tag#1234" then root:CreateButton("CustomNames") end
+	end
 	bridge:RegisterDynamicModifier(nativeTag, NativeAddon, "NativeAddon")
+	bridge:RegisterDynamicModifier(nativeTag, CustomNames, "CustomNames")
 	local function provider(addonName, label)
 		check(bridge:RegisterProvider({
 			addonName = addonName, menuTypes = { "BN_FRIEND", "BN_FRIEND_OFFLINE" }, fallbackIfDynamicModifier = true,
@@ -1616,6 +1620,25 @@ do
 	entries = {}
 	menu = makeMenu()
 	equal(count(menu, "Invite Character"), 0, "an empty cache cannot replace a usable native entry")
+	friend.battleTag = "Tag#1234"
+	equal(count(makeMenu(), "CustomNames"), 1, "the native link menu restores CustomNames from the verified BattleTag")
+	local titleMenu = menuElement("root")
+	CustomNames(row, titleMenu, { battleTag = friend.battleTag })
+	populate(titleMenu, nativeTag, row, friend, true, { battleTag = friend.battleTag })
+	equal(count(titleMenu, "CustomNames"), 1, "a native CustomNames submenu with its own BattleTag is never duplicated")
+	local restrictedMenu = menuElement("root")
+	local previousRestrictionCheck = BFL.IsActionRestricted
+	BFL.IsActionRestricted = function() return inCombat end
+	inCombat = true
+	populate(restrictedMenu, nativeTag, row, friend, true, {})
+	equal(count(restrictedMenu, "CustomNames"), 0, "CustomNames replay respects the bridge restriction in combat")
+	inCombat = false
+	BFL.IsActionRestricted = previousRestrictionCheck
+	bridge._testCompanionAddOnLoaded = false
+	local optOutMenu = menuElement("root")
+	populate(optOutMenu, nativeTag, row, friend, true, {})
+	equal(count(optOutMenu, "CustomNames"), 0, "the native menu honors the Menu Bridge opt-out")
+	bridge._testCompanionAddOnLoaded = true
 	entries = { matching, blocked }
 	menu = makeMenu()
 	_, picker = count(menu, "Invite Character")

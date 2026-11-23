@@ -324,6 +324,10 @@ local function GetFriendUID(friend)
 	if friend.uid then
 		return friend.uid
 	end
+	local id = friend.id
+	if not IsSecretValue(id) and type(id) == "string" and (id:match("^bnet_") or id:match("^wow_")) then
+		return id
+	end
 	if friend.bnetAccountID then
 		return "bnet_" .. tostring(friend.bnetAccountID)
 	end
@@ -624,10 +628,20 @@ for _, field in ipairs(FILTER_FIELDS) do
 	FILTER_FIELD_MAP[field.id] = field
 end
 
+local function NormalizeLocationSortID(id)
+	if BFL.IsForever and id == "realm" then
+		return "ruleset"
+	elseif not BFL.IsForever and id == "ruleset" then
+		return "realm"
+	end
+	return id
+end
+
 local SORT_FIELDS = {
 	{ id = "status", labelKey = "SORT_STATUS", type = "number", defaultDirection = "asc" },
 	{ id = "name", labelKey = "SORT_NAME", type = "string", defaultDirection = "asc" },
 	{ id = "displayName", labelKey = "SORT_NAME", type = "string", defaultDirection = "asc" },
+	{ id = "nickname", labelKey = "FILTER_BUILDER_FIELD_NICKNAME", type = "string", defaultDirection = "asc" },
 	{ id = "favorite", labelKey = "FILTER_BUILDER_FIELD_FAVORITE", type = "boolean", defaultDirection = "desc" },
 	{ id = "level", labelKey = "SORT_LEVEL", type = "number", defaultDirection = "desc" },
 	{ id = "zone", labelKey = "SORT_ZONE", type = "string", defaultDirection = "asc" },
@@ -636,6 +650,7 @@ local SORT_FIELDS = {
 	{ id = "guild", labelKey = "SORT_GUILD", type = "string", defaultDirection = "asc" },
 	{ id = "class", labelKey = "SORT_CLASS", type = "string", defaultDirection = "asc" },
 	{ id = "realm", labelKey = "SORT_REALM", type = "string", defaultDirection = "asc" },
+	{ id = "ruleset", labelKey = "BROKER_COLUMN_RULESET", type = "string", defaultDirection = "asc" },
 	{ id = "lastOnline", labelKey = "FILTER_BUILDER_FIELD_LAST_ONLINE", type = "number", defaultDirection = "asc" },
 	{ id = "recentlyAdded", labelKey = "FILTER_BUILDER_FIELD_RECENTLY_ADDED", type = "number", defaultDirection = "asc" },
 	{ id = "accountCount", labelKey = "FILTER_BUILDER_FIELD_ACCOUNT_COUNT", type = "number", defaultDirection = "desc" },
@@ -959,6 +974,18 @@ function Registry:GetPlayerForeverRuleset()
 	return self.playerRuleset
 end
 
+function Registry:IsOtherForeverRuleset(friend, displayedAccount, playerRuleset)
+	if not BFL.IsForever or IsSecretValue(friend) or type(friend) ~= "table" or IsSecretValue(friend.connected)
+		or IsSecretValue(friend.type) or friend.type ~= "bnet" or friend.connected ~= true or not BFL.GetWoWAccountLocation
+	then
+		return false
+	end
+	playerRuleset = playerRuleset or self:GetPlayerForeverRuleset()
+	if not playerRuleset then return false end
+	local target = select(5, BFL.GetWoWAccountLocation(displayedAccount))
+	return target ~= nil and target ~= playerRuleset
+end
+
 local function BuiltinQuickFilter_ForeverRuleset(friend)
 	local ownRuleset = Registry:GetPlayerForeverRuleset()
 	if not ownRuleset or not friend then return false end
@@ -1112,6 +1139,7 @@ end
 local BUILTIN_SORTERS = {
 	{ id = "status", labelKey = "SORT_STATUS", icon = BFL_ICON_PREFIX .. "status", order = 10, chain = { { field = "status", direction = "asc", empty = "last" } } },
 	{ id = "name", labelKey = "SORT_NAME", icon = BFL_ICON_PREFIX .. "name", order = 20, chain = { { field = "name", direction = "asc", empty = "last" } } },
+	{ id = "nickname", labelKey = "FILTER_BUILDER_FIELD_NICKNAME", icon = BFL_ICON_PREFIX .. "name", order = 25, chain = { { field = "nickname", direction = "asc", empty = "last" } } },
 	{ id = "level", labelKey = "SORT_LEVEL", icon = BFL_ICON_PREFIX .. "level", order = 30, chain = { { field = "level", direction = "desc", empty = "last" } } },
 	{ id = "zone", labelKey = "SORT_ZONE", icon = BFL_ICON_PREFIX .. "zone", order = 40, chain = { { field = "zone", direction = "asc", empty = "last" } } },
 	{ id = "game", labelKey = "SORT_GAME", icon = BFL_ICON_PREFIX .. "game", order = 50, chain = { { field = "game", direction = "asc", empty = "last" } } },
@@ -1119,6 +1147,7 @@ local BUILTIN_SORTERS = {
 	{ id = "guild", labelKey = "SORT_GUILD", icon = BFL_ICON_PREFIX .. "guild", order = 70, chain = { { field = "guild", direction = "asc", empty = "last" } } },
 	{ id = "class", labelKey = "SORT_CLASS", icon = BFL_ICON_PREFIX .. "class", order = 80, chain = { { field = "class", direction = "asc", empty = "last" } } },
 	{ id = "realm", labelKey = "SORT_REALM", icon = BFL_ICON_PREFIX .. "realm", order = 90, chain = { { field = "realm", direction = "asc", empty = "last" } } },
+	{ id = "ruleset", labelKey = "BROKER_COLUMN_RULESET", icon = BFL_ICON_PREFIX .. "realm", order = 90, chain = { { field = "ruleset", direction = "asc", empty = "last" } } },
 }
 
 local BUILTIN_SORTER_MAP = {}
@@ -1209,16 +1238,17 @@ local function NormalizeGroup(node, depth, stats)
 end
 
 local function NormalizeSortStep(step)
-	if type(step) ~= "table" or not SORT_FIELD_MAP[step.field] then
+	local field = type(step) == "table" and NormalizeLocationSortID(step.field)
+	local fieldDef = SORT_FIELD_MAP[field]
+	if not fieldDef then
 		return nil
 	end
-	local fieldDef = SORT_FIELD_MAP[step.field]
 	local direction = (step.direction == "asc" or step.direction == "desc") and step.direction
 		or fieldDef.defaultDirection
 		or "asc"
 	local empty = step.empty == "first" and "first" or "last"
 	return {
-		field = step.field,
+		field = field,
 		direction = direction,
 		empty = empty,
 	}
@@ -1283,6 +1313,8 @@ function Registry:Initialize()
 				if BFL.ForceRefreshFriendsList and (not IsLoggedIn or IsLoggedIn()) then
 					BFL:ForceRefreshFriendsList()
 				end
+				local broker = BFL:GetModule("Broker")
+				if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
 			end
 		end)
 	end
@@ -1360,7 +1392,7 @@ local function BuildDisplayEntry(entry, isCustom)
 		isCustom = isCustom and true or false,
 		builtin = not isCustom,
 		ast = entry.ast,
-		chain = entry.chain and DeepCopy(entry.chain) or nil,
+		chain = entry.chain and NormalizeSorterChain(entry.chain) or nil,
 	}
 end
 
@@ -1386,7 +1418,7 @@ local function ResolveSorterEntry(registry, id, requireVisible, fallbackId)
 	end
 
 	local db = registry:EnsureDB()
-	id = id or fallbackId or registry.FALLBACK_PRIMARY_SORT
+	id = NormalizeLocationSortID(id or fallbackId or registry.FALLBACK_PRIMARY_SORT)
 	local entry = BUILTIN_SORTER_MAP[id]
 	if not entry and db and db.customSorters then
 		entry = db.customSorters[id]
@@ -1455,6 +1487,7 @@ function Registry:IsQuickFilterVisible(id)
 end
 
 function Registry:IsSorterVisible(id)
+	if id ~= NormalizeLocationSortID(id) then return false end
 	local db = self:EnsureDB()
 	if not db or not id then
 		return true
@@ -1531,7 +1564,7 @@ function Registry:GetSorters(includeHidden)
 	local list = {}
 
 	for _, entry in ipairs(BUILTIN_SORTERS) do
-		if includeHidden or self:IsSorterVisible(entry.id) then
+		if entry.id == NormalizeLocationSortID(entry.id) and (includeHidden or self:IsSorterVisible(entry.id)) then
 			local display = BuildDisplayEntry(entry, false)
 			display.visible = self:IsSorterVisible(entry.id)
 			display._order = orderMap[entry.id] or entry.order
@@ -1756,8 +1789,34 @@ local STRING_SORT_CACHE_FIELDS = {
 	realm = "_sort_realmName",
 }
 
-local function GetSortValue(friend, field)
-	if field == "status" then
+local function GetLocationOrNicknameSortKey(friend, field, plan)
+	local keys = plan[field]
+	if not keys then
+		keys = {}
+		plan[field] = keys
+	end
+	if keys[friend] == nil then
+		local value
+		if not (BFL.StreamerMode and BFL.StreamerMode:IsActive()) then
+			if field == "nickname" then
+				value = GetNickname(friend)
+			elseif BFL.GetWoWAccountLocation and not IsSecretValue(friend.gameAccountInfo) then
+				local location, kind = BFL.GetWoWAccountLocation(friend.gameAccountInfo or friend, friend.realmName)
+				if kind == "ruleset" then
+					value = location
+				end
+			end
+		end
+		local text = SafeString(value)
+		keys[friend] = (IntlCompat and IntlCompat.GetSortKey and IntlCompat.GetSortKey(text)) or NormalizeString(text)
+	end
+	return keys[friend]
+end
+
+local function GetSortValue(friend, field, plan)
+	if field == "nickname" or field == "ruleset" then
+		return GetLocationOrNicknameSortKey(friend, field, plan)
+	elseif field == "status" then
 		return friend._sort_status or GetStatusPriority(friend)
 	elseif field == "game" then
 		return friend._sort_game or GetGamePriority(friend)
@@ -1800,14 +1859,15 @@ local function CompareRawValues(aValue, bValue, fieldDef)
 	return aValue < bValue
 end
 
-local function CompareSortStep(step, a, b)
-	local fieldDef = SORT_FIELD_MAP[step.field]
+local function CompareSortStep(step, a, b, plan)
+	local field = NormalizeLocationSortID(step.field)
+	local fieldDef = SORT_FIELD_MAP[field]
 	if not fieldDef then
 		return nil
 	end
 
-	local aValue = GetSortValue(a, step.field)
-	local bValue = GetSortValue(b, step.field)
+	local aValue = GetSortValue(a, field, plan)
+	local bValue = GetSortValue(b, field, plan)
 	local aEmpty = IsEmptyValue(aValue)
 	local bEmpty = IsEmptyValue(bValue)
 	if aEmpty ~= bEmpty then
@@ -1828,12 +1888,12 @@ local function CompareSortStep(step, a, b)
 	return result
 end
 
-local function CompareChain(chain, a, b)
+local function CompareChain(chain, a, b, plan)
 	if type(chain) ~= "table" then
 		return nil
 	end
 	for _, step in ipairs(chain) do
-		local result = CompareSortStep(step, a, b)
+		local result = CompareSortStep(step, a, b, plan)
 		if result ~= nil then
 			return result
 		end
@@ -1876,7 +1936,7 @@ function Registry:CompareFriendsWithSortPlan(a, b, plan)
 	plan = plan or self:CreateSortPlan()
 	local primary = plan.primary
 	local secondary = plan.secondary
-	local result = primary and CompareChain(primary.chain, a, b)
+	local result = primary and CompareChain(primary.chain, a, b, plan)
 	if result ~= nil then
 		return result
 	end
@@ -1886,7 +1946,7 @@ function Registry:CompareFriendsWithSortPlan(a, b, plan)
 	end
 
 	if secondary and secondary.id ~= (primary and primary.id) then
-		result = CompareChain(secondary.chain, a, b)
+		result = CompareChain(secondary.chain, a, b, plan)
 		if result ~= nil then
 			return result
 		end
@@ -1900,7 +1960,7 @@ function Registry:CompareFriendsWithSortPlan(a, b, plan)
 		end
 	end
 
-	result = CompareSortStep(NAME_FALLBACK_SORT_STEP, a, b)
+	result = CompareSortStep(NAME_FALLBACK_SORT_STEP, a, b, plan)
 	if result ~= nil then
 		return result
 	end
@@ -1958,7 +2018,13 @@ function Registry:GetFilterFieldCatalog()
 end
 
 function Registry:GetSortFieldCatalog()
-	return DeepCopy(SORT_FIELDS)
+	local fields = {}
+	for _, field in ipairs(SORT_FIELDS) do
+		if field.id == NormalizeLocationSortID(field.id) then
+			fields[#fields + 1] = DeepCopy(field)
+		end
+	end
+	return fields
 end
 
 function Registry:GetOperatorsForField(fieldId)

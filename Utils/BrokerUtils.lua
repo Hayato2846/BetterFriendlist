@@ -891,7 +891,7 @@ end
 -- Tooltip Auto-Hide (Custom timer with menu detection)
 -- ========================================
 -- detailTooltipRef: optional function that returns the detail tooltip to check for mouse-over
-function BU.SetupTooltipAutoHide(tt, anchorFrame, LQT, detailTooltipRef)
+function BU.SetupTooltipAutoHide(tt, anchorFrame, LQT, detailTooltipRef, keepOpen)
 	tt:SetAutoHideDelay(nil) -- Disable LibQTip's built-in auto-hide
 
 	if not tt.bflTimer then
@@ -911,6 +911,10 @@ function BU.SetupTooltipAutoHide(tt, anchorFrame, LQT, detailTooltipRef)
 
 		local checkInterval = self.checkTimer
 		self.checkTimer = 0
+		if keepOpen and keepOpen() then
+			self.hideTimer, self.menuOpenTimer = 0, 0
+			return
+		end
 
 		local isOver = (tt.IsMouseOver and tt:IsMouseOver())
 

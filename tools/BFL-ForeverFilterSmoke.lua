@@ -105,6 +105,7 @@ env.CreateFrame = function()
 	return { SetSize = function() end, EnableMouse = function() end, SetFrameStrata = function() end, Hide = function() end }
 end
 local getCounts, isBrokerFriendOnline, getFilterAccounts = execute(between(brokerSource, "-- Modules/Broker.lua", "-- Broker Text Update") .. "\nreturn GetFilteredFriendCounts, IsPreviewFriendOnline, GetBNetFilterGameAccounts", "Broker fresh counts")
+local brokerForCounts = BFL:GetModule("Broker")
 local wowOnline, wowTotal, bnetOnline, bnetTotal = getCounts()
 V:AssertEqual(wowOnline, 1, "Broker includes local online Forever friends")
 V:AssertEqual(wowTotal, 2, "Broker preserves unfiltered WoW totals")
@@ -116,8 +117,9 @@ V:Assert(not env.FriendsList:PassesFilters({ type = "bnet", connected = true, ga
 
 -- The grouped tooltip must use the same evaluator for the new built-in.
 local tooltipFilter = execute(between(brokerSource, "local function IsForeverFilter(", "local function GetFriendsList(")
+	.. "local function GetBrokerTagFilter() end\nlocal previewData\n"
 	.. "return function(groupedFriends, sample)\nlocal settings = sample and sample.settings or BetterFriendlistDB\n"
-	.. between(brokerSource, "\t\t-- Apply current filter (to online friends only)", "\t\t-- Apply current sort mode")
+	.. between(brokerSource, "\t\t-- Apply the roster filter and the shared tag selections.", "\t\t-- Apply current sort mode")
 	.. "\nreturn groupedFriends\nend", "Broker grouped tooltip filter")
 local grouped = tooltipFilter({ nogroup = { multi, { type = "bnet", connected = true, gameAccountInfo = focused } } })
 V:AssertEqual(#grouped.nogroup, 1, "Broker tooltip rejects Retail-only and retains secondary Forever")
@@ -241,4 +243,46 @@ V:AssertEqual(activated, tt, "the live Basic tooltip joins the same active lifec
 V:Assert(#rows >= 5, "the Basic tooltip renders the summary, counts and filter")
 env.BetterFriendlistDB.brokerTooltipMode = "advanced"
 V:AssertEqual(route(anchor), "advanced", "Advanced retains the existing grouped-tooltip path")
+
+BFL.IsForever = true
+env.WOW_PROJECT_ID = 18
+local selectedAccount = { clientProgram = "WoW", wowProjectID = 18, isOnline = true,
+	richPresence = "Forever - Roleplay PvP - Tirisfal Glades" }
+local rulesetFriend = { type = "bnet", connected = true }
+V:Assert(registry:IsOtherForeverRuleset(rulesetFriend, selectedAccount, "PVP"), "a known different displayed ruleset is dimmed")
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, selectedAccount, "RPPVP"), "matching rulesets retain their original color")
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "App", isOnline = true }, "PVP"), "app-only contacts are not dimmed")
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "WoW", wowProjectID = 1 }, "PVP"), "other WoW clients are not dimmed")
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend,
+	{ clientProgram = "WoW", wowProjectID = 18, richPresence = "Forever - Mystery - Test" }, "PVP"), "unknown rulesets are not dimmed")
+rulesetFriend.connected = false
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, selectedAccount, "PVP"), "offline accounts do not use prior ruleset presence")
+BFL.IsForever = false
+rulesetFriend.connected = true
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, selectedAccount, "PVP"), "the control has no effect on other clients")
+
+local selectedTags, allowTagSearch = true, true
+function BFL:StripAccents(value) return value:lower() end
+function quickFilters:GetActiveTagFilterDefinitions() return selectedTags and { "team" } or {} end
+function quickFilters:PassesTagFilters(friend) return friend.bnetAccountID == 1 end
+local tags = BFL:RegisterModule("FriendTags", {})
+function tags:CanDisplayTags() return allowTagSearch end
+function tags:GetSearchText(friend) return friend.bnetAccountID == 3 and "Keystone Team" or nil end
+env.BetterFriendlistDB.quickFilter = "all"
+wowOnline, wowTotal, bnetOnline, bnetTotal = getCounts()
+V:AssertEqual(wowOnline + bnetOnline, 1, "tag-only selection filters the broker counts")
+V:AssertEqual(wowTotal + bnetTotal, 5, "tag selection preserves the overall roster total")
+brokerForCounts.tagSearch = "keystone"
+wowOnline, _, bnetOnline = getCounts()
+V:AssertEqual(wowOnline + bnetOnline, 0, "broker search and tag selections must both match")
+selectedTags = false
+BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+wowOnline, _, bnetOnline = getCounts()
+V:AssertEqual(wowOnline + bnetOnline, 1, "the broker uses Friend Tags' searchable text")
+allowTagSearch = false
+BFL.GetNumOnlineWoWFriends = function() return 1 end
+env.BNGetNumFriends = function() return #allAccounts, 2 end
+BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
+wowOnline, _, bnetOnline = getCounts()
+V:AssertEqual(wowOnline + bnetOnline, 3, "a hidden tag query does not filter the broker in Streamer Mode")
 io.write("[OK] Forever filter smoke: " .. assertions .. " assertions, including real menu, list, broker count and tooltip paths\n")

@@ -64,6 +64,7 @@ local DEFAULT_SETTINGS = {
 	chipFontFlags = "SLUG",
 	maxTooltipChips = 8,
 	enableDynamicTagGroups = false,
+	dynamicTagGroupFilter = "all",
 	prioritizeDynamicTagGroups = false,
 	dynamicTagGroupHeaderStyle = "standard",
 	includeCustomTagsInSearch = true,
@@ -713,6 +714,8 @@ local function RefreshSurfaces(refreshCallback, options)
 	if PreviewMode and PreviewMode.OnSettingChanged then
 		PreviewMode:OnSettingChanged("friendTags")
 	end
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
 	elseif BFL.ScheduleFriendsListRefresh then
@@ -1175,6 +1178,8 @@ local function RefreshFriendAssignment(refreshCallback, friend, explicitUID, sup
 	if suppressRefresh then
 		return
 	end
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
 	elseif BFL.ScheduleFriendsListRefresh then
@@ -1468,6 +1473,9 @@ end
 function FriendTags:GetSetting(key, fallback)
 	local settings = self:GetSettings()
 	local value = settings and settings[key]
+	if key == "dynamicTagGroupFilter" then
+		return value == "same_flavor_online" and value or "all"
+	end
 	if key == "dynamicTagGroupHeaderStyle" then
 		return NormalizeDynamicTagGroupHeaderStyle(value)
 	end
@@ -1485,6 +1493,9 @@ function FriendTags:SetSetting(key, value, refreshCallback)
 		return false
 	end
 	local settings = self:GetSettings()
+	if key == "dynamicTagGroupFilter" then
+		value = value == "same_flavor_online" and value or "all"
+	end
 	if key == "dynamicTagGroupHeaderStyle" then
 		value = NormalizeDynamicTagGroupHeaderStyle(value)
 	end
@@ -1495,7 +1506,8 @@ function FriendTags:SetSetting(key, value, refreshCallback)
 	-- Dynamic groups only change display-list grouping. They do not alter tag
 	-- definitions, assignments, row chips, search text, or tooltip contents.
 	-- Keep those caches warm while still rebuilding the visible friend list.
-	if key == "enableDynamicTagGroups" or key == "prioritizeDynamicTagGroups" or key == "dynamicTagGroupHeaderStyle" then
+	if key == "enableDynamicTagGroups" or key == "prioritizeDynamicTagGroups" or key == "dynamicTagGroupHeaderStyle"
+		or key == "dynamicTagGroupFilter" then
 		RefreshSurfaces(refreshCallback, {
 			definitionVersion = false,
 			clearCaches = false,
@@ -2950,6 +2962,29 @@ function FriendTags:GetTagsForFriend(friend, surface)
 	tags = tags or EMPTY_TABLE
 	cache.tagsByFriendSurface[cacheKey] = tags
 	return tags
+end
+
+function FriendTags:GetDynamicGroups(surface)
+	local groups, byTagId = {}, {}
+	if not self:CanDisplayTags(surface or "group") or not self:GetSetting("enableDynamicTagGroups", false) then
+		return groups, byTagId
+	end
+	local states = BetterFriendlistDB and BetterFriendlistDB.groupStates or EMPTY_TABLE
+	for _, tag in ipairs(self:GetAllTagDefinitions()) do
+		if self:ShouldIncludeTagOnSurface(tag, "group") and (not surface or self:ShouldIncludeTagOnSurface(tag, surface)) then
+			local groupId = "tag:" .. tag.id
+			local profile = tag.chipProfile or self:GetChipProfile(tag)
+			local label = self:GetChipLabel(tag)
+			groups[#groups + 1] = {
+				id = groupId, tagId = tag.id, tagProfile = profile, tagRank = #groups + 1,
+				name = label and label ~= "" and label or tag.name or tag.id,
+				builtin = true, virtualTagGroup = true, collapsed = states[groupId] == true,
+				order = 900 + ((tonumber(profile.order) or tonumber(tag.order) or 0) / 1000),
+			}
+			byTagId[tag.id] = groupId
+		end
+	end
+	return groups, byTagId
 end
 
 function FriendTags:GetTagIdsForFriend(friend, surface)

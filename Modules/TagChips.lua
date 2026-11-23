@@ -842,6 +842,44 @@ function TagChips:EnsureRow(button)
 	return row
 end
 
+function TagChips:GetVisibleRowTags(friend, friendsList, groupId, surface)
+	local friendTags = GetFriendTags()
+	if surface == "broker" then
+		if not friendTags or not friendTags:CanDisplayTags(surface, nil, friendsList.settingsSampleStreamerMode, friendsList.settingsSampleTagSettings) then
+			return EMPTY_TABLE
+		end
+	elseif not CanRenderRow(friend, friendsList, friendTags) then
+		return EMPTY_TABLE
+	end
+	local groupTagId = type(groupId) == "string" and groupId:match("^tag:(.+)$") or nil
+	if groupTagId and GetRowSetting(friendsList, friendTags, "hideAllDynamicGroupTagChips", false) then
+		return EMPTY_TABLE
+	end
+
+	local tags
+	if friendsList.settingsSample then
+		tags = friend.settingsTagDefinitions or {}
+		if not friend.settingsTagDefinitions and friend.sampleTags then
+			for _, tag in ipairs(friendTags:GetAllTagDefinitions()) do
+				if friendTags:ShouldIncludeTagOnSurface(tag, surface or "row") then
+					tags[#tags + 1] = tag
+					if #tags == (friend.sampleTagLimit or MAX_ROW_CHIPS) then break end
+				end
+			end
+		end
+	else
+		tags = friendTags:GetTagsForFriend(friend, surface or "row")
+	end
+	if not groupTagId or not GetRowSetting(friendsList, friendTags, "hideDynamicGroupTagChip", false) then
+		return tags
+	end
+	local visible = {}
+	for _, tag in ipairs(tags) do
+		if tostring(tag.id or "") ~= groupTagId then visible[#visible + 1] = tag end
+	end
+	return visible
+end
+
 function TagChips:GetRowData(friend, friendsList, groupId)
 	local FriendTags = GetFriendTags()
 	local persistentCacheKey, persistentUID
@@ -970,32 +1008,7 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 		self.scalarRowCache[cacheKey] = data
 	end
 
-	if not CanRenderRow(friend, friendsList, FriendTags) then
-		return data
-	end
-	local dynamicGroupTagId = type(groupId) == "string" and groupId:match("^tag:(.+)$") or nil
-	if dynamicGroupTagId and GetRowSetting(friendsList, FriendTags, "hideAllDynamicGroupTagChips", false) then
-		return data
-	end
-
-	local tags
-	if friendsList and friendsList.settingsSample then
-		tags = {}
-		if friend.settingsTagDefinitions then
-			tags = friend.settingsTagDefinitions
-		elseif friend.sampleTags and FriendTags then
-			for _, tag in ipairs(FriendTags:GetAllTagDefinitions()) do
-				if FriendTags:ShouldIncludeTagOnSurface(tag, "row") then
-					tags[#tags + 1] = tag
-					if #tags == (friend.sampleTagLimit or MAX_ROW_CHIPS) then
-						break
-					end
-				end
-			end
-		end
-	else
-		tags = FriendTags and FriendTags:GetTagsForFriend(friend, "row") or EMPTY_TABLE
-	end
+	local tags = self:GetVisibleRowTags(friend, friendsList, groupId)
 	if #tags == 0 then
 		return data
 	end
@@ -1006,10 +1019,6 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 	maxChips = math.max(1, math.min(maxChips, MAX_ROW_CHIPS))
 	local chipsPerLine = ClampNumber(GetRowSetting(friendsList, FriendTags, "chipsPerLine", DEFAULT_CHIPS_PER_LINE), 1, MAX_ROW_CHIPS, DEFAULT_CHIPS_PER_LINE)
 	metrics = metrics or ResolveChipMetrics(FriendTags, tagsDefinitionVersion)
-	local hiddenGroupTagId = GetRowSetting(friendsList, FriendTags, "hideDynamicGroupTagChip", false)
-		and dynamicGroupTagId
-		or nil
-
 	local renderableTags = data.renderableTags
 	if renderableTags == EMPTY_TABLE then
 		renderableTags = data._renderableTags
@@ -1019,21 +1028,19 @@ function TagChips:GetRowData(friend, friendsList, groupId)
 		end
 	end
 	for _, tag in ipairs(tags) do
-		if not hiddenGroupTagId or tostring(tag.id or "") ~= tostring(hiddenGroupTagId) then
-			local profile = tag.chipProfile or {}
-			local labelText = FriendTags.GetChipLabel and FriendTags:GetChipLabel(tag) or tag.name or ""
-			if iconOnly then
-				labelText = ""
-			end
-			local iconValue = profile.iconValue or profile.icon
-			local hasIcon = iconValue and iconValue ~= ""
-			if labelText ~= "" or hasIcon then
-				local entry = AcquireRenderableTagEntry(data)
-				entry.tag = tag
-				entry.labelText = labelText
-				entry.profile = profile
-				renderableTags[#renderableTags + 1] = entry
-			end
+		local profile = tag.chipProfile or {}
+		local labelText = FriendTags.GetChipLabel and FriendTags:GetChipLabel(tag) or tag.name or ""
+		if iconOnly then
+			labelText = ""
+		end
+		local iconValue = profile.iconValue or profile.icon
+		local hasIcon = iconValue and iconValue ~= ""
+		if labelText ~= "" or hasIcon then
+			local entry = AcquireRenderableTagEntry(data)
+			entry.tag = tag
+			entry.labelText = labelText
+			entry.profile = profile
+			renderableTags[#renderableTags + 1] = entry
 		end
 	end
 
@@ -1230,6 +1237,49 @@ function TagChips:UpdateStandaloneChip(chip, profile, labelText, maxWidth, maxHe
 		chip, profile, labelText, true, false, (maxWidth or STANDALONE_CHIP_MAX_WIDTH) / scale, true, metrics
 	)
 	return width * scale, hasIcon
+end
+
+-- Use the same chip sizes and spacing when rendering tags into a cell.
+function TagChips:LayoutCellTags(tags, width, wrap, cell, offset, top, settings)
+	local owner = GetFriendTags()
+	if not tags or #tags == 0 or width <= 0 then
+		if cell then for _, chip in ipairs(cell.tagChips or EMPTY_TABLE) do chip:Hide() end end
+		return 0
+	end
+	local metrics = ResolveChipMetrics(owner, nil, settings)
+	local scale = math.min(1, 16 / metrics.height)
+	local lineHeight = metrics.height * scale
+	local limit = ClampNumber(GetMetricSetting(settings, "maxRowChips", GetRowSetting(nil, owner, "maxRowChips", 3)), 1, MAX_ROW_CHIPS, 3)
+	local perLine = wrap and ClampNumber(GetMetricSetting(settings, "chipsPerLine", GetRowSetting(nil, owner, "chipsPerLine", DEFAULT_CHIPS_PER_LINE)), 1, MAX_ROW_CHIPS, DEFAULT_CHIPS_PER_LINE)
+		or MAX_ROW_CHIPS + 1
+	local x, y, count, onLine = 0, 0, 0, 0
+	for index = 1, math.min(#tags, limit + 1) do
+		local overflow = index > limit
+		local tag = tags[index]
+		local profile = overflow and OVERFLOW_PROFILE or tag.chipProfile or EMPTY_TABLE
+		local label = overflow and ("+" .. (#tags - limit)) or owner:GetChipLabel(tag) or ""
+		local hasIcon = profile.iconValue or profile.icon or profile.texture or profile.atlas
+		if label ~= "" or hasIcon then
+			local chipWidth = math.min(width, GetDesiredChipWidth(label, hasIcon and hasIcon ~= "", overflow, metrics) * scale)
+			if onLine >= perLine or x > 0 and x + chipWidth > width then
+				if not wrap then break end
+				x, y, onLine = 0, y + lineHeight + metrics.chipGap, 0
+			end
+			count, onLine = count + 1, onLine + 1
+			if cell then
+				cell.tagChips = cell.tagChips or {}
+				local chip = cell.tagChips[count] or CreateChip(cell)
+				cell.tagChips[count] = chip
+				chip:SetScale(scale)
+				UpdateChipVisual(chip, profile, label, true, overflow, chipWidth / scale, false, metrics)
+				chip:ClearAllPoints()
+				chip:SetPoint("TOPLEFT", cell, "TOPLEFT", (offset + x) / scale, -(top + y) / scale)
+			end
+			x = x + chipWidth + metrics.chipGap
+		end
+	end
+	if cell then for index = count + 1, #(cell.tagChips or EMPTY_TABLE) do cell.tagChips[index]:Hide() end end
+	return count > 0 and y + lineHeight or 0
 end
 
 return TagChips

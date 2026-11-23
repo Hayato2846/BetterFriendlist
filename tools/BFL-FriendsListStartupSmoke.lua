@@ -134,11 +134,14 @@ local function setup(accounts, options)
 		list.scrollBox = { GetDataProvider = function() return provider end, GetWidth = function() return 396 end,
 			SetDataProvider = function(_, nextProvider) provider = nextProvider; paints = paints + 1 end }
 		env.CreateDataProvider = function()
-			local value = { rows = {} }; function value:Insert(row) self.rows[#self.rows + 1] = row end; return value
+			local value = { rows = {} }
+			function value:Insert(row) self.rows[#self.rows + 1] = row end
+			function value:Enumerate() return ipairs(self.rows) end
+			return value
 		end
 	end
 	list:Initialize()
-	return { list = list, BFL = BFL, accounts = accounts, env = env, hooks = hooks, events = eventCallbacks, timers = timers,
+	return { list = list, BFL = BFL, accounts = accounts, env = env, hooks = hooks, events = eventCallbacks, timers = timers, execute = execute,
 		setShown = function(value) shown = value end, paints = function() return paints end,
 		rows = function() return options.modern and list.scrollBox:GetDataProvider().rows or list.classicDisplayList end,
 	}
@@ -158,6 +161,253 @@ do
 	check(context.list:PassesFilters({ type = "bnet", bnetAccountID = 43, uid = "bnet_43" }), "A BFL nickname match is included")
 	check(context.list:PassesFilters({ type = "bnet", bnetAccountID = 44, note = "Shared keyword" }), "A BFL note match is included")
 	check(not context.list:PassesFilters({ type = "bnet", bnetAccountID = 45 }), "A friend matching neither search is filtered")
+end
+local brokerSource = read("Modules/Broker.lua"):gsub("return Broker%s*$", "")
+local function LoadBroker(context, testEntry)
+	context.BFL.BrokerUtils = {}
+	context.env.CreateFrame = function()
+		local function noop() end
+		return { Hide = noop, SetSize = noop, EnableMouse = noop, SetFrameStrata = noop }
+	end
+	return context.execute(brokerSource .. testEntry, "Broker")
+end
+do
+	local context = setup({})
+	local BFL = context.BFL
+	BFL.QTip = {}
+	local setTooltip = LoadBroker(context, "\nreturn function(frame) tooltip = frame end")
+	local broker = BFL.Broker
+	local timers = {}
+	context.env.C_Timer.After = function(_, callback) timers[#timers + 1] = callback end
+	local textUpdates = 0
+	broker.UpdateBrokerText = function() textUpdates = textUpdates + 1 end
+	local function FlushTimers()
+		while #timers > 0 do
+			local callback = table.remove(timers, 1)
+			callback()
+		end
+	end
+
+	broker:ScheduleBrokerTextUpdate(false)
+	broker:ScheduleBrokerTextUpdate(false)
+	equal(#timers, 1, "Broker text updates coalesce without a tooltip")
+	FlushTimers()
+	equal(textUpdates, 1, "Broker text updates with the tooltip closed")
+
+	local filterTooltip = { bflBrokerFilterOpen = true, IsShown = function() return true end }
+	setTooltip(filterTooltip)
+	BFL.BrokerUtils.IsMenuOpen = function() return true end
+	broker:ScheduleBrokerTextUpdate(false)
+	broker:ScheduleObservedTooltipRefresh()
+	FlushTimers()
+	equal(textUpdates, 2, "An open filter menu does not block Broker text updates")
+	check(filterTooltip.bflBrokerFilterDirty, "An open filter menu keeps the tooltip refresh pending")
+end
+do
+	local context = setup({})
+	local groupId = "tag:raid"
+	local states = { [groupId] = true }
+	context.env.BetterFriendlistDB.groupStates = states
+	context.list.RenderDisplay = function() end
+	local marker = 'groupRow:SetScript("OnMouseUp", function(frame, button)'
+	local first = assert(brokerSource:find(marker, 1, true))
+	local last = assert(brokerSource:find("\n\t\t\t\t\t\tend)", first, true))
+	local installClick = context.execute("return function(groupRow, groupInfo, roster, Broker, groupId)\n"
+		.. brokerSource:sub(first, last + #"\n\t\t\t\t\t\tend)") .. "\nend", "Broker group click")
+	local click, renderedStates = nil, {}
+	local row = { SetScript = function(_, _, callback) click = callback end }
+	local broker = { RefreshTooltip = function() renderedStates[#renderedStates + 1] = states[groupId] end }
+	installClick(row, { virtualTagGroup = true }, context.list, broker, groupId)
+	click(row, "LeftButton")
+	equal(renderedStates[1], false, "Clicking a collapsed tag group redraws the expanded tooltip")
+	click(row, "LeftButton")
+	equal(renderedStates[2], true, "Clicking an expanded tag group redraws the collapsed tooltip")
+end
+-- CustomNames v1.2.3a fires no Add/Update callback for an unlinked BattleTag.
+do
+	local tag = "42Solo#1234"
+	local otherTag = "42Solo#5678"
+	local otherAccount = normal(otherTag)
+	otherAccount.bnetAccountID = 44
+	local context = setup({ normal(tag), otherAccount }, { modern = true })
+	local BFL, env, list = context.BFL, context.env, context.list
+	local callbacks, aliases = {}, {}
+	local customNames = {
+		RegisterCallback = function(_, event, callback) callbacks[event] = callback end,
+		Get = function(name) return aliases[name] or name end,
+		Set = function(name, alias)
+			if alias == "Rejected" then return false end
+			local old = aliases[name]
+			aliases[name] = alias
+			if not alias and old then callbacks.Name_Removed("Name_Removed", name) end
+			return true
+		end,
+	}
+	env.LibStub = setmetatable({ GetLibrary = function() end }, {
+		__call = function(_, name) if name == "CustomNames" then return customNames end end,
+	})
+	local installedHooks = 0
+	env.hooksecurefunc = function(object, method, hook)
+		local original = object[method]
+		object[method] = function(...)
+			local result = original(...)
+			hook(...)
+			return result
+		end
+		installedHooks = installedHooks + 1
+	end
+	function BFL:ScheduleFriendsListRefresh(reason) list:ScheduleRefresh(reason) end
+	env.BetterFriendlistDB.colorClassNames = false
+	env.BetterFriendlistDB.nicknames = { bnet_44 = "Unverified previous-session alias" }
+	env.C_BattleNet.GetAccountInfoByID = function(id) if id == 44 then return otherAccount end end
+	context.execute(read("Modules/Database.lua"), "Database")
+	local db = BFL.DB
+	db:Initialize()
+	equal(installedHooks, 1, "CustomNames Set receives one post-hook")
+	equal(aliases[otherTag], nil, "CustomNames never receives a numeric legacy key matched to a new account")
+	equal(db:GetNickname("bnet_44"), nil, "BFL doesn't display an old alias under a new contact's account ID")
+	db:Initialize()
+	equal(installedHooks, 1, "Repeated initialization retains the same post-hook")
+	db:Set("nameFormatPreset", "nickname")
+	equal(db:GetLibKey("bnet_" .. tag), tag, "Digit-prefixed BattleTags are not mistaken for numeric account IDs")
+
+	-- Track a real Broker refresh with mocked QTip drawing and the production name formatter.
+	local brokerName, nicknameColumn, otherBrokerNickname
+	local releases = 0
+	BFL.QTip = { ReleaseTooltip = function() releases = releases + 1 end }
+	local openBroker = LoadBroker(context, [[
+return function(friend, anchor, paint)
+	CreateLibQTipTooltip = function(nextAnchor)
+		paint(GetFriendDisplayName(friend), GetBrokerNickname(friend), GetBrokerNickname({
+			id = "bnet_42Solo#5678", type = "bnet", battleTag = "42Solo#5678",
+		}))
+		return { anchorFrame = nextAnchor, IsShown = function() return true end, IsMouseOver = anchor.IsMouseOver }
+	end
+	tooltip = CreateLibQTipTooltip(anchor)
+end
+]])
+	local function DrainTimers()
+		local count = 0
+		while #context.timers > 0 do
+			local timer = table.remove(context.timers, 1)
+			if not timer.cancelled then timer.callback() end
+			count = count + 1
+			assert(count <= 40, "Unexpected timer loop")
+		end
+	end
+
+	local hovered = true
+	local function OpenBroker()
+		openBroker({ id = "bnet_" .. tag, type = "bnet", battleTag = tag, accountName = "Other friend" },
+			{ IsMouseOver = function() return hovered end }, function(name, nickname, otherNickname)
+				brokerName, nicknameColumn, otherBrokerNickname = name, nickname, otherNickname
+			end)
+	end
+	local function VisibleFriendName(battleTag) return list:ResolveFriendByUID("bnet_" .. (battleTag or tag)).displayName end
+	list:UpdateFriendsList()
+	db:SetNickname("bnet_" .. otherTag, "Other alias")
+	DrainTimers()
+	OpenBroker()
+
+	local function CheckAlias(expected)
+		check(VisibleFriendName():find(expected, 1, true), "Roster displays " .. expected)
+		check(brokerName:find(expected, 1, true), "Broker name displays " .. expected)
+		equal(nicknameColumn, expected, "Broker nickname column uses the current alias")
+		check(VisibleFriendName(otherTag):find("Other alias", 1, true), "Roster keeps the other same-name account's alias")
+		equal(otherBrokerNickname, "Other alias", "Broker keeps the other same-name account's alias")
+		equal(env.BetterFriendlistDB.nicknames[tag], expected, "BFL keeps the confirmed alias for offline use")
+	end
+
+	check(customNames.Set(tag, "First alias"), "Unlinked BattleTag creation succeeds")
+	DrainTimers()
+	CheckAlias("First alias")
+	equal(releases, 1, "Creation refreshes the already shown broker tooltip")
+
+	local paints = context.paints()
+	customNames.Set(tag, "Intermediate alias")
+	customNames.Set(tag, "Latest alias")
+	DrainTimers()
+	CheckAlias("Latest alias")
+	equal(context.paints(), paints + 1, "A burst of alias changes rebuilds the visible list once")
+	equal(releases, 2, "A burst of alias changes refreshes the visible broker once")
+
+	local version = BFL.NicknameCacheVersion
+	equal(customNames.Set(tag, "Rejected"), false, "Post-hook preserves unsuccessful writes")
+	DrainTimers()
+	equal(BFL.NicknameCacheVersion, version, "A rejected write does not invalidate nicknames")
+	CheckAlias("Latest alias")
+
+	check(customNames.Set(tag, nil), "Nickname removal succeeds through the existing callback")
+	DrainTimers()
+	check(not VisibleFriendName():find("Latest alias", 1, true), "Removal clears the roster nickname")
+	equal(nicknameColumn, "", "Removal clears the visible broker nickname")
+	equal(env.BetterFriendlistDB.nicknames[tag], nil, "Removal clears the stored BFL alias")
+
+	hovered = false
+	context.setShown(false)
+	customNames.Set(tag, "After reopening")
+	DrainTimers()
+	equal(releases, 3, "An unobserved broker tooltip does no work")
+	context.setShown(true)
+	context.hooks.OnShow()
+	DrainTimers()
+	hovered = true
+	OpenBroker()
+	CheckAlias("After reopening")
+end
+
+-- Both menu slots expose the new sorters and use the same order in the roster and Broker.
+do
+	local contacts = { normal("Beta#1234"), normal("PvP#1234"), normal("Alpha#1234") }
+	local rules = { "PVE", "PVP", "PVE" }
+	for index, contact in ipairs(contacts) do
+		contact.bnetAccountID = index + 10
+		contact.gameAccountInfo.realmName = "Realm " .. rules[index]
+	end
+
+	local context = setup(contacts, { modern = true })
+	local BFL, list = context.BFL, context.list
+	function BFL:ScheduleFriendsListRefresh(reason) list:ScheduleRefresh(reason) end
+	local names = { ["bnet_Beta#1234"] = "Beta", ["bnet_PvP#1234"] = "Alpha", ["bnet_Alpha#1234"] = "Alpha" }
+	BFL.modules.DB.GetNickname = function(_, uid) return names[uid] end
+	context.execute(read("Modules/FriendsUI.lua"), "FriendsUI")
+	BFL.FriendsUI.appliedStyle = "table"
+	local function SelectModern(slot, id)
+		for _, option in ipairs(BFL.FriendsUI:GetSortMenuItems()[slot].items) do
+			if option.value == id then option.func(id); return true end
+		end
+		return false
+	end
+	local function SelectLegacy(slot, id)
+		local options = {}
+		list:PopulateSortMenu({ CreateRadio = function(_, _, _, select, value) options[value] = select end }, slot)
+		if options[id] then options[id](id); return true end
+		return false
+	end
+
+	local createBrokerComparator = LoadBroker(context, "\nreturn GetRosterComparator")
+	local function AssertOrder(expectedSecond, expectedThird)
+		list:UpdateFriendsList()
+		equal(list.friendsList[1].battleTag, "Alpha#1234", "Both sort keys resolve the first contact")
+		equal(list.friendsList[2].battleTag, expectedSecond, "FriendsList honors the primary and secondary choices")
+		equal(list.friendsList[3].battleTag, expectedThird, "FriendsList resolves remaining ties")
+		local brokerFriends = {}
+		for index, contact in ipairs(contacts) do
+			brokerFriends[index] = { id = "bnet_" .. contact.battleTag, gameAccountInfo = contact.gameAccountInfo, connected = true }
+		end
+		table.sort(brokerFriends, createBrokerComparator(BFL.modules.DB:Get()))
+		equal(brokerFriends[1].id, "bnet_Alpha#1234", "Broker resolves aliases using its own contact record")
+		equal(brokerFriends[2].id, "bnet_" .. expectedSecond, "Broker matches the order selected in the friend list")
+	end
+
+	check(SelectModern(1, "ruleset") and SelectModern(2, "nickname"), "Modern offers Ruleset primary and Nickname secondary")
+	AssertOrder("Beta#1234", "PvP#1234")
+	check(SelectModern(1, "nickname") and SelectModern(2, "ruleset"), "Modern offers Nickname primary and Ruleset secondary")
+	AssertOrder("PvP#1234", "Beta#1234")
+	check(SelectLegacy("primary", "ruleset") and SelectLegacy("secondary", "nickname"), "Legacy offers Ruleset primary and Nickname secondary")
+	AssertOrder("Beta#1234", "PvP#1234")
+	check(SelectLegacy("primary", "nickname") and SelectLegacy("secondary", "ruleset"), "Legacy offers Nickname primary and Ruleset secondary")
+	AssertOrder("PvP#1234", "Beta#1234")
 end
 -- A layout switch replaces the view without rebinding the animated scroll pair.
 for _, preference in ipairs({ {}, { value = false }, { value = true } }) do
@@ -610,4 +860,108 @@ do
 	check(rendered, "The fallback redraws without reloading friends")
 end
 
+-- Dynamic tag groups classify presence independently from the list filter.
+for _,project in ipairs({1,18,2,5,11,14,19}) do
+	local context=setup({})
+	context.env.WOW_PROJECT_ID=project
+	local list=context.list
+	local function friend(client,id,online)
+		return {type="bnet",connected=online~=false,gameAccountInfo={clientProgram=client,wowProjectID=id,isOnline=online~=false}}
+	end
+	local mode="same_flavor_online"
+	check(list:PassesDynamicTagGroupFilter(friend("WoW",project),mode),"same flavor qualifies on each supported project")
+	check(not list:PassesDynamicTagGroupFilter(friend("WoW",project+100),mode),"another flavor goes to the default group")
+	check(not list:PassesDynamicTagGroupFilter(friend("WoW",nil),mode),"missing flavor metadata is not guessed")
+	check(not list:PassesDynamicTagGroupFilter(friend("WoW",project,false),mode),"offline same-flavor friends do not qualify")
+	check(list:PassesDynamicTagGroupFilter({type="wow",connected=true},mode),"online local WoW friends use the current flavor")
+	check(not list:PassesDynamicTagGroupFilter({type="wow",connected=false},mode),"offline local friends fall back")
+	for _,client in ipairs({"App","BSAp","CLNT"}) do
+		local app=friend(client)
+		check(list:PassesDynamicTagGroupFilter(app,mode),"online app-only contacts qualify")
+		app.gameAccounts={{clientProgram="WTCG",isOnline=true}}
+		check(not list:PassesDynamicTagGroupFilter(app,mode),"a parallel app session does not admit another game")
+		app.gameAccounts[2]={clientProgram="WoW",wowProjectID=project,isOnline=true}
+		check(list:PassesDynamicTagGroupFilter(app,mode),"an additional online matching WoW account qualifies")
+	end
+	check(not list:PassesDynamicTagGroupFilter(friend("WTCG"),mode),"other online games do not qualify")
+	check(list:PassesDynamicTagGroupFilter(friend("WTCG"),"all"),"default preserves all online games")
+	check(list:PassesDynamicTagGroupFilter(friend("WoW",project,false),"all"),"default preserves offline contacts")
+	local hidden=friend("App");hidden.gameAccounts=protectedAccount
+	check(not list:PassesDynamicTagGroupFilter(hidden,mode),"restricted account lists cannot prove app-only presence")
+	hidden=friend("WoW",project);hidden.gameAccountInfo.wowProjectID=protectedAccount
+	check(not list:PassesDynamicTagGroupFilter(hidden,mode),"secret project IDs are never compared")
+end
+
+for _,modern in ipairs({false,true}) do
+	local context=setup({}, {modern=modern})
+	local list,BFL=context.list,context.BFL
+	local preference={enableDynamicTagGroups=true,dynamicTagGroupFilter="all"}
+	local definitions={{id="custom:a",name="A",order=1},{id="custom:b",name="B",order=2}}
+	BFL.modules.FriendTags={
+		IsEnabled=function()return true end,
+		GetSetting=function(_,key,fallback)if preference[key]~=nil then return preference[key] end;return fallback end,
+		GetAllTagDefinitions=function()return definitions end,
+		GetChipProfile=function(_,tag)return {visible=true,order=tag.order} end,
+		ShouldIncludeTagOnSurface=function()return true end,
+		CanDisplayTags=function(_,surface)return surface=="group" end,
+		GetChipLabel=function(_,tag)return tag.name end,
+		GetTagsForFriend=function()return definitions end,
+	}
+	local tagSource = read("Modules/FriendTags.lua")
+	local first = assert(tagSource:find("function FriendTags:GetDynamicGroups(", 1, true))
+	local last = assert(tagSource:find("function FriendTags:GetTagIdsForFriend(", first, true))
+	context.env.FriendTags = BFL.modules.FriendTags
+	context.execute("local EMPTY_TABLE = {}\n" .. tagSource:sub(first, last - 1), "dynamic tag groups")
+	local function record(id,client,project,online)
+		return {uid="bnet_"..id,type="bnet",battleTag=id,accountName=id,connected=online,
+			gameAccountInfo={clientProgram=client,wowProjectID=project,isOnline=online}}
+	end
+	list.friendsList={record("Same","WoW",18,true),record("Other","WoW",1,true),record("App","App",nil,true),
+		record("Game","WTCG",nil,true),record("Offline","WoW",18,false)}
+	local function render()
+		BFL.SettingsVersion=(BFL.SettingsVersion or 0)+1
+		list:RenderDisplay(true)
+	end
+	render()
+	equal(#list:GetFriendsForGroup("tag:custom:a"),5,"default keeps all tagged friends")
+	preference.dynamicTagGroupFilter="same_flavor_online";render()
+	equal(#list:GetFriendsForGroup("tag:custom:a"),2,"restricted tag groups contain only matching WoW and app contacts")
+	equal(#list:GetFriendsForGroup("tag:custom:b"),2,"multiple matching tags remain available")
+	equal(#list:GetFriendsForGroup("nogroup"),3,"other flavors, games and offline contacts remain reachable in Friends")
+	for _,row in ipairs(context.rows()) do
+		if row.groupId=="tag:custom:a" and not row.friend then
+			equal(row.totalCount,2,"tag totals follow the grouping rule")
+			equal(row.onlineCount,2,"tag online totals follow the same rule")
+		end
+	end
+	list.groupedFriends,list.cachedGroupedFriends=nil,nil
+	equal(#list:GetFriendsForGroup("tag:custom:a"),2,"uncached group expansion uses the same eligibility rule")
+	equal(#list:GetFriendsForGroup("nogroup"),3,"uncached Friends membership matches rendered membership")
+	list.friendsList[2].gameAccountInfo.wowProjectID=18;render()
+	equal(#list:GetFriendsForGroup("tag:custom:a"),3,"changing flavor moves a friend back into tag groups")
+	list.friendsList[1].connected=false;render()
+	equal(#list:GetFriendsForGroup("nogroup"),3,"going offline moves the friend into Friends")
+	preference.dynamicTagGroupFilter="all";render()
+	equal(#list:GetFriendsForGroup("tag:custom:a"),5,"turning the option off restores all assignments")
+	preference.enableDynamicTagGroups=false;render()
+	equal(#list:GetFriendsForGroup("nogroup"),5,"disabling dynamic groups restores ordinary grouping")
+end
+do
+	local context=setup({})
+	local reviewSource=read("Modules/LegacySettingsReview.lua")
+	local first=assert(reviewSource:find("local function BuildTagGroupComparison",1,true))
+	local last=assert(reviewSource:find("function Review:RenderComparisonLane",first,true))
+	local env=setmetatable({Text=function(key)return key end},{__index=_G})
+	local compare=assert(load(reviewSource:sub(first,last-1).."\nreturn BuildTagGroupComparison","@tag grouping comparison","t",env))()
+	local tags={CreateSettingsTagExamples=function()return {{id="a",name="A"},{id="b",name="B"}} end}
+	local entry={friend={type="bnet",connected=false,uid="example"}}
+	local options={enableDynamicTagGroups=true,dynamicTagGroupFilter="same_flavor_online"}
+	local result=compare(context.list,entry,tags,options)
+	equal(result[1].groupId,"nogroup","filtered comparison shows the default group")
+	equal(result[1].onlineCount,0,"offline comparison never counts a contact as online")
+	options.dynamicTagGroupFilter="all"
+	result=compare(context.list,entry,tags,options)
+	equal(#result,2,"All Contacts comparison preserves both matching tags")
+	equal(result[1].onlineCount,0,"unfiltered comparison has correct offline totals")
+end
 io.write("[OK] FriendsList startup smoke: " .. assertions .. " assertions (complete production module; mocked C APIs/widgets)\n")

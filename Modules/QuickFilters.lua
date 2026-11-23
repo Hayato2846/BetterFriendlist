@@ -294,6 +294,8 @@ function QuickFilters:SetTagFilter(tagId, selected)
 	if BFL.ForceRefreshFriendsList then
 		BFL:ForceRefreshFriendsList()
 	end
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
 	local header = BetterFriendsFrame and BetterFriendsFrame.FriendsTabHeader
 	self:RefreshDropdown(header and header.QuickFilterDropdown)
 	return true
@@ -457,6 +459,8 @@ function QuickFilters:SetFilter(mode)
 	if BetterFriendlistDB then
 		BetterFriendlistDB.quickFilter = mode
 	end
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
 	filterMode = mode
 	RefreshVisibleMenuLabels()
 

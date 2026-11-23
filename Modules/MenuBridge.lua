@@ -587,8 +587,8 @@ function MenuBridge:DisableProvider(provider, errorValue)
 	provider.lastError = tostring(errorValue or "unknown error")
 end
 
-function MenuBridge:ReplayDynamicModifiers(owner, section, safeContext)
-	local entries = self.dynamicModifiersByTag[safeContext.menuTag]
+function MenuBridge:ReplayDynamicModifiers(owner, section, safeContext, tag, addonName)
+	local entries = self.dynamicModifiersByTag[tag or safeContext.menuTag]
 	if not entries then
 		return false
 	end
@@ -597,7 +597,7 @@ function MenuBridge:ReplayDynamicModifiers(owner, section, safeContext)
 	end
 
 	for _, entry in ipairs(entries) do
-		if not entry.disabled then
+		if not entry.disabled and (not addonName or entry.addonName:lower() == addonName) then
 			local ok, err = pcall(entry.callback, owner, section, safeContext)
 			if ok then
 				entry.replayCount = entry.replayCount + 1
@@ -610,7 +610,7 @@ function MenuBridge:ReplayDynamicModifiers(owner, section, safeContext)
 	return section.created == true
 end
 
-function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType, nativeTag)
+function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType, nativeTag, nativeContext)
 	if not BFL.HasSecretValues then
 		return false
 	end
@@ -627,8 +627,22 @@ function MenuBridge:PopulateMenu(owner, rootDescription, contextData, menuType, 
 	end
 
 	local section = CreateExternalSection(rootDescription, safeContext)
-	-- Blizzard already runs the original registrations on its own menus.
-	if bridgeEnabled and not nativeTag then self:ReplayDynamicModifiers(owner, section, safeContext) end
+	if bridgeEnabled and not nativeTag then
+		self:ReplayDynamicModifiers(owner, section, safeContext)
+	elseif bridgeEnabled and nativeContext
+		and (nativeTag == "MENU_UNIT_BN_FRIEND" or nativeTag == "MENU_UNIT_BN_FRIEND_OFFLINE")
+		and type(safeContext.battleTag) == "string" and safeContext.battleTag:match("^[^#%s]+#%d+$")
+	then
+		-- Battle.net links carry the account ID. CustomNames resolves its menu entry
+		-- from the BattleTag, which may only be available in the verified BFL row.
+		local originalTag = SafeValue(nativeContext, "battleTag")
+		if originalTag == nil then originalTag = SafeValue(SafeValue(nativeContext, "accountInfo"), "battleTag") end
+		if not (type(originalTag) == "string" and originalTag:match("^[^#%s]+#%d+$"))
+			and not SafeValue(nativeContext, "unit") and not SafeValue(nativeContext, "guid")
+		then
+			self:ReplayDynamicModifiers(owner, section, safeContext, nativeTag, "customnames")
+		end
+	end
 	local modifierTag = nativeTag or (bridgeEnabled and safeContext.menuTag)
 
 	for _, id in ipairs(self.providerOrder) do

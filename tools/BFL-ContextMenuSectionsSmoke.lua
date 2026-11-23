@@ -69,7 +69,7 @@ local function setup(nativeRoot)
 			rows = {}
 			for _, item in ipairs(items) do
 				rows[#rows + 1] = { text = item.text, kind = item.isTitle and "title" or (item.text == "" and "divider" or "button"),
-					enabled = not item.disabled }
+					enabled = not item.disabled, callback = item.func }
 			end
 		end
 	end
@@ -88,7 +88,7 @@ local function setup(nativeRoot)
 	execute(between(source, "local function BFL_AddRafSummonButton(", "local function BFL_AddFavoriteButton(")
 		.. between(source, "local function BFL_AddInviteButton(", "local function BFL_GetBNetAccountInfo(")
 		.. between(source, "function BFL:OpenBetterFriendlistContextMenu(", "\n\t\t\tif Menu and Menu.ModifyMenu then"), "Production context menu and interaction actions")
-	return { BFL = BFL, env = env, rows = function() return rows end }
+	return { BFL = BFL, env = env, rows = function() return rows end, execute = execute }
 end
 for _, backend in ipairs({ forever, classic, false }) do
 	local context = setup(backend)
@@ -131,4 +131,78 @@ for _, backend in ipairs({ forever, classic, false }) do
 		end
 	end
 end
+
+for _, backend in ipairs({ forever, classic, false }) do
+	local context = setup(backend)
+	local BFL, env = context.BFL, context.env
+	BFL.HasSecretValues = backend == forever
+	BFL.L.MENU_TITLE, BFL.L.MENU_SET_NICKNAME, BFL.L.MENU_GROUPS = "BetterFriendlist", "Set Nickname", "Groups"
+	env.L = BFL.L
+	BFL:RegisterModule("FriendsList", {})
+	local friends = BFL:GetModule("FriendsList")
+	local first = { uid = "bnet_Twin#1234", type = "bnet", bnetAccountID = 41, battleTag = "Twin#1234",
+		accountName = "Shared Name", gameAccountInfo = { playerGuid = "SharedGUID" } }
+	local second = { uid = "bnet_Twin#5678", type = "bnet", bnetAccountID = 42, battleTag = "Twin#5678",
+		accountName = "Shared Name", gameAccountInfo = { playerGuid = "SharedGUID" } }
+	local character = { uid = "wow_Ada-Realm", type = "wow", name = "Ada-Realm" }
+	friends.friendsList = { first, second, character }
+	function friends:GetFriendUID(friend) return friend.uid end
+	function friends:ResolveFriendByUID(uid) if uid == character.uid then return character end end
+	function BFL:NormalizeWoWFriendName(name) return name end
+	env.GetFriendsList = function() return friends end
+	env.GetGroups = function() end
+	env.BFL_AddGroupMembershipButtons = function() end
+	env.BetterFriendlistDB = { nicknames = {}, friendGroups = {} }
+	env.BFL_FindBNetFriendData = function() end
+	context.execute(read(repo, "Utils/FriendNotes.lua"), "FriendNotes")
+	context.execute(read(repo, "Utils/FriendActions.lua"), "FriendActions")
+	context.execute(read(repo, "Modules/Database.lua"), "Database")
+	context.execute(read(repo, "Modules/MenuSystem.lua"), "MenuSystem")
+	BFL:GetModule("MenuSystem"):Initialize()
+	local db = BFL:GetModule("DB")
+	local popup
+	env.StaticPopup_Show = function(_, _, _, data) popup = data end
+	env.AddGroupsToFriendMenu = context.execute(
+		between(source, "local function BFL_IsOwnMenuContext(", "local function BFL_BuildCopyNameHandler(")
+		.. between(source, "local function AddGroupsToFriendMenu(", "local function AddRecentAllyOptions(")
+		.. "\nreturn AddGroupsToFriendMenu", "Production nickname menu")
+	local function Open(menu, data, verified)
+		popup = nil
+		check(BFL:OpenBetterFriendlistContextMenu({}, menu, data, data.name, verified), "Opens the friend menu")
+		for _, row in ipairs(context.rows()) do
+			if row.text == "Set Nickname" then
+				row.callback()
+				return popup
+			end
+		end
+	end
+	local function Rename(data, nickname, enterPressed)
+		local edit = { GetText = function() return nickname end, GetParent = function() return { Hide = function() end } end }
+		local dialog = env.StaticPopupDialogs.BETTER_FRIENDLIST_SET_NICKNAME
+		if enterPressed then dialog.EditBoxOnEnterPressed(edit, data) else dialog.OnAccept({ EditBox = edit }, data) end
+	end
+	BFL.ForceRefreshFriendsList = function() end
+	local edit = Open("BN_FRIEND", { bnetIDAccount = 41, name = "Shared Name", guid = "SharedGUID" })
+	check(edit and edit.uid == first.uid, "An account ID resolves the first contact regardless of shared character GUID")
+	Rename(edit, "First alias")
+	edit = Open("BN_FRIEND_OFFLINE", { battleTag = second.battleTag, name = "Shared Name", guid = "SharedGUID" })
+	check(edit and edit.uid == second.uid, "A full BattleTag resolves the second contact regardless of shared display name")
+	Rename(edit, "Second alias", true)
+	equal(db:GetNickname(first.uid), "First alias", "Editing the second contact leaves the first nickname in place")
+	equal(db:GetNickname(second.uid), "Second alias", "The second nickname is stored under its own BattleTag")
+	check(not Open("BN_FRIEND", { bnetIDAccount = 41, battleTag = second.battleTag, name = character.name }),
+		"Conflicting account identifiers cannot route a nickname edit")
+	check(not Open("BN_FRIEND", { name = character.name, guid = "SharedGUID" }),
+		"A Battle.net menu cannot guess the contact from a character name or GUID")
+	check(Open("BN_FRIEND_OFFLINE", {}, second).uid == second.uid,
+		"A verified BFL row supplies the nickname target even without native context fields")
+	check(Open("FRIEND_OFFLINE", { uid = character.uid }).uid == character.uid,
+		"A verified BFL-owned UID works for an ungrouped character friend")
+	BFL.StreamerMode = { IsActive = function() return true end, GetFriendMenuLabel = function() return "Masked" end }
+	local label
+	env.StaticPopup_Show = function(_, name, _, data) label, popup = name, data end
+	Open("BN_FRIEND", { bnetIDAccount = 41, name = "Shared Name" })
+	equal(label, "Masked", "The nickname dialog uses the Streamer Mode label")
+end
+
 io.write("[OK] Context menu sections smoke: " .. assertions .. " assertions (native Forever/Classic queue helpers and real legacy fallback; mocked widgets/C APIs)\n")
