@@ -217,6 +217,7 @@ end
 local function friendRow(friend)
 	local row = region()
 	row.friendData, row.dragOverlay, row.scripts = friend, region(), {}
+	list:BindFriendGroupAction(row, list:GetFriendUID(friend), friend.rawNote)
 	row.dragOverlay:Hide()
 	function row:SetAlpha(alpha) self.alpha = alpha end
 	function row:SetScript(event, handler) self.scripts[event] = handler end
@@ -225,7 +226,8 @@ end
 local first, second, noGroup = groupHeader("group1"), groupHeader("group2"), groupHeader("nogroup")
 local favorites = groupHeader("favorites")
 local tagHeader = groupHeader("tag:inherited")
-local titleRow = friendRow({ type = "bnet", name = "Title Friend", friendLevel = 3, bnetAccountID = blank.bnetAccountID })
+local titleRow = friendRow({ type = "bnet", name = "Title Friend", friendLevel = 3,
+	bnetAccountID = blank.bnetAccountID, rawNote = blank.note })
 local otherRow = friendRow({ type = "bnet", name = "BattleTag Friend", battleTag = regular.battleTag })
 otherRow.groupId = "group1"
 local frames = { first, second, noGroup, favorites, tagHeader, titleRow, otherRow }
@@ -279,7 +281,7 @@ check(db:IsFriendInGroup(uid, "group2") and db:IsFriendInGroup("bnet_Friend#1234
 titleRow.friendData = originalFriend
 
 local originalNote = blank.note
-local menuKey = db:GetTitleFriendGroupActionKey(uid)
+local menuKey = titleRow.bflGroupActionKey
 list.OnDragStart(titleRow)
 blank.note = notes.AppendTitleGroupToken("", "BBBBBBBB")
 list.OnDragStop(titleRow)
@@ -289,9 +291,30 @@ check(not db:ToggleFriendInGroup(uid, "group1", menuKey) and not db:SetFriendGro
 blank.note = originalNote
 check(db:RequireFriendGroupKey(uid) and db:IsFriendInGroup(uid, "group2"), "rejected drop preserves the original linked membership")
 
+check(titleNotes:ShowEditor(blank.bnetAccountID, "Displayed Title Friend", menuKey), "open the editor for the current link")
+local heldPopup = env.StaticPopupDialogs.BFL_SET_TITLE_FRIEND_NOTE
+local savedText = store.notes[blankToken]
+roster[1] = titleFriend(blank.bnetAccountID, notes.AppendTitleGroupToken("", "CCCCCCCC"))
+check(titleNotes:ShowEditor(blank.bnetAccountID, "Displayed Title Friend", menuKey)
+	and env.StaticPopupDialogs.BFL_SET_TITLE_FRIEND_NOTE == heldPopup, "a stale displayed row cannot open the replacement note")
+heldPopup.OnAccept(editor)
+check(store.notes[blankToken] == savedText and store.notes.CCCCCCCC == nil, "an open editor cannot save across a link replacement")
+drag(titleRow, first, false)
+check(#db:GetFriendGroups(uid) == 0 and not titleRow.scripts.OnUpdate,
+	"a replacement before mouse-down cannot take over a drag from the old displayed row")
+list:BindFriendGroupAction(titleRow, uid, roster[1].note)
+drag(titleRow, first, false)
+check(db:IsFriendInGroup(uid, "group1"), "the same row becomes actionable after rendering the new link")
+check(not db:IsFriendInGroup(uid, "group1", menuKey), "an old menu cannot display the replacement contact's membership")
+roster[1] = blank
+list:BindFriendGroupAction(titleRow, uid, blank.note)
+check(db:RequireFriendGroupKey(uid) and db:IsFriendInGroup(uid, "group2"), "rendering a replacement never moves the old friend's memberships")
+
 hovered = first
 list.OnDragStart(titleRow)
 list.OnDragUpdate(titleRow)
+list:BindFriendGroupAction(titleRow, uid, blank.note)
+check(first.dropHighlight:IsShown() and titleRow.scripts.OnUpdate, "rebinding the same displayed identity preserves an active drag")
 list.CancelFriendDrag(titleRow) -- OnHide is wired to this handler in both list paths.
 list.OnDragStop(titleRow)
 check(not first.dropHighlight:IsShown() and db:IsFriendInGroup(uid, "group2"), "hiding the source cancels even over a valid target")

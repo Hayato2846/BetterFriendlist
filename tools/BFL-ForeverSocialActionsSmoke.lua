@@ -788,6 +788,14 @@ do
 	equal(#frames, 4, "reused rows reuse their click layers")
 	equal(hit.font.args[2], 91, "the recycled row uses the new friend ID")
 	check(rawequal(hit.font.args[1], secret), "a secret name goes directly into the native font formatter")
+	row.bflGroupActionKey = "bnet_title_ABCD2345"
+	test:UpdateRow(friends, row, friend)
+	down(catch, "LeftButton")
+	row.bflGroupActionKey = "bnet_title_ABCD2346"
+	test:UpdateRow(friends, row, friend)
+	up(catch, "LeftButton")
+	equal(callbacks.OnClick, 1, "a changed contact link cancels the press even when its row and account ID are reused")
+	row.bflGroupActionKey = nil
 	friend = { type = "wow", name = "Example-Realm" }
 	friends:RenderDisplay()
 	equal(hit.font.args[1], "Example-Realm", "WoW-only friends use a native player link")
@@ -1381,8 +1389,10 @@ do
 		env[fn] = function(root) root:CreateButton(label) end
 	end
 	env.BFL_ReplaceCopyNameButton = function(_, root) root:CreateButton("Copy name") end
+	local groupActionKey
 	env.AddGroupsToFriendMenu = function(_, root, context, verified)
 		equal(verified.uid, context.uid, "feature actions receive the verified friend")
+		groupActionKey = context.bflGroupActionKey
 		root:CreateButton("BetterFriendlist")
 	end
 	env.BFL_FirstSafeText = function(...)
@@ -1590,13 +1600,17 @@ do
 	equal(count(fallback, "BetterFriendlist"), 1, "the fallback keeps BFL's group section")
 	equal(count(fallback, "Third-party action"), 1, "the fallback replays a captured Menu Bridge action once")
 	equal(count(fallback, "Duplicate fallback"), 0, "the fallback avoids a duplicate provider action")
+	row.bflGroupActionUID, row.bflGroupActionKey = friend.uid, "bnet_title_ABCD2345"
+	BFL:OpenFriendMenuFallback(row, friend)
+	equal(groupActionKey, row.bflGroupActionKey, "the context menu carries the displayed row's group link")
+	row.bflGroupActionUID, row.bflGroupActionKey = nil, nil
 	local oldActive = BFL.StreamerMode.IsActive
 	BFL.StreamerMode.IsActive = function() return true end
 	local oldDB = BFL:GetModule("DB")
 	BFL:RegisterModule("DB", { Get = function(_, key, default)
 		if key == "streamerModeNameFormat" then return "nickname" end
 		return default
-	end, GetNickname = function() return "" end })
+	end, GetNickname = function() return "" end, GetTitleFriendGroupActionKey = function() end })
 	friend.friendLevel = env.Enum.BattleNetFriendLevel.RealID
 	friend.battleTag = "Masked#1234"
 	BFL:OpenFriendMenuFallback(row, friend)

@@ -8678,16 +8678,13 @@ do
 		local friend = button.friendData
 		if FriendsList.activeFriendDrag or not friend or not button.dragOverlay then return end
 		local uid = FriendsList:GetFriendUID(friend)
-		if not uid then return end
+		if not uid or uid ~= button.bflGroupActionUID then return end
 
-		local groupKey
-		if BFL.IsForever and uid:match("^bnet_%d+$") then
-			-- A recycled account ID alone cannot identify a Title Friend at drop time.
+		local groupKey = button.bflGroupActionKey
+		if groupKey ~= nil then
+			-- Check the displayed link before accepting a drag against the live roster.
 			local db = GetDB()
-			if not db then return end
-			local ready
-			ready, groupKey = db:RequireFriendGroupKey(uid)
-			if not ready then return end
+			if not db or not db:RequireFriendGroupKey(uid, groupKey) then return end
 		end
 
 		local name
@@ -9397,6 +9394,18 @@ function FriendsList:ClearSelection()
 	end
 end
 
+function FriendsList:BindFriendGroupAction(button, uid, note)
+	local db = BFL.IsForever and GetDB()
+	local key
+	if db then key = db:GetTitleFriendGroupActionKey(uid, note) end
+	local drag = self.activeFriendDrag
+	if drag and drag.button == button and (drag.uid ~= uid or drag.key ~= key) then
+		self.CancelFriendDrag(button)
+	end
+	button.bflGroupActionUID = uid
+	button.bflGroupActionKey = key
+end
+
 function FriendsList:UpdateFriendButton(button, elementData)
 	local friend = elementData.friend
 	local groupId = elementData.groupId
@@ -9409,6 +9418,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- native friends-card-selected highlight; legacy rows retain their custom
 	-- selection texture.
 	local friendUID = friend.uid or (self.GetFriendUID and self:GetFriendUID(friend))
+	if not self.settingsSample then self:BindFriendGroupAction(button, friendUID, friend.rawNote) end
 	local isSelected = self.selectedFriend == friend
 		or (self.selectedFriendUID ~= nil and friendUID ~= nil and self.selectedFriendUID == friendUID)
 	self:SetButtonSelectionVisual(button, isSelected)
@@ -9435,8 +9445,8 @@ function FriendsList:UpdateFriendButton(button, elementData)
 		button.DownArrow:Hide()
 	end
 
-	-- Reset drag overlay (Fix for recycled buttons showing "multiple drags")
-	if button.dragOverlay then
+	-- Keep the overlay during a refresh of the current drag source.
+	if button.dragOverlay and (not self.activeFriendDrag or self.activeFriendDrag.button ~= button) then
 		button.dragOverlay:Hide()
 	end
 

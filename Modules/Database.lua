@@ -1622,13 +1622,16 @@ local function GetGroupMutationKey(uid, showError, expectedKey)
 	if expectedKey == nil or key == expectedKey then return key end
 end
 
-function DB:GetTitleFriendGroupActionKey(uid)
-	if IsTitleFriendGroupUID(uid) then return GetFriendGroupKey(uid, true) or false end
+function DB:GetTitleFriendGroupActionKey(uid, note)
+	if not IsTitleFriendGroupUID(uid) then return end
+	local notes = BFL.FriendNotes
+	local text, token = notes.SplitTitleGroupNote(note)
+	if token and note == notes.AppendTitleGroupToken(text, token) then return TITLE_GROUP_PREFIX .. token end
+	return false
 end
 
 function DB:RequireFriendGroupKey(uid, expectedKey)
-	local key = GetGroupMutationKey(uid, true, expectedKey)
-	return key ~= nil, key
+	return GetGroupMutationKey(uid, true, expectedKey) ~= nil
 end
 
 local function OnFriendGroupsChanged(uid)
@@ -1640,10 +1643,12 @@ local function OnFriendGroupsChanged(uid)
 end
 
 -- Get friend's groups. With no UID, return the backing store for maintenance.
-function DB:GetFriendGroups(friendUID)
+function DB:GetFriendGroups(friendUID, expectedKey)
 	-- If friendUID is provided, return groups for that specific friend
 	if friendUID then
-		return BetterFriendlistDB.friendGroups[GetFriendGroupKey(friendUID)] or {}
+		local key = GetFriendGroupKey(friendUID)
+		if expectedKey ~= nil and key ~= expectedKey then return {} end
+		return BetterFriendlistDB.friendGroups[key] or {}
 	end
 	-- If no friendUID provided, return ALL friendGroups mappings
 	return BetterFriendlistDB.friendGroups or {}
@@ -1739,9 +1744,9 @@ function DB:RemoveFriendFromGroup(friendUID, groupId, storedKey)
 end
 
 -- Check if friend is in group
-function DB:IsFriendInGroup(friendUID, groupId)
+function DB:IsFriendInGroup(friendUID, groupId, expectedKey)
 	if not friendUID then return false end
-	for _, gid in ipairs(self:GetFriendGroups(friendUID)) do
+	for _, gid in ipairs(self:GetFriendGroups(friendUID, expectedKey)) do
 		if gid == groupId then
 			return true
 		end

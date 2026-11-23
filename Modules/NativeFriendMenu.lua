@@ -208,12 +208,13 @@ local function CreateLayers(row, friends, isWho)
 		state.pressedFriend, state.pressedButton = nil, nil
 		local current = isWho and row.info or row.friendData
 		if pressed and pressed == state.friend and pressed == current and self:IsMouseOver() then
-			local target = state.boundTarget
+			local target, groupKey = state.boundTarget, state.groupActionKey
 			RunRowScript(row, "OnClick", button)
 			-- The client chooses the click target on press. Arm the next press
 			-- after selection and let the inherited hyperlink script do the whisper.
 			if button == "LeftButton" and state.whisperMode == "double"
 				and pressed == state.friend and target == state.boundTarget
+				and groupKey == state.groupActionKey
 				and self:IsVisible() and CanRouteLink()
 			then
 				CancelDoubleClick(state)
@@ -355,7 +356,7 @@ local function HideLayers(row, state)
 	state.hit:Hide()
 	HideCatch(state)
 	state.friend = nil
-	state.boundTarget = nil
+	state.boundTarget, state.groupActionKey = nil, nil
 	state.whisperMode = nil
 	state.leave()
 	if state.inviteLevel then
@@ -653,10 +654,11 @@ function FriendMenu:UpdateRow(friends, row, friend, isWho)
 		return
 	end
 	local boundTarget = target.type == "bnet" and target.bnetAccountID or target.name
-	if state.friend ~= friend or state.boundTarget ~= boundTarget then
+	local groupKey = row.bflGroupActionKey
+	if state.friend ~= friend or state.boundTarget ~= boundTarget or state.groupActionKey ~= groupKey then
 		CancelDoubleClick(state)
 		state.friend = friend
-		state.boundTarget = boundTarget
+		state.boundTarget, state.groupActionKey = boundTarget, groupKey
 		state.pressedFriend, state.pressedButton = nil, nil
 		if row.bflNativeHover then
 			RunRowScript(row, "OnLeave")

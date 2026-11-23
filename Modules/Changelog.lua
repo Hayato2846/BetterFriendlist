@@ -84,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### WoW Forever
 
 #### Fixed
-- **Title Friend Groups** - A missing or duplicate link no longer prevents other Title Friends from being assigned to groups.
+- **Title Friend Groups** - A missing or duplicate link no longer prevents other Title Friends from being assigned to groups. BFL cancels pending group or note edits if it can no longer verify the contact shown.
 - **Title Friend Notes** - Short existing notes can be linked and edited as soon as the friends list is ready, with their original text preserved.
 
 ---

@@ -2919,8 +2919,14 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				local friendCurrentGroups = {}
+				local expectedGroupKey = BFL_SafeContextValue(contextData, "bflGroupActionKey")
 				if DB then
-					for _, gid in ipairs(DB:GetFriendGroups(friendUID)) do
+					if expectedGroupKey == nil then
+						local account = BFL_SafeContextValue(contextData, "accountInfo")
+						local note = BFL_SafeFieldValue(account, "note") or BFL_SafeFieldValue(friendData, "rawNote")
+						expectedGroupKey = DB:GetTitleFriendGroupActionKey(friendUID, note)
+					end
+					for _, gid in ipairs(DB:GetFriendGroups(friendUID, expectedGroupKey)) do
 						friendCurrentGroups[gid] = true
 					end
 				end
@@ -3080,7 +3086,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				end
 
 				-- Add "Create Group" option at the top
-				local expectedGroupKey = DB and DB:GetTitleFriendGroupActionKey(friendUID)
 				groupsButton:CreateButton(L.MENU_CREATE_GROUP, function()
 					local data = friendUID
 					if expectedGroupKey ~= nil then
@@ -3142,7 +3147,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						local checkbox = groupsButton:CreateCheckbox(
 							group.data.name,
 							function() -- Read state dynamically from DB each time checkbox is rendered
-								return DB and DB:IsFriendInGroup(friendUID, groupId) or false
+								return DB and DB:IsFriendInGroup(friendUID, groupId, expectedGroupKey) or false
 							end,
 							function()
 								local Groups = GetGroups()
@@ -3493,10 +3498,15 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				if isBNet and contextData.bnetIDAccount then
 					rootDescription:CreateButton(SET_NOTE or "Set Note", function()
 						local titleNotes = BFL.TitleFriendNotes
-						local account = titleNotes and titleNotes:IsEnabled() and BFL_GetBNetAccountInfo(contextData)
-						if titleNotes and account and BFL.IsTitleFriend(account)
-							and titleNotes:ShowEditor(contextData.bnetIDAccount, BFL_GetContextDisplayName(contextData, true)) then
-							return
+						local expectedKey = contextData.bflGroupActionKey
+						local account = expectedKey == nil and titleNotes and titleNotes:IsEnabled()
+							and BFL_GetBNetAccountInfo(contextData)
+						if titleNotes and (expectedKey ~= nil or (account and BFL.IsTitleFriend(account)))
+						then
+							if titleNotes:ShowEditor(contextData.bnetIDAccount,
+								BFL_GetContextDisplayName(contextData, true), expectedKey) or type(expectedKey) == "string" then
+								return
+							end
 						end
 						if not FriendsFrame and C_AddOns and C_AddOns.LoadAddOn then
 							pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
@@ -4171,6 +4181,17 @@ frame:SetScript("OnEvent", function(self, event, ...)
 						gameAccountInfo = gameAccount,
 					}
 					context.guid = Read(gameAccount, "playerGuid")
+					local db = BFL:GetModule("DB")
+					if row and row.bflGroupActionUID then
+						if row.bflGroupActionUID == context.uid then
+							context.bflGroupActionKey = row.bflGroupActionKey
+						else
+							context.bflGroupActionKey = false
+						end
+					elseif db then
+						context.bflGroupActionKey = db:GetTitleFriendGroupActionKey(context.uid,
+							Read(friend, "rawNote") or Read(account, "note"))
+					end
 				end
 				local streamer = BFL.StreamerMode
 				if streamer and streamer:IsActive() then
@@ -4216,7 +4237,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				local noteButton = elements[SET_NOTE]
 				if noteButton and titleNotes and titleNotes:IsEnabled() and BFL.IsTitleFriend(context.accountInfo) then
 					noteButton:SetResponder(function()
-						titleNotes:ShowEditor(context.bnetIDAccount, BFL_GetContextDisplayName(context, true))
+						titleNotes:ShowEditor(context.bnetIDAccount, BFL_GetContextDisplayName(context, true), context.bflGroupActionKey)
 					end)
 				end
 

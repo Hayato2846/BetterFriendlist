@@ -298,12 +298,12 @@ function TitleNotes:SetEnabled(enabled)
 	TellPlayer(enabled and "TITLE_FRIEND_NOTES_ENABLED" or "TITLE_FRIEND_NOTES_RETURNING")
 end
 
-function TitleNotes:ShowEditor(id, name)
+function TitleNotes:ShowEditor(id, name, expectedKey)
 	if not self:IsEnabled() or BFL:IsSecret(id) or type(id) ~= "number" then return false end
 	local uid = "bnet_" .. id
 	local db = BFL:GetModule("DB")
 	local token, original = db:GetVerifiedTitleFriendToken(uid, true)
-	if not token then
+	if not token or (expectedKey ~= nil and expectedKey ~= keyPrefix .. token) then
 		TellPlayer("TITLE_FRIEND_GROUP_ID_UNAVAILABLE")
 		self:Schedule()
 		return true
