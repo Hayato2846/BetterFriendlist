@@ -337,3 +337,18 @@ check(#db:GetFriendGroups("wow_Character-Realm") == 2, "Classic pool supports mo
 drag(character, noGroup, false)
 check(#db:GetFriendGroups("wow_Character-Realm") == 0, "Classic pool supports ungrouping")
 io.write("Friend row drag and drop smoke passed.\n")
+
+BFL.IsForever, BFL.IsClassic = true, false
+loadProduction("Utils/FriendActions.lua")
+local actions = BFL.FriendActions
+env.C_BattleNet.GetAccountInfoByID = function(id)
+	for _, entry in ipairs(roster) do if entry.bnetAccountID == id then return entry end end
+end
+local titleAction = actions.Capture({ type = "bnet", accountInfo = blank })
+check(titleAction.groupKey == menuKey and actions.Resolve(titleAction) == blank, "a displayed Title link resolves the live contact")
+roster[1] = titleFriend(blank.bnetAccountID, notes.AppendTitleGroupToken("", "DDDDDDDD"))
+check(not actions.Resolve(titleAction), "the same numeric ID with a different Title link cannot receive a social action")
+roster[1], roster[3] = blank, titleFriend(301, blank.note)
+check(not actions.Resolve(titleAction), "duplicate Title links cannot authorize social actions")
+roster[3] = nil
+check(actions.Resolve(titleAction) == blank, "actions recover when the original link is unique again")

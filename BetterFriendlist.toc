@@ -56,6 +56,7 @@ Utils\Encoding.lua
 Utils\ProfileCodec.lua
 Utils\BufferedEditBox.lua
 Utils\FriendNotes.lua
+Utils\FriendActions.lua
 Utils\FontManager.lua
 Utils\WindowGeometry.lua
 Utils\ColorManager.lua

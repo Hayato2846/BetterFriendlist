@@ -2692,6 +2692,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							for _, entry in ipairs(entries) do
 								local displayText = FormatEntryText(entry)
 								elementDescription:CreateButton(displayText, function()
+									if not BFL.FriendActions.ResolveGameAccount(contextData.bflFriendAction,
+										entry.gameAccountID, entry.playerGuid) then return end
 									local didInvite = BFL_InvokeBNetInviteOrRequest(entry)
 									if didInvite and friendUID and entry.gameAccountID then
 										FriendsList:SetLastInvitedAccountID(friendUID, entry.gameAccountID)
@@ -3308,6 +3310,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 						local function InviteEntry(entry)
 							if not IsEnabled(entry) then return end
+							if not BFL.FriendActions.ResolveGameAccount(contextData.bflFriendAction,
+								entry.gameAccountID, entry.playerGuid) then return end
 							local didInvite, reason
 							if useVerifiedInvite then
 								didInvite, reason = BFL_InvokeVerifiedMenuInvite(FriendsList, entry, directInviteFriendID)
@@ -3359,6 +3363,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local buttonText = BFL_GetInviteButtonText(inviteType)
 
 					rootDescription:CreateButton(buttonText, function()
+						if verifiedFriend and not BFL.FriendActions.Resolve(contextData.bflFriendAction) then return end
 						if verifiedFriend and BFL.HasSecretValues and InCombatLockdown() then return end
 						if inviteType == "REQUEST_INVITE" or inviteType == "REQUEST_INVITE_CROSS_FACTION" then
 							if BFL.RequestInviteFromUnit then
@@ -3787,14 +3792,18 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 				local accountInfo = BFL_GetBNetAccountInfo(contextData)
-				if not accountInfo then
+				if not BFL.FriendNotes.IsReadableTable(accountInfo) then
 					return
 				end
 				local isFavorite = accountInfo.isFavorite
+				if BFL:IsSecret(isFavorite) then return end
+				local identity = contextData.bflFriendAction
 				rootDescription:CreateButton(
 					isFavorite and (REMOVE_FAVORITE_STATUS or "Remove Favorite") or (ADD_FAVORITE_STATUS or "Add Favorite"),
 					function()
-						BNSetFriendFavoriteFlag(contextData.bnetIDAccount, not isFavorite)
+						local current = BFL.FriendActions.Resolve(identity)
+						if not current or BFL:IsSecret(current.isFavorite) or current.isFavorite ~= isFavorite then return end
+						BNSetFriendFavoriteFlag(identity.id, not isFavorite)
 						if not isFavorite then
 							local hints = BFL:GetModule("FavoriteHints")
 							if hints then hints:OnAdded() end
@@ -3803,10 +3812,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				)
 			end
 
-			local function BFL_ShowRemoveWoWFriendPrompt(fullName)
+			local function BFL_ShowRemoveWoWFriendPrompt(fullName, identity)
 				local friends = GetFriendsList()
 				local _, friendListName
-				if friends then
+				if friends and BFL.FriendActions.Resolve(identity) then
 					_, friendListName = friends:ResolveWoWFriendIndex(fullName)
 				end
 				if not friendListName then
@@ -3816,20 +3825,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					return
 				end
 
-				if C_FriendList and C_FriendList.RemoveFriend and StaticPopupDialogs["CONFIRM_REMOVE_WOW_FRIEND"] then
-					StaticPopup_Show("CONFIRM_REMOVE_WOW_FRIEND", nil, nil, { name = friendListName })
-					return
-				end
-
-				local ok, text = pcall(string.format, L.DIALOG_REMOVE_FRIEND_CONFIRMATION, friendListName)
+				local ok, text = pcall(string.format, CONFIRM_REMOVE_WOW_FRIEND or L.DIALOG_REMOVE_FRIEND_CONFIRMATION, friendListName)
 				local prompt = ok and text or friendListName
 
 				StaticPopupDialogs["BFL_CONFIRM_REMOVE_WOW_FRIEND"] = {
 					text = "%s",
 					button1 = ACCEPT,
 					button2 = CANCEL,
-					OnAccept = function()
-						if not (BFL.RemoveFriend and BFL.RemoveFriend(friendListName)) and UIErrorsFrame then
+					OnAccept = function(_, target)
+						local current = BFL.FriendActions.Resolve(target)
+						if not (current and BFL.RemoveFriend and BFL.RemoveFriend(current.name)) and UIErrorsFrame then
 							UIErrorsFrame:AddExternalErrorMessage(ERR_FRIEND_NOT_FOUND)
 						end
 					end,
@@ -3838,27 +3843,34 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					hideOnEscape = 1,
 					preferredIndex = 3,
 				}
-				StaticPopup_Show("BFL_CONFIRM_REMOVE_WOW_FRIEND", prompt)
+				StaticPopup_Show("BFL_CONFIRM_REMOVE_WOW_FRIEND", prompt, nil, identity)
 			end
 
-			local function BFL_AddRemoveFriendButton(rootDescription, contextData, isBNet)
+			local function BFL_AddRemoveFriendButton(rootDescription, contextData, isBNet, nativeButton)
 				local createButton = BFL.CreateMenuButton or function(root, text, callback)
 					return root:CreateButton(text, callback)
 				end
+				if nativeButton and nativeButton.SetResponder then
+					createButton = function(_, _, callback) nativeButton:SetResponder(callback) end
+				end
+				local identity = contextData.bflFriendAction
 				if isBNet then
 					if not contextData.bnetIDAccount then
 						return
 					end
 					createButton(rootDescription, BNET_REMOVE_FRIEND or REMOVE_FRIEND or "Remove Friend", function()
+						local accountInfo = BFL.FriendActions.Resolve(identity)
+						if not accountInfo then return end
 						local displayName = BFL_GetContextDisplayName(contextData, true)
-						local accountInfo = BFL_GetBNetAccountInfo(contextData)
-						if C_BattleNet and C_BattleNet.GetAccountInfoByID then
-							local ok, info = pcall(C_BattleNet.GetAccountInfoByID, contextData.bnetIDAccount)
-							accountInfo = ok and info or nil
-						end
 						local prompt = BFL.GetBNetRemoveFriendPrompt(accountInfo, displayName)
 						if prompt then
-							StaticPopup_Show("CONFIRM_REMOVE_BN_FRIEND", prompt, nil, contextData.bnetIDAccount)
+							StaticPopupDialogs.BFL_CONFIRM_REMOVE_BN_FRIEND = {
+								text = "%s", button1 = ACCEPT, button2 = CANCEL, timeout = 0, whileDead = 1, hideOnEscape = 1,
+								OnAccept = function(_, target)
+									if BFL.FriendActions.Resolve(target) and BNRemoveFriend then BNRemoveFriend(target.id) end
+								end,
+							}
+							StaticPopup_Show("BFL_CONFIRM_REMOVE_BN_FRIEND", prompt, nil, identity)
 						end
 					end, { destructive = true })
 					return
@@ -3867,7 +3879,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				local fullName = BFL_GetContextFullName(contextData)
 				if fullName and BFL_HasFriendListContext(contextData) then
 					createButton(rootDescription, REMOVE_FRIEND or "Remove Friend", function()
-						BFL_ShowRemoveWoWFriendPrompt(fullName)
+						BFL_ShowRemoveWoWFriendPrompt(fullName, identity)
 					end, { destructive = true })
 				end
 			end
@@ -4093,7 +4105,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local friendMenu = BFL:GetModule("NativeFriendMenu")
 					if friendMenu then
 						if verifiedFriend then
-							friendMenu:AddFriendWhisperMenuItem(rootDescription, verifiedFriend, isBroker, WHISPER or "Whisper")
+							friendMenu:AddFriendWhisperMenuItem(rootDescription, verifiedFriend, isBroker, WHISPER or "Whisper",
+								contextData.bflFriendAction)
 						elseif not isBNet and not isOffline and (menuTypeWrapper == "WHO" or isRecentAlly or not isFriendMenu) then
 							friendMenu:AddCharacterWhisperMenuItem(rootDescription, BFL_GetContextFullName(contextData), WHISPER or "Whisper")
 						end
@@ -4193,6 +4206,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
 							Read(friend, "rawNote") or Read(account, "note"))
 					end
 				end
+				if row and row.bflGroupActionUID then
+					if row.bflGroupActionUID == context.uid then context.bflFriendAction = row.bflFriendAction or false end
+				else
+					context.bflFriendAction = BFL.FriendActions.Capture(friend, context.bflGroupActionKey)
+				end
 				local streamer = BFL.StreamerMode
 				if streamer and streamer:IsActive() then
 					context.bfl_streamerDisplayName = streamer:GetFriendMenuLabel(friend)
@@ -4230,7 +4248,22 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					local account = friends:GetReadableInviteField(nativeContext, "accountInfo")
 					local gameAccount = friends:GetReadableInviteField(account, "gameAccountInfo")
 					local nativeAccountID = friends:GetReadableInviteField(gameAccount, "gameAccountID")
+					local nativeGUID = friends:GetReadableInviteField(gameAccount, "playerGuid")
+					if invite and invite.SetCanSelect then
+						invite:SetCanSelect(function()
+							return BFL.FriendActions.ResolveGameAccount(context.bflFriendAction, nativeAccountID, nativeGUID) ~= nil
+						end)
+					end
 					BFL_AddInviteButton(root, context, isBNet, context.isOffline, invite, friend, nativeAccountID)
+				end
+				for _, label in pairs({ WHISPER, ADD_FAVORITE_STATUS, REMOVE_FAVORITE_STATUS }) do
+					local action = elements[label]
+					if action and action.SetCanSelect then
+						action:SetCanSelect(function() return BFL.FriendActions.Resolve(context.bflFriendAction) ~= nil end)
+					end
+				end
+				if invite and not isBNet and invite.SetCanSelect then
+					invite:SetCanSelect(function() return BFL.FriendActions.Resolve(context.bflFriendAction) ~= nil end)
 				end
 
 				local titleNotes = BFL.TitleFriendNotes
@@ -4268,7 +4301,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				BFL_AddRafSummonButton(missing, context, isBNet, context.isOffline)
 				BFL_AddViewHousesButton(missing, context, isBNet)
 				BFL_AddIgnoreOrBlockButton(missing, context, isBNet)
-				BFL_AddRemoveFriendButton(missing, context, isBNet)
+				BFL_AddRemoveFriendButton(missing, context, isBNet, elements[BNET_REMOVE_FRIEND] or elements[REMOVE_FRIEND])
 				BFL_AddReportButtons(missing, context, isBNet, false)
 				if not isBNet then BFL_AddPvpReportAfkButton(missing, context) end
 				BFL_ReplaceCopyNameButton(row, root, context, nil, true)
@@ -4318,10 +4351,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
 					if isBNet or (hasNativeFriendMenu and isWoW) then
 						local menuTag = tag
 						Menu.ModifyMenu(menuTag, function(owner, root, context)
-							local row, friend
+							local row, friend, stale
 							if hasNativeFriendMenu then
-								row, friend = nativeFriendMenu:GetMenuFriend(context, isBNet)
+								row, friend, stale = nativeFriendMenu:GetMenuFriend(context, isBNet)
 								nativeFriendMenu:MaskNativeMenuTitle(root, friend, isBNet)
+							end
+							if stale then
+								for _, action in root:EnumerateElementDescriptions() do
+									if action.SetCanSelect then action:SetCanSelect(false) end
+								end
+								return
 							end
 							if isBNet and (row or BFL_SafeContextValue(context, "bflOrigin") == ADDON_NAME) then
 								local hints = BFL:GetModule("FavoriteHints")
@@ -4979,6 +5018,7 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 
 	local L = BFL.L or {}
 	local FriendsList = GetFriendsList()
+	local identity = anchorButton and anchorButton.bflFriendAction
 	local friendUID = nil
 	if anchorButton and anchorButton.friendData and FriendsList and FriendsList.GetFriendUID then
 		friendUID = FriendsList:GetFriendUID(anchorButton.friendData)
@@ -5046,6 +5086,7 @@ local function ShowMultiAccountInvitePicker(invitableAccounts, anchorButton)
 				if capturedEntry.isInvitable == false then
 					return
 				end
+				if not BFL.FriendActions.ResolveGameAccount(identity, gameAccountID, capturedEntry.playerGuid) then return end
 				if BFL.IsForever and not BFL.ValidateForeverInviteTarget(capturedEntry.raw or capturedEntry) then
 					return
 				end
@@ -5075,13 +5116,14 @@ BFL.ShowMultiAccountInvitePicker = ShowMultiAccountInvitePicker
 -- TravelPass Button Handlers
 function BetterFriendsList_TravelPassButton_OnClick(self)
 	local friendData = self.friendData
+	local identity = self.bflFriendAction
 	if not friendData or friendData.connected == false then
 		return
 	end
 	if friendData.type == "wow" then
 		if BFL.IsForever and BFL.GetForeverRulesetInviteRestriction(friendData.gameAccountInfo or friendData) then return end
-		if friendData.connected and friendData.name and BFL.InviteUnit then
-			BFL.InviteUnit(friendData.name)
+		if friendData.connected and BFL.InviteUnit and BFL.FriendActions.Resolve(identity) then
+			BFL.InviteUnit(identity.name)
 		end
 		return
 	elseif friendData.type ~= "bnet" then
@@ -5092,21 +5134,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 	if BFL.IsBattleNetFriendsListEnabled and not BFL.IsBattleNetFriendsListEnabled() then
 		return
 	end
-	if not BNGetNumFriends then
-		return
-	end
-	local numBNet = BNGetNumFriends()
-	local actualIndex = nil
-
-	for i = 1, numBNet do
-		local accountInfo = BFL.GetBNetFriendInfo and BFL.GetBNetFriendInfo(i)
-		if BFL.IsReadableGameAccountInfo(accountInfo) and not BFL:IsSecret(accountInfo.bnetAccountID)
-			and not BFL:IsSecret(friendData.bnetAccountID) and accountInfo.bnetAccountID == friendData.bnetAccountID then
-			actualIndex = i
-			break
-		end
-	end
-
+	local _, actualIndex = BFL.FriendActions.ResolveBNetIndex(identity)
 	if not actualIndex then
 		return
 	end
@@ -5213,13 +5241,15 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 
 		if #validGameAccounts == 1 then
 			-- Single valid account: Auto-Invite or Request Join
-			inviteOrRequest(lastGameAccountGUID, lastGameAccountID)
+			if BFL.FriendActions.ResolveGameAccount(identity, lastGameAccountID, lastGameAccountGUID) then
+				inviteOrRequest(lastGameAccountGUID, lastGameAccountID)
+			end
 		elseif #validGameAccounts > 1 then
 			-- The native dropdown relies on hidden FriendsFrame faction/realm locals.
 			-- Our existing picker uses the accounts validated against live data above.
 			ShowMultiAccountInvitePicker(validGameAccounts, self)
 		elseif fallbackIsUnambiguous and fallbackGameAccountID then
-			BFL.BNInviteFriend(fallbackGameAccountID)
+			if BFL.FriendActions.ResolveGameAccount(identity, fallbackGameAccountID) then BFL.BNInviteFriend(fallbackGameAccountID) end
 		end
 		return
 	end
@@ -5230,6 +5260,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 		if #friendData.invitableAccounts == 1 then
 			-- Single invitable account: use Request-To-Join when appropriate
 			local singleAccount = friendData.invitableAccounts[1]
+			if not BFL.FriendActions.ResolveGameAccount(identity, singleAccount.gameAccountID, singleAccount.playerGuid) then return end
 			if BFL.IsForever and not BFL.ValidateForeverInviteTarget(singleAccount) then return end
 			local singleGuid = singleAccount.playerGuid
 			if singleGuid and GetDisplayedInviteType then
@@ -5257,6 +5288,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 			BFL.HasBNetInviteRealmInfo(gameAccountInfo)
 			and gameAccountInfo.clientProgram == BNET_CLIENT_WOW
 			and gameAccountInfo.isOnline
+			and BFL.FriendActions.ResolveGameAccount(identity, gameAccountInfo.gameAccountID, gameAccountInfo.playerGuid)
 			and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo))
 		then
 			BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
@@ -5268,6 +5300,7 @@ function BetterFriendsList_TravelPassButton_OnClick(self)
 	local gameAccountInfo = C_BattleNet.GetFriendGameAccountInfo(actualIndex, 1)
 	if BFL.HasBNetInviteRealmInfo(gameAccountInfo)
 		and (not BFL.IsForever or BFL.ValidateForeverInviteTarget(gameAccountInfo)) and gameAccountInfo.gameAccountID
+		and BFL.FriendActions.ResolveGameAccount(identity, gameAccountInfo.gameAccountID, gameAccountInfo.playerGuid)
 	then
 		BFL.BNInviteFriend(gameAccountInfo.gameAccountID)
 	end
@@ -5677,6 +5710,7 @@ function BetterFriendsList_Button_OnClick(button, mouseButton, skipWhisper)
 					end
 					FriendsListModule.selectedFriend = nil
 					FriendsListModule.selectedFriendUID = nil
+					FriendsListModule.selectedFriendAction = nil
 					FriendsListModule.selectedButton = nil
 					if FriendsListModule.UpdateSendMessageButton then
 						FriendsListModule:UpdateSendMessageButton()
@@ -5698,6 +5732,7 @@ function BetterFriendsList_Button_OnClick(button, mouseButton, skipWhisper)
 
 			-- Set new selection (store UID to avoid stale pooled objects)
 			FriendsListModule.selectedFriendUID = friendUID
+			FriendsListModule.selectedFriendAction = button.bflFriendAction or false
 			FriendsListModule.selectedFriend = nil
 			FriendsListModule.selectedButton = button
 

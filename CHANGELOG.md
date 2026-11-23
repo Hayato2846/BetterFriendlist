@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Fixed
 - **Dragging Friends** - Drop a friend on a group header to move them, hold Shift to add them to another group, or drop them on No Group to clear their assignments. Releasing over another friend leaves your groups alone.
+- **Friend Actions** - Whisper, invite, remove, and favorite actions now check the intended contact when the friends list refreshes. An old removal confirmation cannot remove a different friend.
 
 ### WoW Forever
 

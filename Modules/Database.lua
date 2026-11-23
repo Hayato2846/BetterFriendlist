@@ -1634,6 +1634,10 @@ function DB:RequireFriendGroupKey(uid, expectedKey)
 	return GetGroupMutationKey(uid, true, expectedKey) ~= nil
 end
 
+function DB:MatchesTitleFriendGroupActionKey(uid, key, fresh)
+	return key ~= nil and GetFriendGroupKey(uid, fresh) == key
+end
+
 local function OnFriendGroupsChanged(uid)
 	if BFL.SettingsVersion then BFL.SettingsVersion = BFL.SettingsVersion + 1 end
 	local friends = BFL:GetModule("FriendsList")

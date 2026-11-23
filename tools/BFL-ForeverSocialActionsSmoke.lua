@@ -34,6 +34,8 @@ local function execute(content, label)
 end
 execute(read(repo, "Locales/enUS.lua"), "Locales/enUS.lua")
 execute(read(repo, "Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
+execute(read(repo, "Utils/FriendNotes.lua"), "Utils/FriendNotes.lua")
+execute(read(repo, "Utils/FriendActions.lua"), "Utils/FriendActions.lua")
 execute(read(repo, "Modules/Dialogs.lua"), "Modules/Dialogs.lua")
 execute(read(forever, "Interface/AddOns/Blizzard_FrameXMLUtil/Camelot/NameUtil.lua"), "Blizzard Camelot NameUtil")
 local assertions = 0
@@ -425,18 +427,51 @@ env.BFL_GetBNetAccountInfo = function() return { friendLevel = 2 } end
 env.BFL_GetContextDisplayName = function() return "Alias" end
 local addRemove = execute(between(legacy, "local function BFL_ShowRemoveWoWFriendPrompt(", "local function BFL_AddIgnoreOrBlockButton(") .. "\nreturn BFL_AddRemoveFriendButton", "remove friend menu")
 local root = element("root")
-addRemove(root, { bnetIDAccount = 42 }, true)
+local target = BFL.FriendActions.Capture({ type = "bnet", bnetAccountID = 42, battleTag = "Tag#1234" })
+addRemove(root, { bnetIDAccount = 42, bflFriendAction = target }, true)
+local removedID
+env.BNRemoveFriend = function(id) removedID = id end
 for _, test in ipairs({ { level = 3, prompt = "WoW friend: Alias" }, { level = 1, prompt = "BattleTag friend: Alias" },
 	{ level = 2, prompt = "Real ID friend: Alias" } }) do
-	account = { friendLevel = test.level, accountName = "Private Real Name" }
+	account = { bnetAccountID = 42, isFriend = true, battleTag = target.tag, friendLevel = test.level, accountName = "Private Real Name" }
 	root.children[1].callback()
-	equal(shownPopup, "CONFIRM_REMOVE_BN_FRIEND", "Removal retains Blizzard's confirmation dialog")
+	equal(shownPopup, "BFL_CONFIRM_REMOVE_BN_FRIEND", "Removal uses a guarded confirmation dialog")
 	equal(popupArgs[1], test.prompt, "Fresh friend type selects the correct removal wording")
-	equal(popupArgs[3], 42, "Removal retains the raw account ID")
+	equal(popupArgs[3], target, "Removal keeps the displayed identity until confirmation")
 end
+local confirm = env.StaticPopupDialogs.BFL_CONFIRM_REMOVE_BN_FRIEND.OnAccept
+account.battleTag = "Replacement#1234"
+confirm(nil, target)
+equal(removedID, nil, "A replacement under the old numeric ID is never removed")
+shownPopup = nil
+root.children[1].callback()
+equal(shownPopup, nil, "An old menu cannot open a removal prompt for the replacement")
+account.battleTag = target.tag
+confirm(nil, target)
+equal(removedID, 42, "The same friend can be confirmed")
+
+local addFavorite = execute(between(legacy, "local function BFL_AddFavoriteButton(", "local function BFL_ShowRemoveWoWFriendPrompt(")
+	.. "\nreturn BFL_AddFavoriteButton", "favorite friend menu")
+env.BFL_GetBNetAccountInfo = function(context) return context.accountInfo end
+local favoriteChanges = 0
+env.BNSetFriendFavoriteFlag = function(id, value)
+	equal(id, target.id, "Favorite uses the verified account ID")
+	equal(value, true, "Favorite sets the menu's requested state")
+	favoriteChanges = favoriteChanges + 1
+end
+root = element("root")
+account.isFavorite = false
+addFavorite(root, { bnetIDAccount = 42, bflFriendAction = target, accountInfo = account })
+account.battleTag = "Replacement#1234"
+root.children[1].callback()
+equal(favoriteChanges, 0, "A reused numeric ID never favorites the replacement")
+account.battleTag = target.tag
+root.children[1].callback()
+equal(favoriteChanges, 1, "The original contact can still be favorited")
 -- Legacy character friends must use the API's exact name after the list changes.
 local friendListSource = read(repo, "Modules/FriendsList.lua")
 env.FriendsList = friends
+BFL.modules.FriendsList = friends
 execute(between(friendListSource, "function FriendsList:IsReadableInviteRecord(", "function FriendsList:GetGameAccountInviteRestriction("), "friend record guards")
 execute(between(friendListSource, "function FriendsList:ResolveWoWFriendIndex(", "-- Resolve current friend data by stable UID"), "friend resolution")
 function BFL:NormalizeWoWFriendName(name) return self.NormalizePlayerIdentityName(name, nil, "Realm") end
@@ -449,24 +484,27 @@ env.C_FriendList.RemoveFriend = function(name)
 	removedName = name
 	return nativeResult
 end
-local function characterRemoveCallback(name)
+local function characterRemoveCallback(name, guid)
 	local menu = element("root")
-	addRemove(menu, { name = name }, false)
+	addRemove(menu, { name = name, bflFriendAction = BFL.FriendActions.Capture({ type = "wow", name = name, guid = guid }) }, false)
 	return assert(menu.children[1].callback)
 end
 
 regional = false
 titleEnabled = false
-local rowsForRemoval = { { name = "Ada" }, { name = "Grace-OtherRealm" } }
+local rowsForRemoval = { { name = "Ada", guid = "Player-1" }, { name = "Grace-OtherRealm" } }
 env.C_FriendList.GetNumFriends = function() return #rowsForRemoval end
 env.C_FriendList.GetFriendInfoByIndex = function(index) return rowsForRemoval[index] end
 env.StaticPopupDialogs.CONFIRM_REMOVE_WOW_FRIEND = {}
-local remove = characterRemoveCallback("Ada-Realm")
+local remove = characterRemoveCallback("Ada-Realm", "Player-1")
 rowsForRemoval[1], rowsForRemoval[2] = rowsForRemoval[2], rowsForRemoval[1]
 remove()
-equal(shownPopup, "CONFIRM_REMOVE_WOW_FRIEND", "Character removal uses Blizzard's confirmation when available")
-equal(popupArgs[3].name, "Ada", "Same-realm removal passes the exact API name after the roster reorders")
+equal(shownPopup, "BFL_CONFIRM_REMOVE_WOW_FRIEND", "Character removal uses a guarded confirmation")
+equal(popupArgs[3].name, "Ada-Realm", "The prompt retains the full selected identity after the roster reorders")
 equal(removedName, nil, "Opening the confirmation does not remove a friend")
+rowsForRemoval[2].guid = "Player-2"
+env.StaticPopupDialogs.BFL_CONFIRM_REMOVE_WOW_FRIEND.OnAccept(nil, popupArgs[3])
+equal(removedName, nil, "A same-name character with a different GUID cannot be confirmed")
 characterRemoveCallback("Grace-OtherRealm")()
 equal(popupArgs[3].name, "Grace-OtherRealm", "A different realm remains part of the API name")
 
@@ -489,7 +527,7 @@ equal(shownPopup, "BFL_CONFIRM_REMOVE_WOW_FRIEND", "Older clients retain the add
 equal(popupArgs[1], "Remove Ada from your friends list?", "The fallback shows the same character")
 nativeResult = false
 errorCount = #errors
-env.StaticPopupDialogs.BFL_CONFIRM_REMOVE_WOW_FRIEND.OnAccept()
+env.StaticPopupDialogs.BFL_CONFIRM_REMOVE_WOW_FRIEND.OnAccept(nil, popupArgs[3])
 equal(removedName, "Ada", "The fallback also keeps the raw friend-list identity")
 equal(#errors, errorCount + 1, "The fallback reports the native API's failed removal")
 regional = true
@@ -692,14 +730,21 @@ do
 		"function FriendsList:SetButtonSelectionVisual(", "function FriendsList:ClearSelection()")
 		.. "\nreturn FriendsList.SetButtonSelectionVisual", "selection and hover visual")
 	friends.SetButtonSelectionVisual = selectionVisual
-	local first = { type = "bnet", accountName = "Example", bnetAccountID = 42, totalGameAccounts = 3, isOnline = false }
-	local second = { type = "bnet", bnetAccountID = 91, friendLevel = 3 }
+	local first = { type = "bnet", accountName = "Example", bnetAccountID = 42, battleTag = "First#1234",
+		totalGameAccounts = 3, isOnline = false }
+	local second = { type = "bnet", bnetAccountID = 91, battleTag = "Second#1234", friendLevel = 3 }
 	local row = frame()
 	row.travelPassButton = frame()
-	env.C_BattleNet.GetAccountInfoByID = function(id)
-		equal(id, 91, "the raw-name lookup stays on the clicked account")
-		return { accountName = secret }
-	end
+	local liveAccounts = {
+		[42] = { bnetAccountID = 42, battleTag = first.battleTag, accountName = first.accountName, isFriend = true },
+		[91] = { bnetAccountID = 91, battleTag = second.battleTag, accountName = secret, isFriend = true },
+		[76] = { bnetAccountID = 76, battleTag = "Broker#1234", accountName = "Native recipient", isFriend = true },
+	}
+	env.C_BattleNet.GetAccountInfoByID = function(id) return liveAccounts[id] end
+	env.C_FriendList.GetFriendInfo = function(name) return { name = name } end
+	BFL.GetWoWFriendInfo = env.C_FriendList.GetFriendInfo
+	local afterRelease
+	env.C_Timer.After = function(_, callback) afterRelease = callback end
 
 	execute(read(repo, "Modules/NativeFriendMenu.lua"), "Modules/NativeFriendMenu.lua")
 	local test = BFL:GetModule("NativeFriendMenu")
@@ -778,6 +823,23 @@ do
 	end
 	up(catch, "LeftButton")
 	equal(callbacks.OnClick, 1, "releasing a drag does not select the row")
+
+	hit.hooks.OnMouseDown(hit, "RightButton")
+	local liveFirst = liveAccounts[42]
+	liveAccounts[42] = { bnetAccountID = 42, battleTag = "Reused#1234", accountName = "New contact", isFriend = true }
+	local _, _, stale = test:GetMenuFriend({ bnetIDAccount = 42 }, true)
+	check(stale, "a known BFL hyperlink whose native account changed is flagged even before redraw")
+	events.scripts.OnEvent(events, "BN_FRIEND_INFO_CHANGED")
+	check(not hit.shown, "a roster update hides a held hyperlink whose account ID was reused")
+	friend = { type = "bnet", bnetAccountID = 42, battleTag = "Reused#1234", accountName = "New contact" }
+	friends:RenderDisplay()
+	check(not hit.shown, "a held native link cannot be re-armed for the replacement")
+	events.scripts.OnEvent(events, "GLOBAL_MOUSE_UP", "RightButton")
+	check(not hit.shown and afterRelease, "the replacement waits until the native release has finished")
+	afterRelease()
+	check(hit.shown, "the refreshed contact can receive a new click")
+	liveAccounts[42], friend = liveFirst, first
+	friends:RenderDisplay()
 
 	down(catch, "LeftButton")
 	friend = second
@@ -884,6 +946,7 @@ do
 	test:MaskNativeMenuTitle(titleRoot, { type = "wow", name = "Character-Realm" })
 	equal(title.initializer, nil, "a character without a BattleTag keeps Blizzard's character name")
 	BFL.modules.DB = originalDB
+	friend.battleTag = liveAccounts[42].battleTag
 	mouseFocus = catch
 	local chatLink = true
 	env.IsModifiedClick = function(mode) return chatLink and mode == "CHATLINK" end
@@ -994,7 +1057,7 @@ do
 	brokerRow.height = 1 -- LibQTip starts new rows at one pixel until UpdateLayout.
 	local brokerFriend = {
 		type = "bnet", bnetAccountID = 76, connected = true,
-		accountName = "Display fallback", accountInfo = { accountName = "Native recipient" },
+		accountName = "Display fallback", accountInfo = liveAccounts[76],
 	}
 	local brokerHover, brokerClicks = false, 0
 	brokerRow:SetScript("OnEnter", function() brokerHover = true end)
@@ -1116,6 +1179,7 @@ do
 	mouseFocus = sendHit
 	onEvent(events, "GLOBAL_MOUSE_DOWN", "RightButton")
 	equal(sendMessage.buttonState, nil, "right clicks do not push Send Message")
+	onEvent(events, "GLOBAL_MOUSE_UP", "RightButton")
 	onEvent(events, "GLOBAL_MOUSE_DOWN", "LeftButton")
 	equal(sendMessage.buttonState, "PUSHED", "a left press shows the real button's pressed state")
 	check(sendMessage.buttonStateLocked, "the pressed state is held until release")
@@ -1140,7 +1204,8 @@ do
 	equal(sendLeaves, 1, "the real button receives its leave handler")
 	sendCatch:GetScript("OnEnter")(sendCatch)
 	onEvent(events, "GLOBAL_MOUSE_DOWN", "LeftButton")
-	selected = { type = "bnet", accountName = "Example", bnetAccountID = 42, connected = false, friendLevel = 3 }
+	selected = { type = "bnet", accountName = "Example", bnetAccountID = 42, connected = false, friendLevel = 3,
+		battleTag = first.battleTag }
 	friends:UpdateSendMessageButton()
 	check(not sendHit.shown and not sendCatch.shown, "an offline Title friend cannot be whispered from Send Message")
 	check(not sendMessage.highlighted, "hiding the click layer clears the highlight")
@@ -1407,6 +1472,7 @@ do
 	}
 	env.MenuResponse = { Open = "open" }
 	env.PARTY_INVITE, env.REQUEST_INVITE = "Invite", "Request to Join"
+	env.WHISPER, env.ADD_FAVORITE_STATUS = "Whisper", "Add Favorite"
 	BFL.L.INVITE_ACCOUNT_PICKER_TITLE = "Invite Character"
 	local inCombat, targetInParty, targetAcceptsRequest = false, false, true
 	env.InCombatLockdown = function() return inCombat end
@@ -1421,10 +1487,19 @@ do
 	env.UIErrorsFrame.AddExternalErrorMessage = function(_, reason) failure = reason end
 	local allowed, onlyOnline = true, true
 	local friend = { type = "bnet", uid = "bnet_Tag#1234", bnetAccountID = 42, index = 3, accountName = "Friend",
-		connected = true, totalGameAccounts = 1 }
+		battleTag = "Tag#1234", connected = true, totalGameAccounts = 1 }
 	local matching = { text = "Match", playerGuid = "request-guid", gameAccountID = 5, isInvitable = true }
 	local blocked = { text = "Mismatch", playerGuid = "invite-guid", gameAccountID = 6, isInvitable = false, restrictionText = "Different ruleset" }
 	local entries = { blocked }
+	local liveTag = friend.battleTag
+	local function LiveAccount() return { bnetAccountID = 42, battleTag = liveTag, isFriend = true } end
+	env.BNGetNumFriends = function() return 1 end
+	env.BNGetFriendIndex = function() return 1 end
+	BFL.GetBNetFriendInfo, env.C_BattleNet.GetAccountInfoByID = LiveAccount, LiveAccount
+	env.C_BattleNet.GetFriendNumGameAccounts = function() return 1 end
+	env.C_BattleNet.GetFriendGameAccountInfo = function()
+		return { gameAccountID = matching.gameAccountID, playerGuid = matching.playerGuid, isOnline = true }
+	end
 	local model = BFL:GetModule("FriendsList")
 	function model:GetReadableInviteField(record, key) return record and record[key] end
 	function model:GetFriendUID(record) return record.uid end
@@ -1452,6 +1527,7 @@ do
 		function value:QueueTitle() end
 		function value:CreateTitle(label) return self:CreateButton(label) end
 		function value:SetResponder(handler) self.callback = handler end
+		function value:SetCanSelect(predicate) self.canSelect = predicate end
 		function value:SetEnabled(enabled) self.enabled = enabled end
 		function value:SetTooltip(tooltip) self.tooltip = tooltip end
 		function value:EnumerateElementDescriptions() return ipairs(self.children) end
@@ -1498,14 +1574,26 @@ do
 	local function makeMenu(omitInvite, disabled, nativeID)
 		local menu = menuElement("root")
 		local whisper = menu:CreateButton("Whisper", nativeWhisper)
+		local favorite = menu:CreateButton("Add Favorite")
 		local invite = not omitInvite and menu:CreateButton("Invite", nativeInvite)
 		if disabled then invite:SetEnabled(false) end
 		menu:CreateButton("Report")
 		NativeAddon(row, menu)
 		populate(menu, nativeTag, row, friend, true, { accountInfo = { gameAccountInfo = { gameAccountID = nativeID } } })
 		check(whisper.callback == nativeWhisper, "Blizzard Whisper's responder stays intact")
+		check(whisper.canSelect(), "the native Whisper responder can select the verified contact")
+		liveTag = "Reused#1234"
+		check(not whisper.canSelect(), "the original native menu cannot whisper to a replacement account")
+		check(not favorite.canSelect(), "the original native menu cannot favorite a replacement account")
+		liveTag = friend.battleTag
 		if invite then
 			check(invite.callback == nativeInvite, "Blizzard Invite's responder stays intact")
+			if nativeID == matching.gameAccountID then
+				check(invite.canSelect(), "the native Invite responder can select the authorized game account")
+				liveTag = "Reused#1234"
+				check(not invite.canSelect(), "the original native Invite cannot target a replacement account")
+				liveTag = friend.battleTag
+			end
 			equal(invite.enabled, not disabled, "Blizzard Invite's enabled state stays intact")
 			equal(#invite.children, 0, "Blizzard Invite remains a standalone action")
 		end

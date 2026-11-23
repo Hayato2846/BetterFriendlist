@@ -1325,6 +1325,7 @@ function Compat.GetBNetFriendInfo(friendIndex)
 		-- Convert to Retail-style table
 		return {
 			bnetAccountID = presenceID,
+			isFriend = presenceID ~= nil,
 			accountName = presenceName,
 			battleTag = battleTag,
 			isBattleTagFriend = isBattleTagPresence,

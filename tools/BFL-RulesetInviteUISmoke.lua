@@ -20,6 +20,8 @@ local function run(source, label)
 end
 execute(repo, "Data/ClassColors.lua")
 execute(repo, "Utils/ClassUtils.lua")
+execute(repo, "Utils/FriendNotes.lua")
+execute(repo, "Utils/FriendActions.lua")
 local model, main = read(repo, "Modules/FriendsList.lua"), read(repo, "BetterFriendlist.lua")
 local constants = between(model, "local INVITE_RESTRICTION_NONE =", "-- Helper Functions")
 run(constants .. between(model, "local function GetClassFileFromClassName(", "local function GetInviteRestrictionTextSafe("), "production invite model")
@@ -34,7 +36,9 @@ function FriendsList:GetLastInvitedAccountID() return nil end
 function FriendsList:SetLastInvitedAccountID(_, id) self.lastInvited = id end
 env.BNGetNumFriends = function() return 1 end
 BFL.IsBattleNetFriendsListEnabled = function() return true end
-BFL.GetBNetFriendInfo = function() return { bnetAccountID = 42 } end
+local identity = { kind = "bnet", id = 42, tag = "Friend#1234" }
+local liveTag = identity.tag
+BFL.GetBNetFriendInfo = function() return { bnetAccountID = 42, battleTag = liveTag, isFriend = true } end
 env.GetNativeRealmID = function() return 100 end
 env.RegionalUniqueNamesEnabled = function() return BFL.IsForever end
 env.LE_PARTY_CATEGORY_HOME = 1
@@ -112,15 +116,15 @@ local function setAccounts(games, online)
 	return currentFriend
 end
 local function menu()
-	local root = Menu(); addInvite(root, { bnetIDAccount = 42 }, true, not currentFriend.connected); return leaves(root)
+	local root = Menu(); addInvite(root, { bnetIDAccount = 42, bflFriendAction = identity }, true, not currentFriend.connected); return leaves(root)
 end
-local function rowClick() env.BetterFriendsList_TravelPassButton_OnClick({ friendData = currentFriend }) end
+local function rowClick() env.BetterFriendsList_TravelPassButton_OnClick({ friendData = currentFriend, bflFriendAction = identity }) end
 local function hover()
-	env.BetterFriendsList_TravelPassButton_OnEnter({ friendData = currentFriend })
+	env.BetterFriendsList_TravelPassButton_OnEnter({ friendData = currentFriend, bflFriendAction = identity })
 	return table.concat(env.BFL_Tooltip.lines, "\n")
 end
 local function broker(account)
-	smartInvite("bnet", { client = "WoW", gameAccountID = account.gameAccountID,
+	smartInvite("bnet", { type = "bnet", bnetAccountID = 42, battleTag = identity.tag, client = "WoW", gameAccountID = account.gameAccountID,
 		gameAccountInfo = account, characterName = account.characterName, realmName = account.realmName })
 end
 local function noAction(callback, message)
@@ -204,12 +208,26 @@ rowClick(); equal(calls[2].id, allowed.gameAccountID, "mixed TravelPass bypasses
 check(not hover():lower():find("ruleset", 1, true), "mixed TravelPass hover uses its eligible account")
 
 setAccounts({ game(10, "PvE"), game(11, "PvE", "Player-18-B") })
-BFL.ShowMultiAccountInvitePicker(accounts, { friendData = currentFriend })
+BFL.ShowMultiAccountInvitePicker(accounts, { friendData = currentFriend, bflFriendAction = identity })
 equal(#picker, 3, "compatible multi-account picker preserves both actions")
 picker[2].func(); picker[3].func()
 local actionsByID = {}; for _, action in ipairs(calls) do actionsByID[action.id] = action.kind end
 equal(actionsByID[10], "invite", "picker executes native Invite for the selected character")
 equal(actionsByID[11], "request", "picker executes native Request Join for the selected character")
+
+setAccounts({ game(10, "PvE"), game(11, "PvE", "Player-18-B") })
+local oldMenuInvite = menu()[1].callback
+BFL.ShowMultiAccountInvitePicker(accounts, { friendData = currentFriend, bflFriendAction = identity })
+local oldPickerInvite = picker[2].func
+liveTag = "Replacement#1234"
+noAction(oldMenuInvite, "an open invite menu cannot invite a replacement Battle.net account")
+noAction(oldPickerInvite, "an open account picker cannot invite a replacement Battle.net account")
+noAction(rowClick, "the stale invite row cannot invite a replacement Battle.net account")
+liveTag = identity.tag
+local retained = accounts[2]
+accounts = { retained }
+noAction(oldMenuInvite, "a separately readable game account must still belong to the selected friend")
+noAction(oldPickerInvite, "an open picker rejects an account that moved out of the selected friend's roster")
 
 setAccounts({ game(10, "PvP"), game(11, "RP") })
 buttons = menu(); equal(#buttons, 2, "all-blocked menu preserves both reasons")
@@ -217,7 +235,7 @@ for _, button in ipairs(buttons) do
 	equal(button.enabled, false, "every blocked submenu button uses actual SetEnabled(false)")
 	noAction(button.callback, "forced all-blocked callback cannot submit")
 end
-BFL.ShowMultiAccountInvitePicker(accounts, { friendData = currentFriend })
+BFL.ShowMultiAccountInvitePicker(accounts, { friendData = currentFriend, bflFriendAction = identity })
 equal(#picker, 3, "account picker contains title and both blocked characters")
 for i = 2, #picker do
 	check(picker[i].disabled and picker[i].text:lower():find("ruleset", 1, true), "picker labels its disabled Ruleset entries")
@@ -234,7 +252,7 @@ for _, mutation in ipairs({ "guid", "ruleset", "offline", "faction", "missing", 
 	local captured = game(10, "PvE")
 	setAccounts({ captured })
 	local callback = menu()[1].callback
-	BFL.ShowMultiAccountInvitePicker({ captured }, { friendData = currentFriend })
+	BFL.ShowMultiAccountInvitePicker({ captured }, { friendData = currentFriend, bflFriendAction = identity })
 	local pickerCallback = picker[2].func
 	local changed = {}; for key, value in pairs(captured) do changed[key] = value end
 	if mutation == "guid" then changed.playerGuid = "Player-18-Reassigned"

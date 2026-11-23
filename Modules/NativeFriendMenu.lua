@@ -6,6 +6,32 @@ local whoRows = {}
 local brokerLayers = {}
 local messageLayers = {}
 local menuLinks = {}
+local heldLinks, linkLayers = {}, {}
+local watchesRelease = false
+
+local function BlockHeldLink(state)
+	for _, held in pairs(heldLinks) do
+		if held == state then state.blocked = true; break end
+	end
+end
+
+local function SetLinkIdentity(state, identity)
+	if not BFL.FriendActions.Same(state.identity, identity) then BlockHeldLink(state) end
+	state.identity = identity
+end
+
+local function CanUseLink(state, fresh)
+	if state.blocked then return false end
+	if state.identity == nil or BFL.FriendActions.Resolve(state.identity, fresh == true) then return true end
+	BlockHeldLink(state)
+	return false
+end
+
+local function PressLink(state, button)
+	if state.identity == nil or not button then return end
+	if watchesRelease then heldLinks[button] = state end
+	if not CanUseLink(state, true) then state.hit:Hide() end
+end
 local rowsByLayer = {}
 local linkText = string.rep("M", 64)
 local DOUBLE_CLICK_WINDOW = 0.3
@@ -156,6 +182,10 @@ local function CreateLinkLayer(row, template)
 	text:SetPoint("TOPLEFT", hit, "TOPLEFT")
 	text:SetPoint("BOTTOMRIGHT", hit, "BOTTOMRIGHT")
 	local state = { hit = hit, text = text }
+	linkLayers[hit] = state
+	if hit.HookScript then
+		hit:HookScript("OnMouseDown", function(_, button) PressLink(state, button) end)
+	end
 	hit:SetScript("OnSizeChanged", function(_, _, height) LayoutLink(state, height) end)
 	return state
 end
@@ -302,7 +332,7 @@ end
 
 local function RefreshBrokerLayer(state)
 	if not state.friend then return end
-	if not CanRouteLink() then
+	if not CanRouteLink() or not CanUseLink(state) then
 		HideBrokerLayers(state)
 		return
 	end
@@ -412,7 +442,7 @@ function FriendMenu:ShowWhisperUnavailable()
 end
 
 local function RefreshMenuLink(state)
-	if state.menu and CanRouteLink() and not (IsModifiedClick and IsModifiedClick("CHATLINK"))
+	if state.menu and CanRouteLink() and CanUseLink(state) and not (IsModifiedClick and IsModifiedClick("CHATLINK"))
 		and (not BFL.CanSendWhisper or BFL.CanSendWhisper())
 	then
 		state.hit:Show()
@@ -441,7 +471,7 @@ local function CreateMenuLink(button)
 	return state
 end
 
-local function AddWhisperMenuItem(self, root, label, bindLink)
+local function AddWhisperMenuItem(self, root, label, bindLink, identity)
 	local canWhisper = not BFL.CanSendWhisper or BFL.CanSendWhisper()
 	local restriction = not canWhisper and BFL.GetAgeVerificationRestrictionTooltip
 		and BFL.GetAgeVerificationRestrictionTooltip()
@@ -467,6 +497,8 @@ local function AddWhisperMenuItem(self, root, label, bindLink)
 			menuLinks[button] = state
 		end
 		if not state then return end
+		SetLinkIdentity(state, identity)
+		if not CanUseLink(state) then return end
 		-- Blizzard lays out the menu button after initialization.
 		LayoutLink(state, button:GetHeight())
 		local ok, bound = pcall(bindLink, state.text)
@@ -494,12 +526,19 @@ function FriendMenu:AddCharacterWhisperMenuItem(root, name, label)
 	end)
 end
 
-function FriendMenu:AddFriendWhisperMenuItem(root, friend, isBroker, label)
+function FriendMenu:AddFriendWhisperMenuItem(root, friend, isBroker, label, identity)
 	local friends = BFL:GetModule("FriendsList")
 	if not friends or not IsWhisperRecipient(friend) then return end
+	if identity == nil then identity = BFL.FriendActions.Capture(friend) or false end
 	AddWhisperMenuItem(self, root, label, function(text)
-		return BindLink(friends, friend, text, isBroker)
-	end)
+		local current = BFL.FriendActions.Resolve(identity)
+		if not current then return false end
+		if identity.kind == "bnet" then
+			return BindLink(friends, { type = "bnet", bnetAccountID = identity.id, accountName = current.accountName }, text)
+		end
+		BindCharacterLink(text, identity.name)
+		return true
+	end, identity)
 end
 
 local function CreateMessageLayers(button)
@@ -540,6 +579,10 @@ function FriendMenu:UpdateSendMessage(friends, button, friend)
 		messageLayers[button] = state
 	end
 	if not state then return end
+	local identity = friends.selectedFriendAction
+	if identity == nil then identity = BFL.FriendActions.Capture(friend) or false end
+	SetLinkIdentity(state, identity)
+	if not CanUseLink(state) then HideClickLayers(state); return end
 	local height = button:GetHeight()
 	if height <= 0 then
 		HideClickLayers(state)
@@ -568,7 +611,7 @@ function FriendMenu:RefreshClickRouting()
 	local canRoute = CanRouteLink()
 	for row, state in pairs(layers) do
 		if state and state.hit:IsVisible() then
-			if canRoute then
+			if canRoute and CanUseLink(state) then
 				UpdateWhisperRouting(friends, state)
 			else
 				HideLayers(row, state)
@@ -607,6 +650,8 @@ function FriendMenu:UpdateBrokerRow(row, friend, whisperOnly)
 		end
 	end
 	if not state then return end
+	SetLinkIdentity(state, BFL.FriendActions.Capture(friend) or false)
+	if not CanUseLink(state) then HideBrokerLayers(state); return end
 	state.friend = nil
 	HideBrokerLayers(state)
 	LayoutLink(state, row:GetHeight())
@@ -639,6 +684,13 @@ function FriendMenu:UpdateRow(friends, row, friend, isWho)
 		end
 	end
 	if not state then return end
+	local identity
+	if not isWho then
+		if row.bflGroupActionUID then identity = row.bflFriendAction or false
+		else identity = BFL.FriendActions.Capture(friend) or false end
+	end
+	SetLinkIdentity(state, identity)
+	if not CanUseLink(state) then HideLayers(row, state); return end
 
 	local height = row:GetHeight()
 	if height <= 0 then
@@ -687,9 +739,9 @@ local function GetFocusedMenuFriend()
 	local state = brokerState or (row and layers[row])
 	local friend = state and state.friend
 	if not friend or state.who or state.whisperOnly or not state.hit:IsVisible() then return end
-	if not brokerState and row.friendData ~= friend then
-		return
-	end
+	if (not brokerState and row.friendData ~= friend)
+		or not BFL.FriendActions.Same(state.identity, BFL.FriendActions.Capture(friend))
+		or not CanUseLink(state, true) then return nil, nil, true end
 	return row, friend
 end
 
@@ -699,8 +751,8 @@ function FriendMenu:MaskNativeMenuTitle(root, friend, isBNet)
 	local title = streamer:GetFriendMenuLabel(friend)
 	if not friend and isBNet then
 		-- A native menu can have unreadable context even when the BFL link has focus.
-		local _, focused = GetFocusedMenuFriend()
-		if focused and focused.type == "bnet" then title = BFL.L.UNKNOWN end
+		local _, focused, stale = GetFocusedMenuFriend()
+		if stale or (focused and focused.type == "bnet") then title = BFL.L.UNKNOWN end
 	end
 	if not title then return end
 	-- UnitPopup creates its title first and sets the name in an initializer.
@@ -716,32 +768,34 @@ function FriendMenu:MaskNativeMenuTitle(root, friend, isBNet)
 end
 
 function FriendMenu:GetMenuFriend(context, isBNet)
-	local row, friend = GetFocusedMenuFriend()
-	if not friend then return end
 	local friends = BFL:GetModule("FriendsList")
 	if not friends or not friends:IsReadableInviteRecord(context) then return end
 	for _, field in ipairs({ "chatFrame", "ownerFrame", "friendsList" }) do
 		local value = context[field]
 		if BFL:IsSecret(value) or value ~= nil then return end
 	end
+	local row, friend, stale = GetFocusedMenuFriend()
+	if stale then return nil, nil, true end
+	if not friend then return end
 
 	if isBNet and friend.type == "bnet" then
 		local id = context.bnetIDAccount
-		if BFL:IsSecret(id) or (type(id) ~= "number" and type(id) ~= "string") then return end
+		if BFL:IsSecret(id) or (type(id) ~= "number" and type(id) ~= "string") then return nil, nil, true end
 		if tonumber(id) == friend.bnetAccountID then return row, friend end
 	elseif not isBNet and friend.type == "wow" then
 		local name = context.name
 		if SafeName(name) then
 			local suffix = context.surname
-			if BFL:IsSecret(suffix) then return end
+			if BFL:IsSecret(suffix) then return nil, nil, true end
 			if not SafeName(suffix) then suffix = context.server end
-			if BFL:IsSecret(suffix) then return end
+			if BFL:IsSecret(suffix) then return nil, nil, true end
 			if SafeName(suffix) then name = name .. "-" .. suffix end
 			if name == friend.name then return row, friend end
 			local normalized = BFL.NormalizeWoWFriendName and BFL:NormalizeWoWFriendName(name)
 			if normalized and normalized == BFL:NormalizeWoWFriendName(friend.name) then return row, friend end
 		end
 	end
+	return nil, nil, true
 end
 
 function FriendMenu:Initialize()
@@ -750,13 +804,40 @@ function FriendMenu:Initialize()
 	events:RegisterEvent("PLAYER_REGEN_DISABLED")
 	events:RegisterEvent("PLAYER_REGEN_ENABLED")
 	events:RegisterEvent("MODIFIER_STATE_CHANGED")
+	for _, event in ipairs({ "BN_FRIEND_LIST_SIZE_CHANGED", "BN_FRIEND_INFO_CHANGED", "BN_DISCONNECTED", "FRIENDLIST_UPDATE" }) do
+		events:RegisterEvent(event)
+	end
 	-- Observe hardware input for the visible button state without owning the click.
-	if BFL.Compat.RegisterEvent(events, "GLOBAL_MOUSE_UP") then
+	watchesRelease = BFL.Compat.RegisterEvent(events, "GLOBAL_MOUSE_UP")
+	if watchesRelease then
 		BFL.Compat.RegisterEvent(events, "GLOBAL_MOUSE_DOWN")
 	end
 	events:SetScript("OnEvent", function(_, event, ...)
 		if event == "GLOBAL_MOUSE_DOWN" or event == "GLOBAL_MOUSE_UP" then
 			UpdateMessagePress(event, ...)
+			local button = ...
+			if event == "GLOBAL_MOUSE_DOWN" and GetMouseFoci then
+				for _, focus in ipairs(GetMouseFoci() or {}) do
+					local state = linkLayers[focus]
+					if state then PressLink(state, button); break end
+				end
+			elseif event == "GLOBAL_MOUSE_UP" and button then
+				local state = heldLinks[button]
+				heldLinks[button] = nil
+				if state and state.blocked then
+					-- The native hyperlink may still be processing this release.
+					C_Timer.After(0, function()
+						for _, held in pairs(heldLinks) do if held == state then return end end
+						state.blocked = nil
+						local friends = BFL:GetModule("FriendsList")
+						if friends then
+							friends:RenderDisplay()
+							friends:UpdateSendMessageButton()
+						end
+						self:RefreshClickRouting()
+					end)
+				end
+			end
 			return
 		end
 		if not self:IsSupported() then return end

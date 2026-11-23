@@ -54,6 +54,8 @@ end
 local core = read(repoRoot, "Core.lua")
 execute(between(core, "function BFL.ResolveClientFlavor(", "local clientFlavor ="), "Core.lua")
 execute(read(repoRoot, "Utils/ClassicCompat.lua"), "Utils/ClassicCompat.lua")
+execute(read(repoRoot, "Utils/FriendNotes.lua"), "Utils/FriendNotes.lua")
+execute(read(repoRoot, "Utils/FriendActions.lua"), "Utils/FriendActions.lua")
 
 local assertions = 0
 local V = {}
@@ -90,7 +92,9 @@ local modeCheck = between(mainSource, "local CLASS_ID_TO_GAME_MODE =", "-- Multi
 execute(mainConstants .. modeCheck .. between(mainSource, "function BetterFriendsList_TravelPassButton_OnClick(", "function BetterFriendsList_TravelPassButton_OnEnter("), "TravelPassButton_OnClick")
 env.BNGetNumFriends = function() return 1 end
 BFL.IsBattleNetFriendsListEnabled = function() return true end
-BFL.GetBNetFriendInfo = function() return { bnetAccountID = 42 } end
+local liveTag = "Friend#1234"
+local identity = { kind = "bnet", id = 42, tag = liveTag }
+BFL.GetBNetFriendInfo = function() return { bnetAccountID = 42, battleTag = liveTag, isFriend = true } end
 env.FriendsFrame_InviteOrRequestToJoin = function(guid, id) calls[#calls + 1] = { guid = guid, id = id } end
 env.FriendsFrame_SetupTravelPassDropdown = function() calls[#calls + 1] = { picker = true } end
 
@@ -158,14 +162,14 @@ local function check(name, project, list, expected, count)
 		V:AssertEqual(friend.canInvite, native(1), name .. " Blizzard parity")
 	end
 	local root = menu()
-	addInviteButton(root, { bnetIDAccount = 42 }, true, false)
+	addInviteButton(root, { bnetIDAccount = 42, bflFriendAction = identity }, true, false)
 	V:AssertEqual(#root.buttons, expected and 1 or 0, name .. " context entry")
 	if expected then
 		calls = {}
 		if count == 1 then
 			root.buttons[1].callback()
 			V:AssertEqual(calls[1].id, friend.invitableAccounts[1].gameAccountID, name .. " menu dispatch")
-			env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+			env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 			V:AssertEqual(calls[2].id, friend.invitableAccounts[1].gameAccountID, name .. " row dispatch")
 		else
 			V:AssertEqual(#root.buttons[1].buttons, count, name .. " picker entries")
@@ -196,7 +200,7 @@ do
 	end
 	local function click(liveAccounts)
 		accounts, calls = liveAccounts, {}
-		env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+		env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 	end
 	env.C_BattleNet.InviteFriend = function(id) calls[#calls + 1] = { id = id, direct = true } end
 	click({ retailWithoutGUID() })
@@ -267,7 +271,7 @@ env.FriendsFrame_SetupTravelPassDropdown = function() error("Hidden native Frien
 inviteType = "INVITE"
 accounts = { account(), account({ gameAccountID = 100 }) }
 calls = {}
-env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 V:AssertEqual(#calls[1].items, 3, "Fresh multi-account picker has a title and two eligible accounts")
 V:Assert(not calls[1].items[2].disabled and not calls[1].items[3].disabled, "Fresh accounts remain enabled without native cached faction data")
 calls[1].items[3].func()
@@ -276,16 +280,16 @@ V:AssertEqual(calls[2].id, 100, "Row picker dispatches the selected account")
 local gameAccountAPI = env.C_BattleNet.GetFriendGameAccountInfo
 env.C_BattleNet.GetFriendGameAccountInfo = function(_, index) if index == 1 then return nil end; return accounts[index] end
 calls = {}
-env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 V:AssertEqual(calls[1].id, 100, "An account disappearing during a click does not prevent inviting the remaining one")
 env.C_BattleNet.GetFriendGameAccountInfo = gameAccountAPI
 accounts = { account({ wowProjectID = 1 }) }
 calls = {}
-env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 V:AssertEqual(#calls, 0, "A now-incompatible account does not open the hidden native dropdown")
 friend.connected = false
 accounts = { account() }
-env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 V:AssertEqual(#calls, 0, "An offline row cannot dispatch a stale invite")
 friend.connected = true
 updateStatus(friend, { gameAccountInfo = accounts[1] }, 1)
@@ -297,16 +301,16 @@ env.BNRequestInviteFriend = function(id) calls[#calls + 1] = { id = id, request 
 BFL.BNInviteFriend = function(id) calls[#calls + 1] = { id = id, invite = true } end
 calls = {}
 local root = menu()
-addInviteButton(root, { bnetIDAccount = 42 }, true, false)
+addInviteButton(root, { bnetIDAccount = 42, bflFriendAction = identity }, true, false)
 root.buttons[1].callback()
 V:Assert(calls[1].request, "Legacy request-to-join uses BNRequestInviteFriend")
-env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 V:Assert(calls[2].request, "Legacy row request-to-join uses BNRequestInviteFriend")
 inviteType = "INVITE"
 root = menu()
-addInviteButton(root, { bnetIDAccount = 42 }, true, false)
+addInviteButton(root, { bnetIDAccount = 42, bflFriendAction = identity }, true, false)
 root.buttons[1].callback()
 V:Assert(calls[3].invite, "Legacy direct invite uses BFL.BNInviteFriend")
-env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend })
+env.BetterFriendsList_TravelPassButton_OnClick({ friendData = friend, bflFriendAction = identity })
 V:Assert(calls[4].invite, "Legacy row direct invite uses BFL.BNInviteFriend")
 io.write("[OK] Invite compatibility smoke: " .. assertions .. " assertions" .. (nativeRestriction and ", including Blizzard Camelot parity" or "") .. (nativeClassicRestriction and " and Classic parity" or "") .. "\n")

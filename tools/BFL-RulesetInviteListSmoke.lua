@@ -20,7 +20,7 @@ end
 local function scenario(accounts, options)
 	options = options or {}
 	local snapshot = title()
-	snapshot.isFavorite = true
+	snapshot.isFavorite, snapshot.isFriend = true, true
 	snapshot.gameAccountInfo = accounts[1]
 	local c = setup({ snapshot }, { modern = true, classic = options.classic })
 	local env, BFL, list = c.env, c.BFL, c.list

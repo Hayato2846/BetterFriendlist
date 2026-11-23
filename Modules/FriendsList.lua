@@ -3702,7 +3702,12 @@ end
 
 -- Resolve the currently selected friend from UID (safe across list refreshes)
 function FriendsList:ResolveSelectedFriend()
-	return self:ResolveFriendByUID(self.selectedFriendUID)
+	local friend = self:ResolveFriendByUID(self.selectedFriendUID)
+	if self.selectedFriendAction ~= nil and not BFL.FriendActions.Same(
+		self.selectedFriendAction, BFL.FriendActions.Capture(friend)) then
+		return nil
+	end
+	return friend
 end
 
 function FriendsList:GetClickWhisperMode()
@@ -5751,6 +5756,7 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 
 				friend.connected = accountInfo.gameAccountInfo and accountInfo.gameAccountInfo.isOnline or false
 				friend.rawNote = accountInfo.note
+				friend.bflFriendAction = BFL.FriendActions.Capture({ type = "bnet", accountInfo = accountInfo }) or false
 				friend.note = BFL.FriendNotes.GetBNetDisplayNote(accountInfo)
 				friend.customMessage = accountInfo.customMessage
 				friend.customMessageTime = accountInfo.customMessageTime
@@ -7671,7 +7677,15 @@ function FriendsList:InviteGroupToParty(groupId)
 			end
 
 			if isValid then
-				table.insert(inviteCandidates, { friend = friend, gameAccountInfo = selectedAccount or friend.gameAccountInfo })
+				local identity = BFL.FriendActions.Capture(friend)
+				if identity then
+					local game = selectedAccount or friend.gameAccountInfo
+					inviteCandidates[#inviteCandidates + 1] = {
+						identity = identity,
+						gameID = self:GetReadableInviteField(game, "gameAccountID"),
+						guid = self:GetReadableInviteField(game, "playerGuid"),
+					}
+				end
 			end
 		end
 	end
@@ -7716,21 +7730,20 @@ function FriendsList:InviteGroupToParty(groupId)
 	-- 4. Execute Invites
 	local inviteCount = 0
 	for i = 1, inviteLimit do
-		local friend = inviteCandidates[i].friend
-		if friend.type == "bnet" then
-			local account = inviteCandidates[i].gameAccountInfo
-			if BFL.IsForever then
-				local allowed, _, current = BFL.ValidateForeverInviteTarget(account)
-				if allowed and self:GetGameAccountInviteRestriction(current) == INVITE_RESTRICTION_NONE then
-					BFL.BNInviteFriend(current.gameAccountID)
-					inviteCount = inviteCount + 1
-				end
-			else
-				BFL.BNInviteFriend(account.gameAccountID)
+		local candidate = inviteCandidates[i]
+		local identity = candidate.identity
+		if identity.kind == "bnet" then
+			local current = BFL.FriendActions.ResolveGameAccount(identity, candidate.gameID, candidate.guid)
+			if current and BFL.IsForever then
+				local allowed, _, fresh = BFL.ValidateForeverInviteTarget(current)
+				current = allowed and fresh or nil
+			end
+			if current and (not BFL.IsForever or self:GetGameAccountInviteRestriction(current) == INVITE_RESTRICTION_NONE) then
+				BFL.BNInviteFriend(current.gameAccountID)
 				inviteCount = inviteCount + 1
 			end
-		elseif friend.type == "wow" then
-			BFL.InviteUnit(friend.name)
+		elseif BFL.FriendActions.Resolve(identity) then
+			BFL.InviteUnit(identity.name)
 			inviteCount = inviteCount + 1
 		end
 	end
@@ -9384,6 +9397,7 @@ function FriendsList:ClearSelection()
 	-- highlight while the dependent button state is being refreshed.
 	self.selectedFriend = nil
 	self.selectedFriendUID = nil
+	self.selectedFriendAction = nil
 	self.selectedButton = nil
 
 	if selectedButton then
@@ -9418,7 +9432,10 @@ function FriendsList:UpdateFriendButton(button, elementData)
 	-- native friends-card-selected highlight; legacy rows retain their custom
 	-- selection texture.
 	local friendUID = friend.uid or (self.GetFriendUID and self:GetFriendUID(friend))
-	if not self.settingsSample then self:BindFriendGroupAction(button, friendUID, friend.rawNote) end
+	if not self.settingsSample then
+		self:BindFriendGroupAction(button, friendUID, friend.rawNote)
+		button.bflFriendAction = BFL.FriendActions.Capture(friend, button.bflGroupActionKey)
+	end
 	local isSelected = self.selectedFriend == friend
 		or (self.selectedFriendUID ~= nil and friendUID ~= nil and self.selectedFriendUID == friendUID)
 	self:SetButtonSelectionVisual(button, isSelected)
@@ -9905,6 +9922,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 				-- Store friend index for click handler
 				button.travelPassButton.friendIndex = friend.index
 				button.travelPassButton.friendData = friend
+				button.travelPassButton.bflFriendAction = button.bflFriendAction
 
 				-- Enable/disable button based on restriction (Pre-calculated)
 				if friend.canInvite then

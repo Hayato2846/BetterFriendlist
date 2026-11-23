@@ -292,6 +292,7 @@ local function SmartInviteOrJoin(friendType, data)
 	if not data then
 		return
 	end
+	local identity = BFL.FriendActions.Capture(data)
 
 	local playerInGroup = IsInGroup(LE_PARTY_CATEGORY_HOME)
 	local isLeader = UnitIsGroupLeader("player") or not playerInGroup
@@ -301,11 +302,14 @@ local function SmartInviteOrJoin(friendType, data)
 		if data.client ~= "WoW" or not data.gameAccountID then
 			return
 		end
-		local currentGameInfo
+		local friends = BFL:GetModule("FriendsList")
+		local guid = friends and friends:GetReadableInviteField(data.gameAccountInfo, "playerGuid")
+		local currentGameInfo = BFL.FriendActions.ResolveGameAccount(identity, data.gameAccountID, guid)
+		if not currentGameInfo then return end
 		if BFL.IsForever then
 			if BFL:IsSecret(data.gameAccountID) then return end
 			local allowed, reason
-			allowed, reason, currentGameInfo = BFL.ValidateForeverInviteTarget(data.gameAccountInfo or data)
+			allowed, reason, currentGameInfo = BFL.ValidateForeverInviteTarget(currentGameInfo)
 			if not allowed or not currentGameInfo or currentGameInfo.gameAccountID ~= data.gameAccountID then return end
 		end
 
@@ -317,12 +321,14 @@ local function SmartInviteOrJoin(friendType, data)
 				if BFL.AreRegionalUniqueNamesEnabled() then
 					targetName = BFL.NormalizePlayerIdentityName(targetName)
 				else
-					targetName = BFL.NormalizePlayerIdentityName(targetName, data.realmName) or targetName
+					local realmName = friends and friends:GetReadableInviteField(currentGameInfo, "realmName")
+					targetName = BFL.NormalizePlayerIdentityName(targetName, realmName)
 				end
-				BFL.RequestInviteFromUnit(targetName)
+				if targetName then BFL.RequestInviteFromUnit(targetName) end
 			end
 		end
 	elseif friendType == "wow" then
+		if not BFL.FriendActions.Resolve(identity) then return end
 		if BFL.IsForever and BFL.GetForeverRulesetInviteRestriction(data.gameAccountInfo or data) then return end
 		local targetName = data.fullName or data.characterName
 		if not targetName then
@@ -2556,14 +2562,12 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 
 			row:SetScript("OnMouseDown", function(frame, button)
 				frame.bflLastMouseButton = button
+				frame.bflPressedFriend = friend
 			end)
 			row:SetScript("OnMouseUp", function(frame, button)
-				if previewData then
-					frame.bflLastMouseButton = nil
-					return
-				end
-				OnFriendLineClick(frame, friend, button)
+				if not previewData and frame.bflPressedFriend == friend then OnFriendLineClick(frame, friend, button) end
 				frame.bflLastMouseButton = nil
+				frame.bflPressedFriend = nil
 			end)
 
 			local nativeMenu = not previewData and BFL:GetModule("NativeFriendMenu")
