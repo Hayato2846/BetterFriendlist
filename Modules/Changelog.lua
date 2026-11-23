@@ -79,14 +79,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### All WoW Versions
 
 #### Fixed
-- **Dragging Friends** - Drop a friend on a group header to move them, hold Shift to add them to another group, or drop them on No Group to clear their assignments. Releasing over another friend leaves your groups alone.
-- **Friend Actions** - Whisper, invite, remove, and favorite actions now check the intended contact when the friends list refreshes. An old removal confirmation cannot remove a different friend.
+- **Drag and Drop** - Letting go over a friend row no longer moves the friend you were dragging.
+- **Friends List** - Fixed cases where a list update could make you whisper, invite, favorite, or remove the wrong friend.
 
 ### WoW Forever
 
 #### Fixed
-- **Title Friend Groups** - A missing or duplicate link no longer prevents other Title Friends from being assigned to groups. BFL cancels pending group or note edits if it can no longer verify the contact shown.
-- **Title Friend Notes** - Short existing notes can be linked and edited as soon as the friends list is ready, with their original text preserved.
+- **Title Friend Groups** - Fixed a bug that could leave you stuck with the "link isn't ready" message when trying to put a Title Friend in a group.
+- **Title Friend Notes** - You can edit short notes you already had on Title Friends without reloading.
 
 ---
 
