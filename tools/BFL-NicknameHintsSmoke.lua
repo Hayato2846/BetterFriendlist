@@ -953,8 +953,13 @@ do
 	local friends = BFL:RegisterModule("FriendsList", {})
 	local quickFilters = BFL:RegisterModule("QuickFilters", {})
 	local selectedTags, member, assignedUID = {}, nil, nil
+	local canAssign, createdGroups = true, 0
+	local db = { RequireFriendGroupKey = function() return canAssign end }
 	function groups:ValidateGroupName(name) return name ~= "" end
-	function groups:Create(name) return true, "custom_" .. name end
+	function groups:Create(name)
+		createdGroups = createdGroups + 1
+		return true, "custom_" .. name
+	end
 	function groups:ToggleFriendInGroup(uid) assignedUID = uid; return true end
 	function friends:SyncGroups() end
 	function friends:ResolveFriendByUID() return member end
@@ -969,6 +974,7 @@ do
 	local nextSection = assert(source:find("-- Rename a group", create, true))
 	assert(load(source:sub(create, nextSection - 1), "@production group creation", "t", {
 		FriendsList = friends, BFL = BFL, GetGroups = function() return groups end,
+		GetDB = function() return db end,
 	}))()
 
 	local popup = StaticPopupDialogs.BETTER_FRIENDLIST_CREATE_GROUP
@@ -1020,6 +1026,12 @@ do
 	equal(values.hideEmptyGroups, true, "clearing the view keeps the persistent visibility preference")
 	Reset()
 	values.hideEmptyGroups, member = true, { connected = true, matches = true }
+	local groupsBefore = createdGroups
+	canAssign, dialog.hidden = false, false
+	assignedPopup.EditBoxOnEnterPressed(dialog.EditBox)
+	assert(createdGroups == groupsBefore and not assignedUID and not dialog.hidden,
+		"a missing link does not create an empty group or close the Enter dialog")
+	canAssign = true
 	assignedPopup.EditBoxOnEnterPressed(dialog.EditBox)
 	equal(assignedUID, dialog.data, "Enter keeps the assigned friend from popup data")
 	assert(not hints:IsShown(), "assigned visible online friend makes the new group visible")

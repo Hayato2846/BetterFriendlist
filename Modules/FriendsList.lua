@@ -3599,6 +3599,8 @@ local function GetFriendUID(friend)
 		return nil
 	end
 	if friend.type == "bnet" then
+		local titleUID = BFL.IsForever and BFL.FriendNotes and BFL.FriendNotes.GetTitleFriendUID(friend)
+		if titleUID then return titleUID end
 		-- Use battleTag as persistent identifier (bnetAccountID is temporary per session)
 		-- CRITICAL: Check for non-empty string, not just truthy value
 		if friend.battleTag and friend.battleTag ~= "" then
@@ -5736,7 +5738,10 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 
 				-- PHASE 9.6: Cache UID (Hot Path)
 				-- CRITICAL: Check for non-empty string, not just truthy value
-				if friend.battleTag and friend.battleTag ~= "" then
+				local titleUID = BFL.IsForever and BFL.FriendNotes.GetTitleFriendUID(accountInfo)
+				if titleUID then
+					friend.uid = titleUID
+				elseif friend.battleTag and friend.battleTag ~= "" then
 					friend.uid = "bnet_" .. friend.battleTag
 				else
 					friend.uid = "bnet_" .. (accountInfo.bnetAccountID or "unknown")
@@ -7386,6 +7391,8 @@ function FriendsList:CreateGroup(groupName, friendUID)
 	if not Groups then
 		return false, "Groups module not available"
 	end
+	local DB = GetDB()
+	if friendUID and DB and not DB:RequireFriendGroupKey(friendUID) then return false end
 
 	local success, result = Groups:Create(groupName)
 	if success then
@@ -8930,7 +8937,7 @@ Button_OnDragStop = function(self)
 				if droppedOnGroup == "nogroup" then
 					local DB = GetDB()
 					if DB then
-						DB:SetFriendGroups(friendUID, nil)
+						DB:SetFriendGroups(friendUID, nil, true)
 					end
 					BFL:ForceRefreshFriendsList()
 					return

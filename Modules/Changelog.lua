@@ -74,6 +74,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.8]        - 2026-11-23
+
+### WoW Forever
+
+#### Fixed
+- **Title Friend Groups** - A missing or duplicate link no longer prevents other Title Friends from being assigned to groups.
+- **Title Friend Notes** - Short existing notes can be linked and edited as soon as the friends list is ready, with their original text preserved.
+
+---
+
 ## [3.1.7]        - 2026-11-22
 
 ### All WoW Versions
@@ -274,47 +284,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Who Searches** - Who no longer skips searches that previously left the results list unchanged.
 
 ---
-
-## [3.0.2]        - 2026-11-07
-
-BetterFriendlist 3.0.2 brings back Blizzard's friend menu, fixes chat taint when you start a whisper, and makes friend tags easier to edit.
-
-### All WoW Versions
-
-#### Added
-- **Hints** - BFL can now show a hint when a nickname, friend tag, private note, new group, or favorite is hidden. You can open the options from the hint.
-
-#### Improved
-- **Friend Menus** - Blizzard's friend menu is back in both layouts when you right-click a friend in the list or Friends Broker. BFL's group, nickname, and tag options are there too, along with actions from compatible addons.
-- **Raid Tab** - Right-click a raid member to open Blizzard's raid menu.
-- **Friend Tag Editor** - Preview changes for each tag and use Save All to save your drafts when closing the editor. Reset previews the default look, and the delete prompt shows how many friends have the tag.
-- **Tag Appearance** - Open the icon picker in one click, enter a custom path, or remove the icon. Icon Only keeps your custom text for later, and hiding a tag keeps your choices for where it appears.
-
-#### Fixed
-- **Chat Taint** - Whisper from a right-click menu, single- and double-click whispers, and the Legacy Send Message button now use Blizzard's own whisper action to fix chat taint. Who, Recent Allies, the guild tab, and both brokers use it too, so the separate Taint-Free Whisper window and setting are gone.
-- **Friend Tag Editor** - Fixed a bug that could reset a custom tag's name, icon, text, or colors when you switched tags or made a new one.
-- **Settings** - Guild filters, sorting, and row options now take effect right away in both settings windows. The same goes for Streamer Mode and broker display options.
-
-### Retail Midnight
-
-#### Improved
-- **Forever Friends** - See a Forever friend's realm ruleset in the friends list and tooltips, or add it to a custom format with `%ruleset%`. The display updates when they switch between Forever and Retail.
-
-#### Fixed
-- **Blizzard Friend Tags** - Removing a friend's last Blizzard tag updates the list right away. You can edit another friend's tags while the first change is still pending.
-
-### Retail Midnight & WoW Forever
-
-#### Improved
-- **Legacy Settings** - When you use the Modern friends list, Legacy Settings uses the same backgrounds, dividers, and scrollbar.
-
-### WoW Forever
-
-#### Improved
-- **Friend Invites** - Invite and Request to Join in Blizzard's friend menu check realm rulesets, even if your friend has more than one character online.
-
-#### Fixed
-- **Who Searches** - The friends list stays put when another addon runs a Who search in the background.
 
 ---
 

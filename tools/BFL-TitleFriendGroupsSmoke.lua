@@ -2,7 +2,8 @@
 local root = assert(arg[1], "repository root required"):gsub("[\\/]$", "")
 local modules, callbacks, messages, roster = {}, {}, {}, {}
 local secret = {}
-local writes, deferred = 0, nil
+local writes, deferred, now = 0, nil, 0
+local rejected, lastAttempt
 local BFL = {
 	IsForever = true,
 	AreTitleFriendsEnabled = function() return true end,
@@ -23,7 +24,8 @@ local env = setmetatable({
 			["bnet_title_name:Old Name"] = { "orphan" }, ["bnet_Friend#1234"] = { "regular" } },
 	},
 	BNGetNumFriends = function() return #roster end,
-	C_Timer = { NewTimer = function(_, callback) return callback end },
+	GetTime = function() return now end,
+	C_Timer = { NewTimer = function() return { Cancel = function() end } end },
 	StaticPopupDialogs = {},
 	StaticPopup_Show = function(name) assert(name == "BFL_SET_TITLE_FRIEND_NOTE") end,
 	print = function(message) messages[#messages + 1] = message end,
@@ -45,6 +47,10 @@ BFL.GetBNetFriendInfo = function(index) return roster[index] end
 env.C_BattleNet = { GetFriendAccountInfo = BFL.GetBNetFriendInfo }
 env.BNSetFriendNote = function(id, note)
 	writes = writes + 1
+	if id == rejected then
+		lastAttempt = note
+		return false
+	end
 	for _, account in ipairs(roster) do
 		if account.bnetAccountID == id then
 			if deferred then deferred[account] = note else account.note = note end
@@ -121,23 +127,58 @@ local duplicate = titleFriend(206, long.note)
 local newcomer = titleFriend(224, "")
 roster[5], roster[6] = duplicate, newcomer
 titleNotes:Process()
-check(writes == 3 and not db:GetVerifiedTitleFriendToken("bnet_199", true), "duplicate markers never route edits or groups")
+check(writes == 4 and token(newcomer), "a duplicate marker does not block linking a different contact")
+check(not db:GetVerifiedTitleFriendToken("bnet_199", true), "duplicate markers never route edits or groups")
 roster[5], roster[6] = newcomer, nil
 titleNotes:Process()
-check(writes == 4 and token(newcomer), "new Title Friends enroll automatically")
-titleNotes:Process()
+local removedToken = token(newcomer)
+check(db:AddFriendToGroup("bnet_224", "keep"), "save a group before its marker goes missing")
 newcomer.note = "edited outside BFL"
-roster[6] = titleFriend(225, "")
+local short = titleFriend(225, "short native note")
+local hidden = titleFriend(secret, "")
+roster[6], roster[7] = short, hidden
 titleNotes:Process()
-check(writes == 4 and newcomer.note == "edited outside BFL", "don't guess which unmarked contact lost a known marker")
-roster[6] = nil
+check(writes == 6 and token(short) and token(newcomer) ~= removedToken, "a missing saved marker and an unreadable ID do not block unrelated links")
+check(newcomer.note:find("edited outside BFL", 1, true) and short.note:find("short native note", 1, true),
+	"link a short native note immediately while preserving the original text")
+check(#db:GetFriendGroups("bnet_224") == 0 and env.BetterFriendlistDB.friendGroups["bnet_title_" .. removedToken][1] == "keep",
+	"keep old data available without assigning it to an unverified contact")
+short.battleTag = secret
+check(db:RequireFriendGroupKey("bnet_225") and notes.GetBNetDisplayNote(short) == "short native note",
+	"the readable Title identity does not depend on the BattleTag")
+check(db:ToggleFriendInGroup("bnet_225", "group1") and db:IsFriendInGroup("bnet_225", "group1"), "menu adds a linked friend")
+check(db:ToggleFriendInGroup("bnet_225", "group1") and not db:IsFriendInGroup("bnet_225", "group1"), "menu removes a linked friend")
+check(db:SetFriendGroups("bnet_225", { "group2" }, true) and db:AddFriendToGroup("bnet_225", "group1"), "move and add a second group")
+check(db:RemoveFriendFromGroup("bnet_225", "group2") and db:SetFriendGroups("bnet_225", nil, true)
+	and #db:GetFriendGroups("bnet_225") == 0, "remove individual and all memberships")
+
+hidden.note = long.note
+check(not db:GetVerifiedTitleFriendToken("bnet_199", true) and db:GetVerifiedTitleFriendToken("bnet_150"),
+	"an unaddressable duplicate marker blocks only the colliding link")
+roster[7] = titleFriend(225, "")
+check(not db:GetVerifiedTitleFriendToken("bnet_225", true), "a duplicate live account ID cannot route either row")
+
+local delayed = titleFriend(226, "")
+roster[7], rejected = delayed, 226
+titleNotes:Process()
+local planned = lastAttempt
+check(planned and writes == 7 and not token(delayed), "a rejected write remains unverified")
+now = 1
+titleNotes:Process()
+check(writes == 7, "do not immediately repeat a rejected write")
+now, rejected = 6, nil
+titleNotes:Process()
+check(writes == 8 and delayed.note == planned, "retry only the same marker after a fresh roster check")
+titleNotes:Process()
+check(db:RequireFriendGroupKey("bnet_226"), "the retried link becomes usable after confirmation")
 
 titleNotes:SetEnabled(false)
 titleNotes:Process()
 check(long.note == "Updated note" and blank.note == "" and old.note == "old text", "return the current text to Blizzard")
+check(short.note == "short native note" and newcomer.note == "edited outside BFL", "return inline notes without losing their text")
 titleNotes:Process()
 check(store.returning == nil and not store.enabled and not env.BetterFriendlistDB.friendGroups[legacyKey], "confirm return and clear links")
 titleNotes:Process()
-check(writes == 7 and not token(blank), "disabled mode never recreates IDs")
+check(writes == 14 and not token(blank), "disabled mode never recreates IDs")
 check(db:GetFriendGroups("bnet_Friend#1234")[1] == "regular", "ordinary group keys are untouched")
 io.write("Title Friend note and group migration smoke passed.\n")

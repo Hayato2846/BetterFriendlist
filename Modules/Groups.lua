@@ -928,13 +928,7 @@ function Groups:ToggleFriendInGroup(friendUID, groupId)
 
 	local DB = BFL:GetModule("DB")
 
-	if DB:IsFriendInGroup(friendUID, groupId) then
-		-- Remove from group
-		return DB:RemoveFriendFromGroup(friendUID, groupId)
-	else
-		-- Add to group
-		return DB:AddFriendToGroup(friendUID, groupId, true)
-	end
+	return DB:ToggleFriendInGroup(friendUID, groupId)
 end
 
 -- Remove friend from group
@@ -995,7 +989,8 @@ function Groups:GetFriendUID(friend)
 		return nil
 	end
 	if friend.type == "bnet" then
-		return BFL.FriendNotes and BFL.FriendNotes.GetBNetUID(friend.accountInfo or friend)
+		local notes, account = BFL.FriendNotes, friend.accountInfo or friend
+		return notes and (BFL.IsForever and notes.GetTitleFriendUID(account) or notes.GetBNetUID(account))
 	else
 		return "wow_" .. (friend.name or "")
 	end

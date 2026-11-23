@@ -690,14 +690,14 @@
     {
       "Type": "DEBUG-PRINT",
       "Path": "FriendsList.lua",
-      "Line": 10665,
-      "Signature": "DEBUG-PRINT|FriendsList.lua|10665"
+      "Line": 10672,
+      "Signature": "DEBUG-PRINT|FriendsList.lua|10672"
     },
     {
       "Type": "DEBUG-PRINT",
       "Path": "FriendsList.lua",
-      "Line": 10724,
-      "Signature": "DEBUG-PRINT|FriendsList.lua|10724"
+      "Line": 10731,
+      "Signature": "DEBUG-PRINT|FriendsList.lua|10731"
     },
     {
       "Type": "DEBUG-PRINT",
@@ -4226,12 +4226,6 @@
       "Path": "RaidTools.lua",
       "Line": 1534,
       "Signature": "TIMER-CLEANUP|RaidTools.lua|1534"
-    },
-    {
-      "Type": "TIMER-CLEANUP",
-      "Path": "TitleFriendNotes.lua",
-      "Line": 249,
-      "Signature": "TIMER-CLEANUP|TitleFriendNotes.lua|249"
     }
   ]
 }

@@ -1560,18 +1560,18 @@ function DB:RefreshTitleFriendGroupKeys(accounts)
 		self:ClearTitleFriendGroupKeys()
 		return
 	end
-	local rows, tokens = notes:Inspect(accounts)
+	local rows, tokens, uids = notes:Inspect(accounts)
 	if not rows then
 		self:ClearTitleFriendGroupKeys()
 		return
 	end
 	local keys = {}
 	for _, row in ipairs(rows) do
-		if row.token and tokens[row.token] == row then keys[row.uid] = row.token end
+		if uids[row.uid] == row and row.token and tokens[row.token] == row then keys[row.uid] = row end
 	end
 	local changed = false
-	for uid, token in pairs(keys) do
-		if titleTokens[uid] ~= token then changed = true; break end
+	for uid, row in pairs(keys) do
+		if not titleTokens[uid] or titleTokens[uid].token ~= row.token then changed = true; break end
 	end
 	if not changed then
 		for uid in pairs(titleTokens) do
@@ -1591,7 +1591,8 @@ function DB:GetVerifiedTitleFriendToken(uid, fresh)
 		if accounts then self:RefreshTitleFriendGroupKeys(accounts)
 		else self:ClearTitleFriendGroupKeys() end
 	end
-	return titleTokens[uid]
+	local row = titleTokens[uid]
+	if row then return row.token, row.text end
 end
 
 function DB:GetStoredGroupNoteUID(key)
@@ -1612,6 +1613,25 @@ end
 local function ReportUnavailableTitleGroupKey()
 	local message = BFL.L and BFL.L.TITLE_FRIEND_GROUP_ID_UNAVAILABLE
 	if DEFAULT_CHAT_FRAME and message then DEFAULT_CHAT_FRAME:AddMessage(message) end
+	if BFL.TitleFriendNotes then BFL.TitleFriendNotes:Schedule() end
+end
+
+local function GetGroupMutationKey(uid, showError)
+	local key = GetFriendGroupKey(uid, true)
+	if not key and uid and showError then ReportUnavailableTitleGroupKey() end
+	return key
+end
+
+function DB:RequireFriendGroupKey(uid)
+	return GetGroupMutationKey(uid, true) ~= nil
+end
+
+local function OnFriendGroupsChanged(uid)
+	if BFL.SettingsVersion then BFL.SettingsVersion = BFL.SettingsVersion + 1 end
+	local friends = BFL:GetModule("FriendsList")
+	if friends and friends.InvalidateSettingsCache then friends:InvalidateSettingsCache() end
+	local noteSync = BFL:GetModule("NoteSync")
+	if noteSync and uid then noteSync:OnGroupChanged(uid) end
 end
 
 -- Get friend's groups. With no UID, return the backing store for maintenance.
@@ -1639,11 +1659,8 @@ function DB:SetFriendGroups(friendUID, groups, showError)
 		end
 	end
 
-	local key = GetFriendGroupKey(friendUID, true)
-	if not key then
-		if showError and #sanitizedGroups > 0 then ReportUnavailableTitleGroupKey() end
-		return false
-	end
+	local key = GetGroupMutationKey(friendUID, showError)
+	if not key then return false end
 
 	if #sanitizedGroups == 0 then
 		BetterFriendlistDB.friendGroups[key] = nil
@@ -1651,61 +1668,46 @@ function DB:SetFriendGroups(friendUID, groups, showError)
 		BetterFriendlistDB.friendGroups[key] = sanitizedGroups
 	end
 
-	-- NoteSync: Sync group change to friend note
-	local NoteSync = BFL:GetModule("NoteSync")
-	if NoteSync then
-		NoteSync:OnGroupChanged(friendUID)
-	end
+	OnFriendGroupsChanged(friendUID)
 	return true
 end
 
--- Add friend to group
-function DB:AddFriendToGroup(friendUID, groupId, showError)
+local function UpdateFriendGroup(friendUID, groupId, showError, toggle)
 	if not friendUID or type(groupId) ~= "string" or NON_PERSISTED_FRIEND_GROUPS[groupId] then
 		return false
 	end
-	local key = GetFriendGroupKey(friendUID, true)
-	if not key then
-		if showError then ReportUnavailableTitleGroupKey() end
-		return false
-	end
+	local key = GetGroupMutationKey(friendUID, showError)
+	if not key then return false end
 
-	if not BetterFriendlistDB.friendGroups[key] then
-		BetterFriendlistDB.friendGroups[key] = {}
-	end
-
-	-- Check if already in group
-	for _, gid in ipairs(BetterFriendlistDB.friendGroups[key]) do
+	local groups = BetterFriendlistDB.friendGroups[key] or {}
+	for index, gid in ipairs(groups) do
 		if gid == groupId then
-			return false -- Already in group
+			if not toggle then return false end
+			table.remove(groups, index)
+			if #groups == 0 then BetterFriendlistDB.friendGroups[key] = nil end
+			OnFriendGroupsChanged(friendUID)
+			return true
 		end
 	end
 
-	table.insert(BetterFriendlistDB.friendGroups[key], groupId)
-
-	-- Optimization: Increment version counter
-	if BFL.SettingsVersion then
-		BFL.SettingsVersion = BFL.SettingsVersion + 1
-	end
-	-- Invalidate caches
-	local FriendsList = BFL:GetModule("FriendsList")
-	if FriendsList and FriendsList.InvalidateSettingsCache then
-		FriendsList:InvalidateSettingsCache()
-	end
-
-	-- NoteSync: Sync group change to friend note
-	local NoteSync = BFL:GetModule("NoteSync")
-	if NoteSync then
-		NoteSync:OnGroupChanged(friendUID)
-	end
-
+	table.insert(groups, groupId)
+	BetterFriendlistDB.friendGroups[key] = groups
+	OnFriendGroupsChanged(friendUID)
 	return true
+end
+
+function DB:AddFriendToGroup(friendUID, groupId, showError)
+	return UpdateFriendGroup(friendUID, groupId, showError, false)
+end
+
+function DB:ToggleFriendInGroup(friendUID, groupId)
+	return UpdateFriendGroup(friendUID, groupId, true, true)
 end
 
 -- Remove friend from group
 function DB:RemoveFriendFromGroup(friendUID, groupId, storedKey)
 	local key = friendUID
-	if not storedKey then key = GetFriendGroupKey(friendUID, true) end
+	if not storedKey then key = GetGroupMutationKey(friendUID, true) end
 	local groups = BetterFriendlistDB.friendGroups[key]
 	if not groups then
 		return false
@@ -1720,23 +1722,9 @@ function DB:RemoveFriendFromGroup(friendUID, groupId, storedKey)
 				BetterFriendlistDB.friendGroups[key] = nil
 			end
 
-			-- Optimization: Increment version counter
-			if BFL.SettingsVersion then
-				BFL.SettingsVersion = BFL.SettingsVersion + 1
-			end
-			-- Invalidate caches
-			local FriendsList = BFL:GetModule("FriendsList")
-			if FriendsList and FriendsList.InvalidateSettingsCache then
-				FriendsList:InvalidateSettingsCache()
-			end
-
-			-- NoteSync: Sync group change to friend note
-			local NoteSync = BFL:GetModule("NoteSync")
 			local noteUID = friendUID
 			if storedKey then noteUID = self:GetStoredGroupNoteUID(key) end
-			if NoteSync and noteUID then
-				NoteSync:OnGroupChanged(noteUID)
-			end
+			OnFriendGroupsChanged(noteUID)
 
 			return true
 		end

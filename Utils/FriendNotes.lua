@@ -99,20 +99,23 @@ local function ReadNote(info, key)
 	return FriendNotes.IsReadableString(note) and note or nil
 end
 
+function FriendNotes.GetTitleFriendUID(account)
+	if not FriendNotes.IsReadableTable(account) then return end
+	local level, id = account.friendLevel, account.bnetAccountID
+	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
+	if titleLevel and not IsSecret(level) and level == titleLevel
+		and not IsSecret(id) and type(id) == "number" and id > 0 and id < math.huge and id % 1 == 0 then
+		return "bnet_" .. tostring(id)
+	end
+end
+
 function FriendNotes.GetBNetUID(account)
 	if not FriendNotes.IsReadableTable(account) then return nil end
 	local tag = account.battleTag
 	if IsSecret(tag) then return nil end
 	if IsName(tag) then return "bnet_" .. tag end
 	if tag ~= nil and tag ~= "" then return nil end
-	local level, id = account.friendLevel, account.bnetAccountID
-	local titleLevel = Enum and Enum.BattleNetFriendLevel and Enum.BattleNetFriendLevel.Title
-	if not IsSecret(level) and titleLevel and level == titleLevel
-		and not IsSecret(id) and type(id) == "number" and id > 0 and id < math.huge and id % 1 == 0
-	then
-		return "bnet_" .. tostring(id)
-	end
-	return nil
+	return FriendNotes.GetTitleFriendUID(account)
 end
 
 function FriendNotes.GetBNetFriends()
@@ -402,7 +405,7 @@ function FriendNotes.WriteTitleFriendLink(uid, index, expected, value)
 	end
 	local function ReadCurrent()
 		local ok, account = pcall(BFL.GetBNetFriendInfo, index)
-		if ok and FriendNotes.GetBNetUID(account) == uid and BFL.IsTitleFriend(account)
+		if ok and FriendNotes.GetTitleFriendUID(account) == uid
 			and not IsSecret(account.isFriend) and account.isFriend == true then return account end
 	end
 	local account = ReadCurrent()

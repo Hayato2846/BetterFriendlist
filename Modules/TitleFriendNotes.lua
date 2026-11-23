@@ -6,9 +6,12 @@ BFL.TitleFriendNotes = TitleNotes
 
 local durableBackups, durableNotes, durableOriginals
 local pending, reserved = {}, {}
-local timer, reportReturn
+local reportReturn
 local alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 local keyPrefix = "bnet_title_"
+local WRITE_RETRY_DELAY = 5
+local MAX_WRITE_ATTEMPTS = 3
+local INLINE_MARKER_LENGTH = #" [BFL:00000000]"
 
 local function TellPlayer(key)
 	if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage(BFL.L[key]) end
@@ -57,38 +60,41 @@ local function GetToken(backup, store, tokens)
 	local token
 	repeat
 		token = backup and backup .. RandomCode(6) or RandomCode(8)
-	until not (tokens[token] or reserved[token] or store.active[token] or store.notes[token]
+	until not (tokens[token] ~= nil or reserved[token] or store.active[token] or store.notes[token] or store.originals[token]
 		or BetterFriendlistDB.friendGroups[keyPrefix .. token])
 	reserved[token] = true
 	return token
 end
 
--- A complete, readable snapshot is necessary to prove marker uniqueness.
+-- Inspect every possible Title Friend note for collisions, even when that row
+-- lacks a usable account ID. Only rows with unique live IDs can be addressed.
 function TitleNotes:Inspect(accounts)
 	local rows, tokens, uids = {}, {}, {}
+	local hasUnaddressableMarker = false
 	for index, account in ipairs(accounts) do
-		if not Notes.IsReadableTable(account) or BFL:IsSecret(account.friendLevel) then return end
-		if account.friendLevel == nil then
-			local tag = account.battleTag
-			if not Notes.IsReadableString(tag) or tag == "" then return end
-		end
-		if BFL.IsTitleFriend(account) then
-			if BFL:IsSecret(account.isFriend) or account.isFriend ~= true then return end
-			local uid = Notes.GetBNetUID(account)
-			if not uid or uids[uid] then return end
+		if not Notes.IsReadableTable(account) then return end
+		local level, tag = account.friendLevel, account.battleTag
+		local isTitle = BFL.IsTitleFriend(account)
+		if isTitle or BFL:IsSecret(level) or (level == nil and (not Notes.IsReadableString(tag) or tag == "")) then
 			local note = account.note
 			if not Notes.IsReadableString(note) then return end
+			local row
+			local uid = Notes.GetTitleFriendUID(account)
 			local text, token, problem = Notes.SplitTitleGroupNote(note)
 			if token and note ~= Notes.AppendTitleGroupToken(text, token) then token, problem = nil, "ambiguous" end
-			local row = { uid = uid, index = index, note = note, text = text, token = token, problem = problem }
-			rows[#rows + 1], uids[uid] = row, row
+			if uid and not BFL:IsSecret(account.isFriend) and account.isFriend == true then
+				row = { uid = uid, index = index, note = note, text = text, token = token, problem = problem }
+				rows[#rows + 1] = row
+			elseif token or problem then
+				hasUnaddressableMarker = true
+			end
+			if uid then uids[uid] = uids[uid] == nil and row or false end
 			Notes.ForEachTitleGroupToken(note, function(found)
-				if tokens[found] ~= nil then tokens[found] = false
-				else tokens[found] = token == found and row or false end
+				tokens[found] = tokens[found] == nil and row and row.token == found and row or false
 			end)
 		end
 	end
-	return rows, tokens, uids
+	return rows, tokens, uids, hasUnaddressableMarker
 end
 
 function TitleNotes:ReadRoster()
@@ -122,8 +128,9 @@ end
 function TitleNotes:GetDisplayNote(account)
 	if not self:IsEnabled() then return end
 	local db = BFL:GetModule("DB")
-	local uid = Notes.GetBNetUID(account)
-	local token = uid and db and db:GetVerifiedTitleFriendToken(uid)
+	local uid = Notes.GetTitleFriendUID(account)
+	if not uid or not db then return end
+	local token = db:GetVerifiedTitleFriendToken(uid)
 	local _, marker = Notes.SplitTitleGroupNote(account.note)
 	if token and token == marker then return GetLocalText(GetStore(), token) end
 end
@@ -138,41 +145,59 @@ end
 local function Write(row, value, token, operation)
 	if pending[row.uid] then return false end
 	local ok, reason = Notes.WriteTitleFriendLink(row.uid, row.index, row.note, value)
-	if ok or reason == "pending" then
-		pending[row.uid] = { token = token, value = value, operation = operation }
+	if ok or reason == "pending" or reason == "failed" then
+		pending[row.uid] = { token = token, value = value, before = row.note, operation = operation,
+			attempts = 1, retryAt = GetTime() + WRITE_RETRY_DELAY }
 		return true
 	end
 	return false
 end
 
 local function ConfirmWrites(store, tokens, uids)
+	local now, waiting, retries = GetTime(), false, 0
 	for uid, write in pairs(pending) do
 		local row = uids[uid]
-		if write.operation == "return" then
-			if row and row.note == write.value and tokens[write.token] == nil then
+		local returning = write.operation == "return"
+		if not row or (row.note ~= write.before and row.note ~= write.value) then
+			pending[uid] = nil
+		elseif row.note == write.value then
+			if returning and tokens[write.token] == nil then
 				store.active[write.token] = nil
 				BetterFriendlistDB.friendGroups[keyPrefix .. write.token] = nil
 				pending[uid] = nil
+			elseif not returning and tokens[write.token] == row then
+				pending[uid] = nil
 			end
-		elseif row and row.token == write.token and tokens[write.token] == row and row.note == write.value then
-			pending[uid] = nil
+		elseif not returning and store.enabled == false then
+			-- While returning notes, allow the last link write to settle.
+			if now >= write.retryAt then pending[uid] = nil else waiting = true end
+		elseif write.attempts < MAX_WRITE_ATTEMPTS and (tokens[write.token] == nil or tokens[write.token] == row) then
+			waiting = true
+			if now >= write.retryAt and retries < 8 then
+				Notes.WriteTitleFriendLink(uid, row.index, row.note, write.value)
+				write.attempts = write.attempts + 1
+				write.retryAt = now + WRITE_RETRY_DELAY
+				retries = retries + 1
+			end
 		end
 	end
+	if retries > 0 then RefreshFriends() end
+	return waiting
 end
 
 function TitleNotes:Process()
 	local accounts = self:ReadRoster()
 	if not accounts then return end
-	local rows, tokens, uids = self:Inspect(accounts)
+	local rows, tokens, uids, hasUnaddressableMarker = self:Inspect(accounts)
 	if not rows then return end
 	local store = GetStore()
-	ConfirmWrites(store, tokens, uids)
+	local waiting = ConfirmWrites(store, tokens, uids)
 	local batch, remaining = 0, 0
 	if store.enabled == false then
 		if not store.returning then return end
 		for _, row in ipairs(rows) do
 			local token = row.token
-			if token and tokens[token] == row then
+			if uids[row.uid] == row and token and tokens[token] == row then
 				local text = GetLocalText(store, token)
 				if text == nil and row.text ~= "" then text = row.text end
 				local clean = row.text == "" or row.text == text or store.originals[token] == row.text
@@ -183,32 +208,28 @@ function TitleNotes:Process()
 		for _, row in ipairs(rows) do
 			if row.token or row.problem then remaining = remaining + 1 end
 		end
-		if remaining == 0 and not next(pending) then
+		if remaining == 0 and not hasUnaddressableMarker and not next(pending) then
 			store.returning = nil
 			store.active = {}
 			reportReturn = nil
 			TellPlayer("TITLE_FRIEND_NOTES_RETURNED")
-		elseif batch > 0 then
-			self:Schedule()
-		elseif reportReturn then
+		elseif reportReturn and batch == 0 and not waiting then
 			reportReturn = nil
 			TellPlayer("TITLE_FRIEND_NOTES_PENDING")
 		end
 		if batch > 0 then RefreshFriends() end
+		if batch > 0 or waiting then self:Schedule(batch == 0 and WRITE_RETRY_DELAY or nil) end
 		return
 	end
 
-	local missing = false
-	for token in pairs(store.active) do
-		if not tokens[token] then missing = true; break end
-	end
 	local backupCodes = {}
 	for code, value in pairs(store.backups) do
 		if not backupCodes[value] or durableBackups[code] == value then backupCodes[value] = code end
 	end
 	for _, row in ipairs(rows) do
 		local token, text = row.token, row.text
-		if token and tokens[token] == row then
+		local verifiedID = uids[row.uid] == row
+		if verifiedID and token and tokens[token] == row then
 			if text ~= "" and not store.active[token] then store.originals[token] = text end
 			store.active[token] = true
 			if store.notes[token] == nil then
@@ -220,17 +241,21 @@ function TitleNotes:Process()
 			then
 				batch = batch + 1
 			end
-		elseif not token and not row.problem and not missing and not pending[row.uid] then
+		elseif verifiedID and not token and not row.problem and not pending[row.uid] then
 			local backup = backupCodes[text]
 			if text ~= "" and not backup then
 				repeat backup = RandomCode(8) until not store.backups[backup]
 				store.backups[backup], backupCodes[text] = text, backup
 			end
-			if batch < 8 and (text == "" or backup and durableBackups[backup] == text) then
+			local backedUp = text == "" or backup and durableBackups[backup] == text
+			local inline = not backedUp and Notes.CountNoteLetters(text) + INLINE_MARKER_LENGTH <= 127
+			if batch < 8 and (backedUp or inline) then
+				-- Until the backup is on disk, keep the full text in the native note.
+				if inline then backup = nil end
 				token = GetToken(backup, store, tokens)
-				if Write(row, Notes.AppendTitleGroupToken("", token), token, "link") then
+				if Write(row, Notes.AppendTitleGroupToken(inline and text or "", token), token, "link") then
 					store.notes[token] = text
-					store.active[token] = true
+					if inline then store.originals[token] = text end
 					batch = batch + 1
 				end
 			end
@@ -238,16 +263,23 @@ function TitleNotes:Process()
 	end
 	if batch > 0 then
 		RefreshFriends()
-		self:Schedule()
 	end
+	if batch > 0 or waiting then self:Schedule(batch == 0 and WRITE_RETRY_DELAY or nil) end
 end
 
-function TitleNotes:Schedule()
-	if timer or not self:IsSupported() or not BetterFriendlistDB then return end
+function TitleNotes:Schedule(delay)
+	if not self:IsSupported() or not BetterFriendlistDB then return end
 	local store = GetStore()
 	if store.enabled == false and not store.returning then return end
-	timer = C_Timer.NewTimer(0.35, function()
-		timer = nil
+	delay = delay or 0.35
+	local due = GetTime() + delay
+	if self.timer then
+		if due >= self.timerDue then return end
+		self.timer:Cancel()
+	end
+	self.timerDue = due
+	self.timer = C_Timer.NewTimer(delay, function()
+		self.timer, self.timerDue = nil, nil
 		self:Process()
 	end)
 end
@@ -270,20 +302,20 @@ function TitleNotes:ShowEditor(id, name)
 	if not self:IsEnabled() or BFL:IsSecret(id) or type(id) ~= "number" then return false end
 	local uid = "bnet_" .. id
 	local db = BFL:GetModule("DB")
-	local token = db:GetVerifiedTitleFriendToken(uid, true)
+	local token, original = db:GetVerifiedTitleFriendToken(uid, true)
 	if not token then
 		TellPlayer("TITLE_FRIEND_GROUP_ID_UNAVAILABLE")
+		self:Schedule()
 		return true
 	end
 	local store = GetStore()
-	local account = Notes.FindBNetFriend(uid)
-	local original
-	if account then
-		local text, marker = Notes.SplitTitleGroupNote(account.note)
-		if marker == token then original = text end
-	end
 	local function Save(dialog)
-		if not self:IsEnabled() or db:GetVerifiedTitleFriendToken(uid, true) ~= token then return end
+		if not self:IsEnabled() then return end
+		if db:GetVerifiedTitleFriendToken(uid, true) ~= token then
+			TellPlayer("TITLE_FRIEND_GROUP_ID_UNAVAILABLE")
+			self:Schedule()
+			return
+		end
 		local box = dialog.GetEditBox and dialog:GetEditBox() or dialog.editBox
 		local text = box:GetText()
 		if Notes.IsReadableString(text) and Notes.CountNoteLetters(text) <= 127 then
@@ -323,14 +355,26 @@ local function Schedule()
 	TitleNotes:Schedule()
 end
 
+if BFL.IsForever then
+	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function()
+		-- An account ID can be reused after a roster change. Observe any
+		-- outstanding writes, and do not resubmit against the old ID.
+		for _, write in pairs(pending) do write.attempts = MAX_WRITE_ATTEMPTS end
+		Schedule()
+	end)
+	BFL:RegisterEventCallback("BN_DISCONNECTED", function() pending = {} end)
+end
 for _, event in ipairs({
-	"PLAYER_ENTERING_WORLD", "BN_CONNECTED", "BN_FRIEND_LIST_SIZE_CHANGED", "BN_FRIEND_INFO_CHANGED",
+	"PLAYER_ENTERING_WORLD", "BN_CONNECTED", "BN_FRIEND_INFO_CHANGED",
 	"PLAYER_REGEN_ENABLED",
 }) do
 	if BFL.IsForever then BFL:RegisterEventCallback(event, Schedule) end
 end
 if BFL.IsForever then
 	BFL:RegisterEventCallback("PLAYER_LOGOUT", function()
-		if timer then timer:Cancel(); timer = nil end
+		if TitleNotes.timer then
+			TitleNotes.timer:Cancel()
+			TitleNotes.timer, TitleNotes.timerDue = nil, nil
+		end
 	end)
 end

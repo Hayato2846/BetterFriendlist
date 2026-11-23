@@ -3086,14 +3086,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
 				-- Add "Remove from All Groups" button immediately after Create Group (User request)
 				if next(friendCurrentGroups) then
-					-- Add "Remove from All Groups" button
-					local Groups = GetGroups()
 					groupsButton:CreateButton(L.MENU_REMOVE_ALL_GROUPS, function()
-						if Groups then
-							for currentGroupId in pairs(friendCurrentGroups) do
-								Groups:RemoveFriendFromGroup(friendUID, currentGroupId)
-							end
-							-- Force full display refresh - group membership affects display structure
+						if DB and DB:SetFriendGroups(friendUID, nil, true) then
 							BFL:ForceRefreshFriendsList()
 						end
 					end)
