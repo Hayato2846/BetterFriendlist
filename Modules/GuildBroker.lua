@@ -730,16 +730,7 @@ local function GetColoredLevelText(level)
 		return C("gray", "??")
 	end
 
-	local maxLevel = BFL.GetMaxLevel and BFL.GetMaxLevel() or 80
-	if level >= maxLevel then
-		return C("gold", tostring(level))
-	elseif level >= maxLevel - 5 then
-		return C("green", tostring(level))
-	elseif level >= maxLevel - 10 then
-		return C("ltyellow", tostring(level))
-	else
-		return C("white", tostring(level))
-	end
+	return BFL.BrokerUtils.ColorLevelByDifficulty(level)
 end
 
 -- ========================================

@@ -671,6 +671,7 @@ function Settings:OnLoad(frame)
 		self:ClearFilterSortPreview(true)
 		self:HideFilterSortEditorPanel()
 	end)
+	BFL:InstallLocalEscapeHandler(settingsFrame)
 end
 
 -- Compatibility for older internal links and imported beta opt-ins.
@@ -697,15 +698,18 @@ end
 -- Opening the window establishes the same anchor, but a live Legacy/Modern
 -- style switch changes the required side-tab clearance without reopening it.
 function Settings:RefreshVisibleWindowAnchor()
-	local FriendsUI = BFL:GetModule("FriendsUI")
-	if not (FriendsUI and FriendsUI.AnchorAuxiliaryWindow) then
+	if not (settingsFrame and settingsFrame:IsShown()) then
 		return
 	end
-
-	if settingsFrame and settingsFrame:IsShown() then
+	local frameSettings = BFL:GetModule("FrameSettings")
+	if frameSettings:ApplySettingsWindowAttachment(settingsFrame) then return end
+	local FriendsUI = BFL:GetModule("FriendsUI")
+	if FriendsUI and FriendsUI.AnchorAuxiliaryWindow then
 		FriendsUI:AnchorAuxiliaryWindow(settingsFrame, 0, true)
+	elseif BetterFriendsFrame then
+		settingsFrame:ClearAllPoints()
+		settingsFrame:SetPoint("TOPLEFT", BetterFriendsFrame, "TOPRIGHT", 5, 0)
 	end
-
 end
 
 -- All entry points use the redesigned standard Settings.
@@ -789,12 +793,16 @@ function Settings:ShowLegacy(categoryID, focusSection)
 	end
 
 	if settingsFrame then
-		if _G.BetterFriendsFrame and not _G.BetterFriendsFrame:IsShown() then
+		local frameSettings = BFL:GetModule("FrameSettings")
+		local detached = frameSettings:IsSettingsWindowDetached()
+		if not detached and _G.BetterFriendsFrame and not _G.BetterFriendsFrame:IsShown() then
 			if _G.ToggleBetterFriendsFrame then
 				_G.ToggleBetterFriendsFrame()
 			end
 		end
 		self:LoadSettings()
+		frameSettings:InitializeSettingsWindow(settingsFrame)
+		frameSettings:ApplySettingsWindowAttachment(settingsFrame)
 		settingsFrame:Show()
 		local review = BFL:GetModule("LegacySettingsReview")
 		if review then
@@ -4482,7 +4490,9 @@ end
 
 local function GetFormatFieldDescription(isInfo)
 	local description = isInfo and L.SETTINGS_INFO_FORMAT_DESC or L.SETTINGS_NAME_FORMAT_DESC
-	if isInfo then description = description .. "\n" .. L.SETTINGS_FORMAT_MULTI_ACCOUNT_TOKENS end
+	if isInfo then
+		description = description .. "\n" .. L.SETTINGS_FORMAT_STATUSONLINE_TOKEN .. "\n" .. L.SETTINGS_FORMAT_MULTI_ACCOUNT_TOKENS
+	end
 	if BFL.IsForever then description = description .. "\n" .. L.SETTINGS_FORMAT_RULESET_TOKENS end
 	return description
 end
@@ -4498,6 +4508,78 @@ function Settings:GetFormatFields(isInfo)
 		end
 	end
 	return fields
+end
+
+local function SetCustomFormatVisibility(rows, visible, refresh)
+	if rows[1].BFL_LegacyAvailable == visible then return end
+	for _, row in ipairs(rows) do
+		row.BFL_LegacyAvailable = visible
+		row:SetShown(visible)
+	end
+	if refresh then NotifyLegacyReviewTabBuilt(rows[1]:GetParent()) end
+end
+
+local function AddFormatColorControls(settings, tab, frames, db, input, isInfo, swatches)
+	local entries = { labels = {}, values = {} }
+	for _, field in ipairs(settings:GetFormatFields(isInfo)) do
+		entries.labels[#entries.labels + 1] = field.token
+		entries.values[#entries.values + 1] = field.token:sub(2, -2)
+	end
+	local selected = "name"
+	local picker
+	local function GetColor(token)
+		return db:Get("friendFormatColors", {})[token]
+	end
+	local function SetColor(token, color)
+		local updated = {}
+		for key, value in pairs(db:Get("friendFormatColors", {})) do updated[key] = value end
+		updated[token] = color
+		db:Set("friendFormatColors", updated)
+		for _, refresh in ipairs(swatches) do refresh() end
+		BFL:ForceRefreshFriendsList()
+		local review = BFL:GetModule("LegacySettingsReview")
+		if review and review.active then review:QueueSample() end
+	end
+	local function RefreshSwatch()
+		local color = GetColor(selected)
+		picker:SetColor(color and color.r, color and color.g, color and color.b)
+	end
+	local field = Components:CreateDropdown(tab, L.SETTINGS_FORMAT_COLOR_FIELD, entries, function(token)
+		return selected == token
+	end, function(token)
+		selected = token
+		RefreshSwatch()
+	end)
+	field.BFL_SettingHelpKey = "SETTINGS_FORMAT_COLOR_FIELD"
+	frames[#frames + 1] = field
+	picker = Components:CreateColorPicker(tab, L.SETTINGS_FORMAT_FIELD_COLOR, GetColor(selected), nil, {
+		opaque = true,
+		tooltipTitle = L.SETTINGS_FORMAT_FIELD_COLOR,
+		tooltipDesc = L.SETTINGS_FORMAT_FIELD_COLOR_DESC,
+		automaticText = L.SETTINGS_FORMAT_FIELD_COLOR_AUTOMATIC,
+		resetText = L.FRIEND_TAGS_EDITOR_RESET,
+		resetTooltip = L.SETTINGS_FORMAT_FIELD_COLOR_RESET,
+		resetCallback = function()
+			if GetColor(selected) then SetColor(selected, nil) end
+		end,
+		captureCallbacks = function(r, g, b)
+			local token, previous = selected, GetColor(selected)
+			local changed = false
+			return function(newR, newG, newB)
+				-- OK also reports the current color when the player made no changes.
+				if newR == r and newG == g and newB == b then return end
+				r, g, b = newR, newG, newB
+				changed = true
+				SetColor(token, { r = r, g = g, b = b })
+			end, function()
+				if changed then SetColor(token, previous) end
+			end
+		end,
+	})
+	picker.BFL_SettingHelpKey = "SETTINGS_FORMAT_FIELD_COLOR"
+	frames[#frames + 1] = picker
+	swatches[#swatches + 1] = RefreshSwatch
+	return { input, field, picker }
 end
 
 function Settings:RefreshGeneralTab()
@@ -4744,6 +4826,17 @@ function Settings:RefreshGeneralTab()
 		gameIcon.BFL_FriendRowSection = "status"
 		difficultyColor.BFL_FriendRowSection = "details"
 	end
+	local friendLocalTime = Components:CreateCheckbox(tab, {
+		label = L.SETTINGS_SHOW_FRIEND_LOCAL_TIME,
+		initialValue = DB:Get("showFriendLocalTime", false),
+		callback = function(enabled)
+			BFL:GetModule("FriendLocalTime"):SetEnabled(enabled)
+		end,
+		tooltipTitle = L.SETTINGS_SHOW_FRIEND_LOCAL_TIME,
+		tooltipDesc = L.SETTINGS_SHOW_FRIEND_LOCAL_TIME_DESC,
+	})
+	friendLocalTime.BFL_FriendRowSection = "status"
+	table.insert(allFrames, friendLocalTime)
 
 	-- Row 6: Welcome Message & Hide Empty
 	local welcome = {
@@ -4883,7 +4976,8 @@ function Settings:RefreshGeneralTab()
 		},
 	}
 
-	local nameCustomInput -- forward declare for visibility toggling
+	local nameCustomRows
+	local formatColorSwatches = {}
 
 	local namePresetDropdown = Components:CreateDropdown(
 		tab,
@@ -4895,16 +4989,8 @@ function Settings:RefreshGeneralTab()
 		function(val)
 			DB:Set("nameFormatPreset", val)
 			BFL:ForceRefreshFriendsList()
-			-- Show/hide custom input
-			if nameCustomInput then
-				if IsLegacyReviewActive() then
-					nameCustomInput.Input:SetEnabled(val == "custom" and not friendListColorsActive)
-				elseif val == "custom" then
-					nameCustomInput:Show()
-				else
-					nameCustomInput:Hide()
-				end
-			end
+			SetCustomFormatVisibility(nameCustomRows, val == "custom", true)
+			self:RefreshCategories()
 		end
 	)
 	namePresetDropdown.BFL_SettingHelpKey = "SETTINGS_NAME_FORMAT_HEADER"
@@ -4917,7 +5003,7 @@ function Settings:RefreshGeneralTab()
 	table.insert(allFrames, namePresetDropdown)
 
 	-- Custom Name Format Input (shown only when preset == "custom")
-	nameCustomInput = Components:CreateInput(
+	local nameCustomInput = Components:CreateInput(
 		tab,
 		IsLegacyReviewActive() and L.SETTINGS_NAME_FORMAT_TOOLTIP or L.SETTINGS_NAME_FORMAT_CUSTOM_LABEL or "Custom Format:",
 		DB:Get("nameFormatCustom", "%name%"),
@@ -4936,14 +5022,6 @@ function Settings:RefreshGeneralTab()
 			GetFormatFieldDescription(false)
 		)
 	end
-	-- Initially show/hide based on current preset
-	if DB:Get("nameFormatPreset", "default") ~= "custom" then
-		if IsLegacyReviewActive() then
-			nameCustomInput.Input:Disable()
-		else
-			nameCustomInput:Hide()
-		end
-	end
 	if friendListColorsActive then
 		if nameCustomInput.Label then
 			nameCustomInput.Label:SetTextColor(0.5, 0.5, 0.5)
@@ -4954,6 +5032,8 @@ function Settings:RefreshGeneralTab()
 		end
 	end
 	table.insert(allFrames, nameCustomInput)
+	nameCustomRows = AddFormatColorControls(self, tab, allFrames, DB, nameCustomInput, false, formatColorSwatches)
+	SetCustomFormatVisibility(nameCustomRows, DB:Get("nameFormatPreset", "default") == "custom")
 
 	-- Spacer before Info Formatting
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -4980,7 +5060,7 @@ function Settings:RefreshGeneralTab()
 		values = { "default", "zone", "level", "class_zone", "level_class_zone", "game", "disabled", "custom" },
 	}
 
-	local infoCustomInput -- forward declare
+	local infoCustomRows
 
 	local infoPresetDropdown = Components:CreateDropdown(
 		tab,
@@ -4992,22 +5072,14 @@ function Settings:RefreshGeneralTab()
 		function(val)
 			DB:Set("infoFormatPreset", val)
 			BFL:ForceRefreshFriendsList()
-			-- Show/hide custom input
-			if infoCustomInput then
-				if IsLegacyReviewActive() then
-					infoCustomInput.Input:SetEnabled(val == "custom")
-				elseif val == "custom" then
-					infoCustomInput:Show()
-				else
-					infoCustomInput:Hide()
-				end
-			end
+			SetCustomFormatVisibility(infoCustomRows, val == "custom", true)
+			self:RefreshCategories()
 		end
 	)
 	table.insert(allFrames, infoPresetDropdown)
 
 	-- Custom Info Format Input (shown only when preset == "custom")
-	infoCustomInput = Components:CreateInput(
+	local infoCustomInput = Components:CreateInput(
 		tab,
 		IsLegacyReviewActive() and L.SETTINGS_INFO_FORMAT_TOOLTIP or L.SETTINGS_INFO_FORMAT_CUSTOM_LABEL or "Custom Format:",
 		DB:Get("infoFormatCustom", "%level%, %zone%"),
@@ -5019,21 +5091,16 @@ function Settings:RefreshGeneralTab()
 		end,
 		IsLegacyReviewActive() and 246 or 350
 	)
+	infoCustomInput.BFL_SettingHelpKey = "SETTINGS_INFO_FORMAT_TOOLTIP"
 	if infoCustomInput.SetTooltip then
 		infoCustomInput:SetTooltip(
 			L.SETTINGS_INFO_FORMAT_TOOLTIP or "Custom Info Format",
 			GetFormatFieldDescription(true)
 		)
 	end
-	-- Initially show/hide based on current preset
-	if DB:Get("infoFormatPreset", "default") ~= "custom" then
-		if IsLegacyReviewActive() then
-			infoCustomInput.Input:Disable()
-		else
-			infoCustomInput:Hide()
-		end
-	end
 	table.insert(allFrames, infoCustomInput)
+	infoCustomRows = AddFormatColorControls(self, tab, allFrames, DB, infoCustomInput, true, formatColorSwatches)
+	SetCustomFormatVisibility(infoCustomRows, DB:Get("infoFormatPreset", "default") == "custom")
 
 	-- Spacer before next section
 	table.insert(allFrames, Components:CreateSpacer(tab))
@@ -5202,19 +5269,37 @@ function Settings:RefreshGeneralTab()
 	end
 	RegisterLegacySection(self, "showFavoritesGroup", groupRow or allFrames[#allFrames])
 
+	if DB:Get("enableInGameGroup", false) then
+		local modeOptions = {
+			labels = { L.SETTINGS_INGAME_MODE_WOW or "WoW Only (Same Era)", L.SETTINGS_INGAME_MODE_ANY or "Any Game" },
+			values = { "same_game", "any_game" },
+		}
+		local modeDropdown = Components:CreateDropdown(tab, L.SETTINGS_INGAME_MODE_LABEL or "   Mode:", modeOptions, function(val)
+			return val == DB:Get("inGameGroupMode", "same_game")
+		end, function(val)
+			self:OnInGameGroupModeChanged(val)
+		end)
+		modeDropdown:SetTooltip(L.SETTINGS_INGAME_MODE_TOOLTIP, L.SETTINGS_INGAME_MODE_TOOLTIP_DESC)
+		table.insert(allFrames, modeDropdown)
+	end
+
 	if IsLegacyReviewActive() then
 		local FriendsList = BFL:GetModule("FriendsList")
 		local Registry = BFL:GetModule("FilterSortRegistry")
 		if FriendsList and Registry then
-			local primary = { labels = {}, values = {} }
-			local secondary = { labels = { L.SORT_NONE }, values = { "none" } }
-			for _, sorter in ipairs(Registry:GetVisibleSorters()) do
-				primary.labels[#primary.labels + 1] = sorter.name
-				primary.values[#primary.values + 1] = sorter.id
-				secondary.labels[#secondary.labels + 1] = sorter.name
-				secondary.values[#secondary.values + 1] = sorter.id
+			local function BuildSortChoices(includeNone, primaryId, secondaryId)
+				local choices = { labels = {}, values = {} }
+				if includeNone then
+					choices.labels[1], choices.values[1] = L.SORT_NONE, "none"
+				end
+				for _, sorter in ipairs(Registry:GetVisibleSorters(primaryId, secondaryId)) do
+					choices.labels[#choices.labels + 1] = sorter.name
+					choices.values[#choices.values + 1] = sorter.id
+				end
+				return choices
 			end
-			secondary.isOptionEnabled = function(mode) return mode ~= FriendsList.sortMode end
+			local primary = BuildSortChoices(false)
+			local secondary = BuildSortChoices(true, FriendsList.sortMode)
 			local primarySort = Components:CreateDropdown(tab, L.SORT_PRIMARY_LABEL, primary, function(mode)
 				return FriendsList.sortMode == mode
 			end, function(mode)
@@ -5233,6 +5318,31 @@ function Settings:RefreshGeneralTab()
 			secondarySort:SetTooltip(L.SORT_SECONDARY_LABEL, L.SORT_SECONDARY_DESC)
 			table.insert(allFrames, secondarySort)
 
+			local tertiaryToggle = Components:CreateCheckbox(tab, {
+				label = L.SETTINGS_ENABLE_TERTIARY_SORT,
+				initialValue = FriendsList:IsTertiarySortEnabled(),
+				callback = function(enabled)
+					FriendsList:SetTertiarySortEnabled(enabled)
+					self:RefreshGeneralTab()
+					self:RefreshCategories()
+				end,
+				tooltipTitle = L.SETTINGS_ENABLE_TERTIARY_SORT,
+				tooltipDesc = L.SETTINGS_ENABLE_TERTIARY_SORT_DESC,
+			})
+			table.insert(allFrames, tertiaryToggle)
+
+			if FriendsList:IsTertiarySortEnabled() then
+				local tertiary = BuildSortChoices(true, FriendsList.sortMode, FriendsList.secondarySort)
+				local tertiarySort = Components:CreateDropdown(tab, L.SORT_TERTIARY_LABEL, tertiary, function(mode)
+					return FriendsList:GetActiveTertiarySortMode() == mode
+				end, function(mode)
+					FriendsList:SetTertiarySortMode(mode)
+					self:RefreshGeneralTab()
+				end)
+				tertiarySort:SetTooltip(L.SORT_TERTIARY_LABEL, L.SORT_TERTIARY_DESC)
+				table.insert(allFrames, tertiarySort)
+			end
+
 			local quickFilters = { labels = {}, values = {} }
 			for _, filter in ipairs(Registry:GetVisibleQuickFilters()) do
 				quickFilters.labels[#quickFilters.labels + 1] = filter.name
@@ -5241,43 +5351,13 @@ function Settings:RefreshGeneralTab()
 			local filter = Components:CreateDropdown(tab, L.SETTINGS_QUICK_FILTER, quickFilters, function(mode)
 				return FriendsList.filterMode == mode
 			end, function(mode)
-				FriendsList:SetFilterMode(mode)
+				local quickFilters = BFL:GetModule("QuickFilters")
+				if quickFilters then quickFilters:SetFilter(mode) else FriendsList:SetFilterMode(mode) end
 				self:RefreshGeneralTab()
 			end)
 			filter:SetTooltip(L.SETTINGS_QUICK_FILTER, L.SETTINGS_QUICK_FILTER_DESC)
 			table.insert(allFrames, filter)
 		end
-	end
-
-	-- NEW: In-Game Group Mode (Sub-option) - Keep as dedicated row since it's a dropdown
-	if DB:Get("enableInGameGroup", false) or IsLegacyReviewActive() then
-		local modeOptions = {
-			labels = { L.SETTINGS_INGAME_MODE_WOW or "WoW Only (Same Era)", L.SETTINGS_INGAME_MODE_ANY or "Any Game" },
-			values = { "same_game", "any_game" },
-		}
-
-		local modeDropdown = Components:CreateDropdown(
-			tab,
-			L.SETTINGS_INGAME_MODE_LABEL or "   Mode:",
-			modeOptions,
-			function(val)
-				return val == DB:Get("inGameGroupMode", "same_game")
-			end,
-			function(val)
-				self:OnInGameGroupModeChanged(val)
-			end
-		)
-		local prerequisite = ""
-		if IsLegacyReviewActive() and not DB:Get("enableInGameGroup", false) then
-			DisableLegacyDropdown(modeDropdown)
-			prerequisite = "\n\n" .. inGameLabel
-		end
-		modeDropdown:SetTooltip(
-			L.SETTINGS_INGAME_MODE_TOOLTIP or "In-Game Group Mode",
-			(L.SETTINGS_INGAME_MODE_TOOLTIP_DESC
-				or "Choose which friends to include in the In-Game group:\n\n|cffffffffWoW Only:|r Friends playing the same WoW version (Retail/Classic)\n|cffffffffAny Game:|r Friends playing any Battle.net game") .. prerequisite
-		)
-		table.insert(allFrames, modeDropdown)
 	end
 
 	-- Recently Added Group checkbox
@@ -5297,8 +5377,7 @@ function Settings:RefreshGeneralTab()
 	table.insert(recentlyAddedCheckbox.BFL_SearchLabels, L.GROUP_RECENTLY_ADDED)
 	table.insert(allFrames, recentlyAddedCheckbox)
 
-	if recentlyAddedEnabled or IsLegacyReviewActive() then
-		local prerequisite = recentlyAddedEnabled and "" or ("\n\n" .. recentlyAddedLabel)
+	if recentlyAddedEnabled then
 		-- Duration Unit dropdown
 		local unitOptions = {
 			labels = {
@@ -5319,11 +5398,9 @@ function Settings:RefreshGeneralTab()
 				self:OnRecentlyAddedDurationUnitChanged(val)
 			end
 		)
-		if not recentlyAddedEnabled then DisableLegacyDropdown(durationDropdown) end
 		durationDropdown:SetTooltip(
 			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_TOOLTIP or "Duration Unit",
-			(L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC
-				or "Choose the time unit for how long friends stay in the Recently Added group.") .. prerequisite
+			L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT_DESC
 		)
 		table.insert(allFrames, durationDropdown)
 
@@ -5346,15 +5423,9 @@ function Settings:RefreshGeneralTab()
 		)
 		CenterNumericInput(durationInput.Input)
 		durationInput.Input:SetNumeric(true)
-		if not recentlyAddedEnabled then
-			durationInput.BFL_SettingDisabled = true
-			durationInput.Input:Disable()
-			durationInput:SetAlpha(0.5)
-		end
 		durationInput:SetTooltip(
 			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_TOOLTIP or "Duration Value",
-			(L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC
-				or "How many days/hours/minutes friends stay in the Recently Added group before being removed.") .. prerequisite
+			L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE_DESC
 		)
 		table.insert(allFrames, durationInput)
 	end
@@ -8224,9 +8295,6 @@ function Settings:ApplyFilterSortPreview(kind, id)
 	FriendsList.filterMode = filterMode
 	FriendsList.sortMode = primarySort
 	FriendsList.secondarySort = secondarySort
-	if FriendsList.ApplySort then
-		FriendsList:ApplySort()
-	end
 	BFL:ForceRefreshFriendsList()
 	self:RefreshFilterSortTab()
 	self:RequestFilterSortLayout()
@@ -8243,9 +8311,6 @@ function Settings:ClearFilterSortPreview(skipRefresh)
 		FriendsList.filterMode = state.previousFilter or "all"
 		FriendsList.sortMode = state.previousPrimary or "status"
 		FriendsList.secondarySort = state.previousSecondary or "name"
-		if FriendsList.ApplySort then
-			FriendsList:ApplySort()
-		end
 		BFL:ForceRefreshFriendsList()
 	end
 	self.filterSortPreview = nil
@@ -9285,10 +9350,6 @@ function Settings:RefreshFilterSortTab()
 	local function SaveSorter(sorter, structureChanged)
 		if inlineReview and structureChanged then review:InvalidateEditorRuleComparison() end
 		Registry:UpdateCustomSorter(selectedId, { chain = sorter.chain })
-		local FriendsList = BFL:GetModule("FriendsList")
-		if FriendsList and FriendsList.sortMode == selectedId and FriendsList.ApplySort then
-			FriendsList:ApplySort()
-		end
 		BFL:ForceRefreshFriendsList()
 	end
 

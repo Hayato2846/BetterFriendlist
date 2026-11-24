@@ -78,6 +78,26 @@ local linkName, linkDisplay
 env.GetPlayerLink = function(name, label) linkName, linkDisplay = name, label; return "link:" .. name end
 execute(read("Modules/QuickJoin.lua"), "Modules/QuickJoin.lua")
 local quickJoin = BFL.modules.QuickJoin
+local shown = false
+local secretResult = {}
+function BFL:IsSecret(value) return value == secretResult end
+env.BetterFriendsFrame = { IsShown = function() return shown end }
+env.wipe = function(values) for key in pairs(values) do values[key] = nil end end
+quickJoin.groupCache = setmetatable({
+	lfg = { info = { lfgListID = 123 } },
+	other = { info = {} },
+}, { __pairs = function(cache)
+	V:Assert(shown, "Hidden Quick Join events never traverse cached groups")
+	return next, cache, nil
+end })
+for resultID = 1, 200 do quickJoin:OnLFGListSearchResultUpdated(resultID) end
+V:Assert(quickJoin.groupCache.lfg, "Hidden events leave cache work queued")
+shown = true
+quickJoin:OnLFGListSearchResultUpdated(secretResult)
+quickJoin:Update(true)
+V:AssertEqual(quickJoin.groupCache.lfg, nil, "The next visible update clears stale LFG results")
+V:Assert(quickJoin.groupCache.other, "Other activity caches stay valid")
+env.BetterFriendsFrame = nil
 env.RegionalUniqueNamesEnabled = function() return true end
 local name, _, _, link = env.BetterFriendlist_GetRelationshipInfo("Player-200-1")
 V:AssertEqual(name, "Ada-Lovelace", "Regional QuickJoin name has no appended realm")

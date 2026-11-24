@@ -2267,6 +2267,14 @@ function QuickJoin:Update(forceUpdate)
 	self.entriesCacheVersion = nil
 
 	if not previewOnly then
+		if self.hiddenLFGResultsChanged then
+			self.hiddenLFGResultsChanged = nil
+			for guid, cached in pairs(self.groupCache) do
+				if GetLFGListIDFromGroupInfo(cached.info) then
+					self.groupCache[guid] = nil
+				end
+			end
+		end
 		RefreshQuickJoinAvailability()
 	end
 	local hasMockGroups = next(self.mockGroups) ~= nil
@@ -3514,7 +3522,12 @@ function QuickJoin:OnLFGListSearchResultUpdated(searchResultID)
 		return
 	end
 
-	if not searchResultID then
+	if BFL:IsSecret(searchResultID) or not searchResultID then
+		return
+	end
+	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
+		self.hiddenLFGResultsChanged = true
+		needsRefreshOnShow = true
 		return
 	end
 

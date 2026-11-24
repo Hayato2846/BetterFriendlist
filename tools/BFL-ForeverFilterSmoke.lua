@@ -104,7 +104,10 @@ local brokerSource = read("Modules/Broker.lua")
 env.CreateFrame = function()
 	return { SetSize = function() end, EnableMouse = function() end, SetFrameStrata = function() end, Hide = function() end }
 end
-local getCounts, isBrokerFriendOnline, getFilterAccounts = execute(between(brokerSource, "-- Modules/Broker.lua", "-- Broker Text Update") .. "\nreturn GetFilteredFriendCounts, IsPreviewFriendOnline, GetBNetFilterGameAccounts", "Broker fresh counts")
+local getCounts, isBrokerFriendOnline, getFilterAccounts, setDataObject = execute(
+	between(brokerSource, "-- Modules/Broker.lua", "-- Tooltip Functions (GameTooltip fallback)")
+		.. "\nreturn GetFilteredFriendCounts, IsPreviewFriendOnline, GetBNetFilterGameAccounts, function(object) dataObject = object end",
+	"Broker label and tooltip counts")
 local brokerForCounts = BFL:GetModule("Broker")
 local wowOnline, wowTotal, bnetOnline, bnetTotal = getCounts()
 V:AssertEqual(wowOnline, 1, "Broker includes local online Forever friends")
@@ -252,7 +255,12 @@ local rulesetFriend = { type = "bnet", connected = true }
 V:Assert(registry:IsOtherForeverRuleset(rulesetFriend, selectedAccount, "PVP"), "a known different displayed ruleset is dimmed")
 V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, selectedAccount, "RPPVP"), "matching rulesets retain their original color")
 V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "App", isOnline = true }, "PVP"), "app-only contacts are not dimmed")
-V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "WoW", wowProjectID = 1 }, "PVP"), "other WoW clients are not dimmed")
+V:Assert(registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "WoW", wowProjectID = 1, isOnline = true }, "PVP"),
+	"online Retail is dimmed in Forever")
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "WoW", wowProjectID = 1, isOnline = false }, "PVP"),
+	"an offline Retail account does not dim an online friend")
+V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend, { clientProgram = "WoW", wowProjectID = 2, isOnline = true }, "PVP"),
+	"Classic presence retains its existing appearance")
 V:Assert(not registry:IsOtherForeverRuleset(rulesetFriend,
 	{ clientProgram = "WoW", wowProjectID = 18, richPresence = "Forever - Mystery - Test" }, "PVP"), "unknown rulesets are not dimmed")
 rulesetFriend.connected = false
@@ -285,4 +293,44 @@ env.BNGetNumFriends = function() return #allAccounts, 2 end
 BFL.SettingsVersion = (BFL.SettingsVersion or 0) + 1
 wowOnline, _, bnetOnline = getCounts()
 V:AssertEqual(wowOnline + bnetOnline, 3, "a hidden tag query does not filter the broker in Streamer Mode")
+
+local dataObject = {}
+setDataObject(dataObject)
+BFL.modules.Broker = brokerForCounts
+BFL.modules.DB = {}
+local settings = env.BetterFriendlistDB
+settings.brokerShowLabel = false
+settings.quickFilterVisibility.forever = nil
+registry:InvalidateCaches()
+brokerForCounts:UpdateBrokerText(true)
+V:AssertEqual(dataObject.text, "3/5", "The unfiltered label keeps the full roster as its denominator")
+BFL.IsForever = true
+foreverRadio.select("forever")
+V:AssertEqual(dataObject.text, "2/5", "The QuickFilter refreshes the closed LDB label to the same count as the tooltip")
+settings.brokerShowGroups = true
+settings.brokerShowWoWIcon, settings.brokerShowBNetIcon = false, false
+brokerForCounts:UpdateBrokerText(true)
+V:AssertEqual(dataObject.text, "1/2 | 1/3", "The split label follows the filter in both groups")
+settings.brokerShowGroups = false
+quickFilters:SetFilter("offline")
+V:AssertEqual(dataObject.text, "2/5", "The offline QuickFilter shows the offline count in the label")
+settings.brokerShowTotal = false
+quickFilters:SetFilter("all")
+V:AssertEqual(dataObject.text, "3", "The filtered label respects hiding totals")
+selectedTags = true
+quickFilters:SetTagFilter("team", true)
+V:AssertEqual(dataObject.text, "1", "Selecting a tag refreshes the label while the tooltip is closed")
+selectedTags = false
+quickFilters:SetTagFilter("team", false)
+V:AssertEqual(dataObject.text, "3", "Removing a tag restores the full online label count")
+local settingsBeforeQueue = env.BetterFriendlistDB
+settingsBeforeQueue.quickFilter = "inqueue"
+registry:NormalizeDB()
+registry:NormalizeCurrentSelections()
+V:AssertEqual(settingsBeforeQueue.quickFilter, "all", "A removed queue selection falls back to All Friends")
+for _, filter in ipairs(registry:GetVisibleQuickFilters()) do
+	V:Assert(filter.id ~= "inqueue" and filter.id ~= "availableforqueue", "Retired queue filters stay out of the menu")
+end
+quickFilters:SetFilter("availableforqueue")
+V:AssertEqual(dataObject.text, "3", "The closed label falls back to the All Friends count")
 io.write("[OK] Forever filter smoke: " .. assertions .. " assertions, including real menu, list, broker count and tooltip paths\n")

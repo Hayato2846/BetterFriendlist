@@ -693,6 +693,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 					labels = entryLabels,
 					values = entryValues,
 					getItemFontObject = GetItemFontObject,
+					preserveMenuFonts = entryFontPaths ~= nil,
 				}, isSelectedCallback, function(selectionValue)
 					onSelectionCallback(selectionValue)
 					UpdateDropdownText(selectionValue)
@@ -716,6 +717,7 @@ function Components:CreateDropdown(parent, labelText, entries, isSelectedCallbac
 						return entryLabels[1] or ""
 					end,
 					getItemFontObject = GetItemFontObject,
+					preserveMenuFonts = entryFontPaths ~= nil,
 				}, isSelectedCallback, function(selectionValue)
 					onSelectionCallback(selectionValue)
 					UpdateDropdownText(selectionValue)
@@ -813,6 +815,13 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 	local colorButton = CreateFrame("Button", nil, holder)
 	colorButton:SetSize(COLOR_SWATCH_BUTTON_SIZE, COLOR_SWATCH_BUTTON_SIZE)
 	colorButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	local resetButton
+	if opts.resetText then
+		resetButton = self:CreateButton(holder, opts.resetText, function() opts.resetCallback(holder) end)
+		resetButton:SetWidth(math.max(64, math.ceil(resetButton:GetFontString():GetStringWidth()) + 24))
+		resetButton:SetPoint("RIGHT", colorButton, "LEFT", -CONTROL_GAP, 0)
+		holder.resetButton = resetButton
+	end
 
 	-- Dynamic Resizing Handler
 	holder:SetScript("OnSizeChanged", function(self, width, height)
@@ -825,7 +834,7 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 		-- Anchor Label Left and Right (to ColorButton)
 		label:ClearAllPoints()
 		label:SetPoint("LEFT", self, "LEFT", 0, 0)
-		label:SetPoint("RIGHT", colorButton, "LEFT", -CONTROL_GAP, 0)
+		label:SetPoint("RIGHT", resetButton or colorButton, "LEFT", -CONTROL_GAP, 0)
 	end)
 
 	-- Trigger initial layout
@@ -841,6 +850,14 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 	colorSwatch:SetPoint("TOPLEFT", colorButton, "TOPLEFT", 3, -3)
 	colorSwatch:SetPoint("BOTTOMRIGHT", colorButton, "BOTTOMRIGHT", -3, 3)
 
+	local automaticMark
+	if resetButton then
+		automaticMark = colorButton:CreateTexture(nil, "OVERLAY")
+		automaticMark:SetSize(10, 2)
+		automaticMark:SetPoint("CENTER")
+		automaticMark:SetColorTexture(0.65, 0.65, 0.65, 1)
+	end
+
 	-- Highlight
 	-- Removed by user request to prevent color distortion
 	-- colorButton:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
@@ -850,7 +867,9 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 		BFL_Tooltip:SetOwner(self, "ANCHOR_RIGHT")
 		BFL_Tooltip:SetText(opts.tooltipTitle or L.SETTINGS_FONT_COLOR or "Font Color", GetAccentColor(1, 0.82, 0, 1))
 		BFL_Tooltip:AddLine(opts.tooltipDesc or L.TOOLTIP_GROUP_COLOR_DESC or "Click to change color", 1, 1, 1, true)
-		if opts.resetCallback then
+		if holder.currentColor == nil and opts.automaticText then
+			BFL_Tooltip:AddLine(opts.automaticText)
+		elseif opts.resetCallback then
 			BFL_Tooltip:AddLine(opts.resetTooltip or "Right-click to reset", 0.75, 0.75, 0.75, true)
 		end
 		BFL_Tooltip:Show()
@@ -859,25 +878,32 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 		BFL_Tooltip:Hide()
 	end)
 
-	if initialColor then
-		colorSwatch:SetColorTexture(initialColor.r, initialColor.g, initialColor.b, initialColor.a or 1)
-	else
-		colorSwatch:SetColorTexture(1, 1, 1, 1)
-	end
-
-	-- Expose update method
 	function holder:SetColor(r, g, b, a)
-		holder.currentColor = { r = r, g = g, b = b, a = a or 1 }
-		colorSwatch:SetColorTexture(r, g, b, a or 1)
+		if r == nil and resetButton then
+			holder.currentColor = nil
+			colorSwatch:SetColorTexture(0.12, 0.12, 0.12, 1)
+			automaticMark:Show()
+			resetButton:Disable()
+		else
+			holder.currentColor = { r = r, g = g, b = b, a = a or 1 }
+			colorSwatch:SetColorTexture(r, g, b, a or 1)
+			if resetButton then
+				automaticMark:Hide()
+				resetButton:Enable()
+			end
+		end
 	end
 
-	-- Store initial
-	holder:SetColor(
-		initialColor and initialColor.r or 1,
-		initialColor and initialColor.g or 1,
-		initialColor and initialColor.b or 1,
-		initialColor and initialColor.a or 1
-	)
+	if not initialColor and resetButton then
+		holder:SetColor()
+	else
+		holder:SetColor(
+			initialColor and initialColor.r or 1,
+			initialColor and initialColor.g or 1,
+			initialColor and initialColor.b or 1,
+			initialColor and initialColor.a or 1
+		)
+	end
 
 	colorButton:SetScript("OnClick", function(_, buttonName)
 		if buttonName == "RightButton" and opts.resetCallback then
@@ -885,11 +911,24 @@ function Components:CreateColorPicker(parent, labelText, initialColor, callback,
 			return
 		end
 
-		local r, g, b, a =
-			holder.currentColor.r, holder.currentColor.g, holder.currentColor.b, holder.currentColor.a or 1
+		local color = holder.currentColor
+		local r, g, b, a = 1, 1, 1, 1
+		if color then r, g, b, a = color.r, color.g, color.b, color.a end
 
 		if BFL.ShowColorPicker then
-			BFL.ShowColorPicker(r, g, b, a, function(nr, ng, nb, na)
+			local pickerAlpha = a
+			if opts.opaque then pickerAlpha = nil end
+			if opts.captureCallbacks then
+				local changed, restore = opts.captureCallbacks(r, g, b)
+				-- Blizzard can fire the swatch callback while setting the opening color.
+				local opening = true
+				BFL.ShowColorPicker(r, g, b, pickerAlpha, function(...)
+					if not opening then changed(...) end
+				end, restore)
+				opening = false
+				return
+			end
+			BFL.ShowColorPicker(r, g, b, pickerAlpha, function(nr, ng, nb, na)
 				holder:SetColor(nr, ng, nb, na)
 				if callback then
 					callback(nr, ng, nb, na)

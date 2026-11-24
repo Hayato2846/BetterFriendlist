@@ -793,6 +793,7 @@ do
 		row:SetScript(event, function(owner, button)
 			check(owner == row, event .. " delegates to the original row")
 			callbacks[event] = (callbacks[event] or 0) + 1
+			if event == "OnDragStart" then return true end
 		end)
 	end
 	catch:GetScript("OnEnter")(catch)
@@ -995,13 +996,46 @@ do
 	combat = true
 	events.scripts.OnEvent(events, "PLAYER_REGEN_DISABLED")
 	check(leftCatch.shown and not catch.shown, "single-click remains routed in combat")
+	local cursorX, isMouseDown = 0, true
+	env.GetCursorPosition = function() return cursorX, 0 end
+	env.IsMouseButtonDown = function() return isMouseDown end
+	env.UIParent = { GetEffectiveScale = function() return 1 end }
+	row:Show()
+	hit.hooks.OnMouseDown(hit, "LeftButton")
+	cursorX = 2
+	events:GetScript("OnUpdate")(events)
+	check(hit.shown, "Moving within the drag threshold leaves the native click intact")
+	isMouseDown = false
+	events.scripts.OnEvent(events, "GLOBAL_MOUSE_UP", "LeftButton")
 	click("LeftButton")
 	equal(nativeWhispers, 1, "one click reaches the native whisper handler in combat with chat lockdown")
 	equal(nativeSelections, 1, "single click still updates the selection")
-	hit:GetScript("OnDragStart")(hit, "LeftButton")
-	hit:GetScript("OnDragStop")(hit, "LeftButton")
+	isMouseDown = true
+	mouseFocus = row.travelPassButton
+	events.scripts.OnEvent(events, "GLOBAL_MOUSE_DOWN", "LeftButton")
+	check(not events:GetScript("OnUpdate"), "The invite button does not start a row drag")
+	mouseFocus = leftCatch
+	events.scripts.OnEvent(events, "GLOBAL_MOUSE_DOWN", "LeftButton")
+	check(events:GetScript("OnUpdate"), "A pass-through catch can start tracking without a native link mouse-down callback")
+	events.scripts.OnEvent(events, "GLOBAL_REGION_MOUSE_DOWN", leftCatch, "LeftButton")
+	cursorX = 24
+	events:GetScript("OnUpdate")(events)
 	equal(callbacks.OnDragStart, 2, "single-click mode preserves row dragging")
+	check(not hit.shown, "A drag cancels the native hyperlink before the held button is released")
+	friends:RenderDisplay()
+	check(not hit.shown, "A row refresh cannot arm the native link during a drag")
+	isMouseDown = false
+	events.scripts.OnEvent(events, "GLOBAL_MOUSE_UP", "LeftButton")
 	equal(callbacks.OnDragStop, 2, "single-click mode preserves drag release")
+	check(afterRelease and not hit.shown, "The native link stays hidden until the release is finished")
+	afterRelease()
+	check(hit.shown and not events:GetScript("OnUpdate"), "Drag release restores the whisper link and stops cursor polling")
+	isMouseDown = true
+	events.scripts.OnEvent(events, "GLOBAL_REGION_MOUSE_DOWN", leftCatch, "LeftButton")
+	check(events:GetScript("OnUpdate"), "The region event can start tracking independently of mouse focus")
+	isMouseDown = false
+	events.scripts.OnEvent(events, "GLOBAL_MOUSE_UP", "LeftButton")
+	mouseFocus = catch
 	streamer = true
 	whisperMode = "double"
 	test:RefreshClickRouting()
@@ -1780,4 +1814,201 @@ end
 
 local updateRow = between(read(repo, "Modules/FriendsList.lua"), "function FriendsList:UpdateFriendButton(", "function FriendsList:OnFriendsUIStyleChanged()")
 check(updateRow:find("friendMenu:UpdateRow(self, button, friend)", 1, true), "native routing is installed by the shared friend row update")
+
+-- A keyboard event reaches Blizzard only when the addon lets it propagate.
+do
+	local slots, afterKey, positionsUpdated = {}, nil, 0
+	local inCombat, secure, nativeCloseBlocked = false, false, false
+	env.InCombatLockdown = function() return inCombat end
+	env.C_Timer = { After = function(_, callback) afterKey = callback end }
+	env.GetUIPanel = function(slot) return slots[slot] end
+	env.GetUIPanelAttribute = function() return "left" end
+	env.HideUIPanel = function(frame, _, skipShownCheck)
+		if not frame or (not frame.shown and not skipShownCheck) then return end
+		check(not inCombat or secure, "Only Blizzard closes managed panels in combat")
+		if nativeCloseBlocked and frame == env.BetterFriendsFrame then return end
+		for slot, panel in pairs(slots) do
+			if panel == frame then slots[slot] = nil end
+		end
+		frame.shown = false
+	end
+	env.securecall = function(name) return env[name]() end
+	env.securecallfunction = function(callback)
+		secure = true
+		local handled = callback()
+		secure = false
+		return handled
+	end
+	env.CloseSpecialWindows = function() end
+	env.UpdateUIPanelPositions = function() positionsUpdated = positionsUpdated + 1 end
+	execute(read(forever, "Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua"), "Forever Escape dispatch")
+	local manager = read(forever, "Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua")
+	execute(between(manager, "local function IsAnyWindowShown(", "function CloseAllWindows("), "Forever window close")
+	env.RegisterGameMenuEscHandler(env.GameMenuEscPriority.AddOnPost, env.CloseWindows)
+
+	local friends = { shown = false, attributes = {}, IsShown = function(self) return self.shown end }
+	friends.EnableKeyboard = function() end
+	friends.SetPropagateKeyboardInput = function(self, propagate)
+		check(not inCombat, "Escape did not touch keyboard propagation in combat")
+		self.propagate = propagate
+	end
+	friends.HookScript = function(self, name, callback) self[name] = callback end
+	friends.IsProtected = function(self) return self.protected == true end
+	friends.Hide = function(self)
+		check(not inCombat or not self:IsProtected(), "The addon did not hide a protected frame in combat")
+		self.shown = false
+	end
+	friends.Show = function(self)
+		self.shown = true
+		self:OnShow()
+	end
+	friends.GetAttribute = function(self, key) return self.attributes[key] end
+	friends.SetAttribute = function(self, key, value)
+		check(not inCombat, "The addon did not change panel attributes in combat")
+		self.attributes[key] = value
+	end
+	env.BetterFriendsFrame = friends
+	env.BetterFriendlistDB = { useUIPanelSystem = true }
+	env.UIPanelWindows = {}
+	env.ShowUIPanel = function(frame)
+		check(not inCombat, "The addon did not call ShowUIPanel in combat")
+		slots.left = frame
+		env.UIPanelWindows.BetterFriendsFrame = {}
+		frame:Show()
+	end
+	env._G = env
+	BFL.IsMainline = true
+	local core = read(repo, "Core.lua")
+	execute(between(core, "local function RunNextFrame(", "function BFL.ResolveFriendsFrameRedirectTab("), "BFL Escape handler")
+	local main = read(repo, "BetterFriendlist.lua")
+	execute(between(main, "local function SuspendBetterFriendsFrameUIPanelForCombat()", "-- STORY MODE RAID TAB HANDLING")
+		.. between(main, "function HideBetterFriendsFrame()", "-- Toggle the friends frame"), "BFL window lifecycle")
+	env.GetFriendsList = function() end
+	local modern = read(repo, "Modules/FriendsUI.lua")
+	local social = {
+		IsSectionAvailable = function() return true end,
+		GetSectionForSocialTab = function(_, id) return id end,
+		GetSelectedSection = function(self) return self.section end,
+		SelectSection = function(self, id) self.section = id end,
+	}
+	env.FriendsUI = social
+	execute(between(modern, "function FriendsUI:OpenSocialUISection(", "function FriendsUI:ToggleSocialUIReplacement(")
+		.. between(modern, "function FriendsUI:ToggleSection(", "function FriendsUI:OnTextScaleUpdated("), "BFL Social controls")
+	check(BFL:InstallLocalEscapeHandler(friends), "Forever installs the frame-local handler")
+	local spellbook = { shown = true, IsShown = friends.IsShown }
+	local groupFinder = { shown = true, IsShown = friends.IsShown }
+	social:OpenSocialUISection("raid")
+	check(slots.left == friends and social.section == "raid", "The Social controls open the requested section as a panel")
+	slots.center, slots.right = spellbook, groupFinder
+	friends:OnKeyDown("A")
+	check(friends.shown and friends.propagate, "Ordinary keys still propagate")
+	inCombat = true
+	friends:OnKeyDown("ESCAPE")
+	check(friends.shown and friends.propagate and not friends.BFL_LocalEscapeHidePending,
+		"A managed panel leaves Escape to Blizzard during combat")
+	if friends.propagate then env.ToggleGameMenu() end
+	afterKey()
+	check(not friends.shown and not spellbook.shown and not groupFinder.shown,
+		"One Escape closes the managed friends list, spellbook and Group Finder")
+	check(not next(slots) and positionsUpdated == 1, "Blizzard releases and recalculates the panel slots")
+
+	social:ToggleSection("friends")
+	check(friends.shown and not slots.left and social.section == "friends", "The Social toggle opens BFL outside the panel manager in combat")
+	friends:OnKeyDown("ESCAPE")
+	check(not friends.shown and friends.propagate and not friends.BFL_LocalEscapeHidePending,
+		"An unprotected floating friends list closes immediately, even in combat")
+	social:ToggleSection("friends")
+	friends.protected = true
+	friends:OnKeyDown("ESCAPE")
+	check(friends.shown and friends.propagate and friends.BFL_LocalEscapeHidePending, "A protected window defers Escape until after combat")
+	inCombat = false
+	BFL:RestoreLocalEscapeHandlersAfterCombat()
+	BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
+	check(not friends.shown and friends.propagate, "Leaving combat finishes the protected window's close")
+	friends.protected = false
+	social:OpenSocialUISection("raid")
+	check(slots.left == friends and social.section == "raid", "BFL can open as a panel again after combat")
+	inCombat = true
+	social:ToggleSection("raid")
+	check(not friends.shown and slots.left == friends, "The Social toggle hides BFL without calling the panel manager in combat")
+	inCombat = false
+	BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
+	check(not slots.left, "Leaving combat clears the stale native slot after a direct close")
+
+	social:OpenSocialUISection("raid")
+	inCombat, nativeCloseBlocked = true, true
+	friends:OnKeyDown("ESCAPE")
+	env.ToggleGameMenu()
+	check(friends.shown, "Blizzard gets the first chance to close the panel")
+	afterKey()
+	check(not friends.shown and friends.propagate, "If the native close leaves unprotected BFL visible, the fallback closes it in combat")
+	inCombat, nativeCloseBlocked = false, false
+	BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
+	check(not slots.left, "The combat fallback releases Blizzard's panel slot after combat")
+
+	env.BetterFriendlistDB.useUIPanelSystem = false
+	social:OpenSocialUISection("friends")
+	check(friends.shown and not slots.left, "With hierarchy disabled, the Social controls open a floating window")
+	spellbook.shown = true
+	slots.center = spellbook
+	friends:OnKeyDown("ESCAPE")
+	check(not friends.shown and not friends.propagate and spellbook.shown, "Floating BFL retains its local Escape behavior")
+	afterKey()
+	check(friends.propagate, "The floating window restores propagation before its next show")
+
+	local settings = {
+		IsShown = friends.IsShown,
+		IsProtected = friends.IsProtected,
+		EnableKeyboard = friends.EnableKeyboard,
+		SetPropagateKeyboardInput = friends.SetPropagateKeyboardInput,
+		HookScript = friends.HookScript,
+		Show = friends.Show,
+		Hide = function(self)
+			friends.Hide(self)
+			self:OnHide()
+		end,
+	}
+	env.BetterFriendlistSettingsFrame = settings
+	local filterPreviewClears, filterEditorCloses = 0, 0
+	env.Settings = {
+		ClearFilterSortPreview = function() filterPreviewClears = filterPreviewClears + 1 end,
+		HideFilterSortEditorPanel = function() filterEditorCloses = filterEditorCloses + 1 end,
+	}
+	local settingsSource = read(repo, "Modules/Settings.lua")
+	execute(between(settingsSource, "function Settings:OnLoad(frame)", "function Settings:IsSettingsCenterEnabled()"),
+		"BFL Settings initialization")
+	for _, path in ipairs({ "BetterFriendlist_Settings.xml", "BetterFriendlist_Settings_Classic.xml" }) do
+		check(read(repo, path):find("BetterFriendlistSettings_OnLoad(self)", 1, true), path .. " passes its Settings frame on load")
+	end
+	env.Settings:OnLoad(settings)
+	check(settings.BFL_LocalEscapeHandlerInstalled, "Settings installs its own Escape handler")
+	settings:Show()
+	settings:OnKeyDown("ESCAPE")
+	check(settings.shown and settings.propagate, "Docked Settings lets the friends list handle Escape")
+	settings.BFL_DockDisabled = true
+	settings:OnKeyDown("W")
+	check(settings.shown and settings.propagate, "Detached Settings propagates movement keys")
+	settings:OnKeyDown("ESCAPE")
+	check(not settings.shown and not settings.propagate, "Escape closes detached Settings with the friends list already hidden")
+	check(filterPreviewClears == 1 and filterEditorCloses == 1, "Escape runs normal Settings cleanup")
+	afterKey()
+	settings:Show()
+	inCombat = true
+	settings:OnKeyDown("ESCAPE")
+	check(not settings.shown and settings.propagate, "Unprotected detached Settings closes immediately in combat")
+	settings:Show()
+	settings.protected = true
+	settings:OnKeyDown("ESCAPE")
+	check(settings.shown and settings.BFL_LocalEscapeHidePending, "Protected detached Settings defers closing in combat")
+	inCombat = false
+	BFL:RestoreLocalEscapeHandlersAfterCombat()
+	check(not settings.shown and settings.propagate, "A deferred Settings close completes after combat")
+	settings:Show()
+	inCombat = true
+	settings:OnKeyDown("ESCAPE")
+	settings.BFL_DockDisabled = false
+	inCombat = false
+	BFL:RestoreLocalEscapeHandlersAfterCombat()
+	check(settings.shown and not settings.BFL_LocalEscapeHidePending, "Reattaching Settings cancels the deferred close")
+end
 io.write("[OK] Forever social actions smoke: " .. assertions .. " assertions, including native friend row routing\n")

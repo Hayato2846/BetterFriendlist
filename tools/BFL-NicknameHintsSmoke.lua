@@ -235,6 +235,23 @@ BFL:SetLocale("enUS")
 assert(next(BFL.MissingKeys) == nil, "guidance must not rely on missing locale keys")
 values = { name = "%NiCkNaMe% (%character%)" }
 equal(nicknames:GetGuidance("friends"), nil, "nickname name format suppresses hint")
+local aliases = { bnet_Title = "|cff00ccaaClefty|r", wow_Character = "Other" }
+local friendRenderer = BFL:RegisterModule("FriendsList", {})
+function friendRenderer:ResolveFriendByUID(uid) return aliases[uid] and {uid=uid} end
+function friendRenderer:GetDisplayName(friend, sorting, format)
+ equal(format,"%name%","hint uses the production primary-identity renderer")
+ return aliases[friend.uid]
+end
+names.bnet_Title, names.wow_Character = "Clefty", "Clefty"
+values = {}
+equal(nicknames:GetGuidance("friends", "bnet_Title"), nil, "visible primary alias suppresses hint without a nickname token")
+assert(nicknames:GetGuidance("friends", "wow_Character"), "a different primary name still needs guidance")
+values.name = "%character%"
+assert(nicknames:GetGuidance("friends", "bnet_Title"), "a hidden primary name does not suppress guidance")
+values = { name = "%name%" }
+aliases.bnet_Title = "CleftyToo"
+assert(nicknames:GetGuidance("friends", "bnet_Title"), "partial alias matches must not hide guidance")
+aliases.bnet_Title = "|cff00ccaaClefty|r"
 values = { info = "%nickname%" }
 equal(nicknames:GetGuidance("friends"), nil, "visible nickname info suppresses hint")
 values.compactMode = true

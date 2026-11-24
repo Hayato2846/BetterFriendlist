@@ -1607,6 +1607,7 @@ function BetterFriendsFrame_OnSearchFocusGained()
 end
 
 function BetterFriendsFrame_OnSearchHide()
+	CancelSearchDebounceTimer()
 	local native = BFL.NativeFriendsSearch
 	if native then native:OnFrameHide() end
 end
@@ -1665,7 +1666,7 @@ local function QueueSearchText(text, topTab, session)
 	-- Wait for typing to settle, but remove an empty filter immediately.
 	BFL.searchDebounceTimer = C_Timer.NewTimer(0.3, function()
 		BFL.searchDebounceTimer = nil
-		ApplySearchText()
+		if BetterFriendsFrame and BetterFriendsFrame:IsShown() then ApplySearchText() end
 	end)
 end
 
@@ -1723,6 +1724,11 @@ function BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()
 		_G.ConfigureUIPanelAttributes(true)
 	end
 
+	-- A direct close during combat can leave a hidden panel in Blizzard's layout.
+	if self.IsMainline and not BetterFriendsFrame:IsShown() and self:IsManagedFriendsPanel(BetterFriendsFrame) then
+		HideUIPanel(BetterFriendsFrame, nil, true)
+	end
+
 	self.SuspendedBetterFriendsFrameUIPanelSettings = nil
 	self.pendingBetterFriendsFrameUIPanelRestore = nil
 end
@@ -1769,6 +1775,25 @@ function ConfigureUIPanelAttributes(enable)
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-area", "")
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-pushable", nil)
 		BetterFriendsFrame:SetAttribute("UIPanelLayout-whileDead", false)
+	end
+end
+
+function BFL:ShowBetterFriendsWindow()
+	local frame = BetterFriendsFrame
+	if frame:IsShown() then return end
+
+	local respectHierarchy = BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem
+	if respectHierarchy and not InCombatLockdown() then
+		ConfigureUIPanelAttributes(true)
+		ShowUIPanel(frame)
+	else
+		-- Blizzard's panel manager is restricted to secure callers in combat.
+		if respectHierarchy then
+			SuspendBetterFriendsFrameUIPanelForCombat()
+		else
+			ConfigureUIPanelAttributes(false)
+		end
+		frame:Show()
 	end
 end
 
@@ -1873,22 +1898,7 @@ function ShowBetterFriendsFrame(tabIndex) -- Clear search box
 	end
 	ClearTopTabSearchState(BetterFriendsFrame, 1)
 
-	-- Use UI Panel system if enabled (for auto-repositioning)
-	-- Note: ShowUIPanel is protected in combat (since 8.2.0), fallback to Show()
-	if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and not InCombatLockdown() then
-		-- Configure UI Panel Layout attributes
-		ConfigureUIPanelAttributes(true)
-		ShowUIPanel(BetterFriendsFrame)
-	else
-		-- Direct :Show() - combat-safe fallback
-		if BetterFriendlistDB and BetterFriendlistDB.useUIPanelSystem and InCombatLockdown() then
-			SuspendBetterFriendsFrameUIPanelForCombat()
-		else
-			-- Ensure attributes are disabled when not using UI Panel system
-			ConfigureUIPanelAttributes(false)
-		end
-		BetterFriendsFrame:Show()
-	end
+	BFL:ShowBetterFriendsWindow()
 
 	-- Force immediate refresh AFTER Show() so the frame is visible
 	-- and UpdateFriendsList() won't bail due to the visibility check.
@@ -2917,6 +2927,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 				rootDescription:CreateTitle(L.MENU_TITLE)
 
 				local menuDisplayName = BFL_FirstSafeText(streamerDisplayName, contextName, battleTag)
+				local localTime = BFL:GetModule("FriendLocalTime")
+				local timeKey = hasBFLFriend and localTime and localTime:IsEnabled() and localTime:GetKey(friendUID)
+				if timeKey then
+					rootDescription:CreateButton(L.MENU_FRIEND_LOCAL_TIME, function()
+						BFL:GetModule("Dialogs"):ShowFriendLocalTime(timeKey)
+					end)
+				end
 				local nicknameKey = DB and DB:GetNicknameKey(friendUID, true)
 				if nicknameKey and (expectedGroupKey == nil or nicknameKey == expectedGroupKey) then
 					rootDescription:CreateButton(L.MENU_SET_NICKNAME, function()
@@ -5972,6 +5989,9 @@ function BetterFriendsFrame_ShowContactsMenu(button)
 				-- Secondary Sort
 				local secondarySort = sortSubmenu:CreateButton(L.SORT_SECONDARY_LABEL or "Secondary")
 				FriendsList:PopulateSortMenu(secondarySort, "secondary")
+				if FriendsList:IsTertiarySortEnabled() then
+					FriendsList:PopulateSortMenu(sortSubmenu:CreateButton(L.SORT_TERTIARY_LABEL), "tertiary")
+				end
 			end
 
 			AddContactsMenuDecoration(rootDescription)

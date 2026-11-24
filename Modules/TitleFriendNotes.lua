@@ -1,7 +1,7 @@
 local _, BFL = ...
 
 local Notes = BFL.FriendNotes
-local TitleNotes = {}
+local TitleNotes = { needsProcessing = true }
 BFL.TitleFriendNotes = TitleNotes
 
 local durableBackups, durableNotes, durableOriginals
@@ -267,10 +267,16 @@ function TitleNotes:Process()
 	if batch > 0 or waiting then self:Schedule(batch == 0 and WRITE_RETRY_DELAY or nil) end
 end
 
+local function CanProcess(store)
+	if InCombatLockdown and InCombatLockdown() then return false end
+	return store.returning or (BetterFriendsFrame and BetterFriendsFrame:IsShown())
+end
+
 function TitleNotes:Schedule(delay)
-	if not self:IsSupported() or not BetterFriendlistDB then return end
-	local store = GetStore()
-	if store.enabled == false and not store.returning then return end
+	local store = BetterFriendlistDB and BetterFriendlistDB.titleFriendNotes
+	if not store or (store.enabled == false and not store.returning) then return end
+	self.needsProcessing = true
+	if not CanProcess(store) or not self:IsSupported() then return end
 	delay = delay or 0.35
 	local due = GetTime() + delay
 	if self.timer then
@@ -280,8 +286,16 @@ function TitleNotes:Schedule(delay)
 	self.timerDue = due
 	self.timer = C_Timer.NewTimer(delay, function()
 		self.timer, self.timerDue = nil, nil
+		local currentStore = BetterFriendlistDB and BetterFriendlistDB.titleFriendNotes
+		if not currentStore or not CanProcess(currentStore) then return end
+		self.needsProcessing = false
+		if currentStore.enabled == false and not currentStore.returning then return end
 		self:Process()
 	end)
+end
+
+function TitleNotes:ResumeProcessing()
+	if self.needsProcessing then self:Schedule() end
 end
 
 function TitleNotes:SetEnabled(enabled)
@@ -366,11 +380,13 @@ if BFL.IsForever then
 end
 for _, event in ipairs({
 	"PLAYER_ENTERING_WORLD", "BN_CONNECTED", "BN_FRIEND_INFO_CHANGED",
-	"PLAYER_REGEN_ENABLED",
 }) do
 	if BFL.IsForever then BFL:RegisterEventCallback(event, Schedule) end
 end
 if BFL.IsForever then
+	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		TitleNotes:ResumeProcessing()
+	end)
 	BFL:RegisterEventCallback("PLAYER_LOGOUT", function()
 		if TitleNotes.timer then
 			TitleNotes.timer:Cancel()

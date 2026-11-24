@@ -22,7 +22,7 @@ local COLOR_TABLE = {
 	gold = "ffd700",
 }
 
-local function WrapClassColor(color, text)
+local function WrapColor(color, text)
 	local hex = color.colorStr or string.format("ff%02x%02x%02x",
 		math.floor(color.r * 255 + 0.5), math.floor(color.g * 255 + 0.5), math.floor(color.b * 255 + 0.5))
 	return "|c" .. hex .. text .. "|r"
@@ -46,7 +46,7 @@ function BU.C(color, text)
 	end
 
 	if classColor then
-		return WrapClassColor(classColor, text)
+		return WrapColor(classColor, text)
 	end
 
 	-- Otherwise use a named color.
@@ -94,7 +94,7 @@ function BU.ClassColorTextByFile(classFile, text)
 	end
 	local classColor = BFL.ClassUtils:GetClassColorByFile(classFile)
 	if classColor then
-		return WrapClassColor(classColor, text)
+		return WrapColor(classColor, text)
 	end
 	return text
 end
@@ -106,9 +106,15 @@ function BU.ClassColorText(friend, text)
 	end
 	local classColor = BFL.ClassUtils and BFL.ClassUtils:GetClassColorForFriend(friend)
 	if classColor then
-		return WrapClassColor(classColor, text)
+		return WrapColor(classColor, text)
 	end
 	return text
+end
+
+function BU.ColorLevelByDifficulty(level)
+	local text = tostring(level)
+	local color = GetQuestDifficultyColor and GetQuestDifficultyColor(level)
+	return color and WrapColor(color, text) or text
 end
 
 -- ========================================

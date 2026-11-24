@@ -4,9 +4,15 @@ local repo = arg[1] or "."
 local assertions, modules, events = 0, {}, {}
 local accounts, wowFriends, timers, now, writes, setterMode = {}, {}, {}, 0, {}, "success"
 local lastNativeWrite
+local shown, inCombat, frameHooks = true, false, {}
 local secret = setmetatable({}, { __tostring = function() error("secret consumed") end })
 local env = setmetatable({}, { __index = _G })
 env._G = env
+env.BetterFriendsFrame = {
+	IsVisible = function() return shown end,
+	HookScript = function(_, script, callback) frameHooks[script] = callback end,
+}
+env.InCombatLockdown = function() return inCombat end
 local BFL = { L = {}, SettingsVersion = 1 }
 function BFL:RegisterModule(name, module) modules[name] = module; return module end
 function BFL:GetModule(name) return modules[name] end
@@ -93,6 +99,7 @@ local function reset(count)
 		groupArrowColors = {}, groupColors = {}, groupStates = {}, migration = {} }
 	accounts, wowFriends, timers, writes, now, setterMode = {}, {}, {}, {}, 0, "success"
 	lastNativeWrite, messages = nil, {}
+	shown, inCombat = true, false
 	for i = 1, count or 1 do accounts[i] = { bnetAccountID = i, battleTag = "Friend#" .. i, note = "memo" } end
 	NoteSync.pendingWrites, NoteSync.inFlight, NoteSync.titleIdentities, NoteSync.unresolvedImports = {}, {}, {}, {}
 	NoteSync.isImporting, NoteSync.isWriting = false, false
@@ -116,11 +123,158 @@ end
 local function create(name)
 	local success, id = Groups:Create(name); assert(success); return id
 end
-local function emit(event)
-	for _, callback in ipairs(events[event] or {}) do callback() end
+local function emit(event, ...)
+	for _, callback in ipairs(events[event] or {}) do callback(...) end
 end
 
 reset(); NoteSync:Initialize()
+
+reset(135)
+local rosterReads, readAccount = 0, env.C_BattleNet.GetFriendAccountInfo
+env.C_BattleNet.GetFriendAccountInfo = function(index)
+	rosterReads = rosterReads + 1
+	return readAccount(index)
+end
+shown = false
+NoteSync:Initialize()
+for _ = 1, 25 do emit("BN_FRIEND_INFO_CHANGED") end
+advance(60)
+equal(rosterReads, 0, "hidden startup and burst of friend events cause no roster reads")
+equal(#timers, 0, "hidden startup and friend events create no polling timers")
+accounts[1].note = "memo#ReceivedWhileHidden"
+inCombat, shown = true, true
+frameHooks.OnShow()
+emit("BN_FRIEND_INFO_CHANGED")
+advance(10)
+equal(rosterReads, 0, "opening during combat still causes no roster reads")
+inCombat = false
+emit("PLAYER_REGEN_ENABLED")
+advance(1)
+equal(rosterReads, 135, "ending combat with the list open coalesces pending events into one scan")
+equal(DB:IsFriendInGroup("bnet_Friend#1", "custom_receivedwhilehidden"), true, "deferred note imports on resume")
+
+reset(2)
+local pausedGroup = create("Paused")
+setterMode = "pending"
+DB:AddFriendToGroup("bnet_Friend#1", pausedGroup)
+DB:AddFriendToGroup("bnet_Friend#2", pausedGroup)
+equal(#writes, 1, "second write is queued behind the first accepted write")
+rosterReads = 0
+inCombat = true
+emit("PLAYER_REGEN_DISABLED")
+advance(15)
+equal(rosterReads, 0, "combat stops verification and dispatch timers")
+shown = false
+frameHooks.OnHide()
+inCombat = false
+emit("PLAYER_REGEN_ENABLED")
+advance(15)
+equal(rosterReads, 0, "combat ending while hidden does not resume verification or dispatch")
+equal(#writes, 1, "paused dispatcher has not repeated or sent a write")
+accounts[1].note = "memo#Paused"
+setterMode = "success"
+shown = true
+frameHooks.OnShow()
+advance(6)
+equal(accounts[2].note, "memo#Paused", "pending write is delivered after reopening out of combat")
+equal(#writes, 2, "previously accepted write was confirmed without a duplicate submission")
+equal(next(NoteSync.pendingWrites), nil, "resumed work finishes the journal")
+
+reset()
+NoteSync:Disable()
+shown = false
+accounts[1].note = "memo#DeferredActivation"
+rosterReads = 0
+equal(NoteSync:Enable(), true, "enabling with detached Settings is accepted while friends list is closed")
+advance(8)
+equal(rosterReads, 0, "activation defers its full import while closed")
+shown = true
+frameHooks.OnShow()
+advance(1)
+equal(DB:IsFriendInGroup("bnet_Friend#1", "custom_deferredactivation"), true, "activation imports upon reopening")
+
+reset(135)
+wowFriends = { { name = "Aster-Realm", notes = "memo" } }
+NoteSync:Initialize(); advance(6)
+local wowReads, readWoWFriend = 0, BFL.GetWoWFriendInfoByIndex
+BFL.GetWoWFriendInfoByIndex = function(index)
+	wowReads = wowReads + 1
+	return readWoWFriend(index)
+end
+rosterReads = 0
+accounts[3].note = "memo#OtherFriend"
+for _ = 1, 25 do emit("BN_FRIEND_INFO_CHANGED", 2) end
+equal(rosterReads, 0, "indexed events defer their native reads")
+advance(6)
+equal(rosterReads, 1, "25 events for the same unchanged note coalesce into one native read")
+equal(wowReads, 0, "indexed Battle.net update skips the WoW roster")
+equal(#writes, 0, "unchanged note is never written")
+equal(Groups:GetGroupIdByName("OtherFriend"), nil, "indexed update does not import an unreported friend")
+
+accounts[2].note = "memo#Targeted"
+shown = false; frameHooks.OnHide()
+emit("BN_FRIEND_INFO_CHANGED", 2)
+advance(12)
+equal(rosterReads, 1, "hidden indexed updates perform no native reads")
+inCombat, shown = true, true; frameHooks.OnShow()
+advance(6)
+equal(rosterReads, 1, "opening during combat preserves the deferred index")
+inCombat = false; emit("PLAYER_REGEN_ENABLED"); advance(1)
+equal(rosterReads, 2, "resume reads only the deferred note")
+equal(DB:IsFriendInGroup("bnet_Friend#2", "custom_targeted"), true, "targeted read imports the changed group")
+
+rosterReads = 0
+accounts[4].note, accounts[5].note = "memo# Beta ", "memo# Gamma "
+emit("BN_FRIEND_INFO_CHANGED", 4); emit("BN_FRIEND_INFO_CHANGED", 5); advance(6)
+equal(accounts[4].note, "memo#Beta", "targeted write normalizes the first updated note")
+equal(accounts[5].note, "memo#Gamma", "paced targeted dispatcher normalizes the second updated note")
+equal(#writes, 2, "targeted dispatch delivers each update once")
+equal(rosterReads < 12, true, "targeted paced dispatch avoids a full roster read")
+equal(wowReads, 0, "targeted writes and dispatch skip the WoW roster")
+
+accounts[1], accounts[2] = accounts[2], accounts[1]
+accounts[1].note = "memo#Targeted#Moved"
+rosterReads = 0
+emit("BN_FRIEND_INFO_CHANGED", 2); advance(6)
+equal(rosterReads, 136, "a recycled index falls back to one full snapshot")
+equal(DB:IsFriendInGroup("bnet_Friend#2", "custom_moved"), true, "fallback imports the correct moved friend")
+equal(DB:IsFriendInGroup("bnet_Friend#1", "custom_moved"), false, "fallback never assigns the reused index's old UID")
+equal(DB:IsFriendInGroup("bnet_Friend#3", "custom_otherfriend"), true, "full fallback reconciles other changed notes")
+
+rosterReads = 0
+emit("BN_FRIEND_INFO_CHANGED", 2); emit("BN_FRIEND_LIST_SIZE_CHANGED"); advance(6)
+equal(rosterReads, 135, "roster event takes priority over an indexed update")
+rosterReads = 0
+emit("BN_FRIEND_INFO_CHANGED"); advance(6)
+equal(rosterReads, 135, "missing index requests a full snapshot")
+rosterReads = 0
+emit("BN_FRIEND_INFO_CHANGED", secret); advance(6)
+equal(rosterReads, 135, "restricted index requests a full snapshot")
+
+local localGroup = create("LocalEdit")
+setterMode = "pending"
+DB:AddFriendToGroup("bnet_Friend#6", localGroup)
+accounts[6].note = "memo#LocalEdit"
+rosterReads = 0
+emit("BN_FRIEND_INFO_CHANGED", 6); advance(6)
+equal(rosterReads, 1, "native write acknowledgement is checked for its single friend")
+equal(#writes, 3, "targeted acknowledgement never resubmits an accepted write")
+equal(next(NoteSync.pendingWrites), nil, "targeted acknowledgement clears the write journal")
+
+reset(3)
+local previousTitleNotes = BFL.TitleFriendNotes
+BFL.TitleFriendNotes = { ManagesAccount = function(_, account) return account.friendLevel == 1 end }
+accounts[2].battleTag, accounts[2].friendLevel = "", 1
+NoteSync:Initialize(); advance(6)
+rosterReads = 0
+accounts[2].note = "memo#ManagedByTitleNotes"
+emit("BN_FRIEND_INFO_CHANGED", 2); advance(6)
+equal(rosterReads, 1, "an identified Title Friend managed separately does not cause a full scan")
+equal(Groups:GetGroupIdByName("ManagedByTitleNotes"), nil, "indexed Group Note Sync leaves managed Title Friend notes alone")
+BFL.TitleFriendNotes = previousTitleNotes
+
+BFL.GetWoWFriendInfoByIndex = readWoWFriend
+env.C_BattleNet.GetFriendAccountInfo = readAccount
 
 reset()
 env.BetterFriendlistDB.syncGroupsToNote = false

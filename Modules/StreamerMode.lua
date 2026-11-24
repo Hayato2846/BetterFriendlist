@@ -211,7 +211,10 @@ end
 function StreamerMode:UpdateState()
 	local KnownCharacters = BFL:GetModule("KnownCharacters")
 	local friendMenu = BFL:GetModule("NativeFriendMenu")
-	if self:IsActive() and KnownCharacters then KnownCharacters:HideSurfaces() end
+	if self:IsActive() then
+		if KnownCharacters then KnownCharacters:HideSurfaces() end
+		if BFL.HideFriendClockTooltip then BFL:HideFriendClockTooltip() end
+	end
 	if friendMenu then
 		friendMenu:RefreshClickRouting()
 	end

@@ -182,7 +182,9 @@ local function BindControlState(frame)
 end
 
 local function SkinWidget(api, frame)
-	if not api or not frame or frame.BFL_SupportIcon or frame.BFL_SettingsReleaseHeader or frame.BFL_DarkNoButtonChrome or IsForbidden(frame) then
+	if not api or not frame or frame.BFL_SupportIcon or frame.BFL_SettingsReleaseHeader
+		or frame.BFL_SettingsTitleAction or frame.BFL_DarkNoButtonChrome or IsForbidden(frame)
+	then
 		return
 	end
 

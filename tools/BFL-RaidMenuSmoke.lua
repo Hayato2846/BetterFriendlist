@@ -221,4 +221,66 @@ assert(raid.raidMembers[2].name == "Grace-OtherRealm" and not raid.raidMembers[2
 names.party1 = "Grace"
 nameUpdate("party1")
 assert(raid.raidMembers[2].name == "Grace", "Readable party names keep their existing format")
-io.write("[OK] Native raid menu, delayed and restricted roster names, protected combat guard, and flavor fallbacks\n")
+local callbacks = read(repo .. "/UI/RaidFrameCallbacks.lua")
+assert(load(between(callbacks, "function BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(",
+	"function BetterRaidFrame_EveryoneAssistCheckbox_OnClick("), "@UI/RaidFrameCallbacks.lua", "t", env))()
+local windowShown, raidShown, controlUpdates, now = false, true, 0, 10
+env.BetterFriendsFrame = {
+	IsShown = function() return windowShown end,
+	RaidFrame = { IsShown = function() return raidShown end },
+}
+env.GetTime = function() return now end
+env.BetterRaidFrame_UpdateControlPanelButtons = function() controlUpdates = controlUpdates + 1 end
+local checkbox = {}
+env.BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(checkbox)
+assert(controlUpdates == 0, "Roster events skip the raid panel while the main window is closed")
+windowShown, raidShown = true, false
+env.BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(checkbox)
+assert(controlUpdates == 0, "Roster events skip the hidden Raid tab")
+raidShown = true
+env.BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(checkbox)
+assert(controlUpdates == 1, "Roster events still refresh a visible Raid tab")
+checkbox.clickCooldown = now
+env.BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(checkbox)
+assert(controlUpdates == 1, "Visible Raid tab still waits for the server after a checkbox click")
+now = now + 1
+env.BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(checkbox)
+assert(controlUpdates == 2, "Visible Raid tab resumes updates after the click cooldown")
+
+env.GetRaidFrame = function() return raid end
+env.IsInRaid = function() return true end
+env.IsInStoryModeRaid = function() return false end
+env.IsInGroup = env.IsInRaid
+BFL.L = {}
+BFL.IsSocialActionRestricted = function() return false end
+BFL.IsRaidListEnabled = function() return true end
+local raidReads, rowUpdates, layoutUpdates, buttonUpdates = 0, 0, 0, 0
+env.GetNumGroupMembers = function() raidReads = raidReads + 1; return 10 end
+env.GetNumSavedRaidLockouts = function() raidReads = raidReads + 1; return 1 end
+raid.UpdateAllMemberButtons = function() rowUpdates = rowUpdates + 1 end
+raid.UpdateControlPanelLayout = function() layoutUpdates = layoutUpdates + 1 end
+raid.CanControlRaid = function() return true end
+local button = {
+	Enable = function() buttonUpdates = buttonUpdates + 1 end,
+	Disable = function() buttonUpdates = buttonUpdates + 1 end,
+	SetText = function() end,
+}
+env.BetterFriendsFrame.RaidFrame.ControlPanel = { RaidInfoButton = button }
+env.BetterFriendsFrame.RaidFrame.ConvertToRaidButton = button
+assert(load("local L = BFL.L\n" .. between(raidCode, "local function IsRaidFrameVisible()", "function RaidFrame:ShouldDisplayMainTankAndAssist()")
+	.. between(raidCode, "function RaidFrame:UpdateConvertButton()", "--- Handle Convert Button Click"), "@raid convert update", "t", env))()
+assert(load(between(callbacks, "function BetterRaidFrame_Update()", "-- Update Control Panel Buttons"), "@legacy raid update", "t", env))()
+assert(load(between(callbacks, "function BetterRaidFrame_UpdateRaidInfoButton()", "-- RAID MEMBER BUTTON CALLBACKS"), "@raid info update", "t", env))()
+for _, visibility in ipairs({ { false, true }, { true, false }, { true, true } }) do
+	windowShown, raidShown = table.unpack(visibility)
+	env.BetterRaidFrame_Update()
+	env.BetterRaidFrame_UpdateRaidInfoButton()
+	events.PLAYER_REGEN_ENABLED()
+	if not (windowShown and raidShown) then
+		assert(raidReads == 0 and rowUpdates == 0 and layoutUpdates == 0 and buttonUpdates == 0,
+			"Legacy raid events and combat transitions do no work for hidden windows")
+	end
+end
+assert(raidReads == 3 and rowUpdates == 1 and layoutUpdates == 1 and buttonUpdates == 2,
+	"Visible Raid updates its list, layout, lockout and convert controls")
+io.write("[OK] Native raid menu, roster names, protected combat, and control panel visibility\n")

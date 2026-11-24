@@ -175,7 +175,7 @@ do
 	local context = setup({})
 	local BFL = context.BFL
 	BFL.QTip = {}
-	local setTooltip = LoadBroker(context, "\nreturn function(frame) tooltip = frame end")
+	local setTooltip = LoadBroker(context, "\ndataObject = {}; return function(frame) tooltip = frame end")
 	local broker = BFL.Broker
 	local timers = {}
 	context.env.C_Timer.After = function(_, callback) timers[#timers + 1] = callback end
@@ -408,6 +408,27 @@ do
 	AssertOrder("Beta#1234", "PvP#1234")
 	check(SelectLegacy("primary", "nickname") and SelectLegacy("secondary", "ruleset"), "Legacy offers Nickname primary and Ruleset secondary")
 	AssertOrder("PvP#1234", "Beta#1234")
+
+	local registry = BFL:GetModule("FilterSortRegistry")
+	context.env.BetterFriendlistDB.enableBetaFeatures = true
+	local custom = registry:CreateCustomSorter("faction")
+	list:SetTertiarySortEnabled(true)
+	local menu = BFL.FriendsUI:GetSortMenuItems()
+	local tertiary = {}
+	for _, option in ipairs(menu[3].items) do tertiary[#tertiary + 1] = option.value end
+	local expected = {}
+	for _, option in ipairs(menu[2].items) do
+		if option.value ~= list.secondarySort then expected[#expected + 1] = option.value end
+	end
+	equal(table.concat(tertiary, ","), table.concat(expected, ","), "Modern tertiary offers the remaining secondary choices in order")
+	local legacy = {}
+	list:PopulateSortMenu({ CreateRadio = function(_, _, _, _, id) legacy[#legacy + 1] = id end }, "tertiary")
+	equal(table.concat(legacy, ","), table.concat(expected, ","), "Legacy tertiary offers the same choices as Modern")
+	check(SelectLegacy("tertiary", custom), "Tertiary accepts a visible custom sorter")
+	check(SelectModern(2, custom), "A tertiary criterion can be moved to secondary")
+	equal(BFL.modules.DB:Get("tertiarySort"), "none", "Moving a criterion to secondary clears the conflicting tertiary selection")
+	check(SelectModern(3, "ruleset") and SelectModern(1, "ruleset"), "A tertiary criterion can be moved to primary")
+	equal(BFL.modules.DB:Get("tertiarySort"), "none", "Moving a criterion to primary clears the conflicting tertiary selection")
 end
 -- A layout switch replaces the view without rebinding the animated scroll pair.
 for _, preference in ipairs({ {}, { value = false }, { value = true } }) do
@@ -640,6 +661,185 @@ for _, modern in ipairs({ false, true }) do
 	equal(#chunked.list.friendsList, 150, "Large Title-first lists finish collection")
 	equal(visibleCount(chunked), 150, "Large Title-first lists reach all visible rows")
 	check(chunked.list.chunkedFriendsListUpdate == nil, "The chunked worker completes")
+end
+do
+	local large = {}
+	for index = 1, 150 do large[index] = title(index) end
+	local context = setup(large, { modern = true })
+	local reads = 0
+	local getAccount = context.BFL.GetBNetFriendInfo
+	context.BFL.GetBNetFriendInfo = function(index)
+		reads = reads + 1
+		return getAccount(index)
+	end
+
+	context.list:UpdateFriendsList()
+	local firstTimer
+	for index, timer in ipairs(context.timers) do
+		if timer.delay == 0 then firstTimer = index; break end
+	end
+	check(firstTimer ~= nil, "Start a chunked roster update")
+	context.timers[firstTimer].callback()
+	check(reads > 0 and reads < #large, "Only the first slice has read accounts")
+	local readsAtClose = reads
+	context.setShown(false)
+	context.timers[firstTimer + 1].callback()
+	equal(reads, readsAtClose, "A closed frame cancels the rest of the roster reads")
+	check(context.list.chunkedFriendsListUpdate == nil and #context.list.friendsList == 0,
+		"Cancellation releases the worker and keeps the previous snapshot")
+
+	context.setShown(true)
+	context.hooks.OnShow()
+	local timerIndex = firstTimer + 2
+	while timerIndex <= #context.timers do
+		check(timerIndex < firstTimer + 100, "Reopen completes in bounded next-frame work")
+		local timer = context.timers[timerIndex]
+		if not timer.cancelled and timer.delay == 0 then timer.callback() end
+		timerIndex = timerIndex + 1
+	end
+	equal(visibleCount(context), #large, "Reopening publishes a complete roster")
+end
+do
+	local context = setup({})
+	local list, BFL = context.list, context.BFL
+	local db = BFL:GetModule("DB")
+	local registry = BFL:GetModule("FilterSortRegistry")
+	BFL.ScheduleFriendsListRefresh = function() end
+	local reads = 0
+	db.GetNickname = function(_, uid)
+		reads = reads + 1
+		return uid
+	end
+	local function Friend(name, ruleset, faction, favorite)
+		return { type = "bnet", uid = name, battleTag = name .. "#2345", connected = true,
+			isFavorite = favorite == true, factionName = faction,
+			gameAccountInfo = { clientProgram = "WoW", wowProjectID = 18, isOnline = true,
+				richPresence = "Forever - " .. ruleset .. " - Elwynn" } }
+	end
+	local rows = {
+		Friend("Ally PvP", "PvP", "Alliance"),
+		Friend("Ally Horde", "Normal", "Horde"),
+		Friend("Zed", "Normal", "Alliance", true),
+		Friend("Ally", "Normal", "Alliance"),
+	}
+	list.sortMode, list.secondarySort = "ruleset", "faction"
+	list.friendsList = rows
+	db:Set("tertiarySort", "nickname")
+	list:ApplySort()
+	equal(reads, 0, "an opt-out never evaluates a third sort key")
+	equal(rows[1].uid, "Zed", "existing favorite priority is preserved with third sort off")
+	list:SetTertiarySortEnabled(true)
+	list:ApplySort()
+	equal(reads, 2, "third-stage nickname lookup is limited to the tied pair")
+	equal(rows[1].uid, "Ally", "third sort breaks a tie after ruleset and faction")
+	equal(rows[2].uid, "Zed", "implicit favorites follow the three explicit criteria")
+	equal(rows[3].uid, "Ally Horde", "faction takes precedence over nickname")
+	equal(rows[4].uid, "Ally PvP", "ruleset takes precedence over faction")
+	equal(registry:NormalizeTertiarySorterId("faction", "ruleset", "faction"), "none", "a duplicate selection is inactive")
+	equal(registry:NormalizeTertiarySorterId("missing"), "none", "an invalid selection never silently takes effect")
+
+	local comparatorStart = assert(brokerSource:find("local function GetRosterComparator", 1, true))
+	local comparatorEnd = assert(brokerSource:find("-- ========================================", comparatorStart, true))
+	local comparatorFactory = context.execute(
+		"local function GetFilterSortRegistry() return BFL:GetModule('FilterSortRegistry') end\n"
+			.. brokerSource:sub(comparatorStart, comparatorEnd - 1) .. "\nreturn GetRosterComparator", "broker comparator")
+	local brokerOptions = { primarySort = "ruleset", secondarySort = "faction", tertiarySort = "nickname", enableTertiarySort = true }
+	local reverse = { rows[4], rows[3], rows[2], rows[1] }
+	table.sort(reverse, comparatorFactory(brokerOptions))
+	for index, friend in ipairs(rows) do equal(reverse[index], friend, "broker and friends list share the three-stage order") end
+	list:SetTertiarySortEnabled(false)
+	equal(db:Get("tertiarySort"), "nickname", "disabling the feature retains the configured third sort")
+	list:ApplySort()
+	equal(rows[1].uid, "Zed", "disabling the feature restores the previous sort rules")
+end
+-- The conditional status is usable by itself and can be colored as a custom field.
+do
+	local context = setup({})
+	local list = context.list
+	list.settingsCache.infoFormatPreset = "custom"
+	list.settingsCache.infoFormatString = "%statusonline%"
+	local friend = { type = "wow", name = "Testfriend", uid = "wow_Testfriend", connected = true }
+	equal(list:FormatInfoLine(friend), "", "Ordinary online presence has no conditional status")
+	friend.afk = true
+	equal(list:FormatInfoLine(friend), "AFK", "AFK appears in the conditional status field")
+	friend.afk, friend.dnd = false, true
+	list.settingsCache.friendFormatColors = { statusonline = { r = 1, g = 0, b = 0 } }
+	equal(list:FormatInfoLine(friend), "|cffff0000DND|r", "Custom color applies to the conditional status")
+	list.settingsCache.infoFormatString = "[ %statusonline% ]"
+	equal(list:FormatInfoLine(friend), "|cffff0000[ DND ]|r", "An info field's brackets and spaces share its custom color")
+	list.settingsCache.infoFormatString = "%statusonline%"
+	friend.connected = false
+	equal(list:FormatInfoLine(friend), "", "Offline presence clears the conditional status")
+end
+-- Status events still update the broker counter while both roster views are closed.
+do
+	local context = setup({ normal("Alpha#1234"), title(42) })
+	local BFL, env, list = context.BFL, context.env, context.list
+	local settings = env.BetterFriendlistDB
+	settings.brokerEnabled = true
+	settings.enableTertiarySort, settings.tertiarySort = true, "nickname"
+	BFL.modules.DB:Set("enableTertiarySort", true)
+	BFL.modules.DB:Set("tertiarySort", "nickname")
+	function BFL:RegisterEventCallback(event, callback, _, gate)
+		self.EventCallbacks[event] = self.EventCallbacks[event] or {}
+		table.insert(self.EventCallbacks[event], { callback = callback, gate = gate })
+	end
+	local dataObject, countReads = nil, 0
+	env.LibStub = { GetLibrary = function()
+		return { NewDataObject = function(_, _, definition) dataObject = definition; return definition end }
+	end }
+	BFL.QTip = {}
+	BFL.GetNumOnlineWoWFriends = function() countReads = countReads + 1; return 0 end
+	env.GetTime = function() return 100 end
+	env.BNConnected = function() return true end
+	local setTooltip = LoadBroker(context, "\nreturn function(frame) tooltip = frame; brokerTooltipEventGate.active = frame ~= nil end")
+	BFL.Broker:Initialize()
+	check(dataObject, "Broker registered its display object")
+	check(countReads > 0, "Broker initialized its count display")
+	list:UpdateFriendsList()
+	context.setShown(false)
+	local sortCalls = 0
+	env.table = setmetatable({ sort = function(...)
+		sortCalls = sortCalls + 1
+		return table.sort(...)
+	end }, { __index = table })
+
+	local timerIndex = 1
+	local function FlushTimers()
+		while timerIndex <= #context.timers do
+			assert(timerIndex <= 40, "Unexpected timer loop")
+			local timer = context.timers[timerIndex]
+			if not timer.cancelled then timer.callback() end
+			timerIndex = timerIndex + 1
+		end
+	end
+	local initialCountReads = countReads
+	BFL:FireEventCallbacks("BN_FRIEND_INFO_CHANGED", 1)
+	FlushTimers()
+	equal(countReads, initialCountReads, "Presence detail changes leave the unfiltered closed broker on its fast path")
+
+	for _, event in ipairs({ "FRIENDLIST_UPDATE", "BN_FRIEND_INFO_CHANGED", "BN_FRIEND_ACCOUNT_ONLINE", "BN_FRIEND_ACCOUNT_OFFLINE" }) do
+		BFL:FireEventCallbacks(event, 1, false)
+	end
+	local tooltipShown = true
+	setTooltip({ IsShown = function() return tooltipShown end, IsMouseOver = function() return tooltipShown end })
+	BFL.Broker:ScheduleObservedTooltipRefresh(true)
+	tooltipShown = false
+	local startingCountReads = countReads
+	FlushTimers()
+	check(countReads > startingCountReads, "The closed broker still refreshes its count display")
+	settings.quickFilter, settings.brokerShowLabel = "hideafk", false
+	BFL.Broker:ScheduleBrokerTextUpdate()
+	FlushTimers()
+	equal(dataObject.text, "2/2", "The filtered label starts with two active friends")
+	context.accounts[1].isAFK = true
+	BFL:FireEventCallbacks("BN_FRIEND_INFO_CHANGED", 1)
+	FlushTimers()
+	equal(dataObject.text, "1/2", "A status change updates the filtered label with both views closed")
+	equal(sortCalls, 0, "Closing both views prevents sorting after friend events and a pending tooltip refresh")
+	context.setShown(true)
+	context.hooks.OnShow()
+	check(sortCalls > 0, "Reopening sorts the pending roster")
 end
 -- Character additions bypass both timers without expediting status events.
 for _, classic in ipairs({ false, true }) do
@@ -943,8 +1143,66 @@ for _,modern in ipairs({false,true}) do
 	equal(#list:GetFriendsForGroup("nogroup"),3,"going offline moves the friend into Friends")
 	preference.dynamicTagGroupFilter="all";render()
 	equal(#list:GetFriendsForGroup("tag:custom:a"),5,"turning the option off restores all assignments")
+
+	context.execute(read("Modules/Groups.lua"), "Modules/Groups.lua")
+	local normalGroup = { id = "nogroup", name = "Friends", builtin = true }
+	BFL.Groups.groups = { nogroup = normalGroup }
+	local states, refreshes = {}, 0
+	context.env.BetterFriendlistDB.groupStates = states
+	BFL.modules.DB.SetGroupState = function(_, id, collapsed) states[id] = collapsed end
+	local renderDisplay = list.RenderDisplay
+	list.RenderDisplay = function(self, ...)
+		refreshes = refreshes + 1
+		return renderDisplay(self, ...)
+	end
+	list.GetInvitableCount = function() return 0 end
+	local function ClickGroupMenu(group, label)
+		local button = {
+			dropHighlight = {},
+			SetScript = function(self, script, callback) self[script] = callback end,
+			RegisterForClicks = function() end,
+			Show = function() end,
+		}
+		local menu
+		BFL.OpenSimpleContextMenu = function(_, _, items)
+			menu = type(items) == "function" and items() or items
+		end
+		group.groupId, group.count = group.id, 0
+		list:UpdateGroupHeaderButton(button, group)
+		button:OnClick("RightButton")
+		for _, item in ipairs(assert(menu)) do
+			if item.text == label then
+				item.func()
+				return
+			end
+		end
+		error("Missing group menu action: " .. label)
+	end
+	local tagGroupId = "tag:custom:a"
+	ClickGroupMenu(normalGroup, BFL.L.MENU_COLLAPSE_ALL)
+	equal(refreshes, 1, "Collapse All redraws once for all group types")
+	check(normalGroup.collapsed and states.nogroup and states[tagGroupId] and states["tag:custom:b"],
+		"Collapse All persists ordinary and dynamic group state")
+	local function CountTagGroupRows()
+		local count = 0
+		for _, row in ipairs(context.rows()) do
+			if row.groupId == tagGroupId and row.friend then count = count + 1 end
+		end
+		return count
+	end
+	equal(CountTagGroupRows(), 0, "Collapsed tag group hides friend rows")
+	local tagGroups = BFL.modules.FriendTags:GetDynamicGroups()
+	local tagGroup = tagGroups[1]
+	ClickGroupMenu(tagGroup, BFL.L.MENU_EXPAND_ALL)
+	equal(refreshes, 2, "Expand All from a tag header redraws once")
+	check(normalGroup.collapsed == false and states.nogroup == false and states[tagGroupId] == false
+		and states["tag:custom:b"] == false, "Expand All opens ordinary and dynamic groups")
+	equal(CountTagGroupRows(), 5, "Expanded tag group shows its friends again")
+
 	preference.enableDynamicTagGroups=false;render()
 	equal(#list:GetFriendsForGroup("nogroup"),5,"disabling dynamic groups restores ordinary grouping")
+	ClickGroupMenu(normalGroup, BFL.L.MENU_COLLAPSE_ALL)
+	check(normalGroup.collapsed and states[tagGroupId] == false, "Disabled dynamic groups keep their saved state")
 end
 do
 	local context=setup({})

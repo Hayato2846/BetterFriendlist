@@ -211,7 +211,7 @@
 				
 				-- Initialize
 				if BetterFriendlistSettings_OnLoad then
-					BetterFriendlistSettings_OnLoad()
+					BetterFriendlistSettings_OnLoad(self)
 				end
 			</OnLoad>
 			<OnDragStart>

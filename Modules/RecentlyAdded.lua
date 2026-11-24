@@ -252,33 +252,83 @@ function RecentlyAdded:UpdateSource(source)
 	end
 	local timer = C_Timer.NewTimer(1, function()
 		self.baselineTimers[source] = nil
+		if self:ShouldDeferSourceUpdates() then
+			self.pendingSources[source] = true
+			return
+		end
 		self:PerformSnapshotDiff(source, true)
 	end)
 	self.baselineTimers[source] = timer
+end
+
+function RecentlyAdded:ShouldDeferSourceUpdates()
+	return InCombatLockdown and InCombatLockdown()
+		and not (BetterFriendsFrame and BetterFriendsFrame:IsShown())
+end
+
+function RecentlyAdded:FlushSourceUpdates()
+	if self.sourceTimer then
+		self.sourceTimer:Cancel()
+		self.sourceTimer = nil
+	end
+	if not self.pendingSources or self:ShouldDeferSourceUpdates() then
+		return
+	end
+	for source in pairs(self.pendingSources) do
+		self.pendingSources[source] = nil
+		self:UpdateSource(source)
+	end
+end
+
+function RecentlyAdded:OnSourceEvent(source)
+	local DB = GetDB()
+	if not DB or not DB:Get("enableRecentlyAddedGroup", false) then
+		return
+	end
+	if BetterFriendsFrame and BetterFriendsFrame:IsShown() then
+		self.pendingSources[source] = nil
+		self:UpdateSource(source)
+		return
+	end
+
+	-- Status bursts can contain real additions, including same-size roster
+	-- changes. Coalesce whole-roster reads without relying on a count match.
+	self.pendingSources[source] = true
+	if not self.sourceTimer and not self:ShouldDeferSourceUpdates() then
+		self.sourceTimer = C_Timer.NewTimer(1, function()
+			self.sourceTimer = nil
+			self:FlushSourceUpdates()
+		end)
+	end
 end
 
 function RecentlyAdded:Initialize()
 	self.ready = {}
 	self.incomplete = {}
 	self.baselineTimers = {}
+	self.pendingSources = {}
 	self:OnFeatureEnabled()
 
 	-- Update timestamps before FriendsList builds its display list (priority 10).
 	BFL:RegisterEventCallback("FRIENDLIST_UPDATE", function()
-		self:UpdateSource("wow")
+		self:OnSourceEvent("wow")
 	end, 5)
 	BFL:RegisterEventCallback("BN_FRIEND_LIST_SIZE_CHANGED", function()
-		self:UpdateSource("bnet")
+		self:OnSourceEvent("bnet")
 	end, 5)
 	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function()
 		if not self.ready.bnet or self.incomplete.bnet then
-			self:UpdateSource("bnet")
+			self:OnSourceEvent("bnet")
 		end
 	end, 5)
 	BFL:RegisterEventCallback("BN_CONNECTED", function()
-		self:UpdateSource("bnet")
+		self:OnSourceEvent("bnet")
+	end, 5)
+	BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function()
+		self:FlushSourceUpdates()
 	end, 5)
 	BFL:RegisterEventCallback("BN_DISCONNECTED", function()
+		self.pendingSources.bnet = nil
 		self.ready.bnet = nil
 		if self.baselineTimers.bnet then
 			self.baselineTimers.bnet:Cancel()

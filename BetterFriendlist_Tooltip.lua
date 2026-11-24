@@ -181,16 +181,79 @@ local function HideContactMemoryTooltipLines(tooltip)
 	end
 end
 
+local clockTicker, clockTooltip, clockLine
+local function StopFriendClock(tooltip)
+	if clockTicker and clockTooltip == tooltip then
+		clockTicker:Cancel()
+		clockTicker, clockTooltip, clockLine = nil, nil, nil
+	end
+end
+
+function BFL:HideFriendClockTooltip()
+	if clockLine then
+		HideTooltipLine(clockLine)
+		StopFriendClock(clockTooltip)
+	end
+end
+
+local function StartFriendClock(tooltip, line, clock, key, initialText)
+	if not line or not (C_Timer and C_Timer.NewTicker) then return end
+	StopFriendClock(clockTooltip)
+	local previous = initialText
+	clockTooltip, clockLine = tooltip, line
+	local ticker = C_Timer.NewTicker(1, function()
+		local text = tooltip:IsShown() and clock:GetTooltipText(key)
+		if not text then
+			line:SetText("")
+			StopFriendClock(tooltip)
+		elseif text ~= previous then
+			line:SetText(text)
+			previous = text
+		end
+	end)
+	clockTicker = ticker
+end
+
 local function HideKnownCharacterTooltipLines(tooltip)
 	for _, line in ipairs(tooltip and tooltip.KnownCharacterLines or {}) do HideTooltipLine(line) end
 end
 
 if FriendsTooltip and FriendsTooltip.HookScript then
 	FriendsTooltip:HookScript("OnHide", function(tooltip)
+		StopFriendClock(tooltip)
+		HideTooltipLine(tooltip.BFLFriendLocalTimeLine)
 		HideTooltipLine(tooltip.BFLFriendTypeLine)
 		HideContactMemoryTooltipLines(tooltip)
 		HideKnownCharacterTooltipLines(tooltip)
 	end)
+end
+
+local function AddFriendLocalTimeTooltipLine(tooltip, friend, anchor)
+	StopFriendClock(tooltip)
+	local clock = BFL:GetModule("FriendLocalTime")
+	local key = clock and clock:IsEnabled() and clock:GetFriendKey(friend)
+	local text = key and clock:GetTooltipText(key)
+	local line = tooltip.BFLFriendLocalTimeLine
+	if tooltip == FriendsTooltip then
+		HideTooltipLine(line)
+		if not text then return end
+		if not line then
+			line = tooltip:CreateFontString(nil, "ARTWORK", "FriendsFont_Small")
+			line:SetJustifyH("LEFT")
+			line:SetWidth(176)
+			tooltip.BFLFriendLocalTimeLine = line
+		end
+		anchor = SetTooltipLine(line, anchor, text, -4)
+	else
+		if not text then return end
+		tooltip:AddLine(text, 1, 1, 1, true)
+		if tooltip.GetName and tooltip:NumLines() > 0 then
+			line = _G[tooltip:GetName() .. "TextLeft" .. tooltip:NumLines()]
+		end
+	end
+	StartFriendClock(tooltip, line, clock, key, text)
+	if anchor then return anchor end
+	return true
 end
 
 local function EnsureContactMemoryTooltipLine(tooltip, index, fontObjectName)
@@ -539,12 +602,13 @@ AddContactMemoryTooltipLines = function(tooltip, friendData, anchor)
 				anchor = SetTooltipLine(line, anchor or GetLastFriendsTooltipAnchor(), label, -6)
 			end
 		end
-		local memoryAnchor = AddContactMemoryFriendsTooltipLines(tooltip, friendData, anchor)
-		return AddKnownCharacterFriendsTooltipLines(tooltip, friendData, memoryAnchor or anchor)
-			or memoryAnchor or (label and anchor)
+		local clockAnchor = AddFriendLocalTimeTooltipLine(tooltip, friendData, anchor or GetLastFriendsTooltipAnchor())
+		local memoryAnchor = AddContactMemoryFriendsTooltipLines(tooltip, friendData, clockAnchor or anchor)
+		return AddKnownCharacterFriendsTooltipLines(tooltip, friendData, memoryAnchor or clockAnchor or anchor)
+			or memoryAnchor or clockAnchor or (label and anchor)
 	end
 	if label and tooltip and tooltip.AddLine then tooltip:AddLine(label, 0.6, 0.6, 0.6) end
-	local added = label ~= nil and label ~= false
+	local added = AddFriendLocalTimeTooltipLine(tooltip, friendData) or label ~= nil and label ~= false
 	if ContactMemory and ContactMemory.AddTooltipLinesForFriend then
 		added = ContactMemory:AddTooltipLinesForFriend(tooltip, friendData) or added
 	end
@@ -662,6 +726,8 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 	local gameAccounts = friendData.gameAccounts
 	if type(gameAccounts) == "table" and numGameAccounts > 1 then
 		local headerSet = false
+		local playerFaction = SafeString(UnitFactionGroup and UnitFactionGroup("player"), nil)
+		local playerRealm = GetRealmName and GetRealmName()
 		for _, otherGameAccountInfo in ipairs(gameAccounts) do
 			local hasFocus = SafeBool(GetGameAccountField(otherGameAccountInfo, "hasFocus", nil), false)
 			local clientProgram = SafeString(GetGameAccountField(otherGameAccountInfo, "clientProgram", nil), nil)
@@ -686,20 +752,14 @@ ShowSafeRetailBNetTooltip = function(button, anchorButton, friendData)
 					local characterLevel = SafeNumber(GetGameAccountField(otherGameAccountInfo, "characterLevel", nil), 0)
 					local raceName = SafeString(GetGameAccountField(otherGameAccountInfo, "raceName", nil), UNKNOWN or "")
 					local className = SafeString(GetGameAccountField(otherGameAccountInfo, "className", nil), UNKNOWN or "")
-					local realmName = SafeString(GetGameAccountField(otherGameAccountInfo, "realmName", nil), nil)
 					local factionName = SafeString(GetGameAccountField(otherGameAccountInfo, "factionName", nil), nil)
 					local coloredCharacterName = ClassColorTextForGameAccount(otherGameAccountInfo, characterName)
-					if realmName == playerRealmName and factionName == playerFactionGroup then
-						text = text .. string.format(FRIENDS_TOOLTIP_WOW_TOON_TEMPLATE, coloredCharacterName, characterLevel, raceName, className)
-					else
-						text = text .. string.format(
-							FRIENDS_TOOLTIP_WOW_TOON_TEMPLATE,
-							coloredCharacterName .. (CANNOT_COOPERATE_LABEL or ""),
-							characterLevel,
-							raceName,
-							className
-						)
+					if (playerFaction and factionName and playerFaction ~= factionName)
+						or BFL.Compat.IsBNetGameAccountOnSameRealm(otherGameAccountInfo, playerRealm) == false
+					then
+						coloredCharacterName = coloredCharacterName .. (CANNOT_COOPERATE_LABEL or "")
 					end
+					text = text .. string.format(FRIENDS_TOOLTIP_WOW_TOON_TEMPLATE, coloredCharacterName, characterLevel, raceName, className)
 					gameText = BFL.IsWoWAccountRulesetLocation(otherGameAccountInfo)
 						and GetSafeGameAccountAreaAndRuleset(otherGameAccountInfo) or areaName
 				else
@@ -792,7 +852,9 @@ local function EnsureClassicFriendsTooltipHook()
 		end
 		if button and button.friendData then
 			RefreshFriendsTooltipAdditions(FriendsTooltip, button.friendData)
-		elseif FriendsTooltip.ContactMemoryLines then
+		else
+			StopFriendClock(FriendsTooltip)
+			HideTooltipLine(FriendsTooltip.BFLFriendLocalTimeLine)
 			HideContactMemoryTooltipLines(FriendsTooltip)
 			HideTooltipLine(FriendsTooltip.BFLFriendTypeLine)
 			HideKnownCharacterTooltipLines(FriendsTooltip)
@@ -967,11 +1029,13 @@ end
 
 -- Button OnLeave handler
 function BetterFriendsList_Button_OnLeave(self)
+	StopFriendClock(clockTooltip)
 	BFL_Tooltip:Hide()
 	SetPrimaryGameAccountNameAsHeader(false)
 	local tooltip = FriendsTooltip
 	-- Native tooltips reuse this frame without knowing about addon-owned lines.
 	-- Hiding only the parent would show stale contact/type text on the next hover.
+	HideTooltipLine(tooltip.BFLFriendLocalTimeLine)
 	HideTooltipLine(tooltip.BFLFriendTypeLine)
 	HideContactMemoryTooltipLines(tooltip)
 	HideKnownCharacterTooltipLines(tooltip)

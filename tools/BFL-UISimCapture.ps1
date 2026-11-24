@@ -5,10 +5,11 @@ param(
     [string]$Profile = 'friends_headers_i18n',
     [ValidateSet('friends', 'nickname_hint', 'tag_editor', 'settings_feedback')]
     [string]$Scenario = 'friends',
-[ValidateSet('normal', 'narrow', 'modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded', 'settings', 'settings-dark-de', 'narrow-dark-de', 'stacked', 'tag-picker', 'custom', 'custom-picker', 'groups', 'theme', 'format', 'help', 'performance', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow', 'diagnostics', 'diagnostics-narrow', 'diagnostics-warning', 'diagnostics-warning-narrow', 'behavior', 'behavior-narrow')]
+[ValidateSet('normal', 'narrow', 'modern-collapsed', 'modern-expanded', 'legacy-collapsed', 'legacy-expanded', 'settings', 'settings-dark-de', 'narrow-dark-de', 'stacked', 'tag-picker', 'custom', 'custom-picker', 'groups', 'groups-narrow', 'theme', 'format', 'format-presets', 'format-presets-narrow', 'help', 'performance', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow', 'diagnostics', 'diagnostics-narrow', 'diagnostics-warning', 'diagnostics-warning-narrow', 'behavior', 'behavior-narrow', 'eui-title', 'eui-title-narrow')]
     [string]$Variant,
     [string]$SimulatorHome,
     [string]$WowRoot,
+    [string]$AddonSource,
     [string]$OutputDirectory,
     [string[]]$ExtraAddonPath = @(),
     [switch]$RawTextAlignment,
@@ -17,6 +18,10 @@ param(
     [ValidateSet('blizzard', 'dark', 'custom')]
     [string]$SideTabTheme,
     [switch]$ShowFriendTabSettings,
+    [switch]$ShowFriendDrag,
+    [switch]$ShowBorrowedSearchSkin,
+    [ValidateSet('blizzard', 'dark', 'custom', 'ellesmereui', 'elvui')]
+    [string]$FriendDragTheme = 'blizzard',
     [switch]$Fade,
     [ValidateNotNullOrEmpty()]
     [ValidateScript({
@@ -38,7 +43,8 @@ function Copy-CaptureTree {
     }
 }
 
-$source = Assert-BFLAddonRoot (Split-Path -Parent $PSScriptRoot)
+if (-not $AddonSource) { $AddonSource = Split-Path -Parent $PSScriptRoot }
+$source = Assert-BFLAddonRoot $AddonSource
 $bflRoot = Resolve-BFLRoot
 $wowRoot = Resolve-BFLWowRoot $WowRoot
 $variants = @('normal', 'narrow')
@@ -56,7 +62,7 @@ if ($Scenario -eq 'tag_editor') {
     $crop = '1600x900+0+0'
 }
 if ($Scenario -eq 'settings_feedback') {
-    $variants = @('groups', 'theme', 'format', 'help', 'performance', 'narrow', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow', 'diagnostics', 'diagnostics-narrow', 'diagnostics-warning', 'diagnostics-warning-narrow', 'behavior', 'behavior-narrow')
+    $variants = @('groups', 'groups-narrow', 'theme', 'format', 'format-presets', 'format-presets-narrow', 'help', 'performance', 'narrow', 'popup', 'input', 'window-fonts', 'resize', 'docking', 'scale', 'scale-narrow', 'scroll', 'scroll-narrow', 'skin-tabs', 'skin-hover', 'skin-footer', 'input-layer', 'format-narrow', 'scrollbars', 'scrollbars-narrow', 'filters', 'filters-narrow', 'diagnostics', 'diagnostics-narrow', 'diagnostics-warning', 'diagnostics-warning-narrow', 'behavior', 'behavior-narrow', 'eui-title', 'eui-title-narrow')
     $crop = '1600x900+0+0'
 }
 if ($Variant) {
@@ -132,7 +138,7 @@ foreach ($extraPath in $ExtraAddonPath) {
 }
 $scene = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'BFL-UISimCapture.lua') -Raw
 foreach ($captureVariant in $variants) {
-    $narrow = ($captureVariant -in @('narrow', 'scale-narrow', 'scroll-narrow', 'skin-hover', 'format-narrow', 'scrollbars-narrow', 'filters-narrow', 'diagnostics-narrow', 'diagnostics-warning-narrow', 'behavior-narrow')).ToString().ToLowerInvariant()
+    $narrow = ($captureVariant -eq 'skin-hover' -or $captureVariant -eq 'narrow' -or $captureVariant.EndsWith('-narrow')).ToString().ToLowerInvariant()
     $hintStyle = if ($Scenario -eq 'nickname_hint') { "'$($captureVariant.Split('-')[0])'" } else { 'nil' }
     $hintExpanded = $captureVariant.EndsWith('-expanded').ToString().ToLowerInvariant()
     $hintFade = $Fade.IsPresent.ToString().ToLowerInvariant()
@@ -145,12 +151,14 @@ foreach ($captureVariant in $variants) {
         if ($captureVariant -eq 'scroll-narrow') { $feedbackScene = "'scroll'" }
         if ($captureVariant -eq 'scrollbars-narrow') { $feedbackScene = "'scrollbars'" }
         if ($captureVariant -eq 'filters-narrow') { $feedbackScene = "'filters'" }
+        if ($captureVariant -eq 'groups-narrow') { $feedbackScene = "'groups'" }
         $targetFrame = if ($captureVariant -eq 'popup') { 'StaticPopup1' } else { 'BetterFriendlistSettingsFrame' }
         if ($captureVariant -eq 'input') { $targetFrame = 'BFLInputDialog' }
         if ($captureVariant -eq 'input-layer') { $targetFrame = 'UIParent' }
         if ($captureVariant -eq 'skin-footer') { $targetFrame = 'BetterFriendsFrame' }
         if ($captureVariant -eq 'format-narrow') { $feedbackScene = "'format'" }
-        if ($captureVariant -match '^(diagnostics(?:-warning)?|behavior)(?:-narrow)?$') {
+        if ($captureVariant -eq 'format-presets-narrow') { $feedbackScene = "'format-presets'" }
+        if ($captureVariant -match '^(diagnostics(?:-warning)?|behavior|eui-title)(?:-narrow)?$') {
             $feedbackScene = "'$($Matches[1])'"
             if ($Matches[1] -eq 'diagnostics-warning') { $targetFrame = 'UIParent' }
         }
@@ -167,11 +175,12 @@ foreach ($captureVariant in $variants) {
     }
     $withFrameColor = (@($ExtraAddonPath | Where-Object { (Split-Path $_ -Leaf) -eq 'FrameColor' }).Count -gt 0).ToString().ToLowerInvariant()
     if ($ShowFriendTabSettings) { $targetFrame = 'BetterFriendlistSettingsFrame' }
+    if ($ShowFriendDrag) { $targetFrame = 'UIParent' }
     $configuration = "local profile, narrow, leftAlignedFields, hintStyle, hintExpanded, hintFade, tagScene, feedbackScene, withFrameColor = '$Profile', $narrow, {$($leftAlignedFields -join ', ')}, $hintStyle, $hintExpanded, $hintFade, $tagScene, $feedbackScene, $withFrameColor"
     $lua = Join-Path $run "$captureVariant.lua"
     $png = Join-Path $run "$captureVariant.png"
     $log = Join-Path $run "$captureVariant.log"
-    $tabConfiguration = "local sideTabPosition, sideTabTheme, showFriendTabSettings = '$SideTabPosition', '$SideTabTheme', $($ShowFriendTabSettings.IsPresent.ToString().ToLowerInvariant())"
+    $tabConfiguration = "local sideTabPosition, sideTabTheme, showFriendTabSettings, showFriendDrag, friendDragTheme, showBorrowedSearchSkin = '$SideTabPosition', '$SideTabTheme', $($ShowFriendTabSettings.IsPresent.ToString().ToLowerInvariant()), $($ShowFriendDrag.IsPresent.ToString().ToLowerInvariant()), '$FriendDragTheme', $($ShowBorrowedSearchSkin.IsPresent.ToString().ToLowerInvariant())"
     [IO.File]::WriteAllText($lua, "$configuration`n$tabConfiguration`n$scene")
 
     $process = [Diagnostics.ProcessStartInfo]::new($simulator)

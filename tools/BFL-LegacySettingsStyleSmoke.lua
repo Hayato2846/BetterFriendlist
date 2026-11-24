@@ -158,6 +158,47 @@ assert(load(settingsSource:sub(helperFirst, helperLast - 1), "@production settin
 modules.Settings = settingsEnv.Settings
 assert(loadfile(root .. "/Modules/LegacySettingsStyle.lua"))("BetterFriendlist", BFL)
 local style = modules.LegacySettingsStyle
+local titleAction = region()
+titleAction.Icon = region(titleAction)
+local nativeHighlight = region(titleAction)
+nativeHighlight:SetAlpha(.6)
+function nativeHighlight:GetAlpha() return self.alpha end
+local suppressedLayers = {}
+function titleAction:DisableDrawLayer(layer) suppressedLayers[layer] = true end
+function titleAction:EnableDrawLayer(layer) suppressedLayers[layer] = nil end
+function titleAction:GetHighlightTexture() return nativeHighlight end
+function titleAction:IsVisible() return self:IsShown() end
+function titleAction:IsMouseOver() return self.hovered end
+style:SkinTitleAction(titleAction)
+check(suppressedLayers.BACKGROUND and suppressedLayers.ARTWORK and suppressedLayers.HIGHLIGHT
+	and not suppressedLayers.OVERLAY, "Blizzard keeps the title icon visible over hidden button art")
+check(nativeHighlight.alpha == 0 and titleAction.Icon.alpha == .8 and #titleAction.textures == 0,
+	"Blizzard title action displays a quiet icon with no hover texture")
+titleAction:RunScript("OnEnter")
+check(titleAction.Icon.alpha == 1 and nativeHighlight.alpha == 0, "Hover brightens only the title icon")
+titleAction:RunScript("OnLeave")
+check(titleAction.Icon.alpha == .8, "Leaving the button restores the icon alpha")
+titleAction.hovered = true
+style:SkinTitleAction(titleAction)
+check(titleAction.Icon.alpha == 1, "Restyling preserves the hovered icon")
+titleAction:Hide()
+check(titleAction.Icon.alpha == .8, "Hiding the title action clears hover")
+theme = "dark"
+style:SkinTitleAction(titleAction)
+titleAction:RunScript("OnEnter")
+check(not next(suppressedLayers) and nativeHighlight.alpha == .6 and titleAction.Icon.alpha == 1,
+	"Blizzard title action changes leak to another theme")
+theme = "blizzard"
+style:SkinTitleAction(titleAction)
+check(#titleAction.hooks.OnEnter == 1, "Theme switches register duplicate hover hooks")
+theme = "ellesmereui"
+titleAction.hovered = false
+style:SkinTitleAction(titleAction)
+check(suppressedLayers.BACKGROUND and suppressedLayers.ARTWORK and nativeHighlight.alpha == 0,
+	"EllesmereUI title actions have no button chrome")
+titleAction:RunScript("OnEnter")
+check(titleAction.Icon.alpha == 1, "EllesmereUI hover visibly brightens the title icon")
+theme = "blizzard"
 local frame = BetterFriendlistSettingsFrame
 frame.scripts.OnShow = function() showCalls = showCalls + 1 end
 style:Initialize()

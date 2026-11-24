@@ -38,7 +38,8 @@ local function GetRosterComparator(settings)
 	if not registry or not registry.CreateSortPlan or not registry.CompareFriendsWithSortPlan then return nil end
 	local primary = settings and settings.primarySort or "status"
 	local secondary = settings and settings.secondarySort or "name"
-	local plan = registry:CreateSortPlan(primary, secondary)
+	local tertiary = settings and settings.enableTertiarySort == true and settings.tertiarySort
+	local plan = registry:CreateSortPlan(primary, secondary, false, tertiary)
 	return function(a, b)
 		return registry:CompareFriendsWithSortPlan(a, b, plan)
 	end
@@ -70,6 +71,7 @@ local tooltip = nil
 local tooltipKey = "BetterFriendlistBrokerTT"
 -- Keep tooltip-only event callbacks out of the hidden broker path entirely.
 local brokerTooltipEventGate = { active = false }
+local filteredCountEventGate = { active = false }
 local previewData = nil
 
 -- Detail Tooltip reference (Forward declared for helper access)
@@ -509,27 +511,13 @@ local function ApplyGameAccountToFriend(friend, gameInfo)
 		friend.level = gameInfo.characterLevel or 0
 		friend.className = gameInfo.className or "UNKNOWN"
 		friend.classID = gameInfo.classID
-		friend.area = gameInfo.areaName or ""
-		friend.realmName = gameInfo.realmName or ""
+		local area, realm = BFL.Compat.GetBNetWoWAreaAndRealm(gameInfo)
+		friend.area = area or ""
+		friend.realmName = realm or ""
 		friend.factionName = gameInfo.factionName or ""
 		friend.guildName = gameInfo.guildName or ""
 		friend.gameName = nil
 
-		local presence = BFL.GetGameAccountRichPresence(gameInfo)
-		if friend.area == "" and presence then
-			local _, _, _, presenceArea = BFL.GetWoWAccountLocation(gameInfo)
-			local sep = string.find(presence, " - ", 1, true)
-			if presenceArea then
-				friend.area = presenceArea
-			elseif sep then
-				friend.area = strtrim(string.sub(presence, 1, sep - 1))
-				if friend.realmName == "" then
-					friend.realmName = strtrim(string.sub(presence, sep + 3))
-				end
-			else
-				friend.area = strtrim(presence)
-			end
-		end
 	elseif client == "BSAp" then
 		friend.characterName = ""
 		friend.level = 0
@@ -741,7 +729,7 @@ end
 local function GetBrokerTagFilter()
 	local quickFilters = GetQuickFilters()
 	local tags = BFL:GetModule("FriendTags")
-	local query = tags and tags:CanDisplayTags("broker") and Broker.tagSearch or nil
+	local query = Broker.tagSearch and tags and tags:CanDisplayTags("broker") and Broker.tagSearch or nil
 	local selected = quickFilters and quickFilters.GetActiveTagFilterDefinitions
 		and #quickFilters:GetActiveTagFilterDefinitions() > 0
 	if not query and not selected then return nil end
@@ -774,13 +762,16 @@ local function GetFilteredFriendCounts()
 	end
 
 	local resolvedFilter = Registry and Registry.ResolveQuickFilter and Registry:ResolveQuickFilter(currentFilter, true)
-	local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or IsForeverFilter(currentFilter))
+	local foreverFilter = IsForeverFilter(currentFilter)
+	local useRegistryFilter = resolvedFilter and (resolvedFilter.isCustom or foreverFilter)
 	local tagFilter = GetBrokerTagFilter()
+	local useSimpleCounts = not useRegistryFilter and not tagFilter and (currentFilter == "all" or currentFilter == "online")
+	filteredCountEventGate.active = not useSimpleCounts and not previewData
 
 	local wowFiltered, wowTotal, bnetFiltered, bnetTotal
 	if previewData and previewData.friends then
 		wowFiltered, wowTotal, bnetFiltered, bnetTotal = GetPreviewFriendCounts(currentFilter)
-	elseif not useRegistryFilter and not tagFilter and (currentFilter == "all" or currentFilter == "online") then
+	elseif useSimpleCounts then
 		wowFiltered, wowTotal, bnetFiltered, bnetTotal = GetFriendCounts()
 	else
 		local treatMobileAsOffline = BetterFriendlistDB and BetterFriendlistDB.treatMobileAsOffline
@@ -890,7 +881,7 @@ local function GetFilteredFriendCounts()
 							numGameAccounts = accountInfo.numGameAccounts,
 							friendTags = nativeTags and CopyFriendTags(accountInfo.friendTags) or nil,
 						}
-						if IsForeverFilter(currentFilter) then
+						if foreverFilter then
 							friendForRegistry.gameAccounts = GetBNetFilterGameAccounts(i)
 						end
 					end
@@ -1001,17 +992,14 @@ function Broker:UpdateBrokerText(force)
 		return
 	end
 
-	-- The display object uses raw counts. Tooltip filters must stay out of this path.
-	local wowOnline, wowTotal, bnetOnline, bnetTotal
-	if previewData and previewData.friends then
-		wowOnline, wowTotal, bnetOnline, bnetTotal = GetPreviewFriendCounts("all")
-	else
-		wowOnline, wowTotal, bnetOnline, bnetTotal = GetFriendCounts()
-	end
+	local wowOnline, wowTotal, bnetOnline, bnetTotal = GetFilteredFriendCounts()
 	dataObject.text, dataObject.icon = FormatBrokerDisplay(wowOnline, wowTotal, bnetOnline, bnetTotal)
 end
 
 function Broker:ScheduleBrokerTextUpdate(invalidateBattleNet)
+	if not dataObject then return end
+	-- Invalidate before the deferred pass so the label and an open tooltip can share the next result.
+	InvalidateFriendCountsCache()
 	pendingTextUpdate = true
 
 	if pendingDeferredUpdate then
@@ -1063,6 +1051,7 @@ function Broker:ScheduleObservedTooltipRefresh(invalidateBattleNet)
 		return
 	end
 
+	InvalidateFriendCountsCache()
 	pendingTooltipBattleNetInvalidation = pendingTooltipBattleNetInvalidation or invalidateBattleNet
 	if pendingTooltipRefresh then
 		return
@@ -1076,9 +1065,9 @@ function Broker:ScheduleObservedTooltipRefresh(invalidateBattleNet)
 			return
 		end
 
-		InvalidateFriendCountsCache()
 		if pendingTooltipBattleNetInvalidation then
 			InvalidateBattleNetCountsCache()
+			if not filteredCountEventGate.active then InvalidateFriendCountsCache() end
 		end
 		pendingTooltipBattleNetInvalidation = false
 		Broker:RefreshTooltip()
@@ -1645,8 +1634,7 @@ local function GetColoredLevelText(level)
 		return ""
 	end
 
-	local color = GetQuestDifficultyColor(level)
-	return string.format("|cff%02x%02x%02x%d|r", color.r * 255, color.g * 255, color.b * 255, level)
+	return BFL.BrokerUtils.ColorLevelByDifficulty(level)
 end
 
 -- ========================================
@@ -1672,6 +1660,7 @@ local function ShowBrokerTagSearch()
 		local function Apply(text)
 			text = text:match("^%s*(.-)%s*$")
 			Broker.tagSearch = text ~= "" and text or nil
+			Broker:ScheduleBrokerTextUpdate()
 			Broker:ScheduleObservedTooltipRefresh()
 		end
 		StaticPopupDialogs[key] = {
@@ -1839,6 +1828,13 @@ local function RenderFixedFooter(footerFrame, sampleFriends, settings)
 	local sortText = GetSortDisplay(primarySort)
 	if secondarySort and secondarySort ~= primarySort and secondarySort ~= "none" then
 		sortText = sortText .. " > " .. GetSortDisplay(secondarySort)
+	end
+
+	if Registry and settings and settings.enableTertiarySort == true then
+		local tertiarySort = Registry:NormalizeTertiarySorterId(settings.tertiarySort, primarySort, secondarySort)
+		if tertiarySort ~= "none" then
+			sortText = sortText .. " > " .. GetSortDisplay(tertiarySort)
+		end
 	end
 
 	local sortLine = AddLine(L("BROKER_SORT_LABEL") .. C("ltyellow", sortText), "GameTooltipText")
@@ -2507,7 +2503,8 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 		local SortRegistry = GetFilterSortRegistry()
 		local function CompareFallback(a, b)
 			if SortRegistry and SortRegistry.CompareFriends then
-				return SortRegistry:CompareFriends(a, b, primarySort, secondarySort)
+				local tertiary = settings and settings.enableTertiarySort == true and settings.tertiarySort
+				return SortRegistry:CompareFriends(a, b, primarySort, secondarySort, tertiary)
 			end
 
 			local function CompareByMode(mode, a, b)
@@ -2679,7 +2676,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 				if col.key == "Nickname" then
 					local nick = GetBrokerNickname(friend)
 					if nick ~= "" then
-						val = grayRuleset and (nameColor .. nick:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "|r")
+						val = shouldGray and BFL.FormatDimmedFriendText(nick)
 							or ApplyBrokerColumnColor(nick, "brokerNicknameColor", settings)
 						if val == nick then
 							val = defaultNameColor .. nick .. "|r"
@@ -2688,8 +2685,8 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 				elseif col.key == "Name" then
 					local statusPrefix = hasStatusColumn and "" or (statusIcon .. " ")
 					local displayName = GetFriendDisplayName(friend)
-					if grayRuleset then displayName = displayName:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
-					val = indentation .. statusPrefix .. nameColor .. displayName .. "|r"
+					local nameText = shouldGray and BFL.FormatDimmedFriendText(displayName) or (nameColor .. displayName .. "|r")
+					val = indentation .. statusPrefix .. nameText
 				elseif col.key == "Status" then
 					val = statusIcon
 				elseif col.key == "Level" then
@@ -2708,7 +2705,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 						end
 
 						if shouldGray then
-							val = "|cff808080" .. displayCharName .. "|r"
+							val = BFL.FormatDimmedFriendText(displayCharName)
 						elseif GetBrokerColumnColor("brokerCharacterColor", settings) then
 							val = ApplyBrokerColumnColor(displayCharName, "brokerCharacterColor", settings)
 						elseif colorClassNames then
@@ -2732,7 +2729,7 @@ local function CreateLibQTipTooltip(anchorFrame, sample)
 			end
 
 			local row = BFL.BrokerUtils.AddSettingsComparisonRow(tt, comparison, cellValues)
-			if grayRuleset then
+			if shouldGray then
 				for index, column in ipairs(activeColumns) do
 					if column.key == "Name" or column.key == "Character" or column.key == "Nickname" then
 						rulesetDimmedCells[#rulesetDimmedCells + 1] = row:GetCell(index)
@@ -3109,6 +3106,7 @@ end
 
 function Broker:OnPrivacyChanged()
 	InvalidateFriendCountsCache()
+	self:ScheduleBrokerTextUpdate()
 	if LQT and tooltip then
 		LQT:ReleaseTooltip(tooltip)
 		tooltip = nil
@@ -3323,6 +3321,7 @@ function Broker:OnClick(clickedFrame, button)
 			if BetterFriendlistDB then
 				BetterFriendlistDB.quickFilter = nextFilter
 			end
+			self:ScheduleBrokerTextUpdate()
 		end
 
 		BFL:ForceRefreshFriendsList()
@@ -3337,7 +3336,6 @@ function Broker:OnClick(clickedFrame, button)
 			if clickedFrame then
 				tooltip = CreateLibQTipTooltip(clickedFrame)
 			end
-			self:UpdateBrokerText()
 		end
 	end
 end
@@ -3463,6 +3461,13 @@ function Broker:RegisterEvents()
 	BFL:RegisterEventCallback("BN_DISCONNECTED", function(...)
 		Broker:ScheduleBrokerTextUpdate(true)
 	end)
+
+	-- An online friend can switch games or status without signing in or out.
+	local function RefreshFilteredCount()
+		Broker:ScheduleBrokerTextUpdate()
+	end
+	BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", RefreshFilteredCount, nil, filteredCountEventGate)
+	BFL:RegisterEventCallback("BN_INFO_CHANGED", RefreshFilteredCount, nil, filteredCountEventGate)
 
 	local function RegisterObservedTooltipEvent(event, invalidateBattleNet)
 		BFL:RegisterEventCallback(event, function()

@@ -159,7 +159,10 @@ env.BetterFriendsFrame_ShowBottomTab = function(tab)
 	if tab ~= 2 then addonWho.shown = false end
 end
 local main = readFile(repo .. "/BetterFriendlist.lua")
-loadNative("addon ShowBetterFriendsFrame", between(main, "function ShowBetterFriendsFrame(tabIndex)", "-- Hide the friends frame"))
+loadNative("addon ShowBetterFriendsFrame",
+	between(main, "local function SuspendBetterFriendsFrameUIPanelForCombat()", "function BFL:RestoreBetterFriendsFrameUIPanelAfterCombat()")
+		.. between(main, "function BFL:ShowBetterFriendsWindow()", "-- STORY MODE RAID TAB HANDLING")
+		.. between(main, "function ShowBetterFriendsFrame(tabIndex)", "-- Hide the friends frame"))
 loadNative("Core addon display target", between(core, "function BFL:ApplyBetterFriendsFrameTarget(", "function BFL:ShowBetterFriendsFrameIgnoreList()"))
 function s.BFL:ForceRefreshFriendsList() end
 local nativeToggle = env.ToggleGroupFinderFrame

@@ -716,6 +716,7 @@ local function RefreshSurfaces(refreshCallback, options)
 	end
 	local broker = BFL:GetModule("Broker")
 	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
+	if broker and broker.ScheduleBrokerTextUpdate then broker:ScheduleBrokerTextUpdate() end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
 	elseif BFL.ScheduleFriendsListRefresh then
@@ -1180,6 +1181,7 @@ local function RefreshFriendAssignment(refreshCallback, friend, explicitUID, sup
 	end
 	local broker = BFL:GetModule("Broker")
 	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
+	if broker and broker.ScheduleBrokerTextUpdate then broker:ScheduleBrokerTextUpdate() end
 	if type(refreshCallback) == "function" then
 		refreshCallback()
 	elseif BFL.ScheduleFriendsListRefresh then

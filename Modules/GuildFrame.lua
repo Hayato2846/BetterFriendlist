@@ -1844,6 +1844,9 @@ function GuildFrame:RenderGuildNews(bar)
 end
 
 function GuildFrame:RefreshGuildNews()
+	-- The event invalidates the provider even when the news panel is closed.
+	-- Entering News requests the current data and consumes that invalidation.
+	if self.headerDetailMode ~= "news" or not IsGuildFrameVisible() then return end
 	local provider = GetGuildRosterData()
 	if not (provider and provider.HasGuildNewsAPI and provider:HasGuildNewsAPI()) then
 		self.guildNewsEntries = {}
@@ -1852,9 +1855,7 @@ function GuildFrame:RefreshGuildNews()
 	self.guildNewsEntries = provider and provider.CollectGuildNews
 		and provider:CollectGuildNews(GUILD_NEWS_MAX_ENTRIES) or {}
 	self.guildNewsResetScroll = true
-	if IsGuildFrameVisible() then
-		self:UpdateGuildFeatureBar()
-	end
+	self:UpdateGuildFeatureBar()
 end
 
 function GuildFrame:RequestGuildNews(force)

@@ -637,18 +637,28 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		if not isElvUIActiveSecondary then
 			BFL.SetDropdownWidth(secondaryDropdown, 70)
 		end
-		local secondaryOptions = BuildSortOptions(true)
-		secondaryOptions.isOptionHidden = function(sortMode)
-			return sortMode ~= "none" and sortMode == FriendsList.sortMode
+		local function IsSecondarySelected(sortMode)
+			return (GetSortDB().secondarySort or FriendsList.secondarySort or "name") == sortMode
 		end
-		BFL.InitializeDropdown(secondaryDropdown, secondaryOptions, function(sortMode)
-			local db = GetSortDB()
-			local currentSort = db.secondarySort or FriendsList.secondarySort or "name"
-			return currentSort == sortMode
-		end, function(sortMode)
+		local function SetSecondarySelected(sortMode)
 			FriendsList:SetSecondarySortMode(sortMode)
 			FriendsList:RenderDisplay()
-		end)
+			BFL.SetDropdownSelectedValue(secondaryDropdown, sortMode)
+			BFL.SetDropdownText(secondaryDropdown, GetIconText(sortMode))
+		end
+		BFL.InitializeDropdown(secondaryDropdown, {
+			populateRootDescription = function(rootDescription)
+				if FriendsList:IsTertiarySortEnabled() then
+					FriendsList:PopulateSortMenu(rootDescription:CreateButton(L.SORT_TERTIARY_LABEL), "tertiary")
+				end
+				local options = BuildSortOptions(true)
+				for index, sortMode in ipairs(options.values) do
+					if sortMode == "none" or sortMode ~= FriendsList.sortMode then
+						rootDescription:CreateRadio(options.labels[index], IsSecondarySelected, SetSecondarySelected, sortMode)
+					end
+				end
+			end,
+		}, IsSecondarySelected, SetSecondarySelected)
 		local currentSecondary = GetSortDB().secondarySort or FriendsList.secondarySort or "name"
 		if currentSecondary ~= "none" and currentSecondary == FriendsList.sortMode then
 			currentSecondary = "none"
@@ -816,6 +826,9 @@ function FrameInitializer:InitializeSortDropdowns(frame)
 		end,
 		populateRootDescription = function(rootDescription)
 			rootDescription:SetTag("MENU_FRIENDS_SECONDARY_SORT")
+			if FriendsList:IsTertiarySortEnabled() then
+				FriendsList:PopulateSortMenu(rootDescription:CreateButton(L.SORT_TERTIARY_LABEL), "tertiary")
+			end
 
 			rootDescription:CreateRadio(FormatIconText(SORT_ICONS.none, L.SORT_NONE), IsSecondarySelected, SetSecondarySelected, "none")
 			for _, sorter in ipairs(GetVisibleSorters()) do

@@ -98,6 +98,72 @@ equal(guildMembers[1].profession1ID, 164, "A readable profile still enriches the
 equal(guildMembers[1].guid, "", "A secret profile GUID stays out of the roster")
 env.C_Club, env.issecrettable, BFL.HasSecretValues = nil, nil, nil
 
+do
+	local events, reads, requests, paints = {}, 0, 0, 0
+	local parentShown, tabShown = false, true
+	env.BetterFriendsFrame = {
+		IsShown = function() return parentShown end,
+		GuildFrame = { IsShown = function() return tabShown end },
+	}
+	env.C_GuildInfo = { GetGuildNewsInfo = function() reads = reads + 1; return { newsType = 1 } end }
+	env.GetNumGuildNews = function() return 2 end
+	env.QueryGuildNews = function() requests = requests + 1 end
+	local register = BFL.RegisterEventCallback
+	BFL.RegisterEventCallback = function(_, event, handler) events[event] = handler end
+	local guild = read("Modules/GuildFrame.lua")
+	local create = "local GuildFrame = { headerDetailMode = 'news' }\n"
+		.. "local GUILD_NEWS_MAX_ENTRIES = 50\nlocal GetGuildRosterData = ...\n"
+	local frame = assert(load(create
+		.. between(guild, "local function IsGuildFrameVisible()", "local function MarkDisplayListDirty(")
+		.. between(guild, "function GuildFrame:RegisterGuildEvents()", "function GuildFrame:EnsureEnabled()")
+		.. between(guild, "function GuildFrame:RefreshGuildNews()", "-- Kept as a compatibility entry point")
+		.. "return GuildFrame", "@guild news visibility", "t", env))(function() return guildRoster end)
+	frame.UpdateGuildFeatureBar = function() paints = paints + 1 end
+	frame.UpdateHeaderEditButtons = function() end
+	frame:RegisterGuildEvents()
+	events.GUILD_NEWS_UPDATE()
+	equal(reads, 0, "A news event never enumerates entries behind a hidden parent")
+	parentShown, tabShown = true, false
+	events.GUILD_NEWS_UPDATE()
+	equal(reads, 0, "A news event skips a hidden Guild tab")
+	tabShown, frame.headerDetailMode = true, "motd"
+	events.GUILD_NEWS_UPDATE()
+	equal(reads, 0, "A news event skips the guild message view")
+	frame:SetGuildHeaderMode("news")
+	check(requests == 1 and reads == 2 and #frame.guildNewsEntries == 2, "Entering News requests and displays fresh entries")
+	local painted = paints
+	events.GUILD_NEWS_UPDATE()
+	check(reads == 4 and paints == painted + 1, "A visible news panel refreshes on its update event")
+	BFL.RegisterEventCallback = register
+	env.BetterFriendsFrame, env.C_GuildInfo, env.GetNumGuildNews, env.QueryGuildNews = nil, nil, nil, nil
+end
+
+do
+	local shown, rendered = false, 0
+	local tab = {
+		IsShown = function() return true end,
+		ScrollBox = { SetDataProvider = function() rendered = rendered + 1 end },
+	}
+	env.BetterFriendsFrame = { IsShown = function() return shown end, RecentAlliesFrame = tab }
+	env.ScrollBoxConstants = {}
+	local function yes() return true end
+	local allies = { searchText = "", IsSystemEnabled = yes, IsDataReady = yes,
+		SetLoadingSpinnerShown = function() end, BuildDataProvider = function() return {} end }
+	local source = read("Modules/RecentAllies.lua")
+	assert(load("local RecentAllies = ...\n"
+		.. between(source, "function RecentAllies:Refresh(", "function RecentAllies:HasActiveFilters()")
+		.. between(source, "function RecentAllies:SetSearchText(", "-- Set loading spinner visibility"),
+		"@recent allies visibility", "t", env))(allies)
+	local hadRecentAllies = BFL.HasRecentAllies
+	BFL.HasRecentAllies = true
+	allies:SetSearchText("a")
+	equal(rendered, 0, "A selected Recent Allies tab does not render under a closed parent")
+	shown = true
+	allies:Refresh(tab)
+	equal(rendered, 1, "The visible Recent Allies tab can render the saved search state")
+	env.BetterFriendsFrame, env.ScrollBoxConstants, BFL.HasRecentAllies = nil, nil, hadRecentAllies
+end
+
 local dropdown = {
 	SetupMenu = function() end,
 	SetSelectionText = function(self, callback) self.selectionText = callback end,
@@ -218,7 +284,8 @@ env.C_Timer = { NewTimer = function(_, callback)
 	return whoTimer
 end }
 env.C_FriendList.SetWhoToUi = function(value) check(value == true, "Who routing stays with the submitted query") end
-env.BetterFriendsFrame = { WhoFrame = {
+env.BetterFriendsFrame = { IsShown = function() return true end, WhoFrame = {
+	IsShown = function() return true end,
 	GroupInviteButton = { Disable = function() end },
 	AddFriendButton = { Disable = function() end },
 } }
@@ -338,9 +405,11 @@ recent:OpenMenu({ elementData = preview })
 equal(menusOpened, 0, "Preview identities never reach native menus")
 local lastMenu, menuName
 BFL.OpenContextMenu = function(_, kind, context) lastMenu, menuName = kind, context.name end
+local savedStreamerMode = BFL.StreamerMode
+BFL.StreamerMode = { IsActive = function() return true end }
 env.UnitPopupMenus = { RECENT_ALLY = {} }
 recent:OpenMenu({ elementData = safe[1] })
-equal(lastMenu, "RECENT_ALLY", "Registered Recent Ally menus keep their native note/pin actions")
+equal(lastMenu, "RECENT_ALLY", "Recent Ally menus keep their native note and pin actions in Streamer Mode")
 env.UnitPopupMenus.RECENT_ALLY = nil
 recent:OpenMenu({ elementData = safe[1] })
 equal(lastMenu, "FRIEND", "Missing Recent Ally menus retain the legacy fallback")
@@ -355,6 +424,18 @@ env.GameTooltip_AddHighlightLine = function(_, text) tooltip.rows[#tooltip.rows 
 recent:AddActivityTooltipLines(tooltip, activities)
 equal(#tooltip.rows, 3, "All readable short-history activities appear in the tooltip")
 equal(tooltip.rows[1][2], "100s", "Timeline age uses the sanitized timestamp")
+tooltip.rows = {}
+env.GameTooltip_AddNormalLine = env.GameTooltip_AddHighlightLine
+env.C_CreatureInfo = {
+	GetRaceInfo = function() end,
+	GetClassInfo = function() end,
+	GetFactionInfo = function() end,
+}
+safe[1].stateData.currentLocation = "Ashenvale"
+recent:BuildTooltip({ elementData = safe[1] }, tooltip)
+equal(tooltip.rows[1][1], "Ada-Realm", "The Recent Allies tooltip shows the name in Streamer Mode")
+equal(tooltip.rows[2][1], "Ashenvale", "The Recent Allies tooltip shows the location in Streamer Mode")
+equal(tooltip.rows[5][1], "Newest", "The Recent Allies tooltip shows the activity in Streamer Mode")
 
 local function widget()
 	local object = { scripts = {}, text = "" }
@@ -408,6 +489,7 @@ equal(recent.activityFrame.point[2], env.UIParent, "Out-of-combat placement also
 equal(recent.activityFrame.point[4], 408, "History placement translates the source UI scale")
 equal(recent.activityFrame.point[5], 300, "History placement translates vertical coordinates")
 recent.activityFrame:Hide()
+BFL.StreamerMode = savedStreamerMode
 
 -- Exercise the real recycled-row click closure, including disabled programmatic clicks.
 local setupInvite = execute("return function(self, button, elementData)\nlocal stateData, characterData = elementData.stateData, elementData.characterData\n"

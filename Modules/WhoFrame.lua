@@ -639,8 +639,7 @@ function WhoFrame:OnNativeWhoRequestSent(showResults)
 	self:ReleaseNativeWhoRequest(self.nativeWhoRequestGuard)
 	self.whoWaitMessage = nil
 	self.lastWhoSendTime = GetTime()
-	self:StartRefreshButtonCooldown()
-	self:StartBuilderSearchButtonCooldown()
+	self:RefreshCooldownButtons()
 	return self:ShowWhoResults()
 end
 
@@ -1016,10 +1015,8 @@ function WhoFrame:RefreshActionButtonState()
 		return
 	end
 
-	if whoFrame.WhoButton and not self:IsOnCooldown() then
-		whoFrame.WhoButton:SetText(REFRESH or "Refresh")
-		whoFrame.WhoButton:Enable()
-	end
+	self:WatchCooldownButton(whoFrame.WhoButton)
+	self:RefreshCooldownButtons()
 	local hasSelection = whoFrame.selectedWho ~= nil and whoFrame.selectedName ~= nil and whoFrame.selectedName ~= ""
 	if whoFrame.AddFriendButton then
 		whoFrame.AddFriendButton:SetEnabled(hasSelection)
@@ -1643,6 +1640,7 @@ end
 -- Initialize Who Frame with ScrollBox (Retail) or FauxScrollFrame (Classic)
 function WhoFrame:OnLoad(frame)
 	ApplyStaticWhoFrameFonts(frame)
+	self:WatchCooldownButton(frame.WhoButton)
 
 	-- Classic: Use FauxScrollFrame approach
 	if not BFL.HasModernScrollBox then
@@ -2145,8 +2143,7 @@ function WhoFrame:BeginWhoRequest()
 	self.whoWaitMessage = nil
 	local requestGuard = {}
 	self.nativeWhoRequestGuard = requestGuard
-	self:StartRefreshButtonCooldown()
-	self:StartBuilderSearchButtonCooldown()
+	self:RefreshCooldownButtons()
 	if self.whoTimeoutTimer then self.whoTimeoutTimer:Cancel() end
 	self.whoTimeoutTimer = C_Timer.NewTimer(WHO_TIMEOUT, function()
 		if self:ApplyWhoWaitMessage(requestGuard) then return end
@@ -2174,9 +2171,7 @@ function WhoFrame:SendWhoRequest(text, origin, filters)
 	-- Throttle: Prevent queries faster than the server allows
 	local now = GetTime()
 	if self.lastWhoSendTime and (now - self.lastWhoSendTime < WHO_COOLDOWN) then
-		-- Still in cooldown - update buttons to show remaining time
-		self:UpdateRefreshButtonCooldown()
-		self:UpdateBuilderSearchButtonCooldown()
+		self:RefreshCooldownButtons()
 		return
 	end
 
@@ -2301,7 +2296,7 @@ end
 
 function WhoFrame:ShowWhoStatus(message)
 	local frame = BetterFriendsFrame and BetterFriendsFrame.WhoFrame
-	if not frame then
+	if not (frame and BetterFriendsFrame:IsShown() and frame:IsShown()) then
 		return
 	end
 	self:SetLoadingSpinnerShown(frame, false)
@@ -2321,130 +2316,52 @@ end
 
 function WhoFrame:ShowThrottleHint()
 	local L = BFL.L
-	self:ShowWhoStatus(L and L.WHO_SEARCH_TIMEOUT or "No response. Try again.")
+	self.whoWaitMessage = L and L.WHO_SEARCH_TIMEOUT or "No response. Try again."
+	self:ShowWhoStatus(self.whoWaitMessage)
 end
 
--- Start the Refresh button cooldown with countdown text
-function WhoFrame:StartRefreshButtonCooldown()
-	local whoButton = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.WhoButton
-	if not whoButton then
-		return
+local function RefreshVisibleCooldownButton(button, hiding, label, seconds)
+	if not button or button == hiding or not button:IsVisible() then return false end
+	if seconds > 0 then
+		button:Disable()
+		button:SetText(format("%s (%ds)", label, seconds))
+	else
+		button:Enable()
+		button:SetText(label)
 	end
-
-	whoButton:Disable()
-
-	-- Cancel any existing ticker
-	if self.buttonCooldownTicker then
-		self.buttonCooldownTicker:Cancel()
-		self.buttonCooldownTicker = nil
-	end
-
-	-- Update button text with countdown
-	local L = BFL.L
-	local refreshLabel = REFRESH or "Refresh"
-	local remaining = WHO_COOLDOWN
-	whoButton:SetText(format("%s (%ds)", refreshLabel, remaining))
-
-	self.buttonCooldownTicker = C_Timer.NewTicker(1, function()
-		remaining = remaining - 1
-		if remaining <= 0 then
-			self:StopRefreshButtonCooldown()
-		else
-			whoButton:SetText(format("%s (%ds)", refreshLabel, remaining))
-		end
-	end, WHO_COOLDOWN)
+	return true
 end
 
--- Re-enable the Refresh button and restore its label
-function WhoFrame:StopRefreshButtonCooldown()
-	if self.buttonCooldownTicker then
-		self.buttonCooldownTicker:Cancel()
-		self.buttonCooldownTicker = nil
+function WhoFrame:RefreshCooldownButtons(hiding)
+	if self.cooldownTimer then
+		self.cooldownTimer:Cancel()
+		self.cooldownTimer = nil
 	end
 
-	local whoButton = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.WhoButton
-	if not whoButton then
-		return
-	end
+	local remaining = self.lastWhoSendTime and WHO_COOLDOWN - (GetTime() - self.lastWhoSendTime) or 0
+	local seconds = math.max(0, math.ceil(remaining))
+	local frame = BetterFriendsFrame and BetterFriendsFrame.WhoFrame
+	local refreshVisible = RefreshVisibleCooldownButton(frame and frame.WhoButton, hiding, REFRESH or "Refresh", seconds)
+	local builderVisible = RefreshVisibleCooldownButton(self.builder and self.builder.searchBtn, hiding,
+		BFL.L and BFL.L.WHO_BUILDER_SEARCH or "Search", seconds)
 
-	whoButton:SetText(REFRESH or "Refresh")
-	whoButton:Enable()
-end
-
--- Update button when a throttled request is attempted (visual shake / feedback)
-function WhoFrame:UpdateRefreshButtonCooldown()
-	local whoButton = BetterFriendsFrame and BetterFriendsFrame.WhoFrame and BetterFriendsFrame.WhoFrame.WhoButton
-	if not whoButton then
-		return
-	end
-
-	-- Button should already be disabled with countdown text from StartRefreshButtonCooldown
-	-- If somehow it's enabled, re-start the cooldown display
-	if whoButton:IsEnabled() then
-		self:StartRefreshButtonCooldown()
+	-- The request throttle is based on the send time. Only the on-screen
+	-- countdown needs a timer, and reopening resumes from that same deadline.
+	if seconds > 0 and (refreshVisible or builderVisible) then
+		self.cooldownTimer = C_Timer.NewTimer(remaining - seconds + 1, function()
+			self.cooldownTimer = nil
+			self:RefreshCooldownButtons()
+		end)
 	end
 end
 
--- Start the builder Search button cooldown with countdown text
-function WhoFrame:StartBuilderSearchButtonCooldown()
-	local searchBtn = self.builder and self.builder.searchBtn
-	if not searchBtn then
-		return
-	end
-
-	searchBtn:Disable()
-
-	-- Cancel any existing ticker
-	if self.builderCooldownTicker then
-		self.builderCooldownTicker:Cancel()
-		self.builderCooldownTicker = nil
-	end
-
-	local L = BFL.L
-	local searchLabel = L and L.WHO_BUILDER_SEARCH or "Search"
-	local remaining = WHO_COOLDOWN
-	searchBtn:SetText(format("%s (%ds)", searchLabel, remaining))
-
-	self.builderCooldownTicker = C_Timer.NewTicker(1, function()
-		remaining = remaining - 1
-		if remaining <= 0 then
-			self:StopBuilderSearchButtonCooldown()
-		else
-			searchBtn:SetText(format("%s (%ds)", searchLabel, remaining))
-		end
-	end, WHO_COOLDOWN)
+function WhoFrame:WatchCooldownButton(button)
+	if not button or button.BFL_WhoCooldownWatched then return end
+	button.BFL_WhoCooldownWatched = true
+	button:HookScript("OnShow", function() self:RefreshCooldownButtons() end)
+	button:HookScript("OnHide", function(owner) self:RefreshCooldownButtons(owner) end)
 end
 
--- Re-enable the builder Search button and restore its label
-function WhoFrame:StopBuilderSearchButtonCooldown()
-	if self.builderCooldownTicker then
-		self.builderCooldownTicker:Cancel()
-		self.builderCooldownTicker = nil
-	end
-
-	local searchBtn = self.builder and self.builder.searchBtn
-	if not searchBtn then
-		return
-	end
-
-	local L = BFL.L
-	searchBtn:SetText(L and L.WHO_BUILDER_SEARCH or "Search")
-	searchBtn:Enable()
-end
-
--- Update builder Search button when a throttled request is attempted
-function WhoFrame:UpdateBuilderSearchButtonCooldown()
-	local searchBtn = self.builder and self.builder.searchBtn
-	if not searchBtn then
-		return
-	end
-
-	if searchBtn:IsEnabled() then
-		self:StartBuilderSearchButtonCooldown()
-	end
-end
-
--- Update Who list display
 function WhoFrame:Update(forceRebuild)
 	if not BetterFriendsFrame or not BetterFriendsFrame.WhoFrame then
 		return
@@ -2459,17 +2376,17 @@ function WhoFrame:Update(forceRebuild)
 		return
 	end
 
+	if not BetterFriendsFrame:IsShown() or not frame:IsShown() then
+		needsRenderOnShow = true
+		return
+	end
+
 	if self.whoPending then
 		self:SetLoadingSpinnerShown(frame, true)
 		return
 	end
 	self:SetLoadingSpinnerShown(frame, false)
 
-	-- Visibility Optimization:
-	if not BetterFriendsFrame:IsShown() or not frame:IsShown() then
-		needsRenderOnShow = true
-		return
-	end
 	if self.whoWaitMessage then
 		self:ShowWhoStatus(self.whoWaitMessage)
 		return
@@ -2835,7 +2752,7 @@ end
 -- Mirror Recent Allies' loading behavior while waiting for WHO_LIST_UPDATE.
 function WhoFrame:SetLoadingSpinnerShown(frame, shown)
 	frame = frame or (BetterFriendsFrame and BetterFriendsFrame.WhoFrame)
-	if not frame then
+	if not (BetterFriendsFrame and BetterFriendsFrame:IsShown() and frame and frame:IsShown()) then
 		return false
 	end
 
@@ -4762,6 +4679,7 @@ function WhoFrame:CreateSearchBuilder(whoFrame)
 	-- Store references
 	self.builderFlyout = flyout
 	self.builderToggle = toggleBtn
+	self:WatchCooldownButton(self.builder.searchBtn)
 
 	-- Toggle button click
 	toggleBtn:SetScript("OnClick", function()
@@ -5265,7 +5183,7 @@ end
 function WhoFrame:ExecuteBuilderSearch()
 	-- Don't close the builder or search during cooldown
 	if self:IsOnCooldown() then
-		self:UpdateBuilderSearchButtonCooldown()
+		self:RefreshCooldownButtons()
 		return
 	end
 

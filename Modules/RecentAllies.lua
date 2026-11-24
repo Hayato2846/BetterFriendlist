@@ -8,7 +8,7 @@ local ADDON_NAME, BFL = ...
 local RecentAllies = BFL:RegisterModule("RecentAllies", {})
 
 local function SafeValue(value, expectedType, fallback)
-	if (BFL.IsSecret and BFL:IsSecret(value)) or type(value) ~= expectedType then return fallback end
+	if (BFL.IsSecret and BFL:IsSecret(value)) or (type(value) == "table" and issecrettable and issecrettable(value)) or type(value) ~= expectedType then return fallback end
 	if expectedType == "string" and value == "" then return fallback end
 	if expectedType == "number" and (value ~= value or value == math.huge or value == -math.huge) then return fallback end
 	return value
@@ -21,7 +21,7 @@ end
 -- Copy only documented, readable fields. Native results stay untouched, and
 -- secrets never enter comparisons, formatting, action arguments or storage.
 function RecentAllies:NormalizeAlly(value)
-	if (BFL.IsSecret and BFL:IsSecret(value)) or type(value) ~= "table" then return nil end
+	if not SafeValue(value, "table") then return nil end
 	local character, state, interaction = SafeTable(value.characterData), SafeTable(value.stateData), SafeTable(value.interactionData)
 	local data = { characterData = {}, stateData = {}, interactionData = { interactions = {} } }
 	-- Keep BFL's preview marker across the private copy, never authorizing a
@@ -797,6 +797,9 @@ end
 
 -- Refresh the list (RecentAlliesListMixin:Refresh)
 function RecentAllies:Refresh(frame, retainScrollPosition)
+	-- A child can remain shown while its parent is closed. Deferred callers
+	-- must wait for OnShow to rebuild the list in that case.
+	if not (BetterFriendsFrame and BetterFriendsFrame:IsShown() and frame and frame:IsShown()) then return end
 	-- A cache refresh can recycle selected rows; discard the visible snapshot.
 	if self.activityFrame then self.activityFrame:Hide() end
 	if frame.selectedEntry then

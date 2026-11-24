@@ -3,6 +3,9 @@ local Flags = BFL:RegisterModule("SettingsNewFlags", {})
 
 -- Stable option IDs and introduction revisions; labels and positions are not IDs.
 Flags.definitions = {
+	friendFormatColors = { route="rows", key="SETTINGS_FORMAT_FIELD_COLOR", revision="3.1.9", customFormat=true },
+	showFriendLocalTime = { route="rows", key="SETTINGS_SHOW_FRIEND_LOCAL_TIME", revision="3.1.9" },
+	["friendTags.dynamicTagGroupFilter"] = { route="tags", key="FRIEND_TAGS_DYNAMIC_GROUP_FILTER", revision="3.1.9" },
 	fontWindowTitle = { route="windowFonts", section="SETTINGS_WINDOW_TITLE_FONT", key="SETTINGS_FONT" },
 	fontSizeWindowTitle = { route="windowFonts", section="SETTINGS_WINDOW_TITLE_FONT", key="SETTINGS_FONT_SIZE_NUM" },
 	fontActionButton = { route="windowFonts", section="SETTINGS_ACTION_BUTTON_FONT", key="SETTINGS_FONT" },
@@ -11,18 +14,25 @@ Flags.definitions = {
 	useThemedDialogs = { route="theme", key="SETTINGS_BFL_INPUT_DIALOGS" },
 	hideThemeAvatar = { route="theme", key="SETTINGS_THEME_HIDE_AVATAR", themed=true },
 	modernSideTabPosition = { route="friendTabs", key="SETTINGS_MODERN_TAB_POSITION", mainline=true },
+	enableTertiarySort = { route="automatic", key="SETTINGS_ENABLE_TERTIARY_SORT", revision="3.1.9" },
+	tertiarySort = { route="automatic", key="SORT_TERTIARY_LABEL", revision="3.1.9", prerequisite="enableTertiarySort" },
 }
 local REVISION = "3.1.2"
 
 function Flags:IsAvailable(definition, review)
 	if definition.mainline and not BFL.IsMainline then return false end
+	if definition.customFormat then
+		local db = BFL:GetModule("DB")
+		if not db or (db:Get("nameFormatPreset") ~= "custom" and db:Get("infoFormatPreset") ~= "custom") then return false end
+	end
+	if definition.prerequisite and not BFL:GetModule("DB"):Get(definition.prerequisite, false) then return false end
 	if definition.themed then
 		local theme = BFL:GetEffectiveTheme()
 		if theme ~= "dark" and theme ~= "custom" and theme ~= "elvui" and theme ~= "ellesmereui" then return false end
 	end
 	local page = BFL.LegacySettingsCatalog.pages[definition.route]
 	local _, reason = review.settings:GetLegacyTabAvailability(page[1])
-	return reason ~= "client"
+	return reason ~= "client" and reason ~= "beta"
 end
 
 function Flags:IsUnread(id)
@@ -53,7 +63,9 @@ end
 
 function Flags:NavigationBadge(row, text, unread)
 	row.label:SetText(text)
-	row.BFL_NewBadgeWidth = self:SetBadge(row, unread, 8)
+	self:SetBadge(row, unread, row.route and 0 or 8)
+	-- Child labels may extend into the badge's outer padding, up to its text.
+	row.BFL_NewBadgeWidth = unread and (row.route and row.BFL_NewBadge:GetWidth() - 16 or 50) or 0
 	row.label:ClearAllPoints()
 	row.label:SetPoint("LEFT", row.labelInset, 0)
 	row.label:SetWidth(math.max(1, row:GetWidth() - row.labelInset - 8 - row.BFL_NewBadgeWidth))
@@ -80,10 +92,16 @@ function Flags:LayoutRowBadge(row)
 				local point, relative, relativePoint, x, y = region:GetPoint(index)
 				if relative == row and relativePoint:find("RIGHT", 1, true) then
 					local old = offsets[point]
-					local original = old and x == old.shifted and y == old.y and old.original or x
+					local unchanged = old and old.relative == relative and old.relativePoint == relativePoint
+						and math.abs(x - old.shifted) < 0.001 and math.abs(y - old.y) < 0.001
+					local original = unchanged and old.original or x
 					local shifted = original - inset
 					if x ~= shifted then region:SetPoint(point, relative, relativePoint, shifted, y) end
-					offsets[point] = { original = original, shifted = shifted, y = y }
+					-- Native anchors round to floats. Remember the applied coordinates,
+					-- not the Lua double, so later clicks cannot reserve the space again.
+					local _, _, _, appliedX, appliedY = region:GetPoint(index)
+					offsets[point] = { original = original, shifted = appliedX, y = appliedY,
+						relative = relative, relativePoint = relativePoint }
 				end
 			end
 		end

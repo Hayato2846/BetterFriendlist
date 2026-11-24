@@ -343,6 +343,43 @@ for _, flavor in ipairs({ "retail", "forever" }) do
 		equal(s.calls[3][1], "Native", "the explicit Blizzard bypass keeps its native handler")
 	end)
 end
+case("Who countdown observes button visibility", function()
+	local s = renderFixture("forever")
+	local function makeButton()
+		local button = textWidget()
+		function button:IsVisible() return self.shown and s.parent.shown end
+		function button:HookScript(event, handler) self[event] = handler end
+		function button:Enable() self.enabled = true end
+		function button:Disable() self.enabled = false end
+		return button
+	end
+	local refresh, builder = makeButton(), makeButton()
+	s.frame.WhoButton, s.who.builder = refresh, { searchBtn = builder }
+	s.who:WatchCooldownButton(refresh)
+	s.who:WatchCooldownButton(builder)
+	refresh.shown, builder.shown = true, true
+	s.who.lastWhoSendTime = s.now
+	s.who:RefreshCooldownButtons()
+	check(not refresh.enabled and not builder.enabled, "the visible query buttons are disabled during cooldown")
+	local pending = s.who.cooldownTimer
+	s.parent.shown = false
+	refresh:OnHide()
+	builder:OnHide()
+	check(pending.cancelled and not s.who.cooldownTimer, "closing BFL cancels the visual countdown")
+	s:advance(3.2)
+	equal(refresh:GetText(), "Refresh (5s)", "no hidden button text update")
+	check(s.who:IsOnCooldown(), "closing BFL preserves the server throttle")
+	s.parent.shown = true
+	refresh:OnShow()
+	equal(refresh:GetText(), "Refresh (2s)", "reopening uses only the remaining time")
+	local replacement = makeButton()
+	replacement.shown, refresh.shown = true, false
+	s.frame.WhoButton = replacement
+	s.who:RefreshActionButtonState()
+	check(replacement.OnHide and not replacement.enabled, "the modern replacement inherits the running cooldown")
+	s:advance(1.81)
+	check(replacement.enabled and builder.enabled and not s.who.cooldownTimer, "visible buttons recover at the original deadline")
+end)
 for _, message in ipairs(failures) do io.stderr:write("FAIL: " .. message .. "\n") end
 assert(#failures == 0, ("Who results smoke: %d/%d cases failed"):format(#failures, cases))
 io.write(("Who results smoke: %d cases, %d checks passed (production Lua/XML; mocked client)\n"):format(cases, assertions))

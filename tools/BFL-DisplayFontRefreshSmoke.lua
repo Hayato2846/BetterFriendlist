@@ -166,8 +166,10 @@ combat = false
 Load("Modules/FriendsList.lua")
 local list, calls = BFL.modules.FriendsList, 0
 local function Header(shown, kind)
-	return { IsShown = function() return shown end, elementData = { buttonType = kind or 2 } }
+	return { IsVisible = function() return shown end, elementData = { buttonType = kind or 2 } }
 end
+local friendsShown = true
+env.BetterFriendsFrame = { IsShown = function() return friendsShown end }
 local visible, hidden, friend = Header(true), Header(false), Header(true, 1)
 function list:UpdateGroupHeaderButton(button, data) equal(button.elementData, data, "Existing provider data is retained"); calls = calls + 1 end
 function list:UpdateFriendsList() error("Display text recovery must not rescan friend data") end
@@ -182,6 +184,9 @@ list.classicHeaderPool = { visible, hidden }
 equal(list:RefreshGroupHeadersAfterDisplayChange(), 1, "Classic refreshes its header pool")
 equal(list.activeProviderDisplayList, provider, "Provider identity survives display recovery")
 equal(list.selectedFriendUID, "friend-42", "Selection survives display recovery")
+friendsShown = false
+equal(list:RefreshGroupHeadersAfterDisplayChange(), 0, "Display changes skip a closed friends list")
+friendsShown = true
 combat = true
 equal(list:RefreshGroupHeadersAfterDisplayChange(), 0, "Header callers also honor combat lockdown")
 io.write("PASS: display font recovery scheduling, state preservation and header dispatch (" .. checks .. " checks; mocked engine)\n")

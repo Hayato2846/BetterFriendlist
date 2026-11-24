@@ -423,13 +423,24 @@ local function CaptureLayout(frame, view, search, friendsFrame)
 	-- the decoration while it is borrowed. Include addon-created skin backings
 	-- in the same snapshot so Blizzard receives their original opacity on release.
 	local decorations = {}
+	local function CaptureDecoration(region)
+		if not region or decorations[region] then return end
+		assert(CanUseRegion(region, true), "Blizzard search decoration is restricted")
+		decorations[region] = true
+		AddState(session, region, "GetAlpha", "SetAlpha", 0)
+	end
 	for _, key in ipairs({ "Background", "searchIcon", "Instructions", "backdrop", "Backdrop", "NineSlice", "Left", "Middle", "Right" }) do
-		local region = box[key]
-		if region and not decorations[region] then
-			if not CanUseRegion(region, true) then return nil, "Blizzard search decoration " .. key end
-			decorations[region] = true
-			AddState(session, region, "GetAlpha", "SetAlpha", 0)
-		end
+		CaptureDecoration(box[key])
+	end
+	-- Skin addons can create unnamed backing textures. Keep the edit box's
+	-- text and interactive children, including the native clear button, intact.
+	for _, region in ipairs({ box:GetRegions() }) do
+		if region:IsObjectType("Texture") then CaptureDecoration(region) end
+	end
+	local eui = _G.EllesmereUI
+	local pixels = eui and (eui.PanelPP or eui.PP)
+	if pixels and type(pixels.GetBorders) == "function" then
+		CaptureDecoration(pixels.GetBorders(box))
 	end
 	local text = box:GetText()
 	if not IsReadable(text, "string") then return nil, "native input text is unreadable" end

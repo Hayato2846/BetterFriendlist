@@ -57,8 +57,11 @@ end
 local parent=frame();parent.width,parent.height=1600,900;env.UIParent=parent
 function env.CreateFrame(_,name,owner) local w=frame(owner);if name then env[name]=w end;return w end
 local native=frame(parent);native.EditBox=frame(native)
-function env.StaticPopup_Show(which)
- native.which=which;env.StaticPopupDialogs[which].OnShow(native);native:Show();return native
+function env.StaticPopup_Show(which, _, _, data)
+ native.which, native.data = which, data
+ native:Show()
+ env.StaticPopupDialogs[which].OnShow(native, data)
+ return native
 end
 assert(loadfile(root.."/Modules/Dialogs.lua","t",env))("BetterFriendlist",BFL)
 local dialogs=modules.Dialogs
@@ -97,4 +100,85 @@ check(dialogs.inputDialog.button2:IsShown() and dialogs.inputDialog.EditBox:GetT
 dialogs.inputDialog:Hide();profile.useThemedDialogs=false
 tags:ShowCustomTagDialog(friend,"Example",function() end)
 check(native.which=="BFL_FRIEND_TAGS_CREATE_CUSTOM_TAG","native preference is ignored by friend-menu tag creation")
-io.write(string.format("PASS: copy dialogs, single-button layout, keyboard handling and native preference (%d checks)\n",checks))
+-- Verify the clock's draft, conversion at save and cancellation in both dialog styles.
+profile.useThemedDialogs = true
+profile.friendTimeOffsets = { sample = 330 }
+function modules.DB:Set(key, value) profile[key] = value end
+BFL.L.FRIEND_LOCAL_TIME_PROMPT = "Enter the difference."
+BFL.L.FRIEND_LOCAL_TIME_PREVIEW = "Your time: %s\nFriend: %s"
+BFL.L.FRIEND_LOCAL_TIME_INVALID = "Invalid difference"
+BFL.L.FRIEND_LOCAL_TIME_TOOLTIP = "Local time: %s"
+local now = 14 * 3600
+local localOffset = 60
+env.GetServerTime = function() return now end
+env.date = function(format, timestamp)
+ return os.date("!*t", timestamp + (format == "*t" and localOffset * 60 or 0))
+end
+local ticker
+env.C_Timer = { NewTicker = function(_, callback)
+ ticker = { Tick = callback, Cancel = function(self) self.cancelled = true end }
+ return ticker
+end }
+assert(loadfile(root .. "/Modules/FriendLocalTime.lua", "t", env))("BetterFriendlist", BFL)
+local clock = modules.FriendLocalTime
+check(not clock:IsEnabled() and clock:GetTooltipText("sample") == nil, "The clock is hidden by default even if an offset is saved")
+check(dialogs:ShowFriendLocalTime("sample") == nil and not ticker, "The disabled clock cannot open a dialog or start a timer")
+clock:SetEnabled(true)
+local openClock = dialogs:ShowFriendLocalTime("sample")
+local hiddenClockTooltip
+function BFL:HideFriendClockTooltip() hiddenClockTooltip = true end
+clock:SetEnabled(false)
+check(not openClock:IsShown() and ticker.cancelled and hiddenClockTooltip, "Turning the clock off closes its surfaces and stops its timer")
+check(clock:GetOffset("sample") == 330 and clock:GetTooltipText("sample") == nil, "Turning the clock off keeps saved offsets")
+clock:SetEnabled(true)
+local popup = dialogs:ShowFriendLocalTime("sample")
+check(popup.EditBox:GetText() == "+04:30", "A saved UTC offset did not reopen as a relative difference")
+check(popup.text:GetText():find("Your time: 15:00\nFriend: 19:30", 1, true), "Both clocks should appear on opening")
+popup.EditBox:SetText("-03:45")
+check(popup.text:GetText():find("Friend: 11:15", 1, true), "Typing a valid difference must update the friend clock")
+check(clock:GetOffset("sample") == 330, "The preview persisted an unsaved difference")
+now = now + 60
+ticker.Tick()
+check(popup.text:GetText():find("Your time: 15:01\nFriend: 11:16", 1, true), "Both clocks should advance while the dialog is open")
+popup.EditBox:SetText("+02:99")
+dialogs:AcceptInputDialog()
+check(popup:IsShown() and popup.BFL_ErrorLabel:GetText() == BFL.L.FRIEND_LOCAL_TIME_INVALID, "An invalid difference was accepted")
+popup.EditBox:SetText("-03:45")
+dialogs:AcceptInputDialog()
+check(not popup:IsShown() and ticker.cancelled, "Saving did not stop the preview timer")
+check(clock:GetOffset("sample") == -165, "Save must apply the player's current local offset once")
+localOffset = 120
+check(clock:GetTooltipText("sample") == "Local time: 11:16", "Changing local timezone moved the saved friend's clock")
+popup = dialogs:ShowFriendLocalTime("sample")
+check(popup.EditBox:GetText() == "-04:45", "After a local zone change the saved value must be shown as a new relative difference")
+popup.EditBox:SetText("")
+dialogs:AcceptInputDialog()
+check(clock:GetOffset("sample") == nil, "Blank save must clear the friend's clock")
+
+profile.useThemedDialogs = false
+native.prompt = frame(native)
+function native:GetTextFontString() return self.prompt end
+function native:Resize() self.resized = true end
+popup = dialogs:ShowFriendLocalTime("sample")
+local spec = env.StaticPopupDialogs.BFL_FRIEND_LOCAL_TIME
+check(popup == native and native.resized, "Native preference must keep a live popup")
+check(native.prompt:GetText():find("Friend: --:--", 1, true), "An unset clock should show a placeholder")
+native.EditBox:SetText("+00:00")
+spec.EditBoxOnTextChanged(native.EditBox, native.data)
+check(native.prompt:GetText():find("Your time: 16:01\nFriend: 16:01", 1, true), "Zero difference should preview the same time")
+spec.OnAccept(native, native.data)
+spec.OnHide(native, native.data)
+check(clock:GetOffset("sample") == 120 and ticker.cancelled, "Native save and hide must convert and stop the timer")
+
+localOffset = 840
+local yearEnd = 1735686000 -- 2024-12-31 23:00 UTC
+check(clock:GetLocalOffset(yearEnd) == 840, "UTC+14 across New Year wrapped to the wrong offset")
+check(clock:GetOffsetFromDifference("-26:00", 840) == -720, "Opposite ends of the timezone range are a valid relative difference")
+localOffset = -720
+check(clock:GetLocalOffset(yearEnd + 7200) == -720, "A negative offset across New Year wrapped in the wrong direction")
+check(clock:GetOffsetFromDifference("+26:00", -720) == 840, "The full positive relative range is accepted")
+localOffset = 345
+check(clock:GetLocalOffset(now) == 345, "Local offsets with a quarter hour are retained")
+local _, outside = clock:GetOffsetFromDifference("+14:00", 60)
+check(not outside, "A difference producing an out-of-range UTC offset was accepted")
+io.write(string.format("PASS: copy and clock dialogs, keyboard handling and native preference (%d checks)\n", checks))

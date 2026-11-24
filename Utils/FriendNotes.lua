@@ -118,6 +118,15 @@ function FriendNotes.GetBNetUID(account)
 	return FriendNotes.GetTitleFriendUID(account)
 end
 
+function FriendNotes.ReadBNetFriendAtIndex(index)
+	if not (C_BattleNet and C_BattleNet.GetFriendAccountInfo) then return end
+	local ok, account = pcall(C_BattleNet.GetFriendAccountInfo, index)
+	local uid = ok and FriendNotes.GetBNetUID(account)
+	if not uid then return end
+	local note = ReadNote(account, "note")
+	if note ~= nil then return account, uid, note end
+end
+
 function FriendNotes.GetBNetFriends()
 	local friends, indices = {}, {}
 	if type(BNGetNumFriends) ~= "function" or not (C_BattleNet and C_BattleNet.GetFriendAccountInfo) then
@@ -127,9 +136,8 @@ function FriendNotes.GetBNetFriends()
 	if not ok or IsSecret(count) or type(count) ~= "number" then return friends, false, 0 end
 	local complete = true
 	for index = 1, count do
-		local readable, account = pcall(C_BattleNet.GetFriendAccountInfo, index)
-		local uid = readable and FriendNotes.GetBNetUID(account)
-		if uid and ReadNote(account, "note") ~= nil then
+		local account, uid = FriendNotes.ReadBNetFriendAtIndex(index)
+		if account then
 			friends[#friends + 1] = account
 			if indices[uid] ~= nil then indices[uid] = false else indices[uid] = index end
 		else

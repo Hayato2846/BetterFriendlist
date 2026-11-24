@@ -365,6 +365,13 @@ end
 
 local function HookScript_OnFrameShow()
 	local self = BFL.FriendsList
+	local recentlyAdded = BFL:GetModule("RecentlyAdded")
+	if recentlyAdded and recentlyAdded.FlushSourceUpdates then
+		recentlyAdded:FlushSourceUpdates()
+	end
+	if BFL.IsForever and BFL.TitleFriendNotes then
+		BFL.TitleFriendNotes:ResumeProcessing()
+	end
 	-- CRITICAL FIX: Update layout immediately when shown
 	-- This ensures SearchBox appears instantly in Simple Mode,
 	-- instead of waiting for the threaded UpdateFriendsList -> RenderDisplay cycle
@@ -423,6 +430,10 @@ local function Timer_ScheduledFriendsListRefresh()
 	self.scheduledRefreshIgnoreVisibility = nil
 	self.scheduledRefreshRenderOnly = nil
 	self.scheduledRefreshNextFrame = nil
+	if not ignoreVisibility and not (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then
+		needsRenderOnShow = true
+		return
+	end
 	if self.UpdateFontCache then
 		self:UpdateFontCache()
 	end
@@ -1061,30 +1072,38 @@ local function IsLatinOrNeutralHeaderCodepoint(codepoint)
 		or (codepoint >= 0x1DF00 and codepoint <= 0x1DFFF)
 end
 
-local function HasNonLatinScript(text)
-	if type(text) ~= "string" then
+function FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(button, text)
+	if not (button and button.HeaderText) or type(text) ~= "string" then
 		return false
 	end
 
+	-- Select a Blizzard font by the name's script. The default FontFamily can
+	-- resolve to the client alphabet even when the name uses another script.
 	local index = 1
+	local nonLatin, han, cyrillic = false, false, false
 	while index <= #text do
 		local codepoint, nextIndex = DecodeUTF8Codepoint(text, index)
-		if not codepoint or not IsLatinOrNeutralHeaderCodepoint(codepoint) then
-			return true
+		if not codepoint then return true end
+		if (codepoint >= 0x1100 and codepoint <= 0x11FF)
+			or (codepoint >= 0x3130 and codepoint <= 0x318F)
+			or (codepoint >= 0xA960 and codepoint <= 0xA97F)
+			or (codepoint >= 0xAC00 and codepoint <= 0xD7FF) then
+			-- A Korean name can also contain Han characters.
+			return true, "Fonts\\2002.TTF"
 		end
+		han = han or (codepoint >= 0x3400 and codepoint <= 0x9FFF)
+			or (codepoint >= 0xF900 and codepoint <= 0xFAFF)
+		cyrillic = cyrillic or (codepoint >= 0x0400 and codepoint <= 0x052F)
+			or (codepoint >= 0x2DE0 and codepoint <= 0x2DFF)
+			or (codepoint >= 0xA640 and codepoint <= 0xA69F)
+		nonLatin = nonLatin or not IsLatinOrNeutralHeaderCodepoint(codepoint)
 		index = nextIndex
 	end
-
-	return false
-end
-
-function FriendsList:ShouldUseNativeMultilingualGroupHeaderFont(button, text)
-	-- Retail 12.1 can hang in the native renderer when a runtime-created
-	-- FontFamily resolves several non-Latin alphabets while ScrollBox headers
-	-- are initialized. Extended Latin stays on BFL's configurable font path;
-	-- other scripts use Blizzard's initialized family. Malformed UTF-8 fails
-	-- safe to the native family, while Legacy keeps its existing path.
-	return button ~= nil and button.HeaderText ~= nil and HasNonLatinScript(text)
+	if han then
+		return true, GetLocale() == "zhTW" and "Fonts\\blei00d.TTF" or "Fonts\\ARKai_T.ttf"
+	end
+	if cyrillic then return true, "Fonts\\FRIZQT___CYR.TTF" end
+	return nonLatin
 end
 
 local function GetGroupHeaderContentWidth(fontString)
@@ -1221,7 +1240,8 @@ local function SafeSetText(fs, text)
 end
 
 local function EnsureHeaderFontFromButton(button, fs, countFs)
-	if not (button and button.GetNormalFontObject and fs) then
+	-- Modern headers manage their own FontStrings, separate from ButtonText.
+	if not (button and not button.HeaderText and button.GetNormalFontObject and fs) then
 		return false
 	end
 	local fontObj = button:GetNormalFontObject()
@@ -1257,7 +1277,7 @@ local function ScheduleGroupHeaderTextRetry(button, retry)
 		button._deferredHeaderUpdateCallback = nil
 		button._deferredHeaderUpdateElementData = nil
 
-		if callback and button.elementData == expectedElementData then
+		if callback and button.elementData == expectedElementData and button:IsVisible() then
 			callback()
 		end
 	end)
@@ -3752,7 +3772,14 @@ function FriendsList:HandleFriendWhisperClick(friend, clickMode)
 end
 
 -- Replace token case-insensitively in format string
-local function ReplaceTokenCaseInsensitive(str, token, value)
+function FriendsList:ColorFormatField(colors, token, value)
+	local color = colors and colors[token]
+	if not color or value == "" then return value end
+	local plainValue = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+	return FormatColorCode(color.r, color.g, color.b) .. plainValue .. "|r"
+end
+
+local function ReplaceTokenCaseInsensitive(str, token, value, colors)
 	-- Create pattern that matches token case-insensitively
 	local pattern = "%%"
 	for i = 1, #token do
@@ -3765,8 +3792,18 @@ local function ReplaceTokenCaseInsensitive(str, token, value)
 	end
 	pattern = pattern .. "%%"
 
+	if colors and colors[token] and value ~= "" then
+		-- Paired punctuation belongs to the field when nothing else is inside it.
+		str = str:gsub("%((%s*)" .. pattern .. "(%s*)%)", function(before, after)
+			return FriendsList:ColorFormatField(colors, token, "(" .. before .. value .. after .. ")")
+		end)
+		str = str:gsub("%[(%s*)" .. pattern .. "(%s*)%]", function(before, after)
+			return FriendsList:ColorFormatField(colors, token, "[" .. before .. value .. after .. "]")
+		end)
+	end
+
 	-- Escape value for replacement
-	local safeValue = value:gsub("%%", "%%%%")
+	local safeValue = FriendsList:ColorFormatField(colors, token, value):gsub("%%", "%%%%")
 	return str:gsub(pattern, safeValue)
 end
 
@@ -4036,18 +4073,13 @@ function FriendsList:FormatInfoLine(friend)
 	local realmName, locationKind = self:GetDisplayLocation(friend)
 	local ruleset = locationKind == "ruleset" and realmName or ""
 	local note = friend.note or friend.notes or ""
-	local statusText = ""
-
-	-- Status text (AFK/DND)
+	local awayStatus
 	if friend.isAFK or friend.afk then
-		statusText = CHAT_FLAG_AFK or "AFK"
+		awayStatus = CHAT_FLAG_AFK or "AFK"
 	elseif friend.isDND or friend.dnd then
-		statusText = CHAT_FLAG_DND or "DND"
-	elseif friend.connected then
-		statusText = L.ONLINE_STATUS or "Online"
-	else
-		statusText = L.OFFLINE_STATUS or "Offline"
+		awayStatus = CHAT_FLAG_DND or "DND"
 	end
+	local statusText = awayStatus or (friend.connected and (L.ONLINE_STATUS or "Online") or (L.OFFLINE_STATUS or "Offline"))
 
 	-- Last online text
 	local lastOnlineText = ""
@@ -4113,11 +4145,14 @@ function FriendsList:FormatInfoLine(friend)
 
 	-- Custom or preset format: Replace tokens
 	local formatString = self.settingsCache.infoFormatString or "%level%, %zone%"
+	local conditionalStatus = HasTokenCaseInsensitive(formatString, "statusonline")
+	local colors = infoPreset == "custom" and self.settingsCache.friendFormatColors
 
-	-- For offline friends with custom format, show last online or offline status
+	-- An explicit conditional status also allows custom fields to render offline.
 	if not friend.connected then
-		if HasTokenCaseInsensitive(formatString, "lastonline") and lastOnlineText ~= "" then
-			local result = ReplaceTokenCaseInsensitive(formatString, "lastonline", lastOnlineText)
+		if conditionalStatus or (HasTokenCaseInsensitive(formatString, "lastonline") and lastOnlineText ~= "") then
+			local result = ReplaceTokenCaseInsensitive(formatString, "statusonline", "")
+			result = ReplaceTokenCaseInsensitive(result, "lastonline", lastOnlineText, colors)
 			-- Clear other tokens that don't apply to offline friends
 			result = ReplaceTokenCaseInsensitive(result, "level", "")
 			result = ReplaceTokenCaseInsensitive(result, "zone", "")
@@ -4125,23 +4160,25 @@ function FriendsList:FormatInfoLine(friend)
 			result = ReplaceTokenCaseInsensitive(result, "game", "")
 			result = ReplaceTokenCaseInsensitive(result, "realm", "")
 			result = ReplaceTokenCaseInsensitive(result, "ruleset", "")
-			result = ReplaceTokenCaseInsensitive(result, "note", note)
-			result = ReplaceTokenCaseInsensitive(result, "status", statusText)
+			result = ReplaceTokenCaseInsensitive(result, "note", note, colors)
+			result = ReplaceTokenCaseInsensitive(result, "status", statusText, colors)
 			-- Phase 22b: Unified tokens - name tokens in info format
 			result = ReplaceTokenCaseInsensitive(
 				result,
 				"name",
-				isBNet and BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or (friend.name or "Unknown")
+				isBNet and BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or (friend.name or "Unknown"),
+				colors
 			)
 			result = ReplaceTokenCaseInsensitive(
 				result,
 				"battletag",
-				friend.battleTag and (friend.battleTag:match("([^#]+)") or friend.battleTag) or ""
+				friend.battleTag and (friend.battleTag:match("([^#]+)") or friend.battleTag) or "",
+				colors
 			)
 			local DB = GetDB()
 			local uid = friend.uid or GetFriendUID(friend)
-			result = ReplaceTokenCaseInsensitive(result, "nickname", (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or "")
-			result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or "")
+			result = ReplaceTokenCaseInsensitive(result, "nickname", (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or "", colors)
+			result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or "", colors)
 			-- Multi-Game-Account tokens (empty for offline)
 			result = ReplaceTokenCaseInsensitive(result, "accounts", "")
 			result = ReplaceTokenCaseInsensitive(result, "games", "")
@@ -4152,7 +4189,7 @@ function FriendsList:FormatInfoLine(friend)
 			result = result:gsub("^%s*,%s*", "")
 			result = result:gsub("%s*,%s*$", "")
 			result = result:match("^%s*(.-)%s*$")
-			if result == "" then
+			if result == "" and not conditionalStatus then
 				return lastOnlineText ~= "" and lastOnlineText or (L.OFFLINE_STATUS or "Offline")
 			end
 			return result
@@ -4163,29 +4200,30 @@ function FriendsList:FormatInfoLine(friend)
 
 	-- Replace tokens for online friends
 	local result = formatString
-	result = ReplaceTokenCaseInsensitive(result, "level", levelText)
-	result = ReplaceTokenCaseInsensitive(result, "zone", zone)
-	result = ReplaceTokenCaseInsensitive(result, "class", className)
-	result = ReplaceTokenCaseInsensitive(result, "game", gameName)
-	result = ReplaceTokenCaseInsensitive(result, "realm", realmName)
-	result = ReplaceTokenCaseInsensitive(result, "ruleset", ruleset)
-	result = ReplaceTokenCaseInsensitive(result, "note", note)
-	result = ReplaceTokenCaseInsensitive(result, "status", statusText)
+	result = ReplaceTokenCaseInsensitive(result, "statusonline", awayStatus or "", colors)
+	result = ReplaceTokenCaseInsensitive(result, "level", levelText, colors)
+	result = ReplaceTokenCaseInsensitive(result, "zone", zone, colors)
+	result = ReplaceTokenCaseInsensitive(result, "class", className, colors)
+	result = ReplaceTokenCaseInsensitive(result, "game", gameName, colors)
+	result = ReplaceTokenCaseInsensitive(result, "realm", realmName, colors)
+	result = ReplaceTokenCaseInsensitive(result, "ruleset", ruleset, colors)
+	result = ReplaceTokenCaseInsensitive(result, "note", note, colors)
+	result = ReplaceTokenCaseInsensitive(result, "status", statusText, colors)
 	result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
 	-- Phase 22b: Unified tokens - name tokens in info format
 	local nameValue = isBNet and (BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or "Unknown")
 		or (friend.name or "Unknown")
-	result = ReplaceTokenCaseInsensitive(result, "name", nameValue)
+	result = ReplaceTokenCaseInsensitive(result, "name", nameValue, colors)
 	local battletag = friend.battleTag and (friend.battleTag:match("([^#]+)") or friend.battleTag) or ""
-	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
+	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag, colors)
 	local DB = GetDB()
 	local uid = friend.uid or GetFriendUID(friend)
-	result = ReplaceTokenCaseInsensitive(result, "nickname", (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or "")
-	result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or friend.name or "")
+	result = ReplaceTokenCaseInsensitive(result, "nickname", (self.settingsSample and friend.sampleNickname) or (not self.settingsSample and DB and DB:GetNickname(uid)) or "", colors)
+	result = ReplaceTokenCaseInsensitive(result, "character", friend.characterName or friend.name or "", colors)
 
 	-- Multi-Game-Account tokens
 	local accountCount = friend.numGameAccounts or (isBNet and 1 or 1)
-	result = ReplaceTokenCaseInsensitive(result, "accounts", tostring(accountCount))
+	result = ReplaceTokenCaseInsensitive(result, "accounts", tostring(accountCount), colors)
 
 	local gamesText = ""
 	if friend.gameAccounts and #friend.gameAccounts > 0 then
@@ -4202,7 +4240,7 @@ function FriendsList:FormatInfoLine(friend)
 	elseif gameName ~= "" then
 		gamesText = gameName
 	end
-	result = ReplaceTokenCaseInsensitive(result, "games", gamesText)
+	result = ReplaceTokenCaseInsensitive(result, "games", gamesText, colors)
 
 	-- Append multi-account summary only when no dedicated row is shown
 	if not ShouldShowMultiAccountRow(self, friend) then
@@ -4224,7 +4262,7 @@ function FriendsList:FormatInfoLine(friend)
 	result = result:gsub("%s*,%s*$", "")
 	result = result:match("^%s*(.-)%s*$")
 
-	if result == "" then
+	if result == "" and not conditionalStatus then
 		return L.ONLINE_STATUS or "Online"
 	end
 
@@ -4233,7 +4271,7 @@ end
 
 -- Get display name based on format setting
 -- @param forSorting (boolean) If true, use BattleTag instead of AccountName for BNet friends (prevents sorting issues with protected strings)
-function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Name Caching (Persistent)
+function FriendsList:GetDisplayName(friend, forSorting, formatOverride) -- PHASE 9.7: Display Name Caching (Persistent)
 	-- PERFY OPTIMIZATION: Direct cache access
 	-- [STREAMER MODE] Determine if active (used below to override %name%)
 	local isStreamerMode = self.settingsSampleStreamerMode
@@ -4245,7 +4283,9 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	end
 
 	-- PERFY OPTIMIZATION: Direct cache access (Phase 22: Use preset system)
-	local format = self.settingsCache.nameFormatString or "%name%"
+	local format = formatOverride or self.settingsCache.nameFormatString or "%name%"
+	local colors = not forSorting and not formatOverride and not isStreamerMode
+		and self.settingsCache.nameFormatPreset == "custom" and self.settingsCache.friendFormatColors
 	local uid = friend.uid or GetFriendUID(friend)
 	local note = (friend.note or friend.notes or "")
 	local showRealmName = self.settingsCache.showRealmName or false
@@ -4282,7 +4322,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	if not self.displayNameCache[uid] then
 		self.displayNameCache[uid] = {}
 	end
-	local modeKey = forSorting and 2 or 1
+	local modeKey = formatOverride and ("format:" .. formatOverride) or (forSorting and 2 or 1)
 	local cacheEntry = self.displayNameCache[uid][modeKey]
 
 	-- Check if cache is valid (inputs haven't changed)
@@ -4292,6 +4332,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 		and not BFL:IsSecret(rawTitleCustomName)
 		and hasPublicClassData
 		and cacheEntry.format == format
+		and cacheEntry.formatColors == colors
 		and cacheEntry.showRealmName == showRealmName
 		and cacheEntry.colorClassNames == colorClassNames
 		and cacheEntry.showFactionIcons == showFactionIcons
@@ -4451,10 +4492,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	end
 
 	-- Replace tokens case-insensitively
-	result = ReplaceTokenCaseInsensitive(result, "name", name)
-	result = ReplaceTokenCaseInsensitive(result, "note", note)
-	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname)
-	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag)
+	result = ReplaceTokenCaseInsensitive(result, "name", name, colors)
+	result = ReplaceTokenCaseInsensitive(result, "note", note, colors)
+	result = ReplaceTokenCaseInsensitive(result, "nickname", nickname, colors)
+	result = ReplaceTokenCaseInsensitive(result, "battletag", battletag, colors)
 
 	-- Phase 22b: Unified token system - all tokens available in name format
 	local character = characterName
@@ -4496,7 +4537,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 
 		-- Check if %character% is wrapped in parentheses: (%character%) → include parens in class coloring
 		local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
-		local wrapStart, wrapEnd = result:find(wrappedPattern)
+		local wrapStart, wrapEnd
+		if not (colors and colors.character) then
+			wrapStart, wrapEnd = result:find(wrappedPattern)
+		end
 		if wrapStart then
 			-- Replace (%character%) with class-colored (CharName) - parens inside color
 			local wrappedReplacement
@@ -4510,12 +4554,12 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 			-- Also replace any remaining standalone %character% tokens (unlikely but safe)
 			if HasTokenCaseInsensitive(result, "character") then
 				local standaloneReplacement = colorStr and ("|c" .. colorStr .. decoratedChar .. "|r") or decoratedChar
-				result = ReplaceTokenCaseInsensitive(result, "character", standaloneReplacement)
+				result = ReplaceTokenCaseInsensitive(result, "character", standaloneReplacement, colors)
 			end
 		else
 			-- Standard replacement: class color without parens
 			local replacement = colorStr and ("|c" .. colorStr .. decoratedChar .. "|r") or decoratedChar
-			result = ReplaceTokenCaseInsensitive(result, "character", replacement)
+			result = ReplaceTokenCaseInsensitive(result, "character", replacement, colors)
 		end
 	else
 		-- Empty character or forSorting: remove wrapping parens for empty character, then replace
@@ -4523,10 +4567,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 			local wrappedPattern = "%(%%[Cc][Hh][Aa][Rr][Aa][Cc][Tt][Ee][Rr]%%%)"
 			result = result:gsub(wrappedPattern, "")
 		end
-		result = ReplaceTokenCaseInsensitive(result, "character", character)
+		result = ReplaceTokenCaseInsensitive(result, "character", character, colors)
 	end
-	result = ReplaceTokenCaseInsensitive(result, "realm", realm)
-	result = ReplaceTokenCaseInsensitive(result, "ruleset", locationKind == "ruleset" and realm or "")
+	result = ReplaceTokenCaseInsensitive(result, "realm", realm, colors)
+	result = ReplaceTokenCaseInsensitive(result, "ruleset", locationKind == "ruleset" and realm or "", colors)
 
 	-- Info tokens available in name format (Phase 22b: Unified tokens)
 	if not forSorting then
@@ -4552,10 +4596,10 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 			gameName = friend.clientProgram
 		end
 
-		result = ReplaceTokenCaseInsensitive(result, "level", levelText)
-		result = ReplaceTokenCaseInsensitive(result, "zone", zone)
-		result = ReplaceTokenCaseInsensitive(result, "class", className)
-		result = ReplaceTokenCaseInsensitive(result, "game", gameName)
+		result = ReplaceTokenCaseInsensitive(result, "level", levelText, colors)
+		result = ReplaceTokenCaseInsensitive(result, "zone", zone, colors)
+		result = ReplaceTokenCaseInsensitive(result, "class", className, colors)
+		result = ReplaceTokenCaseInsensitive(result, "game", gameName, colors)
 		result = ReplaceTokenCaseInsensitive(result, "status", "")
 		result = ReplaceTokenCaseInsensitive(result, "lastonline", "")
 	else
@@ -4584,6 +4628,7 @@ function FriendsList:GetDisplayName(friend, forSorting) -- PHASE 9.7: Display Na
 	self.displayNameCache[uid][modeKey] = {
 		result = result,
 		format = format,
+		formatColors = colors,
 		showRealmName = showRealmName,
 		colorClassNames = colorClassNames,
 		showFactionIcons = showFactionIcons,
@@ -4900,6 +4945,8 @@ function FriendsList:UpdateSettingsCache()
 	-- Core Display Settings (Phase 22: Preset system)
 	self.settingsCache.nameDisplayFormat = DB:Get("nameDisplayFormat", "%name%") -- Legacy compat
 	self.settingsCache.nameFormatString = DB:GetNameFormatString()
+	self.settingsCache.nameFormatPreset = DB:Get("nameFormatPreset", "default")
+	self.settingsCache.friendFormatColors = DB:Get("friendFormatColors")
 	self.settingsCache.infoFormatPreset = DB:Get("infoFormatPreset", "default")
 	self.settingsCache.infoFormatString = DB:GetInfoFormatString()
 	self.settingsCache.infoDisabled = DB:IsInfoDisabled()
@@ -5530,16 +5577,23 @@ local function CanRunChunkedFriendsListUpdate()
 		and C_Timer.After
 end
 
-local function ResumeChunkedFriendsListUpdate(self, updateThread)
+local function ResumeChunkedFriendsListUpdate(self, updateThread, ignoreVisibility, snapshotPublished)
 	if self.chunkedFriendsListUpdate ~= updateThread then
 		return
 	end
+	if not snapshotPublished and not ignoreVisibility and not (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then
+		self.chunkedFriendsListUpdate = nil
+		isUpdatingFriendsList = false
+		hasPendingUpdate = false
+		needsRenderOnShow = true
+		return
+	end
 
-	local ok, errorMessage = coroutine.resume(updateThread)
+	local ok, publishedOrError = coroutine.resume(updateThread)
 	if not ok then
 		self.chunkedFriendsListUpdate = nil
 		isUpdatingFriendsList = false
-		error(errorMessage, 0)
+		error(publishedOrError, 0)
 	end
 
 	if coroutine.status(updateThread) == "dead" then
@@ -5548,7 +5602,7 @@ local function ResumeChunkedFriendsListUpdate(self, updateThread)
 	end
 
 	C_Timer.After(0, function()
-		ResumeChunkedFriendsListUpdate(self, updateThread)
+		ResumeChunkedFriendsListUpdate(self, updateThread, ignoreVisibility, publishedOrError)
 	end)
 end
 
@@ -5563,7 +5617,7 @@ function FriendsList:StartChunkedFriendsListUpdate(ignoreVisibility)
 	end)
 	self.chunkedFriendsListUpdate = updateThread
 	C_Timer.After(0, function()
-		ResumeChunkedFriendsListUpdate(self, updateThread)
+		ResumeChunkedFriendsListUpdate(self, updateThread, ignoreVisibility)
 	end)
 end
 
@@ -5847,32 +5901,11 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 						friend.className = gameInfo.className
 						friend.classID = gameInfo.classID -- 11.2.7+: Store classID for optimized class color lookup
 						friend.classFilename = gameInfo.classFilename
-						friend.areaName = gameInfo.areaName
 						-- friend.richPresence = gameInfo.richPresence -- REVERTED: Caused issues with zone display
 						friend.level = gameInfo.characterLevel
-						friend.realmName = gameInfo.realmName
+						friend.areaName, friend.realmName = BFL.Compat.GetBNetWoWAreaAndRealm(gameInfo)
 						friend.factionName = gameInfo.factionName
 						friend.timerunningSeasonID = gameInfo.timerunningSeasonID
-
-						-- Classic Fix: Parse richPresence if areaName is missing (format: "Zone - Realm")
-						-- Use " - " (space-dash-space) as separator to avoid splitting localized zone names
-						-- that contain hyphens (e.g. French "Lune-d'Argent" for Silvermoon City)
-						local richPresence = BFL.GetGameAccountRichPresence(gameInfo)
-						if (not friend.areaName or friend.areaName == "") and richPresence then
-							local _, _, _, presenceArea = BFL.GetWoWAccountLocation(gameInfo)
-							local sep = string.find(richPresence, " - ", 1, true)
-							if presenceArea then
-								friend.areaName = presenceArea
-							elseif sep then
-								friend.areaName = strtrim(string.sub(richPresence, 1, sep - 1))
-								local richRealm = strtrim(string.sub(richPresence, sep + 3))
-								if richRealm ~= "" and (not friend.realmName or friend.realmName == "") then
-									friend.realmName = richRealm
-								end
-							else
-								friend.areaName = strtrim(richPresence)
-							end
-						end
 
 						if gameInfo.timerunningSeasonID then
 							friend.timerunningSeasonID = gameInfo.timerunningSeasonID
@@ -5975,30 +6008,11 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 								friend.className = prefAccount.className
 								friend.classID = prefAccount.classID
 								friend.classFilename = prefAccount.classFilename
-								friend.areaName = prefAccount.areaName
 								friend.level = prefAccount.characterLevel
-								friend.realmName = prefAccount.realmName
+								friend.areaName, friend.realmName = BFL.Compat.GetBNetWoWAreaAndRealm(prefAccount)
 								friend.factionName = prefAccount.factionName
 								friend.timerunningSeasonID = prefAccount.timerunningSeasonID
 								friend.gameName = nil
-								-- Classic richPresence fallback (format: "Zone - Realm")
-								-- Use " - " separator to preserve localized zone names with hyphens
-								local richPresence = BFL.GetGameAccountRichPresence(prefAccount)
-								if (not friend.areaName or friend.areaName == "") and richPresence then
-									local _, _, _, presenceArea = BFL.GetWoWAccountLocation(prefAccount)
-									local sep = string.find(richPresence, " - ", 1, true)
-									if presenceArea then
-										friend.areaName = presenceArea
-									elseif sep then
-										friend.areaName = strtrim(string.sub(richPresence, 1, sep - 1))
-										local richRealm = strtrim(string.sub(richPresence, sep + 3))
-										if richRealm ~= "" and (not friend.realmName or friend.realmName == "") then
-											friend.realmName = richRealm
-										end
-									else
-										friend.areaName = strtrim(richPresence)
-									end
-								end
 							elseif prefAccount.clientProgram == "BSAp" then
 								friend.characterName = nil
 								friend.className = nil
@@ -6130,12 +6144,6 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		friendsList[i] = nil
 	end
 
-	if isChunkedUpdate then
-		local previousFriendsList = self.friendsList
-		self.friendsList = friendsList
-		self.chunkedFriendsListBuffer = previousFriendsList
-	end
-
 	-- PERFY OPTIMIZATION: Pre-calculate sort keys for ALL friends
 	-- This prevents recalculation during the N*log(N) sort process (1000s of calls)
 	-- We always calculate ALL keys because primary/secondary sort can switch instantly
@@ -6155,15 +6163,14 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 	-- PERFY OPTIMIZATION: Pre-resolve numeric key extractors for inline SortComparator
 	local primaryKeyFn = sortNumericKey[primarySort] or sortNumericKey.status
 	local secondaryKeyFn = sortNumericKey[secondarySort] or sortNumericKey.name
-	local bnetFriendsByIndex = self.bnetFriendsByIndex
-	if not bnetFriendsByIndex then
-		bnetFriendsByIndex = {}
-		self.bnetFriendsByIndex = bnetFriendsByIndex
-	else
-		wipe(bnetFriendsByIndex)
+	local bnetFriendsByIndex = self.bnetFriendsByIndex or {}
+	if isChunkedUpdate then
+		bnetFriendsByIndex = self.chunkedBNetIndexBuffer or {}
+		self.chunkedBNetIndexBuffer = bnetFriendsByIndex
 	end
+	wipe(bnetFriendsByIndex)
 
-	for _, friend in ipairs(self.friendsList) do
+	for _, friend in ipairs(friendsList) do
 		if friend.type == "bnet" and friend.index then
 			bnetFriendsByIndex[friend.index] = friend
 		end
@@ -6252,11 +6259,19 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 		YieldChunkedFriendsListUpdate(isChunkedUpdate, updateBudget)
 	end
 
-	-- Apply filters and sort
+	-- Keep the previous roster and index together until the next snapshot can
+	-- be published. A hidden frame can discard any earlier slice safely.
 	YieldChunkedFriendsListUpdatePhase(isChunkedUpdate, updateBudget, false)
+	if isChunkedUpdate then
+		self.chunkedFriendsListBuffer, self.friendsList = self.friendsList, friendsList
+		self.chunkedBNetIndexBuffer = self.bnetFriendsByIndex
+	end
+	self.bnetFriendsByIndex = bnetFriendsByIndex
 	self:ApplyFilters()
 	self:ApplySort()
-	YieldChunkedFriendsListUpdatePhase(isChunkedUpdate, updateBudget, true)
+	if isChunkedUpdate then
+		coroutine.yield(true)
+	end
 
 	-- PERFY OPTIMIZATION (Phase 2B): Increment version AFTER data collection to prevent premature cache invalidation
 	-- This ensures BuildDisplayList cache is only invalidated when data actually changed
@@ -6267,7 +6282,9 @@ function FriendsList:UpdateFriendsList(ignoreVisibility, isChunkedUpdate) -- Vis
 	self:RenderDisplay(ignoreVisibility)
 
 	-- Update Send Message button state based on current selection status
-	self:UpdateSendMessageButton()
+	if ignoreVisibility or (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then
+		self:UpdateSendMessageButton()
+	end
 
 	-- Release lock after update complete
 	isUpdatingFriendsList = false
@@ -6495,8 +6512,9 @@ function FriendsList:ApplySort()
 	local primarySort = self.sortMode or "status"
 	local secondarySort = self.secondarySort or "name"
 	local Registry = GetFilterSortRegistry()
+	local tertiarySort = self:GetActiveTertiarySortMode()
 
-	if CanUseFastSortMode(Registry, primarySort) and CanUseFastSortMode(Registry, secondarySort) then
+	if tertiarySort == "none" and CanUseFastSortMode(Registry, primarySort) and CanUseFastSortMode(Registry, secondarySort) then
 		-- Set string tiebreaker fields for the inline comparator
 		currentPrimaryStringField = sortStringField[primarySort]
 		currentSecondaryStringField = sortStringField[secondarySort]
@@ -6507,13 +6525,13 @@ function FriendsList:ApplySort()
 	end
 
 	if Registry and Registry.CreateSortPlan and Registry.CompareFriendsWithSortPlan then
-		local sortPlan = Registry:CreateSortPlan(primarySort, secondarySort)
+		local sortPlan = Registry:CreateSortPlan(primarySort, secondarySort, false, tertiarySort)
 		table.sort(self.friendsList, function(a, b)
 			return Registry:CompareFriendsWithSortPlan(a, b, sortPlan)
 		end)
 	elseif Registry and Registry.CompareFriends then
 		table.sort(self.friendsList, function(a, b)
-			return Registry:CompareFriends(a, b, primarySort, secondarySort)
+			return Registry:CompareFriends(a, b, primarySort, secondarySort, tertiarySort)
 		end)
 	else
 		currentPrimaryStringField = sortStringField[primarySort]
@@ -6985,13 +7003,10 @@ local function RequestFriendsListRefresh(reason)
 end
 
 -- Set filter mode
-function FriendsList:SetFilterMode(mode, forceRefresh)
+function FriendsList:SetFilterMode(mode)
 	local Registry = GetFilterSortRegistry()
 	local newMode = Registry and Registry.NormalizeQuickFilterId and Registry:NormalizeQuickFilterId(mode) or (mode or "all")
 	if self.filterMode == newMode then
-		if forceRefresh then
-			RequestFriendsListRefresh("filter")
-		end
 		return
 	end
 	self.filterMode = newMode
@@ -7006,6 +7021,51 @@ function FriendsList:SetFilterMode(mode, forceRefresh)
 	RequestFriendsListRefresh("filter")
 end
 
+function FriendsList:IsTertiarySortEnabled()
+	local DB = GetDB()
+	return DB ~= nil and DB:Get("enableTertiarySort", false) == true
+end
+
+function FriendsList:GetActiveTertiarySortMode()
+	local DB, registry = GetDB(), GetFilterSortRegistry()
+	if DB and registry and registry.NormalizeTertiarySorterId and DB:Get("enableTertiarySort", false) == true then
+		return registry:NormalizeTertiarySorterId(DB:Get("tertiarySort", "none"), self.sortMode, self.secondarySort)
+	end
+	return "none"
+end
+
+function FriendsList:RefreshSortSelection()
+	local DB, registry = GetDB(), GetFilterSortRegistry()
+	local configured = DB and DB:Get("tertiarySort", "none")
+	if configured and configured ~= "none" and registry then
+		local tertiary = registry:NormalizeTertiarySorterId(configured, self.sortMode, self.secondarySort)
+		if tertiary ~= configured then DB:Set("tertiarySort", tertiary) end
+	end
+	RequestFriendsListRefresh("sort")
+	local friendsUI = BFL:GetModule("FriendsUI")
+	if friendsUI and friendsUI.RefreshSortButtonText then friendsUI:RefreshSortButtonText() end
+	local broker = BFL:GetModule("Broker")
+	if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
+end
+
+function FriendsList:SetTertiarySortEnabled(enabled)
+	local DB = GetDB()
+	if DB and DB:Get("enableTertiarySort", false) ~= enabled then
+		DB:Set("enableTertiarySort", enabled)
+		self:RefreshSortSelection()
+	end
+end
+
+function FriendsList:SetTertiarySortMode(mode)
+	local DB, registry = GetDB(), GetFilterSortRegistry()
+	if not DB or not self:IsTertiarySortEnabled() or not registry then return end
+	mode = registry:NormalizeTertiarySorterId(mode, self.sortMode, self.secondarySort)
+	if DB:Get("tertiarySort", "none") ~= mode then
+		DB:Set("tertiarySort", mode)
+		self:RefreshSortSelection()
+	end
+end
+
 -- Set sort mode
 function FriendsList:SetSortMode(mode)
 	local Registry = GetFilterSortRegistry()
@@ -7015,10 +7075,9 @@ function FriendsList:SetSortMode(mode)
 	end
 	self.sortMode = newMode
 
-	-- Compatibility: If new Primary matches Secondary, reset Secondary to 'none'
-	-- This prevents parallel sorting on the same criteria
+	-- Reset a lower-priority selection when its criterion moves to primary.
 	if self.secondarySort == newMode then
-		self:SetSecondarySortMode("none")
+		self.secondarySort = "none"
 	end
 
 	-- Save to database
@@ -7026,9 +7085,10 @@ function FriendsList:SetSortMode(mode)
 	if DB then
 		local db = DB:Get()
 		db.primarySort = self.sortMode
+		db.secondarySort = self.secondarySort
 	end
 
-	RequestFriendsListRefresh("primary-sort")
+	self:RefreshSortSelection()
 end
 
 -- Set secondary sort mode (for multi-criteria sorting)
@@ -7056,7 +7116,7 @@ function FriendsList:SetSecondarySortMode(mode)
 		db.secondarySort = self.secondarySort
 	end
 
-	RequestFriendsListRefresh("secondary-sort")
+	self:RefreshSortSelection()
 end
 
 -- Helper to populate the Sort menu for the Contacts menu
@@ -7082,30 +7142,27 @@ function FriendsList:PopulateSortMenu(rootDescription, sortType)
 		for _, sorter in ipairs(Registry:GetVisibleSorters()) do
 			CreatePrimaryRadio(rootDescription, Registry:FormatIcon(sorter.icon, 16) .. " " .. sorter.name, sorter.id)
 		end
-	elseif sortType == "secondary" then
-		local function IsSecondarySelected(mode)
+	elseif sortType == "secondary" or sortType == "tertiary" then
+		local isTertiary = sortType == "tertiary"
+		local function IsSelected(mode)
+			if isTertiary then return self:GetActiveTertiarySortMode() == mode end
 			return self.secondarySort == mode
 		end
 
-		local function SetSecondarySelected(mode)
-			self:SetSecondarySortMode(mode)
-		end
-
-		local function CreateSecondaryRadio(root, text, mode)
-			-- Prevent selecting same sort as Primary (except None)
-			if mode ~= "none" and mode == self.sortMode then
-				return
+		local function Select(mode)
+			if isTertiary then
+				self:SetTertiarySortMode(mode)
+			else
+				self:SetSecondarySortMode(mode)
 			end
-			root:CreateRadio(text, IsSecondarySelected, SetSecondarySelected, mode)
 		end
 
-		CreateSecondaryRadio(
-			rootDescription,
-			Registry:FormatIcon("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up", 16) .. " " .. (L.SORT_NONE or "None"),
-			"none"
-		)
-		for _, sorter in ipairs(Registry:GetVisibleSorters()) do
-			CreateSecondaryRadio(rootDescription, Registry:FormatIcon(sorter.icon, 16) .. " " .. sorter.name, sorter.id)
+		rootDescription:CreateRadio(Registry:FormatIcon(Registry:GetSorterIcon("none"), 16) .. " " .. L.SORT_NONE,
+			IsSelected, Select, "none")
+		local secondaryId = isTertiary and self.secondarySort or nil
+		for _, sorter in ipairs(Registry:GetVisibleSorters(self.sortMode, secondaryId)) do
+			rootDescription:CreateRadio(Registry:FormatIcon(sorter.icon, 16) .. " " .. sorter.name,
+				IsSelected, Select, sorter.id)
 		end
 	end
 end
@@ -8023,33 +8080,34 @@ end
 -- Button Update Functions (called by ScrollBox Factory)
 -- ========================================
 
+local function SetAllGroupsCollapsed(collapsed)
+	local Groups, DB = GetGroups(), GetDB()
+	if not (Groups and Groups.groups and DB) then return end
+	for groupId in pairs(Groups.groups) do
+		Groups:SetCollapsed(groupId, collapsed, true)
+	end
+
+	local FriendTags = BFL:GetModule("FriendTags")
+	if FriendTags then
+		for _, group in ipairs(FriendTags:GetDynamicGroups()) do
+			DB:SetGroupState(group.id, collapsed)
+		end
+	end
+	FriendsList.lastBuildSignature = nil
+	FriendsList:RenderDisplay()
+end
+
 local function AddGroupCollapseMenuItems(items)
 	table.insert(items, {
 		type = "divider",
 	})
 	table.insert(items, {
 		text = BFL.L.MENU_COLLAPSE_ALL,
-		func = function()
-			local Groups = GetGroups()
-			if Groups and Groups.groups then
-				for gid in pairs(Groups.groups) do
-					Groups:SetCollapsed(gid, true, true)
-				end
-				BFL:ForceRefreshFriendsList()
-			end
-		end,
+		func = function() SetAllGroupsCollapsed(true) end,
 	})
 	table.insert(items, {
 		text = BFL.L.MENU_EXPAND_ALL,
-		func = function()
-			local Groups = GetGroups()
-			if Groups and Groups.groups then
-				for gid in pairs(Groups.groups) do
-					Groups:SetCollapsed(gid, false, true)
-				end
-				BFL:ForceRefreshFriendsList()
-			end
-		end,
+		func = function() SetAllGroupsCollapsed(false) end,
 	})
 end
 
@@ -8175,11 +8233,11 @@ end
 
 -- Update group header button (NEW - Phase 1)
 function FriendsList:RefreshGroupHeadersAfterDisplayChange()
-	if InCombatLockdown() then return 0 end
+	if InCombatLockdown() or not (BetterFriendsFrame and BetterFriendsFrame:IsShown()) then return 0 end
 	local count = 0
 	local function Refresh(button, data)
 		data = data or button.elementData
-		if data and data.buttonType == BUTTON_TYPE_GROUP_HEADER and button:IsShown() then
+		if data and data.buttonType == BUTTON_TYPE_GROUP_HEADER and button:IsVisible() then
 			self:UpdateGroupHeaderButton(button, data)
 			count = count + 1
 		end
@@ -8311,7 +8369,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 	local arrowColor = { r = arrowR, g = arrowG, b = arrowB, a = arrowA }
 	local usesModernCollapse =
 		ApplyModernGroupCollapseButton(button, collapsed, showArrow, arrowAlign, align, arrowColor)
-	local useNativeMultilingualFont = self:ShouldUseNativeMultilingualGroupHeaderFont(button, name)
+	local useNativeMultilingualFont, scriptFont = self:ShouldUseNativeMultilingualGroupHeaderFont(button, name)
 
 	local fs = GetGroupHeaderFontString(button)
 	if fs then
@@ -8331,10 +8389,10 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 			end
 
 			if useNativeMultilingualFont and _G.GameFontNormal then
-				-- Do not recreate Blizzard's alphabet fallback at runtime for
-				-- multilingual Modern headers. GameFontNormal inherits the
-				-- preinitialized SystemFont_Shadow_Med1 FontFamily.
+				-- Keep the initialized family as a fallback. Apply a single face
+				-- for known scripts without creating a runtime FontFamily in a header.
 				fs:SetFontObject(_G.GameFontNormal)
+				if scriptFont then SafeSetFont(fs, scriptFont, fontSize, fontFlags) end
 				appliedFont = true
 				if fontShadow then
 					fs:SetShadowColor(0, 0, 0, 1)
@@ -8587,6 +8645,7 @@ function FriendsList:UpdateGroupHeaderButton(button, elementData)
 						func = function() FriendsList:InviteGroupToParty(targetGroupId) end,
 					}
 				end
+				AddGroupCollapseMenuItems(items)
 				BFL.OpenSimpleContextMenu(self, "BFL_VirtualTagGroupDropdown", items)
 			else
 				FriendsList:ToggleGroup(self.groupId)
@@ -8694,7 +8753,7 @@ do
 		if ghost and ghost:IsShown() then
 			local x, y = GetCursorPosition()
 			local scale = UIParent:GetEffectiveScale()
-			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+			ghost:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale + 12, y / scale - 8)
 		end
 
 		local header, group = FindFriendDropTarget(button)
@@ -8712,6 +8771,112 @@ do
 		end
 	end
 
+	FriendsList.ShowFriendDragGhost = (function()
+		local blizzardDragBackdrop = {
+			bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+			edgeSize = 10,
+			insets = { left = 2, right = 2, top = 2, bottom = 2 },
+		}
+		local skinnedDragBackdrop = {
+			bgFile = "Interface\\Buttons\\WHITE8x8",
+			edgeFile = "Interface\\Buttons\\WHITE8x8",
+			edgeSize = 1,
+		}
+
+		local function GetDragPalette(theme)
+			if theme == "elvui" then
+				local skin = BFL:GetModule("ElvUISkin")
+				if skin then return skin:GetSettingsSampleBackdropColors() end
+			elseif theme == "ellesmereui" then
+				local skin = BFL:GetModule("EllesmereUISkin")
+				if skin then
+					local colors = skin:GetPalette()
+					return colors.control, colors.border
+				end
+			elseif theme == "dark" or theme == "custom" then
+				local skin = BFL:GetModule("SkinEngine")
+				if skin and skin.colors then return skin.colors.control, skin.colors.controlBorder end
+			end
+		end
+
+		local function CopyDragStatusIcon(target, source)
+			if not source or not source:IsShown() then
+				target:Hide()
+				return false
+			end
+			local atlas = source.GetAtlas and source:GetAtlas()
+			if atlas then
+				BFL.SetTextureOrAtlas(target, atlas)
+			else
+				target:SetTexture(source:GetTexture())
+				target:SetTexCoord(source:GetTexCoord())
+			end
+			target:SetVertexColor(source:GetVertexColor())
+			target:SetAlpha(source:GetAlpha())
+			target:Show()
+			return true
+		end
+
+		return function(self, button, name)
+			local ghost = self.friendDragGhost
+			if not ghost then
+				ghost = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+				ghost:Hide()
+				ghost:SetFrameStrata("TOOLTIP")
+				ghost:EnableMouse(false)
+				ghost:SetClampedToScreen(true)
+				ghost.card = ghost:CreateTexture(nil, "ARTWORK", nil, -1)
+				ghost.card:SetPoint("TOPLEFT", 3, -3)
+				ghost.card:SetPoint("BOTTOMRIGHT", -3, 3)
+				ghost.status = ghost:CreateTexture(nil, "OVERLAY")
+				ghost.status:SetSize(15, 15)
+				ghost.status:SetPoint("LEFT", 10, 0)
+				ghost.text = ghost:CreateFontString(nil, "OVERLAY", "BetterFriendlistFriendsFontNormal")
+				ghost.text:SetWordWrap(false)
+				ghost.text:SetMaxLines(1)
+				ghost.text:SetJustifyH("LEFT")
+				self.friendDragGhost = ghost
+			end
+
+			local theme = BFL:IsElvUISkinActive() and "elvui" or BFL:GetEffectiveTheme()
+			local bg, border = GetDragPalette(theme)
+			ghost:SetBackdrop(bg and skinnedDragBackdrop or blizzardDragBackdrop)
+			if bg and border then
+				ghost:SetBackdropColor(bg[1], bg[2], bg[3], math.max(bg[4] or 1, 0.92))
+				ghost:SetBackdropBorderColor(unpack(border))
+				ghost.card:Hide()
+			else
+				ghost:SetBackdropColor(0.06, 0.05, 0.04, 0.98)
+				ghost:SetBackdropBorderColor(0.74, 0.60, 0.42, 0.95)
+				local rowCard = button.CardBackground
+				local atlas = rowCard and rowCard.GetAtlas and rowCard:GetAtlas()
+				local friend = button.friendData
+				atlas = atlas or (not friend.connected and "friends-card-disabled"
+					or (friend.type == "bnet" and "friends-card-battleNet" or "friends-card-default"))
+				ghost.card:SetShown(BFL.SetTextureOrAtlas(ghost.card, atlas) == true)
+			end
+
+			local label = button.Name
+			local font, size, flags = label:GetFont()
+			SafeSetFont(ghost.text, font, size, flags)
+			ghost.text:SetTextColor(label:GetTextColor())
+			ghost.text:SetText(name)
+			local left = CopyDragStatusIcon(ghost.status, button.status) and 32 or 12
+			local maxWidth = math.max(136, math.min(380, button:GetWidth()))
+			local width = math.min(maxWidth, math.max(136, math.ceil(ghost.text:GetUnboundedStringWidth()) + left + 12))
+			ghost:SetSize(width, math.max(32, (size or 12) + 16))
+			ghost.text:ClearAllPoints()
+			ghost.text:SetPoint("LEFT", left, 0)
+			ghost.text:SetPoint("RIGHT", -12, 0)
+			local x, y = GetCursorPosition()
+			local scale = UIParent:GetEffectiveScale()
+			ghost:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale + 12, y / scale - 8)
+			ghost:Show()
+			return ghost
+		end
+	end)()
+
 	Button_OnDragStart = function(button)
 		local friend = button.friendData
 		if FriendsList.activeFriendDrag or not friend or not button.dragOverlay then return end
@@ -8725,36 +8890,18 @@ do
 			if not db or not db:RequireFriendGroupKey(uid, groupKey) then return end
 		end
 
-		local name
-		if BFL.StreamerMode and BFL.StreamerMode:IsActive() and friend.type == "bnet" then
+		local name = button.Name and button.Name:GetText()
+		if BFL:IsSecret(name) or type(name) ~= "string" or name == "" then
 			name = FriendsList:GetDisplayName(friend)
-		else
-			name = friend.name or BFL:GetSafeAccountName(friend.accountName, friend.battleTag) or "Unknown"
 		end
-		local ghost = BFL:GetDragGhost()
+		if BFL:IsSecret(name) then name = UNKNOWN or "" end
+		local ghost = FriendsList:ShowFriendDragGhost(button, name)
 		FriendsList.activeFriendDrag = { button = button, uid = uid, key = groupKey, name = name, ghost = ghost }
-		if ghost then
-			local text = name
-			local r, g, b = 1, 0.82, 0
-			if BFL.GetThemeAccentColor then r, g, b = BFL:GetThemeAccentColor(r, g, b, 1) end
-			ghost.text:SetTextColor(r, g, b)
-			local classColor = BFL.ClassUtils:GetClassColorByFile(GetClassFileForFriend(friend))
-			if classColor then
-				text = "|c" .. (classColor.colorStr or BFL.ClassUtils:GetClassColorHex(friend)) .. text .. "|r"
-				r, g, b = classColor.r, classColor.g, classColor.b
-			end
-			ghost.text:SetText(text)
-			ghost.stripe:SetColorTexture(r, g, b)
-			ghost:SetSize(ghost.text:GetStringWidth() + 30, 24)
-			ghost:Show()
-			local x, y = GetCursorPosition()
-			local scale = UIParent:GetEffectiveScale()
-			ghost:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
-		end
 		button.dragOverlay:Show()
 		button:SetAlpha(0.5)
 		BFL_Tooltip:Hide()
 		button:SetScript("OnUpdate", Button_OnDragUpdate)
+		return true
 	end
 
 	Button_OnDragStop = function(button)
@@ -8791,7 +8938,13 @@ function FriendsList:GetFormattedButtonText(friend)
 	local DB = GetDB()
 	local factionIcon, factionName = self:GetFriendFactionIcon(friend)
 	if not self.settingsCache.showFactionIcons then factionIcon = "" end
-	local locationText, locationKind = self:GetDisplayLocation(friend)
+	local locationText, locationKind, _, _, ruleset = self:GetDisplayLocation(friend)
+	local grayRuleset = false
+	if self.settingsCache.grayOtherRuleset and friend.type == "bnet" then
+		local registry = GetFilterSortRegistry()
+		grayRuleset = registry and registry:IsOtherForeverRuleset(friend, friend.gameAccountInfo,
+			self.settingsSample and "PVP" or nil, ruleset or false) or false
+	end
 
 	-- [STREAMER MODE LOGIC INTEGRATED]
 	-- We removed the early return here to allow formatted names (e.g. Nicknames)
@@ -8809,6 +8962,7 @@ function FriendsList:GetFormattedButtonText(friend)
 		and friend._cache_text_factionIcon == factionIcon
 		and friend._cache_text_location == locationText
 		and friend._cache_text_locationKind == locationKind
+		and friend._cache_text_grayRuleset == grayRuleset
 		and friend._cache_text_line1
 	then
 		return friend._cache_text_line1, friend._cache_text_line2
@@ -8891,20 +9045,9 @@ function FriendsList:GetFormattedButtonText(friend)
 
 		if friend.connected then
 			local isOppositeFaction = factionName and factionName ~= playerFactionGroup
-			local shouldGray = grayOtherFaction and isOppositeFaction
-			if not shouldGray and self.settingsCache.grayOtherRuleset then
-				local registry = GetFilterSortRegistry()
-				shouldGray = registry and registry:IsOtherForeverRuleset(friend, friend.gameAccountInfo,
-					self.settingsSample and "PVP" or nil)
-			end
-
+			local shouldGray = grayRuleset or (grayOtherFaction and isOppositeFaction)
 			if shouldGray then
-				-- The setting remains authoritative even when FriendListColors
-				-- supplied the initial string. Strip nested colors before applying
-				-- one uniform other-faction tint.
-				local graySource = usedExternalFormatter and line1Text or displayName
-				local stripped = (graySource or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-				line1Text = "|cff808080" .. stripped .. "|r"
+				line1Text = BFL.FormatDimmedFriendText(usedExternalFormatter and line1Text or displayName)
 			elseif not usedExternalFormatter then
 				line1Text = displayName
 			end
@@ -8947,8 +9090,7 @@ function FriendsList:GetFormattedButtonText(friend)
 			local isOppositeFaction = factionName and factionName ~= playerFactionGroup
 			local shouldGray = grayOtherFaction and isOppositeFaction
 			if shouldGray and usedExternalFormatter then
-				local stripped = (line1Text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-				line1Text = "|cff808080" .. stripped .. "|r"
+				line1Text = BFL.FormatDimmedFriendText(line1Text)
 			elseif not usedExternalFormatter then
 				local characterName = displayName
 
@@ -9017,6 +9159,7 @@ function FriendsList:GetFormattedButtonText(friend)
 	friend._cache_text_factionIcon = factionIcon
 	friend._cache_text_location = locationText
 	friend._cache_text_locationKind = locationKind
+	friend._cache_text_grayRuleset = grayRuleset
 	friend._cache_text_line1 = line1Text
 	friend._cache_text_line1_base = line1BaseText
 	friend._cache_text_line1_suffix = line1SuffixText
@@ -10190,7 +10333,7 @@ function FriendsList:UpdateFriendButton(button, elementData)
 			if not self.settingsSample and (fontChanged or textChanged or needsRenderOnShow) then
 				C_Timer.After(0, function()
 					-- Only update if the button still belongs to the same friend
-					if button and button.friendData == targetFriend then
+					if button.friendData == targetFriend and button:IsVisible() then
 						UpdateFavoriteIconPosition()
 					end
 				end)

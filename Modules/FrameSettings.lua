@@ -388,7 +388,8 @@ end
 
 function FrameSettings:FitSettingsWindow(frame)
 	local parentRatio = frame:GetParent():GetEffectiveScale() / UIParent:GetEffectiveScale()
-	frame:SetScale(math.min(1, (UIParent:GetWidth() - 24) / (640 * parentRatio),
+	local preferredScale = frame.BFL_DockDisabled and BFL.MainFrame and BFL.WindowGeometry:GetRatio(BFL.MainFrame) or 1
+	frame:SetScale(math.min(preferredScale, (UIParent:GetWidth() - 24) / (640 * parentRatio),
 		(UIParent:GetHeight() - 42) / (520 * parentRatio)))
 	local ratio = BFL.WindowGeometry:GetRatio(frame)
 	local maxWidth = (UIParent:GetWidth() - 24) / ratio
@@ -399,6 +400,102 @@ function FrameSettings:FitSettingsWindow(frame)
 	frame:SetResizeBounds(math.min(640, maxWidth), math.min(520, maxHeight), maxWidth, maxHeight)
 	frame:SetSize(width, height)
 	frame.CategoryList:SetWidth(width < 800 and 156 or 174)
+end
+
+function FrameSettings:IsSettingsWindowDetached()
+	return self.db ~= nil and self.db.settingsWindowDetached == true
+end
+
+function FrameSettings:SaveSettingsWindowPosition(frame)
+	local x, y, _, height = BFL.WindowGeometry:GetRect(frame)
+	if x then
+		BFL:GetModule("DB"):Set("settingsWindowPosition", { x = x, top = y + height })
+	end
+end
+
+function FrameSettings:ApplySettingsWindowAttachment(frame)
+	local detached = self:IsSettingsWindowDetached()
+	frame.BFL_DockDisabled = detached
+	local parent = detached and UIParent or BetterFriendsFrame
+	if parent and frame:GetParent() ~= parent then
+		local strata, level = frame:GetFrameStrata(), frame:GetFrameLevel()
+		frame:SetParent(parent)
+		-- Parenting can inherit the new parent's strata and level.
+		if frame:GetFrameStrata() ~= strata then frame:SetFrameStrata(strata) end
+		if frame:GetFrameLevel() ~= level then frame:SetFrameLevel(level) end
+		frame.BFL_DockGeometry = nil
+		self:FitSettingsWindow(frame)
+	end
+	if frame.BFL_SettingsDragHandle then frame.BFL_SettingsDragHandle:SetShown(detached) end
+	frame:SetMovable(detached)
+	frame:SetClampedToScreen(detached)
+	if detached and not frame.BFL_SettingsDragging and not frame.BFL_Resizing then
+		local pos = self.db.settingsWindowPosition
+		local geometry = BFL.WindowGeometry
+		local ratio = geometry:GetRatio(frame)
+		local width, height = frame:GetWidth() * ratio, frame:GetHeight() * ratio
+		local x = type(pos) == "table" and tonumber(pos.x)
+		local top = type(pos) == "table" and tonumber(pos.top)
+		if not x or x ~= x or not top or top ~= top then
+			x, top = (UIParent:GetWidth() - width) / 2, (UIParent:GetHeight() + height) / 2
+		end
+		x, top = geometry:Fit(x, top, width, height, 4)
+		geometry:SetTopLeft(frame, x, top)
+	end
+	return detached
+end
+
+function FrameSettings:GetSettingsTitleActionLayout(frame, left, top, width)
+	-- EllesmereUI's shell draws a 25px title strip at the top edge.
+	local eui = BFL:GetEffectiveTheme() == "ellesmereui"
+	local buttonWidth, buttonHeight, iconSize = 22, 20, 13
+	local y, leftInset, rightInset, gap = -4, 10, -34, 3
+	if eui then
+		buttonWidth, buttonHeight, iconSize = 26, 25, 14
+		y, leftInset = 0, 7
+	end
+	local geometry = BFL.WindowGeometry
+	local close = frame.CloseButton
+	if left and close then
+		local closeX, closeY, _, closeHeight = geometry:GetRect(close)
+		if closeX then
+			local ratio = geometry:GetRatio(frame)
+			if not eui then y = (closeY + closeHeight / 2 - top) / ratio + buttonHeight / 2 end
+			rightInset = (closeX - left - width) / ratio - gap
+		end
+	end
+	return buttonWidth, buttonHeight, iconSize, y, leftInset, rightInset, gap
+end
+
+function FrameSettings:RefreshSettingsWindowControls(frame)
+	local button = frame.BFL_SettingsAnchorButton
+	if not button then return end
+	local theme = BFL:GetEffectiveTheme()
+	if theme == "blizzard" or theme == "ellesmereui" then
+		local left, bottom, width, height = BFL.WindowGeometry:GetRect(frame)
+		local buttonWidth, buttonHeight, iconSize, y, inset =
+			self:GetSettingsTitleActionLayout(frame, left, left and bottom + height, width)
+		button:SetSize(buttonWidth, buttonHeight)
+		button.Icon:SetSize(iconSize, iconSize)
+		button:SetPoint("TOPLEFT", frame, "TOPLEFT", inset, y)
+	else
+		button:SetSize(26, 22)
+		button.Icon:SetSize(12, 12)
+		button:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -3)
+	end
+	local level = frame:GetFrameLevel() + 1
+	for _, chrome in pairs({ frame.NineSlice, frame.TitleContainer }) do
+		level = math.max(level, chrome:GetFrameLevel() + 1)
+	end
+	button:SetFrameLevel(level)
+	frame.BFL_SettingsDragHandle:SetFrameLevel(level)
+	button.Icon:SetTexture(self:IsSettingsWindowDetached() and "Interface\\AddOns\\BetterFriendlist\\Icons\\move.blp"
+		or "Interface\\AddOns\\BetterFriendlist\\Icons\\anchor.blp")
+	if theme == "blizzard" then
+		button.Icon:SetVertexColor(1, 1, 0)
+	else
+		button.Icon:SetVertexColor(BFL:GetThemeAccentColor())
+	end
 end
 
 function FrameSettings:InitializeSettingsWindow(frame)
@@ -432,6 +529,56 @@ function FrameSettings:InitializeSettingsWindow(frame)
 		frame.CategoryList:SetWidth(frame:GetWidth() < 800 and 156 or 174)
 	end)
 	frame.BFL_ResizeGrip = grip
+
+	local handle = CreateFrame("Frame", nil, frame)
+	frame.BFL_SettingsDragHandle = handle
+	handle:SetPoint("TOPLEFT", frame, "TOPLEFT", 65, 0)
+	handle:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -65, -23)
+	handle:EnableMouse(true)
+	handle:RegisterForDrag("LeftButton")
+	handle:Hide()
+	handle:SetScript("OnDragStart", function()
+		if not self:IsSettingsWindowDetached() or frame.BFL_Resizing then return end
+		frame.BFL_SettingsDragging = true
+		frame:StartMoving()
+	end)
+	local function StopDragging()
+		if not frame.BFL_SettingsDragging then return end
+		frame.BFL_SettingsDragging = nil
+		frame:StopMovingOrSizing()
+		frame:SetUserPlaced(false)
+		self:SaveSettingsWindowPosition(frame)
+	end
+	handle:SetScript("OnDragStop", StopDragging)
+	frame:HookScript("OnHide", StopDragging)
+
+	local button = BFL.SettingsComponents:CreateButton(frame, "", function()
+		local db = BFL:GetModule("DB")
+		local detached = not self:IsSettingsWindowDetached()
+		if detached then
+			local saved = db:Get("settingsWindowPosition")
+			if type(saved) ~= "table" or not saved.x then self:SaveSettingsWindowPosition(frame) end
+		elseif BetterFriendsFrame and not BetterFriendsFrame:IsShown() then
+			if ShowBetterFriendsFrame then ShowBetterFriendsFrame() end
+		end
+		db:Set("settingsWindowDetached", detached)
+		BFL:GetModule("Settings"):RefreshVisibleWindowAnchor()
+		self:RefreshSettingsWindowControls(frame)
+	end)
+	frame.BFL_SettingsAnchorButton = button
+	button.BFL_SettingsTitleAction = true
+	button.Icon = button:CreateTexture(nil, "OVERLAY")
+	button.Icon:SetSize(12, 12)
+	button.Icon:SetPoint("CENTER")
+	button:SetScript("OnEnter", function(owner)
+		BFL_Tooltip:SetOwner(owner, "ANCHOR_BOTTOMRIGHT")
+		BFL_Tooltip:SetText(BFL.L[self:IsSettingsWindowDetached() and "SETTINGS_WINDOW_ATTACH" or "SETTINGS_WINDOW_DETACH"])
+		BFL_Tooltip:Show()
+	end)
+	button:SetScript("OnLeave", function(owner)
+		if BFL_Tooltip:GetOwner() == owner then BFL_Tooltip:Hide() end
+	end)
+	self:RefreshSettingsWindowControls(frame)
 end
 
 function FrameSettings:ResetSettingsWindowSize()

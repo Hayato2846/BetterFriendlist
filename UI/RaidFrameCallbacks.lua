@@ -253,13 +253,12 @@ end
 
 -- Update: Render raid member list and control panel
 function BetterRaidFrame_Update()
-	local RaidFrame = GetRaidFrame()
-	if not RaidFrame then
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+	if not frame or not BetterFriendsFrame:IsShown() or not frame:IsShown() then
 		return
 	end
-
-	local frame = BetterFriendsFrame.RaidFrame
-	if not frame or not frame:IsShown() then
+	local RaidFrame = GetRaidFrame()
+	if not RaidFrame then
 		return
 	end
 
@@ -513,6 +512,12 @@ function BetterRaidFrame_EveryoneAssistCheckbox_OnLoad(self)
 end
 
 function BetterRaidFrame_EveryoneAssistCheckbox_OnEvent(self)
+	-- OnShow refreshes the control panel with the current roster state.
+	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
+	if not frame or not BetterFriendsFrame:IsShown() or not frame:IsShown() then
+		return
+	end
+
 	-- Guard: Skip update briefly after user click to prevent race condition
 	-- (GROUP_ROSTER_UPDATE may fire before server confirms the new state)
 	if self.clickCooldown and GetTime() - self.clickCooldown < 0.5 then
@@ -708,7 +713,7 @@ end
 -- Update Raid Info Button (Enable/Disable based on saved instances)
 function BetterRaidFrame_UpdateRaidInfoButton()
 	local raidFrame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not raidFrame then
+	if not raidFrame or not BetterFriendsFrame:IsShown() or not raidFrame:IsShown() then
 		return
 	end
 

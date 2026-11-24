@@ -176,7 +176,7 @@ local function GetRouteCategory(route)
 	return Catalog.categories[1]
 end
 
-local function BuildFriends(renderer, mixedGames, queueExamples, allTags)
+local function BuildFriends(renderer, mixedGames, filterExamples, allTags)
 	local realm = Text("SETTINGS_LEGACY_SAMPLE_REALM")
 	local zone = Text("SETTINGS_LEGACY_SAMPLE_ZONE")
 	local samples = BFL.LegacySettingsSocialSamples
@@ -255,18 +255,9 @@ local function BuildFriends(renderer, mixedGames, queueExamples, allTags)
 			_isMock = true,
 		}
 	end
-	if queueExamples then
-		local account = WoWAccount(3, clover, "DRUID", 11, math.max(1, maxLevel - 5), faction)
-		friends[1].sampleQueueStatus = "inqueue"
+	if filterExamples then
 		friends[1].isAFK = true
 		friends[2].isDND = true
-		friends[#friends + 1] = {
-			type = "bnet", connected = true, accountName = clover, battleTag = Text("SETTINGS_LEGACY_SAMPLE_OFFLINE") .. "#5678",
-			characterName = account.characterName, level = account.characterLevel, className = account.className,
-			classFilename = account.classFilename, classID = account.classID, factionName = account.factionName,
-			realmName = account.realmName, areaName = account.areaName, gameName = gameName,
-			gameAccountInfo = account, sampleQueueStatus = "availableforqueue", _isMock = true,
-		}
 	end
 
 	local entries = {}
@@ -390,11 +381,9 @@ local function BuildGroups(db, friends, automatic, targetID, renderer)
 	local groupNames = db:Get("builtinGroupOverrides") or {}
 	local registry = automatic and BFL:GetModule("FilterSortRegistry")
 	local filter = db:Get("quickFilter", "all")
-	-- Queue filters depend on native Battle.net result snapshots.
-	if (filter == "inqueue" or filter == "availableforqueue") and not (friends[1] and friends[1].friend.sampleQueueStatus) then
-		filter = "all"
-	end
-	local sortPlan = registry and registry:CreateSortPlan(db:Get("primarySort", "status"), db:Get("secondarySort", "name"))
+	local tertiary = db:Get("enableTertiarySort", false) and db:Get("tertiarySort", "none")
+	local sortPlan = registry and registry:CreateSortPlan(db:Get("primarySort", "status"),
+		db:Get("secondarySort", "name"), false, tertiary)
 	local recent = automatic and BFL:GetModule("RecentlyAdded")
 	local duration = recent and recent:GetDurationSeconds(db) or 0
 	local mode = db:Get("inGameGroupMode", "same_game")
@@ -740,7 +729,8 @@ function Review:ApplyFilterSample(data, db)
 			results[#results + 1] = item
 		end
 	end
-	local plan = Registry:CreateSortPlan(primary, secondary, sorting)
+	local tertiary = db:Get("enableTertiarySort", false) and db:Get("tertiarySort", "none")
+	local plan = Registry:CreateSortPlan(primary, secondary, sorting, tertiary)
 	table.sort(results, function(a, b) return Registry:CompareFriendsWithSortPlan(a.friend, b.friend, plan) end)
 
 	local title = self.filterSampleLabel
@@ -866,7 +856,7 @@ function Review:RenderSample()
 		note = L.SETTINGS_LEGACY_SAMPLE_EMPTY_HIDDEN:format(hiddenEmpty)
 	elseif #data == 0 and not filterNote then
 		note = L.SETTINGS_LEGACY_NO_RESULTS
-	elseif self.route == "rows" then
+	elseif self.route == "rows" and not tableView then
 		local format, disabled, isDefault = db:GetInfoFormatString()
 		if disabled or (not isDefault and not (format and format:lower():find("%level%", 1, true))) then
 			note = L.SETTINGS_LEGACY_SAMPLE_LEVEL_HINT
@@ -1696,7 +1686,7 @@ local function GetOutcomeComparisonLines(guide, settings, value)
 		return { name, Text("WHO_DOUBLE_CLICK_WHISPER"), value and Text("SETTINGS_EXTERNAL_MENU_BRIDGE") or nil }
 	elseif kind == "welcome" then
 		local lines = { CHAT or Text("SETTINGS_SHOW_WELCOME_MESSAGE") }
-		if value then lines[2] = Text("CORE_LOADED"):format(BFL.VERSION, "") end
+		if value then lines[2] = BFL:GetWelcomeMessage() end
 		return lines
 	elseif kind == "debug" then
 		return { CHAT or Text("SETTINGS_DEBUG_PRINT"), value and Text("DEBUG_ENABLED") or nil }
@@ -1772,6 +1762,7 @@ local function BuildTagGroupComparison(renderer, entry, tags, settings)
 end
 
 function Review:RenderComparisonLane(lane, guide, db, value, width, top)
+	if lane.tableSampleHeader then lane.tableSampleHeader:Hide() end
 	local overrides = { [guide[1]] = value }
 	for key, sampleValue in pairs(guide.sampleOverrides or {}) do overrides[key] = sampleValue end
 	if guide.order then
@@ -1929,8 +1920,9 @@ function Review:RenderComparisonLane(lane, guide, db, value, width, top)
 			ast, chain = guide.patch(value)
 		end
 		if guide.filterEditor == "sorter" then
-			local plan = chain and registry:CreateSettingsSortPlan(chain, secondary)
-				or registry:CreateSortPlan(value and guide.entryID or registry.FALLBACK_PRIMARY_SORT, secondary, true)
+			local tertiary = db:Get("enableTertiarySort", false) and db:Get("tertiarySort", "none")
+			local plan = chain and registry:CreateSettingsSortPlan(chain, secondary, tertiary)
+				or registry:CreateSortPlan(value and guide.entryID or registry.FALLBACK_PRIMARY_SORT, secondary, true, tertiary)
 			data = friends
 			table.sort(data, function(a, b) return registry:CompareFriendsWithSortPlan(a.friend, b.friend, plan) end)
 		else
@@ -2954,12 +2946,16 @@ function Review:OnBuilt(tab)
 	end
 end
 
+local function IsHiddenPage(reason)
+	return reason == "client" or reason == "beta"
+end
+
 function Review:UpdateNavigation(category)
 	local pages = {}
 	for index = 3, #category do
 		local route = category[index]
 		local _, reason = self.settings:GetLegacyTabAvailability(Catalog.pages[route][1])
-		if reason ~= "client" then
+		if not IsHiddenPage(reason) then
 			pages[#pages + 1] = route
 		end
 	end
@@ -2995,8 +2991,8 @@ function Review:UpdateAvailability()
 		self:ShowResults(self.search:GetText())
 	elseif self.route then
 		local _, reason = self.settings:GetLegacyTabAvailability(Catalog.pages[self.route][1])
-		if reason == "client" then
-			self:ShowHome()
+		if IsHiddenPage(reason) then
+			self:Navigate(self.route)
 		else
 			self:UpdateNavigation(GetRouteCategory(self.route))
 			self:Layout()
@@ -3350,6 +3346,10 @@ function Review:Navigate(route, hit)
 		self:ShowHome()
 		return
 	end
+	if reason == "beta" then
+		self:Navigate("advanced", { key = "SETTINGS_BETA_FEATURES_ENABLE", section = "SETTINGS_BETA_FEATURES_TITLE" })
+		return
+	end
 	self:ClearSearch()
 	self:ClearPage()
 	self.route = route
@@ -3357,13 +3357,10 @@ function Review:Navigate(route, hit)
 	if not enabled then
 		self:UpdateNavigation(GetRouteCategory(route))
 		self:ShowPageFrame()
-		local prerequisite = reason == "beta" and "SETTINGS_LEGACY_NEEDS_BETA"
-			or (reason == "legacy" and "SETTINGS_LEGACY_NEEDS_CLASSIC_TABS" or "SETTINGS_LEGACY_NEEDS_MODERN")
+		local prerequisite = reason == "legacy" and "SETTINGS_LEGACY_NEEDS_CLASSIC_TABS" or "SETTINGS_LEGACY_NEEDS_MODERN"
 		self.message:SetText(themeRequirement and Text("SETTINGS_LEGACY_NEEDS_THEME"):format(themeRequirement) or Text(prerequisite))
 		if reason == "theme" then
 			self:ListButton(1, Text("SETTINGS_THEME_DROPDOWN"), function() self:Navigate("theme") end)
-		elseif reason == "beta" then
-			self:ListButton(1, Text("SETTINGS_BETA_FEATURES_TITLE"), function() self:Navigate("advanced") end)
 		else
 			self:ListButton(1, Text("SETTINGS_FRIENDS_UI_STYLE_HEADER"), function() self:Navigate("layout") end)
 		end
@@ -3492,12 +3489,16 @@ function Review:ShowResults(query)
 	end
 	local hits = {}
 	local currentTheme = BFL:GetEffectiveTheme()
+	local customFormatSections = {
+		SETTINGS_NAME_FORMAT_HEADER = db and db:Get("nameFormatPreset") == "custom",
+		SETTINGS_INFO_FORMAT_HEADER = db and db:Get("infoFormatPreset") == "custom",
+	}
 	for _, category in ipairs(Catalog.categories) do
 		for index = 3, #category do
 			local route = category[index]
 			local page = Catalog.pages[route]
 			local _, reason = self.settings:GetLegacyTabAvailability(page[1])
-			if reason ~= "client" then
+			if not IsHiddenPage(reason) then
 				local pageLabel = Text(page[2])
 				local categoryLabel = Text(category[2])
 				local path = categoryLabel .. " / " .. pageLabel
@@ -3519,7 +3520,9 @@ function Review:ShowResults(query)
 						local realm = key == "SETTINGS_SHOW_REALM_NAME" or key == "BROKER_COLUMN_REALM"
 							or key == "BROKER_SETTINGS_REALM_COLOR"
 						local wrongClient = (ruleset and not BFL.IsForever) or (realm and BFL.IsForever)
-						if not wrongClient and Matches(words, terms) then
+						local hiddenFormatColor = (key == "SETTINGS_FORMAT_COLOR_FIELD" or key == "SETTINGS_FORMAT_FIELD_COLOR")
+							and not customFormatSections[section]
+						if not wrongClient and not hiddenFormatColor and Matches(words, terms) then
 							local score = math.max(10, SearchLabelScore(words, query, label))
 							local theme = Catalog.themeSections[section]
 							if theme == currentTheme then score = score + 1 end
@@ -3615,7 +3618,7 @@ function Review:Create(frame, settings)
 			if row.route ~= self.route or self.pageFrame:IsShown() then
 				self:Navigate(row.route)
 			end
-		end, 24, true)
+		end, 18, true)
 		self.subButtons[index]:Hide()
 	end
 

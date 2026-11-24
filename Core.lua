@@ -618,7 +618,7 @@ end
 
 function BFL:GetThemeAccentHex(fallbackHex)
 	local theme = self.GetEffectiveTheme and self:GetEffectiveTheme() or "blizzard"
-	if theme == "dark" or theme == "custom" or theme == "ellesmereui" then
+	if theme == "dark" or theme == "custom" or theme == "ellesmereui" or theme == "msuf" then
 		local r, g, b = self:GetThemeAccentColor()
 		return string.format("%02x%02x%02x", ColorComponentToHex(r), ColorComponentToHex(g), ColorComponentToHex(b))
 	end
@@ -628,6 +628,11 @@ end
 
 function BFL:GetThemeAccentColorCode(fallbackHex)
 	return "|cff" .. self:GetThemeAccentHex(fallbackHex)
+end
+
+function BFL:GetWelcomeMessage(versionSuffix)
+	local text = string.format(self.L.CORE_LOADED, self.VERSION, versionSuffix or "")
+	return (text:gsub("|cff00ff00", self:GetThemeAccentColorCode("00ff00")))
 end
 
 -- Toggle debug print mode (slash command)
@@ -1011,9 +1016,40 @@ end
 
 local localEscapeHandlerFrames = setmetatable({}, { __mode = "k" })
 local pendingLocalEscapeHandlerFrames = setmetatable({}, { __mode = "k" })
+local escapePanelSlots = { "left", "center", "right", "doublewide", "fullscreen" }
+
+function BFL:IsManagedFriendsPanel(frame)
+	if frame ~= BetterFriendsFrame or not GetUIPanel then return false end
+	for _, slot in ipairs(escapePanelSlots) do
+		local panel = GetUIPanel(slot)
+		if not self:IsSecret(panel) and panel == frame then return true end
+	end
+	return false
+end
 
 function BFL:IsLocalEscapeHandlerRestricted()
 	return type(InCombatLockdown) == "function" and InCombatLockdown() == true
+end
+
+local function HideLocalEscapeFrame(owner)
+	if BFL:IsManagedFriendsPanel(owner) then
+		HideBetterFriendsFrame()
+	else
+		owner:Hide()
+	end
+end
+
+local function TryHideLocalEscapeFrame(owner)
+	if not owner:IsShown() then return end
+	if BFL:IsLocalEscapeHandlerRestricted() and (not owner.IsProtected or owner:IsProtected()) then
+		owner.BFL_LocalEscapeHidePending = true
+		return
+	end
+	HideLocalEscapeFrame(owner)
+end
+
+local function CanHandleLocalEscape(owner)
+	return owner ~= BetterFriendlistSettingsFrame or owner.BFL_DockDisabled == true
 end
 
 local function SetLocalEscapeKeyboardPropagation(owner, propagate)
@@ -1045,8 +1081,8 @@ local function RestoreLocalEscapeHandlerFrame(owner)
 
 	if owner.BFL_LocalEscapeHidePending then
 		owner.BFL_LocalEscapeHidePending = nil
-		if type(owner.IsShown) ~= "function" or owner:IsShown() then
-			owner:Hide()
+		if CanHandleLocalEscape(owner) and (type(owner.IsShown) ~= "function" or owner:IsShown()) then
+			HideLocalEscapeFrame(owner)
 		end
 	end
 
@@ -1101,22 +1137,33 @@ function BFL:InstallLocalEscapeHandler(frame)
 	frame:EnableKeyboard(true)
 	SetLocalEscapeKeyboardPropagation(frame, true)
 	frame:HookScript("OnShow", function(owner)
+		owner.BFL_LocalEscapePanelPending = nil
+		owner.BFL_LocalEscapeHidePending = nil
 		SetLocalEscapeKeyboardPropagation(owner, true)
 	end)
 	frame:HookScript("OnKeyDown", function(owner, key)
-		if key ~= "ESCAPE" then
-			return
-		end
+		if key ~= "ESCAPE" or not CanHandleLocalEscape(owner) then return end
+		local managed = BFL:IsManagedFriendsPanel(owner)
 
-		-- Consume only Escape; every other key continues to the normal binding
-		-- and edit-box handlers. Restricted frame operations are never attempted
-		-- during combat; the pending close is completed after lockdown instead.
+		-- Keyboard propagation itself cannot be changed in combat.
 		if BFL:IsLocalEscapeHandlerRestricted() then
-			owner.BFL_LocalEscapeHidePending = true
-			owner.BFL_LocalEscapePropagationPending = true
+			if owner ~= BetterFriendsFrame and owner ~= BetterFriendlistSettingsFrame then
+				owner.BFL_LocalEscapeHidePending = true
+			elseif not managed then
+				TryHideLocalEscapeFrame(owner)
+			elseif not owner.BFL_LocalEscapePanelPending then
+				-- Give the native Escape dispatch the first chance to close a docked panel.
+				owner.BFL_LocalEscapePanelPending = true
+				RunNextFrame(function()
+					if not owner.BFL_LocalEscapePanelPending then return end
+					owner.BFL_LocalEscapePanelPending = nil
+					TryHideLocalEscapeFrame(owner)
+				end)
+			end
 			return
 		end
 
+		if managed then return end
 		SetLocalEscapeKeyboardPropagation(owner, false)
 		owner:Hide()
 		owner.BFL_LocalEscapePropagationPending = true
@@ -2688,7 +2735,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 			end
 
 			if showWelcome then
-				print(string.format(BFL.L.CORE_LOADED, BFL.VERSION, versionSuffix))
+				DEFAULT_CHAT_FRAME:AddMessage(BFL:GetWelcomeMessage(versionSuffix), 1, 1, 1)
 			end
 
 			BFL:InstallFriendsFrameRedirects()

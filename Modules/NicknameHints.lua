@@ -6,6 +6,19 @@ local function HasToken(format, token)
 	return type(format) == "string" and format:lower():find("%" .. token .. "%", 1, true) ~= nil
 end
 
+local function NameAlreadyShowsNickname(DB, uid, format)
+	if not HasToken(format, "name") or type(uid) ~= "string" then return false end
+	local friends = BFL:GetModule("FriendsList")
+	local friend = friends and friends.ResolveFriendByUID and friends:ResolveFriendByUID(uid)
+	local nickname = DB:GetNickname(uid)
+	if not friend or type(nickname) ~= "string" or nickname == "" then return false end
+	-- The primary identity can already be an alias supplied by the client or
+	-- CustomNames. Check the real renderer rather than requiring %nickname%.
+	local name = friends:GetDisplayName(friend, false, "%name%")
+	if BFL.IsSecret and BFL:IsSecret(name) then return false end
+	return type(name) == "string" and name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") == nickname
+end
+
 local function Path(...)
 	return table.concat({ ... }, " > ")
 end
@@ -53,7 +66,8 @@ function NicknameHints:GetGuidance(kind, uid, preview)
 		local streamerActive = BFL.StreamerMode and BFL.StreamerMode:IsActive()
 		local streamerNickname = streamerActive and DB:Get("streamerModeNameFormat", "battletag") == "nickname"
 			and type(uid) == "string" and uid:find("bnet_", 1, true) == 1 and HasToken(nameFormat, "name")
-		if not preview and ((not externalFormatter and (HasToken(nameFormat, "nickname") or streamerNickname))
+		if not preview and ((not externalFormatter and (HasToken(nameFormat, "nickname") or streamerNickname
+			or NameAlreadyShowsNickname(DB, uid, nameFormat)))
 			or (not DB:Get("compactMode", false) and HasToken(infoFormat, "nickname"))) then
 			return
 		end

@@ -21,6 +21,11 @@ local function IsEnabled()
 	return DB and DB:Get("syncGroupsToNote") == true
 end
 
+local function CanProcess()
+	return BetterFriendsFrame and BetterFriendsFrame:IsVisible()
+		and not (InCombatLockdown and InCombatLockdown())
+end
+
 local function WizardIsBusy()
 	local wizard = BFL.NoteCleanupWizard
 	return wizard and wizard.IsBusy and wizard:IsBusy()
@@ -193,6 +198,8 @@ function NoteSync:CancelWork()
 	self.passiveQueued = {}
 	self.submitted = {}
 	self.rosterChanged, self.noteEventPending = false, false
+	self.bnetNotesByIndex, self.bnetIndicesByUID, self.bnetUpdates = nil, nil, nil
+	self.fullVerificationPending, self.indexedDispatch = nil, nil
 end
 
 function NoteSync:ResetPendingWrites()
@@ -212,7 +219,7 @@ function NoteSync:OnDatabaseImported()
 	local timer = C_Timer.NewTimer(0, function()
 		if not committed then return end
 		self.verifyTimer = nil
-		if IsEnabled() then self:SyncAllFriends() end
+		self:VerifyAllNotes()
 	end)
 	local ok, err = pcall(self.ResetPendingWrites, self)
 	if not ok then timer:Cancel(); error(err) end
@@ -234,10 +241,11 @@ function NoteSync:Enable(callback, progressCallback)
 	local DB = BFL:GetModule("DB")
 	if not DB then return false end
 	DB:Set("syncGroupsToNote", true)
-	if WizardIsBusy() then
-		self.waitingForWizard = true
+	local wizardBusy = WizardIsBusy()
+	if wizardBusy or not CanProcess() then
+		self.waitingForWizard = wizardBusy and true or false
 		self.enablePending, self.enableCallbacks = true, { callback, progressCallback }
-		self:ScheduleVerification(1)
+		self:ScheduleVerification(wizardBusy and 1 or nil)
 		return true, 0, 0
 	end
 	local groups, assignments, success, complete = self:ImportGroupsFromNotes()
@@ -257,17 +265,50 @@ function NoteSync:SetEnabled(enabled, callback, progressCallback)
 	return true
 end
 
+function NoteSync:PauseProcessing()
+	-- Keep the queue, accepted writes and retry state intact across a pause.
+	if self.syncTimer then self.syncTimer:Cancel(); self.syncTimer = nil end
+	self.isSyncing = false
+	if self.verifyTimer then
+		self.verifyTimer:Cancel()
+		self.verifyTimer, self.verifyDue = nil, nil
+		self.verificationPending = true
+	end
+end
+
+function NoteSync:ResumeProcessing()
+	if not IsEnabled() or not CanProcess() then return end
+	if self.verificationPending then self:ArmVerificationTimer(0.25) end
+	self:StartDispatcher()
+end
+
 function NoteSync:Initialize()
 	self:LoadPendingWrites()
 	if not self.eventsRegistered then
 		self.eventsRegistered = true
-		for _, event in ipairs({ "FRIENDLIST_UPDATE", "BN_FRIEND_INFO_CHANGED", "BN_FRIEND_LIST_SIZE_CHANGED", "BN_CONNECTED", "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED" }) do
-			local rosterChanged = event ~= "FRIENDLIST_UPDATE" and event ~= "BN_FRIEND_INFO_CHANGED"
+		BFL:RegisterEventCallback("PLAYER_REGEN_DISABLED", function() self:PauseProcessing() end, 90)
+		BFL:RegisterEventCallback("PLAYER_REGEN_ENABLED", function() self:ResumeProcessing() end, 90)
+		if BetterFriendsFrame then
+			BetterFriendsFrame:HookScript("OnHide", function() self:PauseProcessing() end)
+			BetterFriendsFrame:HookScript("OnShow", function() self:ResumeProcessing() end)
+		end
+		BFL:RegisterEventCallback("BN_FRIEND_INFO_CHANGED", function(index)
+			-- A slot is only a hint. Read it after debouncing and verify its identity.
+			if not BFL:IsSecret(index) and type(index) == "number" and index >= 1 and index % 1 == 0 then
+				self:ScheduleVerification(nil, index)
+			else
+				self.noteEventPending = true
+				self:ScheduleVerification()
+			end
+		end, 90)
+		for _, event in ipairs({ "FRIENDLIST_UPDATE", "BN_FRIEND_LIST_SIZE_CHANGED", "BN_CONNECTED", "BN_DISCONNECTED", "LEGACY_FRIEND_SYSTEM_STATUS_UPDATED" }) do
+			local rosterChanged = event ~= "FRIENDLIST_UPDATE"
 			BFL:RegisterEventCallback(event, function()
 				-- Events only flag work. Native note setters can synchronously emit
 				-- many events; do not read the entire roster from each callback.
 				self.rosterChanged = self.rosterChanged or rosterChanged
 				self.noteEventPending = true
+				if rosterChanged then self.bnetNotesByIndex, self.bnetIndicesByUID = nil, nil end
 				self:ScheduleVerification()
 			end, 90)
 		end
@@ -278,10 +319,29 @@ function NoteSync:Initialize()
 	self:ScheduleVerification()
 end
 
-function NoteSync:ScheduleVerification(delay)
+function NoteSync:QueueVerification(friendIndex)
+	if not friendIndex then
+		self.fullVerificationPending, self.bnetUpdates = true, nil
+	elseif not self.fullVerificationPending then
+		self.bnetUpdates = self.bnetUpdates or {}
+		self.bnetUpdates[friendIndex] = true
+	end
+end
+
+function NoteSync:ScheduleVerification(delay, friendIndex)
+	if not IsEnabled() then return end
+	self:QueueVerification(friendIndex)
+	self:ArmVerificationTimer(delay)
+end
+
+function NoteSync:ScheduleFriendVerification(uid, delay)
+	self:ScheduleVerification(delay, self.bnetIndicesByUID and self.bnetIndicesByUID[uid])
+end
+
+function NoteSync:ArmVerificationTimer(delay)
 	if not IsEnabled() then return end
 	delay = math.max(0.25, delay or VERIFY_DEBOUNCE)
-	if self.isWriting or self.isSyncing or self.isImporting then
+	if not CanProcess() or self.isWriting or self.isSyncing or self.isImporting then
 		self.verificationPending = true
 		self.verificationDelay = math.min(self.verificationDelay or delay, delay)
 		return
@@ -293,7 +353,7 @@ function NoteSync:ScheduleVerification(delay)
 	self.verifyDue, self.verificationDelay = due, nil
 	self.verifyTimer = C_Timer.NewTimer(delay, function()
 		self.verifyTimer, self.verifyDue = nil, nil
-		self:VerifyAllNotes()
+		self:VerifyAllNotes(true)
 	end)
 end
 
@@ -313,6 +373,42 @@ SnapshotFriends = function()
 		end
 	end
 	return friends, snapshot.complete, snapshot
+end
+
+function NoteSync:RememberBNetNotes(friends, snapshot)
+	self.bnetNotesByIndex, self.bnetIndicesByUID = {}, {}
+	if not snapshot.bnetComplete then return end
+	for uid, index in pairs(snapshot.bnetIndices) do
+		if index then
+			local friend = friends[uid]
+			if not friend then
+				self.bnetNotesByIndex[index] = { uid = uid, managed = true }
+			elseif not uid:match("^bnet_%d+$") then
+				-- Numeric Title identities use separate validation and may be recycled.
+				self.bnetNotesByIndex[index] = { uid = uid, note = friend.note }
+				self.bnetIndicesByUID[uid] = index
+			end
+		end
+	end
+end
+
+function NoteSync:SnapshotBNetUpdates(indices)
+	if not self.bnetNotesByIndex then return end
+	local friends, snapshot = {}, { bnet = {}, bnetIndices = {}, wow = {} }
+	local helper = BFL.FriendNotes
+	for index in pairs(indices) do
+		local previous = self.bnetNotesByIndex[index]
+		if not previous then return end
+		local account, uid, note = helper.ReadBNetFriendAtIndex(index)
+		if uid ~= previous.uid then return end
+		local managed = BFL.TitleFriendNotes and BFL.TitleFriendNotes:ManagesAccount(account) and true or false
+		if managed ~= (previous.managed == true) then return end
+		if not managed then
+			friends[uid] = { note = note, account = account }
+			snapshot.bnet[uid], snapshot.bnetIndices[uid] = account, index
+		end
+	end
+	return friends, snapshot
 end
 
 function NoteSync:ApplyRosterChanges(friends)
@@ -429,7 +525,7 @@ function NoteSync:WriteNote(friendUID, currentNote, groupNames, charLimit, write
 			-- Even current == latest desired can be the pre-write base state. An old
 			-- accepted add may still arrive after a local remove, so do not clear intent.
 			self:TrackSyncWork(friendUID)
-			self:ScheduleVerification(VERIFY_DEBOUNCE)
+			self:ScheduleFriendVerification(friendUID, VERIFY_DEBOUNCE)
 			return false, limitReached, "awaiting"
 		end
 		self.inFlight[friendUID] = nil
@@ -467,20 +563,20 @@ function NoteSync:WriteNote(friendUID, currentNote, groupNames, charLimit, write
 	end
 	if ok and reason == "blocked" then
 		self.inFlight[friendUID] = BFL.FriendNotes.GetAcceptedWrite(friendUID)
-		self:ScheduleVerification()
+		self:ScheduleFriendVerification(friendUID)
 		return false, limitReached, "awaiting"
 	end
 	if ok and reason == "pending" then
 		self.inFlight[friendUID] = BFL.FriendNotes.GetAcceptedWrite(friendUID) or { note = expectedNote, before = currentNote, time = now }
 		self:MarkPending(friendUID, true)
 		self.retryAt[friendUID] = nil
-		self:ScheduleVerification(VERIFY_DEBOUNCE)
+		self:ScheduleFriendVerification(friendUID, VERIFY_DEBOUNCE)
 		return false, limitReached, "awaiting"
 	end
 	local delay = math.min(MAX_RETRY_DELAY, VERIFY_DEBOUNCE * 2 ^ (self.retryCounts[friendUID] - 1))
 	self.retryAt[friendUID] = now + delay
 	-- Only a real native rejection/error is eligible for automatic resubmission.
-	self:ScheduleVerification(math.min(delay, VERIFY_DEBOUNCE))
+	self:ScheduleFriendVerification(friendUID, math.min(delay, VERIFY_DEBOUNCE))
 	return false, limitReached, ok and reason or "failed"
 end
 
@@ -548,7 +644,7 @@ function NoteSync:SyncSingleFriend(friendUID, snapshot, friends)
 		self:MarkPending(friendUID, true)
 		self:TrackSyncWork(friendUID)
 		self.retryAt[friendUID] = (GetTime and GetTime() or 0) + MAX_RETRY_DELAY
-		self:ScheduleVerification(VERIFY_DEBOUNCE)
+		self:ScheduleFriendVerification(friendUID, VERIFY_DEBOUNCE)
 		BFL:DebugPrint("NoteSync: Write failed: " .. tostring(success))
 		return false, false, "failed"
 	end
@@ -603,12 +699,16 @@ function NoteSync:ReportSyncState()
 	end
 end
 
-function NoteSync:VerifyAllNotes()
+function NoteSync:VerifyAllNotes(useScheduledScope)
 	if not IsEnabled() then return end
-	if WizardIsBusy() then self.waitingForWizard = true; self:ScheduleVerification(1); return end
+	if not useScheduledScope then self.fullVerificationPending = true end
+	if not CanProcess() then self:ArmVerificationTimer(); return end
+	if WizardIsBusy() then self.waitingForWizard = true; self:ArmVerificationTimer(1); return end
 	self.waitingForWizard = false
 	if self.isSyncing or self.isImporting or self.isWriting then self.verificationPending = true; return end
 	self.verificationPending = false
+	local indices = not self.fullVerificationPending and self.bnetUpdates
+	self.fullVerificationPending, self.bnetUpdates = nil, nil
 	if self.profileRestorePending then self:SyncAllFriends(); return end
 	if self.enablePending then
 		local friends, complete, snapshot = SnapshotFriends()
@@ -620,12 +720,42 @@ function NoteSync:VerifyAllNotes()
 		end
 		return
 	end
+	local friends, snapshot
+	if indices and not (self.syncQueue and #self.syncQueue > 0) then
+		friends, snapshot = self:SnapshotBNetUpdates(indices)
+	end
+	local indexed = friends ~= nil
+	if indexed then
+		for uid, friend in pairs(friends) do
+			local previous = self.bnetNotesByIndex[snapshot.bnetIndices[uid]]
+			if self.retryCounts[uid] and friend.note ~= self.retryNotes[uid] then self:ResetRetry(uid) end
+			if friend.note == previous.note and not (self.pendingWrites[uid] or self.inFlight[uid]
+				or self.passiveQueued[uid] or (self.unresolvedImports and self.unresolvedImports[uid])
+				or BFL.FriendNotes.GetAcceptedWrite(uid)) then
+				friends[uid] = nil
+			end
+		end
+		if not next(friends) then return end
+	else
+		local complete
+		friends, complete, snapshot = SnapshotFriends()
+		if indices then self.noteEventPending = true end
+		self:ApplyRosterChanges(friends)
+	end
 	local excluded = {}
-	local friends, complete, snapshot = SnapshotFriends()
-	self:ApplyRosterChanges(friends)
-	for uid in pairs(self.pendingWrites) do excluded[uid] = true end
+	if not indexed then
+		for uid in pairs(self.pendingWrites) do excluded[uid] = true end
+	end
 	local _, _, imported = self:ImportGroupsFromNotes(friends, excluded, snapshot)
 	if not imported then return end
+	if indexed then
+		for uid, friend in pairs(friends) do
+			local previous = self.bnetNotesByIndex and self.bnetNotesByIndex[snapshot.bnetIndices[uid]]
+			if previous and previous.uid == uid then previous.note = friend.note end
+		end
+	else
+		self:RememberBNetNotes(friends, snapshot)
+	end
 	-- Confirmation is read-only. A changed DB goal is dispatched only after the
 	-- older accepted value is actually observed, and joins the same fair FIFO.
 	self.isPolling = true
@@ -633,16 +763,19 @@ function NoteSync:VerifyAllNotes()
 	for uid in pairs(excluded) do if not friends[uid] then self:SyncSingleFriend(uid, snapshot, friends) end end
 	self.isPolling = false
 	self:StartDispatcher()
-	if self.isSyncing then self:ProcessDispatch(friends, snapshot) end
+	if self.isSyncing then
+		self.indexedDispatch = indexed and snapshot.bnetIndices or nil
+		self:ProcessDispatch(friends, snapshot)
+	end
 	self:ReportSyncState()
 	-- Unavailable/removed friends keep their journal entry and retry on roster events, not a permanent polling loop.
-	if self.verificationPending then self:ScheduleVerification(self.verificationDelay) end
+	if self.verificationPending then self:ArmVerificationTimer(self.verificationDelay) end
 end
 
 function NoteSync:QueueFriend(friendUID)
 	if self.syncReport then self.syncReport.uids[friendUID] = true end
 	if self.inFlight[friendUID] and self.inFlight[friendUID].confirmed then self.inFlight[friendUID] = nil end
-	if self.inFlight[friendUID] then self:ScheduleVerification(); return end
+	if self.inFlight[friendUID] then self:ScheduleFriendVerification(friendUID); return end
 	self.syncQueue, self.syncQueued = self.syncQueue or {}, self.syncQueued or {}
 	if not self.syncQueued[friendUID] then
 		self.syncQueue[#self.syncQueue + 1] = friendUID
@@ -654,24 +787,42 @@ end
 function NoteSync:FinishDispatcher()
 	if self.syncTimer then self.syncTimer:Cancel(); self.syncTimer = nil end
 	self.isSyncing = false
+	self.indexedDispatch = nil
 	local callbacks = self.syncCallbacks or {}
 	self.syncCallbacks = nil
 	if self.syncReport then
 		for _, entry in ipairs(callbacks) do self.syncReport.callbacks[#self.syncReport.callbacks + 1] = entry end
 	end
 	self:ReportSyncState()
-	local delay
+	local delay = self.verificationPending and (self.verificationDelay or VERIFY_DEBOUNCE)
 	local now = GetTime and GetTime() or 0
 	for uid in pairs(self.pendingWrites) do
-		if self.inFlight[uid] then delay = VERIFY_DEBOUNCE; break end
-		if self.retryAt[uid] then delay = math.min(delay or VERIFY_DEBOUNCE, math.max(.25, self.retryAt[uid] - now)) end
+		if self.inFlight[uid] or self.retryAt[uid] then
+			self:QueueVerification(self.bnetIndicesByUID and self.bnetIndicesByUID[uid])
+			local retryDelay = self.retryAt[uid] and self.retryAt[uid] - now or VERIFY_DEBOUNCE
+			delay = math.min(delay or VERIFY_DEBOUNCE, retryDelay, VERIFY_DEBOUNCE)
+		end
 	end
-	if delay or self.verificationPending then self:ScheduleVerification(delay or self.verificationDelay) end
+	if delay then self:ArmVerificationTimer(delay) end
+end
+
+function NoteSync:SnapshotDispatchUpdates()
+	if not self.indexedDispatch then return end
+	local indices = {}
+	for uid in pairs(self.syncQueued) do
+		local index = self.indexedDispatch[uid]
+		if not index then return end
+		indices[index] = true
+	end
+	return self:SnapshotBNetUpdates(indices)
 end
 
 function NoteSync:ProcessDispatch(friends, snapshot)
 	if not IsEnabled() or self.isImporting or WizardIsBusy() then return end
+	if not CanProcess() then self:PauseProcessing(); return end
+	if not friends then friends, snapshot = self:SnapshotDispatchUpdates() end
 	if not friends then
+		self.indexedDispatch = nil
 		local complete
 		friends, complete, snapshot = SnapshotFriends()
 		self:ApplyRosterChanges(friends)
@@ -711,7 +862,7 @@ function NoteSync:ProcessDispatch(friends, snapshot)
 end
 
 function NoteSync:StartDispatcher()
-	if self.isSyncing or not IsEnabled() or self.isImporting then return end
+	if self.isSyncing or not IsEnabled() or self.isImporting or not CanProcess() then return end
 	if not self.syncQueue or #self.syncQueue == 0 then return end
 	self.isSyncing = true
 	local version = self.workVersion
@@ -737,6 +888,7 @@ function NoteSync:SyncAllFriends(callback, progressCallback)
 		local _, _, imported = self:ImportGroupsFromNotes(friends, nil, snapshot)
 		if not imported then return false end
 	end
+	self:RememberBNetNotes(friends, snapshot)
 	self.syncQueue, self.syncQueued, self.syncCallbacks = self.syncQueue or {}, self.syncQueued or {}, self.syncCallbacks or {}
 	self.syncReport = self.syncReport or { uids = {}, confirmed = {}, limits = {}, unavailable = {}, callbacks = {} }
 	if callback or progressCallback then self.syncCallbacks[#self.syncCallbacks + 1] = { callback, progressCallback } end
@@ -776,7 +928,9 @@ function NoteSync:OnGroupChanged(friendUID, preserveIdentity)
 	local snapshot, friends = self.groupDefinitionSnapshot, self.groupDefinitionFriends
 	if friendUID:match("^bnet_%d+$") and (preserveIdentity or self.isChangingGroupDefinition) then
 		local identity = self.titleIdentities[friendUID]
-		if not identity or not BFL.FriendNotes.ResolveBNetIdentity(identity, snapshot and snapshot.bnet) then return end
+		-- The dispatcher revalidates the captured identity before writing. During a
+		-- pause, keep existing intent without looking up the numeric account ID.
+		if not identity or (snapshot and not BFL.FriendNotes.ResolveBNetIdentity(identity, snapshot.bnet)) then return end
 	else
 		-- Remember explicit current-friend identity evidence even while sync is disabled.
 		self:BindTitleIdentity(friendUID, snapshot and snapshot.bnet[friendUID], true, snapshot)
@@ -797,7 +951,11 @@ end
 function NoteSync:WithGroupDefinitionChange(callback)
 	local previous = self.isChangingGroupDefinition
 	local previousSnapshot, previousFriends = self.groupDefinitionSnapshot, self.groupDefinitionFriends
-	local friends, complete, snapshot = SnapshotFriends()
+	local friends, snapshot
+	if IsEnabled() and CanProcess() then
+		local complete
+		friends, complete, snapshot = SnapshotFriends()
+	end
 	self.isChangingGroupDefinition, self.groupDefinitionSnapshot, self.groupDefinitionFriends = true, snapshot, friends
 	local ok, err = pcall(callback)
 	self.isChangingGroupDefinition, self.groupDefinitionSnapshot, self.groupDefinitionFriends = previous, previousSnapshot, previousFriends
@@ -820,7 +978,8 @@ function NoteSync:OnGroupRenamed(groupId)
 end
 
 function NoteSync:OnGroupOrderChanged()
-	if IsEnabled() and not self.isImporting then self:SyncAllFriends() end
+	if not IsEnabled() or self.isImporting then return end
+	if CanProcess() then self:SyncAllFriends() else self:ScheduleVerification() end
 end
 
 function NoteSync:CleanFriendNote(friendUID)

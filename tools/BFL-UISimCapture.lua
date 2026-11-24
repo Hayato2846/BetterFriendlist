@@ -61,6 +61,91 @@ if layout == "RetailModern" and #leftAlignedFields > 0 then
 	restoreCardAlignment(frame)
 end
 
+if showBorrowedSearchSkin then
+	BFL:GetModule("ThemeManager"):SetTheme("blizzard", "borrowed-search-fixture")
+	BFL.NativeFriendsSearch:ReleaseInput()
+	local native = CreateFrame("Frame", nil, UIParent)
+	native:Hide()
+	local view = CreateFrame("Frame", nil, native)
+	view:SetSize(400, 600)
+	view:SetPoint("TOPLEFT", native, "TOPLEFT")
+	native.FriendsList = view
+	view.ScrollBox = CreateFrame("Frame", nil, view)
+	view.FilterBar = CreateFrame("Frame", nil, view)
+	local input = CreateFrame("EditBox", nil, view.FilterBar, "SearchBoxTemplate")
+	input:SetSize(200, 30)
+	input:SetPoint("TOPLEFT", view, "TOPLEFT")
+	input:EnableMouse(true)
+	view.FilterBar.SearchBar = input
+	view.RefreshSearchResults = function() end
+	local fill = input:CreateTexture(nil, "BACKGROUND")
+	fill:SetColorTexture(0.02, 0.02, 0.02, 1)
+	fill:SetAllPoints(input)
+	local border = CreateFrame("Frame", nil, input)
+	border:SetAllPoints(input)
+	local top = border:CreateTexture(nil, "BORDER")
+	top:SetColorTexture(0.35, 0.35, 0.35, 1)
+	top:SetPoint("TOPLEFT", border)
+	top:SetPoint("TOPRIGHT", border)
+	top:SetHeight(1)
+	SocialUIFrame = native
+	EllesmereUI = { PanelPP = { GetBorders = function(region) return region == input and border or nil end } }
+	BFL.NativeFriendsSearch:Observe(native)
+	BFL.NativeFriendsSearch:UpdateLayout()
+	assert(BFL.NativeFriendsSearch:IsInputHosted(frame.FriendsTabHeader.SearchBox), "Native search fixture did not attach")
+	-- The simulator culls the off-screen parent before painting the hosted child.
+	-- Move the empty fixture parent on screen after verifying the real attachment.
+	view:ClearAllPoints()
+	view:SetPoint("TOPLEFT", frame, "TOPLEFT")
+	input.SkinFill, input.SkinBorder = fill, border
+end
+
+if showFriendDrag then
+	if BFLAppearanceOnboardingFrame then BFLAppearanceOnboardingFrame:Hide() end
+	local friends = assert(BFL:GetModule("FriendsList"))
+	local db = assert(BFL:GetModule("DB"))
+	db:Set("nameFormatPreset", "custom")
+	db:Set("nameFormatCustom", "%nickname% (%character%)")
+	local externalDragTheme = friendDragTheme == "ellesmereui" or friendDragTheme == "elvui"
+	if not externalDragTheme then
+		if friendDragTheme == "custom" then
+			BFL:GetModule("ThemePalette"):SetCustomColor("controlColor", { r = 0.13, g = 0.09, b = 0.24, a = 1 })
+		end
+		BFL:GetModule("ThemeManager"):SetTheme(friendDragTheme, "friend-drag-fixture")
+	end
+	BFL:ForceRefreshFriendsList()
+	for _ = 1, 16 do A_Admin.AdvanceTime(0.016) end
+	local function FindFriend(parent)
+		if not parent:IsVisible() then return end
+		if parent.friendData and parent.friendData.type == "bnet" and parent.Name and parent.bflGroupActionUID then
+			return parent
+		end
+		for _, child in ipairs({ parent:GetChildren() }) do
+			local row = FindFriend(child)
+			if row then return row end
+		end
+	end
+	local row = assert(FindFriend(frame), "No draggable Battle.net fixture row")
+	local getTheme = BFL.GetEffectiveTheme
+	if externalDragTheme then
+		-- Render the integration's palette without loading a third-party addon in the simulator.
+		BFL.GetEffectiveTheme = function() return friendDragTheme end
+	end
+	friends.OnDragStart(row)
+	BFL.GetEffectiveTheme = getTheme
+	local ghost = assert(friends.activeFriendDrag and friends.activeFriendDrag.ghost, "Friend drag did not show a ghost")
+	assert(ghost:IsVisible())
+	if ghost.card then
+		assert(ghost.text:GetText() == row.Name:GetText(), "The drag name differs from the original row")
+		assert(ghost.card:IsShown() == (friendDragTheme == "blizzard"), "The drag preview used the wrong theme surface")
+	end
+	row:SetScript("OnUpdate", nil)
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 40, -32)
+	ghost:ClearAllPoints()
+	ghost:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 72, -3)
+end
+
 if hintStyle then
 	assert(BFL:GetModule("NicknameHints")):ShowPreview()
 	local hints = assert(BFL:GetModule("FeatureHints"))
@@ -409,17 +494,17 @@ if feedbackScene then
 	local themes = BFL:GetModule("ThemeManager")
 	if feedbackScene == "window-fonts" or feedbackScene == "input" or feedbackScene == "scroll"
 		or ((feedbackScene == "filters" or feedbackScene == "diagnostics" or feedbackScene == "diagnostics-warning"
-			or feedbackScene == "behavior") and narrow) then BFL:SetLocale("deDE") end
+			or feedbackScene == "behavior" or feedbackScene == "groups" or feedbackScene == "format-presets") and narrow) then BFL:SetLocale("deDE") end
 	local function Advance()
 		for _ = 1, 10 do A_Admin.AdvanceTime(0.016) end
 	end
-	local function FindRow(label)
+	local function FindRow(label, optional, section)
 		for _, row in ipairs(review.controlRows or {}) do
 			for _, name in ipairs(row.BFL_SearchLabels or {}) do
-				if name == label then return row end
+				if name == label and (not section or review.controlSections[row] == section) then return row end
 			end
 		end
-		error("Missing setting row " .. tostring(label))
+		if not optional then error("Missing setting row " .. tostring(label)) end
 	end
 	local function FindButton(parent, text)
 		if parent:IsVisible() and parent.GetText and parent:GetText() == text and parent:IsObjectType("Button") then return parent end
@@ -440,6 +525,9 @@ if feedbackScene then
 	elseif feedbackScene == "format" then
 		db:Set("nameFormatPreset", "custom")
 		db:Set("infoFormatPreset", "custom")
+	elseif feedbackScene == "format-presets" then
+		db:Set("nameFormatPreset", "nickname")
+		db:Set("infoFormatPreset", "default")
 	elseif feedbackScene == "performance" or feedbackScene == "filters" or feedbackScene == "diagnostics"
 		or feedbackScene == "diagnostics-warning" or feedbackScene == "behavior" then
 		db:Set("enableBetaFeatures", true)
@@ -455,7 +543,31 @@ if feedbackScene then
 	elseif feedbackScene == "scroll" or feedbackScene == "skin-hover" then
 		db:Set("settingsWindowSize", narrow and { width = 760, height = 620 } or { width = 1170, height = 800 })
 	end
-	themes:SetTheme(feedbackScene == "groups" and "blizzard" or "custom", "settings-feedback-fixture")
+	if feedbackScene == "eui-title" then
+		local eui = assert(BFL:GetModule("EllesmereUISkin"))
+		local function Button(button)
+			if button.BFL_FixtureEUIBorder then return end
+			button:SetNormalTexture(nil)
+			button:SetPushedTexture(nil)
+			button:SetHighlightTexture(nil)
+			local border = button:CreateTexture(nil, "BACKGROUND")
+			border:SetAllPoints()
+			border:SetColorTexture(0.30, 0.30, 0.30, 1)
+			local fill = button:CreateTexture(nil, "BACKGROUND", nil, 1)
+			fill:SetPoint("TOPLEFT", 1, -1)
+			fill:SetPoint("BOTTOMRIGHT", -1, 1)
+			fill:SetColorTexture(0.02, 0.02, 0.02, 1)
+			button.BFL_FixtureEUIBorder = border
+		end
+		eui.facade = { apiVersion = 1, Button = Button }
+		eui.facadeActivated = true
+		db:Set("settingsWindowSize", { width = narrow and 760 or 930, height = narrow and 620 or 700 })
+		db:Set("settingsPreviewCollapsed", true)
+		themes:SetTheme("ellesmereui", "settings-feedback-fixture")
+		assert(BFL:GetEffectiveTheme() == "ellesmereui", "EUI fixture did not activate its skin")
+	else
+		themes:SetTheme(feedbackScene == "groups" and "blizzard" or "custom", "settings-feedback-fixture")
+	end
 	if feedbackScene == "groups" then
 		local list, tags = BFL:GetModule("FriendsList"), BFL:GetModule("FriendTags")
 		local friend
@@ -520,7 +632,21 @@ if feedbackScene then
 		review:Layout()
 	end
 
-	if feedbackScene == "diagnostics" or feedbackScene == "diagnostics-warning" or feedbackScene == "behavior" then
+	if feedbackScene == "eui-title" then
+		review:Navigate("behavior")
+		Advance()
+		local anchor = frame.BFL_SettingsAnchorButton
+		local toggle = BFL:GetModule("SettingsPreviewDock").toggle
+		assert(anchor:IsVisible() and toggle:IsVisible(), "The EUI title controls are hidden")
+		if anchor.BFL_SettingsTitleAction then
+			assert(anchor:GetWidth() == toggle:GetWidth() and anchor:GetHeight() == toggle:GetHeight(),
+				"The EUI title hit areas differ")
+			assert(anchor.Icon:GetWidth() == toggle.Icon:GetWidth() and anchor:GetTop() == toggle:GetTop(),
+				"The EUI title glyphs differ in size or alignment")
+			assert(not anchor.BFL_FixtureEUIBorder and not toggle.BFL_FixtureEUIBorder,
+				"The generic EUI button skin reached a title action")
+		end
+	elseif feedbackScene == "diagnostics" or feedbackScene == "diagnostics-warning" or feedbackScene == "behavior" then
 		review:Navigate(feedbackScene == "behavior" and "behavior" or "advanced")
 		Advance()
 		if feedbackScene == "diagnostics-warning" then
@@ -534,13 +660,94 @@ if feedbackScene then
 	elseif feedbackScene == "groups" then
 		review:Navigate("automatic")
 		Advance()
-		local unit = FindRow(BFL.L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT)
-		local value = FindRow(BFL.L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE)
-		assert(unit.BFL_SettingDisabled and unit:GetAlpha() <= 0.5 and not unit.DropDown:IsEnabled(),
-			"An unavailable duration dropdown looks active")
-		assert(value.Input:IsNumeric(), "Duration Value accepts letters")
+		local function HasSubpage(route)
+			for _, row in ipairs(review.subButtons) do
+				if row.route == route and row:IsShown() then return true end
+			end
+			return false
+		end
+		assert(not HasSubpage("filters"), "Beta opt-out leaves QuickFilter & Sorter visible")
+		review:Navigate("filters")
+		Advance()
+		assert(review.route == "advanced", "A hidden beta deep link does not lead to the beta opt-in")
+		FindRow(BFL.L.SETTINGS_BETA_FEATURES_ENABLE).checkBox:Click()
+		Advance()
+		review:Navigate("automatic")
+		Advance()
+		assert(HasSubpage("filters"), "Beta opt-in does not reveal QuickFilter & Sorter")
+		review:Navigate("advanced")
+		Advance()
+		FindRow(BFL.L.SETTINGS_BETA_FEATURES_ENABLE).checkBox:Click()
+		Advance()
+		review:Navigate("automatic")
+		Advance()
+		assert(not HasSubpage("filters"), "Beta opt-out does not remove QuickFilter & Sorter again")
+		local L = BFL.L
+		local inGame = FindRow(L.GROUP_INGAME)
+		local mode = FindRow(L.SETTINGS_INGAME_MODE_LABEL)
+		local followsGroup = false
+		for i = 1, mode:GetNumPoints() do
+			local point, relative = mode:GetPoint(i)
+			if point == "TOP" and relative == inGame then followsGroup = true end
+		end
+		assert(followsGroup, "In-Game mode is not immediately below its group switch")
+		inGame.checkBox:Click()
+		Advance()
+		assert(not FindRow(L.SETTINGS_INGAME_MODE_LABEL, true), "In-Game mode is visible with its group off")
+		FindRow(L.GROUP_INGAME).checkBox:Click()
+		Advance()
+		assert(FindRow(L.SETTINGS_INGAME_MODE_LABEL).DropDown:IsEnabled(), "In-Game mode is disabled with its group on")
+		assert(not FindRow(L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT, true) and not FindRow(L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE, true),
+			"Recently Added duration fields are visible with their group off")
+		FindRow(L.GROUP_RECENTLY_ADDED).checkBox:Click()
+		Advance()
+		assert(FindRow(L.SETTINGS_RECENTLY_ADDED_DURATION_UNIT).DropDown:IsEnabled(), "Duration Unit is disabled with its group on")
+		assert(FindRow(L.SETTINGS_RECENTLY_ADDED_DURATION_VALUE).Input:IsNumeric(), "Duration Value accepts letters")
+		FindRow(L.GROUP_RECENTLY_ADDED).checkBox:Click()
+		Advance()
 		assert(review.previewNote:IsShown() and review.previewNote:GetText():find(BFL.L.GROUP_NO_GROUP, 1, true),
 			"The preview does not name its hidden empty group")
+		if narrow then
+			local anchor = frame.BFL_SettingsAnchorButton
+			local toggle = BFL:GetModule("SettingsPreviewDock").toggle
+			assert(anchor:GetWidth() == toggle:GetWidth() and anchor:GetHeight() == toggle:GetHeight(),
+				"Blizzard title buttons do not have matching dimensions")
+			for _, action in ipairs({ anchor, toggle }) do
+				local highlight = action:GetHighlightTexture()
+				assert(not highlight or highlight:GetAlpha() == 0, "Native highlight is visible on the Blizzard title action")
+			end
+			local _, anchorY, _, anchorHeight = BFL.WindowGeometry:GetRect(anchor)
+			local _, toggleY, _, toggleHeight = BFL.WindowGeometry:GetRect(toggle)
+			assert(math.abs(anchorY + anchorHeight / 2 - toggleY - toggleHeight / 2) < 1,
+				"Blizzard title buttons do not share the same centerline")
+		end
+		local friendsList = BFL:GetModule("FriendsList")
+		if friendsList and friendsList.IsTertiarySortEnabled then
+			assert(not db:Get("enableBetaFeatures"), "The standard controls must be tested with Beta Features off")
+			assert(FindRow(L.SORT_PRIMARY_LABEL).DropDown:IsEnabled(), "Primary Sort is missing with Beta Features off")
+			assert(FindRow(L.SORT_SECONDARY_LABEL).DropDown:IsEnabled(), "Secondary Sort is missing with Beta Features off")
+			assert(FindRow(L.SETTINGS_QUICK_FILTER).DropDown:IsEnabled(), "QuickFilter is missing with Beta Features off")
+			assert(not FindRow(BFL.L.SORT_TERTIARY_LABEL, true), "The criterion is visible before opting into tertiary sorting")
+			local toggle = FindRow(BFL.L.SETTINGS_ENABLE_TERTIARY_SORT)
+			assert(toggle.checkBox, "Tertiary sort opt-in is missing")
+			toggle.checkBox:Click()
+			Advance()
+			assert(db:Get("enableTertiarySort") and not FindRow(BFL.L.SORT_TERTIARY_LABEL).BFL_SettingDisabled,
+				"Turning on tertiary sorting did not enable the sorter")
+			local tertiary = FindRow(BFL.L.SORT_TERTIARY_LABEL)
+			assert(tertiary.DropDown:IsEnabled(), "The active tertiary dropdown is disabled")
+			assert(FindRow(BFL.L.SETTINGS_ENABLE_TERTIARY_SORT).BFL_NewBadgeShown and tertiary.BFL_NewBadgeShown,
+				"Third sort settings are missing their New badges")
+			assert(tertiary.BFL_SettingGuide[1][2]:find(BFL.L.SORT_TERTIARY_DESC, 1, true),
+				"Third sort help uses the primary and secondary description")
+			local expected = {}
+			local secondary = FindRow(BFL.L.SORT_SECONDARY_LABEL)
+			for _, id in ipairs(secondary.BFL_ComparisonChoices.values) do
+				if id ~= friendsList.secondarySort then expected[#expected + 1] = id end
+			end
+			assert(table.concat(tertiary.BFL_ComparisonChoices.values, ",") == table.concat(expected, ","),
+				"Tertiary does not offer exactly the remaining secondary choices in order")
+		end
 	elseif feedbackScene == "theme" then
 		review:Navigate("theme")
 		Advance()
@@ -551,6 +758,103 @@ if feedbackScene then
 		Advance()
 		assert(review.sectionRows.SETTINGS_THEME_DARK_HEADER:IsVisible(), "Dark settings are hidden after choosing Dark")
 		settingsUI:OnThemeChanged("custom")
+		Advance()
+	elseif feedbackScene == "format-presets" then
+		local L = BFL.L
+		review:Navigate("rows", { key = "SETTINGS_NAME_FORMAT_HEADER" })
+		Advance()
+		local function CheckVisibility(nameVisible, infoVisible)
+			assert(FindRow(L.SETTINGS_NAME_FORMAT_TOOLTIP):IsVisible() == nameVisible, "Name field does not follow its preset")
+			assert(FindRow(L.SETTINGS_INFO_FORMAT_TOOLTIP):IsVisible() == infoVisible, "Info field does not follow its preset")
+			for _, label in ipairs({ L.SETTINGS_FORMAT_COLOR_FIELD, L.SETTINGS_FORMAT_FIELD_COLOR }) do
+				assert(FindRow(label, false, "SETTINGS_NAME_FORMAT_HEADER"):IsVisible() == nameVisible,
+					"Name field colors do not follow the Name preset")
+				assert(FindRow(label, false, "SETTINGS_INFO_FORMAT_HEADER"):IsVisible() == infoVisible,
+					"Info field colors do not follow the Info preset")
+			end
+		end
+		local function SelectPreset(label, value)
+			local menu = FindRow(label).DropDown.BFL_DarkDropdownData
+			menu.onSelect(value)
+			menu.setText(value)
+			Advance()
+		end
+		local function OpenFormatSearch(key, expectedLabel)
+			review:ShowResults(L[key])
+			for _, button in ipairs(review.listButtons) do
+				if button:IsShown() and button.settingHit and button.settingHit.key == key then
+					button:Click()
+					Advance()
+					assert(review.focusedRow == FindRow(expectedLabel), "Format search focused the wrong control")
+					return
+				end
+			end
+			error("Missing format search result " .. key)
+		end
+		CheckVisibility(false, false)
+		assert(not db:Get("showFriendLocalTime"), "Local time must default off")
+		FindRow(L.SETTINGS_SHOW_FRIEND_LOCAL_TIME).checkBox:Click()
+		assert(db:Get("showFriendLocalTime") == true, "The Local Time option did not enable the clock")
+		FindRow(L.SETTINGS_SHOW_FRIEND_LOCAL_TIME).checkBox:Click()
+		assert(db:Get("showFriendLocalTime") == false, "The Local Time option did not disable the clock")
+		OpenFormatSearch("SETTINGS_NAME_FORMAT_TOOLTIP", L.SETTINGS_NAME_FORMAT_HEADER)
+		OpenFormatSearch("SETTINGS_INFO_FORMAT_TOOLTIP", L.SETTINGS_INFO_FORMAT_HEADER)
+		for _, preset in ipairs({ L.SETTINGS_NAME_FORMAT_HEADER, L.SETTINGS_INFO_FORMAT_HEADER }) do
+			local help = FindRow(preset).BFL_SettingGuide[1][2]
+			assert(help:find(narrow and "Benutzerdefiniert" or "Choose Custom", 1, true), "Preset help is missing the Custom hint")
+		end
+		SelectPreset(L.SETTINGS_NAME_FORMAT_HEADER, "custom")
+		CheckVisibility(true, false)
+		local nameValue, infoValue = "%nickname% · %character%", "%zone% · %level%"
+		local name = FindRow(L.SETTINGS_NAME_FORMAT_TOOLTIP).Input
+		name:SetText(nameValue)
+		name:GetScript("OnEnterPressed")(name)
+		SelectPreset(L.SETTINGS_NAME_FORMAT_HEADER, "nickname")
+		SelectPreset(L.SETTINGS_INFO_FORMAT_HEADER, "custom")
+		CheckVisibility(false, true)
+		local info = FindRow(L.SETTINGS_INFO_FORMAT_TOOLTIP).Input
+		info:SetText(infoValue)
+		info:GetScript("OnEnterPressed")(info)
+		SelectPreset(L.SETTINGS_INFO_FORMAT_HEADER, "default")
+		CheckVisibility(false, false)
+		SelectPreset(L.SETTINGS_NAME_FORMAT_HEADER, "custom")
+		SelectPreset(L.SETTINGS_INFO_FORMAT_HEADER, "custom")
+		CheckVisibility(true, true)
+		local nameColor = FindRow(L.SETTINGS_FORMAT_FIELD_COLOR, false, "SETTINGS_NAME_FORMAT_HEADER")
+		local infoColor = FindRow(L.SETTINGS_FORMAT_FIELD_COLOR, false, "SETTINGS_INFO_FORMAT_HEADER")
+		local showPicker, changeColor, cancelColor = BFL.ShowColorPicker
+		BFL.ShowColorPicker = function(r, g, b, _, apply, cancel)
+			changeColor, cancelColor = apply, cancel
+			apply(r, g, b)
+		end
+		nameColor.colorButton:Click()
+		changeColor(1, 1, 1)
+		assert(not db:Get("friendFormatColors").name and not nameColor.resetButton:IsEnabled(),
+			"Opening and confirming the picker without edits saved a color")
+		changeColor(1, 0.5, 0)
+		assert(infoColor.currentColor.g == 0.5 and nameColor.resetButton:IsEnabled(),
+			"An actual color change did not update both swatches")
+		changeColor(1, 1, 1)
+		assert(db:Get("friendFormatColors").name.g == 1, "An explicit white color was ignored")
+		cancelColor()
+		assert(not db:Get("friendFormatColors").name, "Cancel did not restore automatic color")
+		nameColor.colorButton:Click()
+		changeColor(1, 0.5, 0)
+		db:Get("friendFormatColors").zone = { r = 0, g = 1, b = 0 }
+		infoColor.resetButton:Click()
+		assert(not db:Get("friendFormatColors").name and db:Get("friendFormatColors").zone.g == 1
+			and not nameColor.resetButton:IsEnabled(), "Reset did not restore only the selected field")
+		BFL.ShowColorPicker = showPicker
+		OpenFormatSearch("SETTINGS_NAME_FORMAT_TOOLTIP", L.SETTINGS_NAME_FORMAT_TOOLTIP)
+		OpenFormatSearch("SETTINGS_INFO_FORMAT_TOOLTIP", L.SETTINGS_INFO_FORMAT_TOOLTIP)
+		assert(db:Get("nameFormatCustom") == nameValue and FindRow(L.SETTINGS_NAME_FORMAT_TOOLTIP).Input:GetText() == nameValue,
+			"Changing presets lost the saved name format")
+		assert(db:Get("infoFormatCustom") == infoValue and FindRow(L.SETTINGS_INFO_FORMAT_TOOLTIP).Input:GetText() == infoValue,
+			"Changing presets lost the saved info format")
+		SelectPreset(L.SETTINGS_NAME_FORMAT_HEADER, "nickname")
+		SelectPreset(L.SETTINGS_INFO_FORMAT_HEADER, "default")
+		CheckVisibility(false, false)
+		review:Navigate("rows", { key = "SETTINGS_NAME_FORMAT_HEADER" })
 		Advance()
 	elseif feedbackScene == "format" then
 		local function CheckSearchSkin()
@@ -1002,6 +1306,37 @@ if feedbackScene then
 		Advance()
 		newX, newY = geometry:GetRect(owner)
 		assert(math.abs(x - newX) < 1 and math.abs(y - newY) < 1, "The normal close/open path lost the saved position")
+		if frame.BFL_SettingsAnchorButton then
+			local button = frame.BFL_SettingsAnchorButton
+			local strata = frame:GetFrameStrata()
+			button:Click()
+			assert(db:Get("settingsWindowDetached") and frame:GetParent() == UIParent, "Settings did not detach from the friends list")
+			assert(frame:GetFrameStrata() == strata, "Detaching changed Settings frame strata")
+			local handle = frame.BFL_SettingsDragHandle
+			assert(handle:IsVisible(), "Detached Settings cannot be dragged by the title bar")
+			handle:GetScript("OnDragStart")(handle)
+			geometry:SetTopLeft(frame, 70, UIParent:GetHeight() - 50)
+			handle:GetScript("OnDragStop")(handle)
+			local saved = db:Get("settingsWindowPosition")
+			assert(saved and math.abs(saved.x - 70) < 1, "Dragging Settings did not save its position")
+			Move(UIParent:GetWidth() - owner:GetWidth() - 40)
+			assert(math.abs(geometry:GetRect(frame) - saved.x) < 1, "Moving BFL moved the detached Settings window")
+			HideBetterFriendsFrame()
+			Advance()
+			assert(frame:IsVisible(), "Detached Settings closed with the friends list")
+			settingsUI:HideLegacyWindow()
+			geometry:SetTopLeft(frame, 200, 500)
+			settingsUI:ShowLegacy()
+			Advance()
+			local restoredX, restoredY, _, height = geometry:GetRect(frame)
+			assert(not owner:IsShown() and math.abs(restoredX - saved.x) < 1 and math.abs(restoredY + height - saved.top) < 1,
+				"Reopening displaced detached Settings or opened the friends list")
+			button:Click()
+			Advance()
+			assert(not db:Get("settingsWindowDetached") and owner:IsShown() and frame:GetParent() == owner,
+				"The anchor button did not reattach Settings")
+			assert(frame:GetFrameStrata() == strata, "Reattaching changed Settings frame strata")
+		end
 	elseif feedbackScene == "input" then
 		local dialogs = BFL:GetModule("Dialogs")
 		local editor = BFL:GetModule("FriendTagEditor")

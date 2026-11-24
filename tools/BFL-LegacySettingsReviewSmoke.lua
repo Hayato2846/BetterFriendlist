@@ -214,6 +214,20 @@ for _, locale in ipairs(locales) do
 end
 
 BFL:SetLocale("enUS")
+local available = review.settings.GetLegacyTabAvailability
+function review.settings:GetLegacyTabAvailability(tabID)
+	if tabID == 11 or tabID == 12 then return false, "beta" end
+	return available(self, tabID)
+end
+for _, result in ipairs(Search(BFL.L.SETTINGS_TAB_FILTER_SORT)) do
+	assert(result.settingHit.route ~= "filters", "Disabled QuickFilter & Sorter appears in search")
+end
+for _, result in ipairs(Search(BFL.L.SETTINGS_TAB_GUILD)) do
+	assert(result.settingHit.route ~= "guild", "Disabled Guild settings appear in search")
+end
+review.settings.GetLegacyTabAvailability = available
+local betaPage = Search(BFL.L.SETTINGS_TAB_FILTER_SORT)[1]
+assert(betaPage and betaPage.settingHit.id == "filters", "Enabled QuickFilter & Sorter is missing from search")
 local tagHits = Search("Tag")
 assert(tagHits[1].settingHit.id == "tags", "Friend Tags page should lead results for Tag")
 for index = 2, #tagHits do

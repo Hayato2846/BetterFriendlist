@@ -8,6 +8,7 @@ local messageLayers = {}
 local menuLinks = {}
 local heldLinks, linkLayers = {}, {}
 local watchesRelease = false
+local dragTracker, linkDrag
 
 local function BlockHeldLink(state)
 	for _, held in pairs(heldLinks) do
@@ -27,10 +28,14 @@ local function CanUseLink(state, fresh)
 	return false
 end
 
-local function PressLink(state, button)
+local function PressLink(state, button, skipDrag)
 	if state.identity == nil or not button then return end
 	if watchesRelease then heldLinks[button] = state end
-	if not CanUseLink(state, true) then state.hit:Hide() end
+	if not CanUseLink(state, true) then
+		state.hit:Hide()
+	elseif state.trackDrag and not skipDrag then
+		state.trackDrag(button)
+	end
 end
 local rowsByLayer = {}
 local linkText = string.rep("M", 64)
@@ -87,7 +92,15 @@ end
 
 local function RunRowScript(row, script, ...)
 	local handler = row:GetScript(script)
-	if handler then handler(row, ...) end
+	if handler then return handler(row, ...) end
+end
+
+local function StopTrackingLinkDrag()
+	local drag = linkDrag
+	linkDrag = nil
+	if not drag then return end
+	dragTracker:SetScript("OnUpdate", nil)
+	if drag.started then RunRowScript(drag.row, "OnDragStop", "LeftButton") end
 end
 
 local function ShowCatch(state, catch)
@@ -105,6 +118,36 @@ local function CancelDoubleClick(state)
 	state.doubleClickTimer:Cancel()
 	state.doubleClickTimer = nil
 	if state.hit:IsShown() then ShowCatch(state, state.catch) end
+end
+
+local function TrackLinkDrag(state, row, button)
+	if not watchesRelease or linkDrag or button ~= "LeftButton" or state.activeCatch ~= state.leftCatch then return end
+	local x, y = GetCursorPosition()
+	local drag = { row = row, friend = row.friendData, x = x, y = y }
+	linkDrag = drag
+	dragTracker:SetScript("OnUpdate", function(self)
+		if not state.hit:IsVisible() or not row:IsVisible() or row.friendData ~= drag.friend then
+			StopTrackingLinkDrag()
+			return
+		end
+		if not IsMouseButtonDown("LeftButton") then return end
+		local currentX, currentY = GetCursorPosition()
+		local dx, dy = currentX - drag.x, currentY - drag.y
+		local threshold = 6 * UIParent:GetEffectiveScale()
+		if dx * dx + dy * dy < threshold * threshold then return end
+		self:SetScript("OnUpdate", nil)
+		if not CanUseLink(state, true) then
+			state.hit:Hide()
+			return
+		end
+		drag.started = RunRowScript(row, "OnDragStart", "LeftButton")
+		if drag.started then
+			-- Cancel the native hyperlink release only after a row drag actually started.
+			state.blocked = true
+			state.hit:Hide()
+			CancelDoubleClick(state)
+		end
+	end)
 end
 
 local function IsWhisperRecipient(friend, isWho)
@@ -183,6 +226,7 @@ local function CreateLinkLayer(row, template)
 	text:SetPoint("BOTTOMRIGHT", hit, "BOTTOMRIGHT")
 	local state = { hit = hit, text = text }
 	linkLayers[hit] = state
+	linkLayers[text] = state
 	if hit.HookScript then
 		hit:HookScript("OnMouseDown", function(_, button) PressLink(state, button) end)
 	end
@@ -279,9 +323,15 @@ local function CreateLayers(row, friends, isWho)
 		end)
 		state.hasClickObserver = ok and hooked ~= false
 		if state.hasClickObserver and not isWho then
-			hit:RegisterForDrag("LeftButton")
-			hit:SetScript("OnDragStart", DragStart)
-			hit:SetScript("OnDragStop", DragStop)
+			state.trackDrag = function(button)
+				TrackLinkDrag(state, row, button)
+			end
+			-- Keep the frame callbacks for clients that cannot report a global release.
+			if not watchesRelease then
+				hit:RegisterForDrag("LeftButton")
+				hit:SetScript("OnDragStart", DragStart)
+				hit:SetScript("OnDragStop", DragStop)
+			end
 		end
 	end
 
@@ -745,6 +795,23 @@ local function GetFocusedMenuFriend()
 	return row, friend
 end
 
+local function PressRegionLink(region, button)
+	if BFL:IsSecret(region) then return false end
+	local state = region and linkLayers[region]
+	if not state and button == "LeftButton" then
+		local row = rowsByLayer[region] or region
+		state = layers[row]
+		-- A pass-through catch can be the only region reported for a native click.
+		-- Restrict this route to the row or that exact catch, excluding action buttons.
+		if not state or not state.trackDrag or state.activeCatch ~= state.leftCatch
+			or (region ~= state.leftCatch and region ~= row) or not state.hit:IsVisible()
+		then return false end
+	end
+	if not state then return false end
+	PressLink(state, button)
+	return true
+end
+
 function FriendMenu:MaskNativeMenuTitle(root, friend, isBNet)
 	local streamer = BFL.StreamerMode
 	if not streamer or not streamer:IsActive() then return end
@@ -805,6 +872,7 @@ end
 function FriendMenu:Initialize()
 	local streamerChatLink = false
 	local events = CreateFrame("Frame")
+	dragTracker = events
 	events:RegisterEvent("PLAYER_REGEN_DISABLED")
 	events:RegisterEvent("PLAYER_REGEN_ENABLED")
 	events:RegisterEvent("MODIFIER_STATE_CHANGED")
@@ -815,17 +883,27 @@ function FriendMenu:Initialize()
 	watchesRelease = BFL.Compat.RegisterEvent(events, "GLOBAL_MOUSE_UP")
 	if watchesRelease then
 		BFL.Compat.RegisterEvent(events, "GLOBAL_MOUSE_DOWN")
+		BFL.Compat.RegisterEvent(events, "GLOBAL_REGION_MOUSE_DOWN")
 	end
 	events:SetScript("OnEvent", function(_, event, ...)
-		if event == "GLOBAL_MOUSE_DOWN" or event == "GLOBAL_MOUSE_UP" then
+		if event == "GLOBAL_REGION_MOUSE_DOWN" then
+			PressRegionLink(...)
+			return
+		elseif event == "GLOBAL_MOUSE_DOWN" or event == "GLOBAL_MOUSE_UP" then
 			UpdateMessagePress(event, ...)
 			local button = ...
 			if event == "GLOBAL_MOUSE_DOWN" and GetMouseFoci then
-				for _, focus in ipairs(GetMouseFoci() or {}) do
-					local state = linkLayers[focus]
-					if state then PressLink(state, button); break end
+				local foci = GetMouseFoci()
+				if foci and not PressRegionLink(foci[1], button) then
+					-- The lower layers still validate held links, but only the
+					-- pressed surface can begin a drag.
+					for index = 2, #foci do
+						local state = linkLayers[foci[index]]
+						if state then PressLink(state, button, true); break end
+					end
 				end
 			elseif event == "GLOBAL_MOUSE_UP" and button then
+				if button == "LeftButton" then StopTrackingLinkDrag() end
 				local state = heldLinks[button]
 				heldLinks[button] = nil
 				if state and state.blocked then

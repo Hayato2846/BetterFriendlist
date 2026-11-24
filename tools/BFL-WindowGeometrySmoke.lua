@@ -325,4 +325,50 @@ actionFont:SetFont("theme-native.ttf", 15)
 BFL.FontManager:RefreshWindowFonts()
 _, actionSize = actionFont:GetFont()
 equal(actionSize, 15, "default font settings leave external theme fonts in control")
+do
+	local owner = Window(40, 60, 400, 650, 1.15)
+	BFL.MainFrame, env.BetterFriendsFrame = owner, owner
+	local function SettingsWindow()
+		local frame = Window(0, 0, 780, 600)
+		frame.parent = owner
+		frame.strata, frame.level = "HIGH", 3
+		frame.CategoryList = { SetWidth = function() end }
+		function frame:GetParent() return self.parent end
+		function frame:SetParent(parent)
+			self.parent = parent
+			self.strata, self.level = "MEDIUM", 1
+		end
+		function frame:GetFrameStrata() return self.strata end
+		function frame:SetFrameStrata(strata) self.strata = strata end
+		function frame:GetFrameLevel() return self.level end
+		function frame:SetFrameLevel(level) self.level = level end
+		function frame:SetScale(scale) self.ratio = scale * self.parent:GetEffectiveScale() / env.UIParent:GetEffectiveScale() end
+		function frame:SetSize(width, height) self.width, self.height = width, height end
+		function frame:SetResizeBounds() end
+		function frame:SetMovable(movable) self.movable = movable end
+		return frame
+	end
+	local first = SettingsWindow()
+	module.db = { settingsWindowDetached = true, settingsWindowSize = { width = 780, height = 600 } }
+	BFL.modules.DB = { Set = function(_, key, value) module.db[key] = value end }
+	assert(module:ApplySettingsWindowAttachment(first) and first:GetParent() == env.UIParent and first.movable,
+		"Detaching makes Settings independently movable")
+	assert(first:GetFrameStrata() == "HIGH", "Detaching loses the Settings strata")
+	equal(first:GetFrameLevel(), 3, "Detaching loses the Settings frame level")
+	geometry:SetTopLeft(first, 136, 811)
+	module:SaveSettingsWindowPosition(first)
+	local saved = module.db.settingsWindowPosition
+	local reopened = SettingsWindow()
+	owner.left = 1110
+	assert(module:ApplySettingsWindowAttachment(reopened), "Saved attachment mode survives rebuilding the window")
+	local x, y, _, height = geometry:GetRect(reopened)
+	equal(x, 136, "A new Settings window restores its independent x coordinate")
+	equal(y + height, 811, "A new Settings window restores its independent top coordinate")
+	module.db.settingsWindowDetached = false
+	assert(not module:ApplySettingsWindowAttachment(reopened) and reopened:GetParent() == owner and not reopened.movable,
+		"Reattaching restores the friends list as parent")
+	assert(reopened:GetFrameStrata() == "HIGH", "Reattaching loses the Settings strata")
+	equal(reopened:GetFrameLevel(), 3, "Reattaching loses the Settings frame level")
+	assert(module.db.settingsWindowPosition == saved, "Reattaching overwrites the last independent position")
+end
 io.write(string.format("PASS: window docking, position persistence and fonts (%d checks)\n", checks))

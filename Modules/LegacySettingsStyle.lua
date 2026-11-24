@@ -378,6 +378,44 @@ function LegacySettingsStyle:SkinActions(buttons, editBox)
 	end
 end
 
+local function UsesBareTitleIcons()
+	local theme = BFL:GetEffectiveTheme()
+	return theme == "blizzard" or theme == "ellesmereui"
+end
+
+function LegacySettingsStyle:SkinTitleAction(button)
+	local bare = UsesBareTitleIcons()
+	for _, layer in ipairs({ "BACKGROUND", "ARTWORK", "HIGHLIGHT" }) do
+		if bare then button:DisableDrawLayer(layer) else button:EnableDrawLayer(layer) end
+	end
+	-- The template's button-state highlight can still render with the draw layer disabled.
+	local highlight = button:GetHighlightTexture()
+	if bare then
+		if highlight then
+			button.BFL_TitleHighlightAlpha = button.BFL_TitleHighlightAlpha or highlight:GetAlpha()
+			highlight:SetAlpha(0)
+		end
+		if not button.BFL_TitleActionHooked then
+			local function UpdateIcon(owner, hovered)
+				if UsesBareTitleIcons() then owner.Icon:SetAlpha(hovered and 1 or .8) end
+			end
+			local function ClearHover(owner) UpdateIcon(owner, false) end
+			button:HookScript("OnEnter", function(owner) UpdateIcon(owner, true) end)
+			button:HookScript("OnLeave", ClearHover)
+			button:HookScript("OnHide", ClearHover)
+			button.BFL_TitleActionHooked = true
+		end
+		button.Icon:SetAlpha(button:IsVisible() and button:IsMouseOver() and 1 or .8)
+	else
+		if highlight and button.BFL_TitleHighlightAlpha then
+			highlight:SetAlpha(button.BFL_TitleHighlightAlpha)
+			button.BFL_TitleHighlightAlpha = nil
+		end
+		if button.BFL_TitleActionHooked then button.Icon:SetAlpha(1) end
+		self:SkinActions({ button })
+	end
+end
+
 function LegacySettingsStyle:SkinReleaseHeader(header, modern)
 	local theme = BFL:GetEffectiveTheme()
 	if theme == "elvui" then
@@ -414,6 +452,10 @@ function LegacySettingsStyle:Refresh()
 	if not (frame and frame.Bg and frame.MainInset) then return end
 	local theme, modern, palette, FriendsUI = self:GetWindowStyle()
 	local review = BFL:GetModule("LegacySettingsReview")
+	if frame.BFL_SettingsAnchorButton then
+		self:SkinTitleAction(frame.BFL_SettingsAnchorButton)
+		BFL:GetModule("FrameSettings"):RefreshSettingsWindowControls(frame)
+	end
 	local dock = BFL:GetModule("SettingsPreviewDock")
 	if dock then dock:RefreshAppearance() end
 	local shell = review and review.previewShell

@@ -2377,6 +2377,9 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 	if iconPath and icon.SetTexture then
 		icon:SetTexture(iconPath)
 	end
+	-- Utility glyphs are tinted with the theme's icon color. Their bundled
+	-- gold artwork must not multiply that color into a different hue.
+	if button.BFL_SettingsIconButton then self:SetTextureDesaturated(button, icon, true) end
 	if needsSetup and icon.ClearAllPoints then
 		self:SetRegionPoints(button, icon, {
 			{ "CENTER", button, "CENTER", iconX, iconY },
@@ -2411,6 +2414,7 @@ function SkinEngine:SkinIconButton(button, iconPath, opts)
 		elseif icon.GetTexture and hoverIcon.SetTexture then
 			hoverIcon:SetTexture(icon:GetTexture())
 		end
+		if button.BFL_SettingsIconButton then self:SetTextureDesaturated(button, hoverIcon, true) end
 		if needsSetup and hoverIcon.ClearAllPoints then
 			self:SetRegionPoints(button, hoverIcon, {
 				{ "CENTER", icon, "CENTER", 0, 0 },

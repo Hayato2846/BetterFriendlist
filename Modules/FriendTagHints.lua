@@ -50,6 +50,9 @@ function FriendTagHints:GetGuidance(friend, tagIds)
 		if currentFriend then
 			group = friends:PassesFilters(currentFriend)
 		end
+		if group and friends and friends.PassesDynamicTagGroupFilter then
+			group = friends:PassesDynamicTagGroupFilter(currentFriend or friend, tags:GetSetting("dynamicTagGroupFilter", "all"))
+		end
 		if group and db:Get("hideEmptyGroups", false) and not BFL:IsSecret(connected) and connected == false then
 			-- An offline friend can still join a group that has other online members.
 			visibleGroups = {}

@@ -2006,6 +2006,7 @@
 				end
 			</OnShow>
 			<OnHide>
+				BetterFriendsFrame_OnSearchHide()
 				-- Fix #81: Reset bottom tab to Friends so reopen doesn't get stuck on Who/Quick Join
 				self.selectedTab = 1
 			</OnHide>

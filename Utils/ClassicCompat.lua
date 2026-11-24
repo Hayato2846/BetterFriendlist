@@ -80,6 +80,7 @@ local function ApplyIconProfileToClassicMenuItem(item, profile)
 	end
 
 	item.icon = texture
+	item.BFL_MenuIconProfile = profile
 	local texCoord = profile.texCoord
 	if type(texCoord) == "table" and #texCoord >= 4 then
 		item.tCoordLeft = texCoord[1]
@@ -95,6 +96,34 @@ local function ApplyIconProfileToClassicMenuItem(item, profile)
 		item.tCoordBottom = 1 - zoom
 	end
 	return true
+end
+
+local function RestoreClassicMenuIcon(button)
+	local state = button.BFL_MenuIconState
+	if not state then return end
+	state.icon:SetDesaturated(state.desaturated)
+	state.icon:SetVertexColor(unpack(state.color))
+	button.BFL_MenuIconState = nil
+end
+
+local function AddClassicMenuButton(info, level)
+	local list = _G["DropDownList" .. level]
+	local nextButton = list and _G[list:GetName() .. "Button" .. (list.numButtons + 1)]
+	if nextButton then RestoreClassicMenuIcon(nextButton) end
+	UIDropDownMenu_AddButton(info, level)
+	if not info.BFL_MenuIconProfile then return end
+	list = _G["DropDownList" .. level]
+	local button = list and _G[list:GetName() .. "Button" .. list.numButtons]
+	local icon = button and _G[button:GetName() .. "Icon"]
+	if not icon then return end
+	button.BFL_MenuIconState = { icon = icon, desaturated = icon:IsDesaturated(), color = { icon:GetVertexColor() } }
+	-- UIDropDownMenu copies texture/crop metadata but has no icon tint field.
+	-- Reuse the editor's tinting and release it when this pooled row is hidden.
+	Compat.ApplyIconTint(icon, info.BFL_MenuIconProfile.iconColor)
+	if not button.BFL_MenuIconRestoreBound then
+		button.BFL_MenuIconRestoreBound = true
+		button:HookScript("OnHide", RestoreClassicMenuIcon)
+	end
 end
 
 local SIMPLE_MENU_CHECKED_ATLASES = {
@@ -747,7 +776,7 @@ function Compat.OpenSimpleContextMenu(owner, name, itemsOrFactory)
 						RunSimpleMenuItem(item, item.value)
 					end
 				end
-				UIDropDownMenu_AddButton(info, level)
+				AddClassicMenuButton(info, level)
 			end
 		end
 	end, "MENU")
@@ -1071,7 +1100,7 @@ function Compat.InitializeDropdown(dropdown, options, getter, setter, scrollHeig
 					for key, value in pairs(item) do
 						info[key] = value
 					end
-					UIDropDownMenu_AddButton(info, level)
+					AddClassicMenuButton(info, level)
 				end
 				return
 			end
@@ -1852,6 +1881,34 @@ function Compat.GetGameAccountRichPresence(gameAccountInfo)
 	return presence
 end
 
+function Compat.GetBNetWoWAreaAndRealm(gameAccountInfo)
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return nil, nil end
+	local area, realm = gameAccountInfo.areaName, gameAccountInfo.realmName
+	if BFL.IsSecret then
+		if BFL:IsSecret(area) then area = nil end
+		if BFL:IsSecret(realm) then realm = nil end
+	end
+	if IsSafeNameValue(area) then return area, realm end
+
+	local presence = Compat.GetGameAccountRichPresence(gameAccountInfo)
+	if not presence then return area, realm end
+	if Compat.IsWoWAccountRulesetLocation(gameAccountInfo) then
+		-- A Forever status supplies display text. Preserve the realm from the API.
+		local _, _, presenceArea = GetForeverDisplayPresence(presence)
+		return presenceArea or presence:match("^%s*(.-)%s*$"), realm
+	end
+
+	local separator = presence:find(" - ", 1, true)
+	if separator then
+		if not IsSafeNameValue(realm) then
+			local presenceRealm = presence:sub(separator + 3):match("^%s*(.-)%s*$")
+			if presenceRealm ~= "" then realm = presenceRealm end
+		end
+		presence = presence:sub(1, separator - 1)
+	end
+	return presence:match("^%s*(.-)%s*$"), realm
+end
+
 local function GetForeverRulesetLabel(gameAccountInfo)
 	local presenceToken, presenceRealm, presenceArea, rawLabel = GetForeverDisplayPresence(gameAccountInfo.richPresence)
 	local realm = gameAccountInfo.realmName
@@ -1879,6 +1936,25 @@ end
 local function IsReadableAccountID(value)
 	return not (BFL.IsSecret and BFL:IsSecret(value)) and type(value) == "number"
 		and value > 0 and value < math.huge and value % 1 == 0
+end
+
+function Compat.IsBNetGameAccountOnSameRealm(gameAccountInfo, playerRealm)
+	if not IsReadableGameAccountInfo(gameAccountInfo) then return nil end
+
+	local api = C_BattleNet and C_BattleNet.IsGameAccountOnSameRealm
+	local id = gameAccountInfo.gameAccountID
+	if type(api) == "function" and IsReadableAccountID(id) then
+		local ok, sameRealm = pcall(api, id)
+		if ok and not (BFL.IsSecret and BFL:IsSecret(sameRealm)) and type(sameRealm) == "boolean" then
+			return sameRealm
+		end
+	end
+
+	local realm = gameAccountInfo.realmName
+	if IsSafeNameValue(realm) and IsSafeNameValue(playerRealm) then
+		return realm == playerRealm
+	end
+	return nil
 end
 
 function Compat.HasBNetInviteRealmInfo(gameAccountInfo)
@@ -2266,23 +2342,6 @@ function Compat.IsBattleNetFriendsListEnabled()
 		return SafeBooleanAPICall(C_BattleNet.IsBattleNetFriendsListEnabled, false)
 	end
 	return true
-end
-
-function Compat.CanSearchBattleNetFriends()
-	return BFL.IsMainline == true
-		and C_BattleNet ~= nil
-		and type(C_BattleNet.SearchFriends) == "function"
-end
-
-function Compat.SearchBattleNetFriends(searchInfo)
-	if not Compat.CanSearchBattleNetFriends() or type(searchInfo) ~= "table" then
-		return nil
-	end
-	local ok, result = pcall(C_BattleNet.SearchFriends, searchInfo)
-	if not ok or type(result) ~= "table" then
-		return nil
-	end
-	return result
 end
 
 function Compat.AreBattleNetFriendTagsEnabled()
@@ -4266,8 +4325,6 @@ BFL.IsBNetInviteRealmRestricted = Compat.IsBNetInviteRealmRestricted
 BFL.GetBNetInviteTooltipInfo = Compat.GetBNetInviteTooltipInfo
 BFL.IsBattleNetFriendsListSupported = Compat.IsBattleNetFriendsListSupported
 BFL.IsBattleNetFriendsListEnabled = Compat.IsBattleNetFriendsListEnabled
-BFL.CanSearchBattleNetFriends = Compat.CanSearchBattleNetFriends
-BFL.SearchBattleNetFriends = Compat.SearchBattleNetFriends
 BFL.AreBattleNetFriendTagsEnabled = Compat.AreBattleNetFriendTagsEnabled
 BFL.GetBNetFriendInviteInfo = Compat.GetBNetFriendInviteInfo
 BFL.CanSetBNetBlocked = Compat.CanSetBNetBlocked

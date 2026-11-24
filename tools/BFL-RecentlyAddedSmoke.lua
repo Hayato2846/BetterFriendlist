@@ -3,6 +3,9 @@ local events, timers = {}, {}
 local wow, bnet = {}, {}
 local wowCount, bnetCount = 0, 0
 local connected, enabled, now = true, true, 1000000
+local shown, inCombat, wowReads = true, false, 0
+BetterFriendsFrame = { IsShown = function() return shown end }
+InCombatLockdown = function() return inCombat end
 local db = {
 	Get = function(_, key, default)
 		if key == "enableRecentlyAddedGroup" then
@@ -26,7 +29,7 @@ local BFL = {
 	Compat = { GetBNetFriendInfo = function(i) return bnet[i] end },
 	CanUseWoWFriendList = function() return true end,
 	GetNumWoWFriends = function() return wowCount end,
-	GetWoWFriendInfoByIndex = function(i) return wow[i] end,
+	GetWoWFriendInfoByIndex = function(i) wowReads = wowReads + 1; return wow[i] end,
 	NormalizeWoWFriendName = function(_, name) return name end,
 	IsSecret = function() return false end,
 	IsTitleFriend = function(info) return info.title end,
@@ -142,4 +145,25 @@ assert(duration == 7 * 86400, "the seven-day comparison must use the selected un
 assert(module:IsWithinDuration(2 * 3600, duration), "a friend added two hours ago remains in Recently Added")
 assert(not module:IsWithinDuration(8 * 86400, duration), "a friend added eight days ago is outside the seven-day duration")
 assert(not module:IsWithinDuration(duration, duration), "a timestamp exactly on the expiration boundary has expired")
+shown, wowReads = false, 0
+for _ = 1, 100 do events.FRIENDLIST_UPDATE() end
+assert(wowReads == 0 and #timers == 1, "Closed-window status bursts queue one scan")
+Settle()
+assert(wowReads == wowCount, "Only one WoW snapshot is taken for the burst")
+
+inCombat, wowReads = true, 0
+wow[wowCount] = { name = "Replacement-Realm" }
+for _ = 1, 100 do events.FRIENDLIST_UPDATE() end
+assert(wowReads == 0 and #timers == 0, "Closed-window combat queues no scans")
+inCombat = false
+events.PLAYER_REGEN_ENABLED()
+assert(wowReads == wowCount and module:IsFriendRecentlyAdded("wow_Replacement-Realm"),
+	"A same-size roster change is observed after combat")
+
+wowReads = 0
+events.FRIENDLIST_UPDATE()
+shown = true
+module:FlushSourceUpdates()
+Settle()
+assert(wowReads == wowCount, "Opening flushes a queued scan exactly once")
 io.write("Recently Added smoke passed\n")

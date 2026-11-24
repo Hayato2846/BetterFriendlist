@@ -16,6 +16,7 @@ local Dialogs = BFL:RegisterModule("Dialogs", {})
 -- Only these addon-owned text workflows may use the private dialog. Native
 -- confirmations, invitations and other addons' StaticPopup slots stay native.
 local INPUT_DIALOGS = {
+	BFL_FRIEND_LOCAL_TIME = true,
 	BETTER_FRIENDLIST_CREATE_GROUP = true,
 	BETTER_FRIENDLIST_CREATE_GROUP_AND_ADD_FRIEND = true,
 	BETTER_FRIENDLIST_RENAME_GROUP = true,
@@ -218,6 +219,94 @@ end
 
 function BFL.ShowInputDialog(...)
 	return Dialogs:ShowInput(...)
+end
+
+-- Links and explicit copy actions share the private input dialog, including
+-- theme, layering and the user's native-dialog preference. Never skin a pooled
+-- StaticPopup slot or leave a copy-specific key handler installed on it.
+function Dialogs:HideFriendLocalTime()
+	local frame = self.inputDialog
+	if frame and frame.which == "BFL_FRIEND_LOCAL_TIME" and frame:IsShown() then frame:Hide() end
+	if StaticPopup_Hide then StaticPopup_Hide("BFL_FRIEND_LOCAL_TIME") end
+end
+
+function Dialogs:ShowFriendLocalTime(key)
+	local clock = BFL:GetModule("FriendLocalTime")
+	if not clock:IsEnabled() then return end
+
+	local function RefreshPreview(frame)
+		if not frame.data or not frame:IsShown() then return end
+		if not clock:IsEnabled() then
+			frame:Hide()
+			return
+		end
+		local now = clock:GetTimestamp()
+		local ownOffset = clock:GetLocalOffset(now)
+		local box = frame.EditBox or frame:GetEditBox()
+		local offset = clock:GetOffsetFromDifference(box:GetText(), ownOffset)
+		local ownTime = clock:FormatTime(now, ownOffset)
+		local friendTime = offset and clock:FormatTime(now, offset) or "--:--"
+		local text = L.FRIEND_LOCAL_TIME_PROMPT .. "\n\n" .. L.FRIEND_LOCAL_TIME_PREVIEW:format(ownTime, friendTime)
+		local label = frame.BFL_ErrorLabel and frame.text or frame:GetTextFontString()
+		if label:GetText() == text then return end
+		label:SetText(text)
+		if frame.BFL_ErrorLabel then self:LayoutInputDialog() else frame:Resize() end
+	end
+
+	StaticPopupDialogs.BFL_FRIEND_LOCAL_TIME = {
+		text = L.FRIEND_LOCAL_TIME_PROMPT,
+		button1 = SAVE or ACCEPT,
+		button2 = CANCEL,
+		hasEditBox = true,
+		hideOnEscape = true,
+		OnShow = function(frame, data)
+			local box = frame.EditBox or frame:GetEditBox()
+			local offset = clock:GetOffset(data.key)
+			local ownOffset = clock:GetLocalOffset(clock:GetTimestamp())
+			box:SetMaxLetters(8)
+			box:SetText(offset and clock:FormatDifference(offset - ownOffset) or "")
+			box:SetFocus()
+			box:HighlightText()
+			RefreshPreview(frame)
+			local ticker = C_Timer.NewTicker(1, function() RefreshPreview(frame) end)
+			data.previewTicker = ticker
+		end,
+		OnHide = function(_, data)
+			if data and data.previewTicker then
+				data.previewTicker:Cancel()
+				data.previewTicker = nil
+			end
+		end,
+		OnAccept = function(frame, data)
+			if not clock:IsEnabled() then return end
+			local box = frame.EditBox or frame:GetEditBox()
+			local ownOffset = clock:GetLocalOffset(clock:GetTimestamp())
+			local offset, valid = clock:GetOffsetFromDifference(box:GetText(), ownOffset)
+			if not valid then
+				if frame.BFL_ErrorLabel then
+					frame.BFL_ErrorLabel:SetText(L.FRIEND_LOCAL_TIME_INVALID)
+					self:LayoutInputDialog()
+				else
+					UIErrorsFrame:AddExternalErrorMessage(L.FRIEND_LOCAL_TIME_INVALID)
+				end
+				box:SetFocus()
+				return true
+			end
+			clock:SetOffset(data.key, offset)
+		end,
+		EditBoxOnTextChanged = function(box)
+			local frame = box:GetParent()
+			if frame.BFL_ErrorLabel then frame.BFL_ErrorLabel:SetText("") end
+			RefreshPreview(frame)
+		end,
+		EditBoxOnEnterPressed = function(box)
+			box:GetParent():GetButton1():Click()
+		end,
+		EditBoxOnEscapePressed = function(box)
+			box:GetParent():Hide()
+		end,
+	}
+	return self:ShowInput("BFL_FRIEND_LOCAL_TIME", nil, nil, { key = key })
 end
 
 -- Links and explicit copy actions share the private input dialog, including

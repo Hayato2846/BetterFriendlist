@@ -76,6 +76,35 @@ local function check(condition, description)
 	assert(condition, description)
 end
 check(callbacks.PLAYER_ENTERING_WORLD and callbacks.BN_FRIEND_LIST_SIZE_CHANGED, "migration starts from roster events")
+local shown, inCombat, scheduled = false, false, nil
+env.BetterFriendsFrame = { IsShown = function() return shown end }
+env.InCombatLockdown = function() return inCombat end
+env.C_Timer.NewTimer = function(_, callback)
+	scheduled = callback
+	return { Cancel = function() scheduled = nil end }
+end
+local liveProcess, passes = titleNotes.Process, 0
+titleNotes.Process = function() passes = passes + 1 end
+for _ = 1, 100 do callbacks.BN_FRIEND_INFO_CHANGED() end
+callbacks.PLAYER_REGEN_ENABLED()
+check(scheduled == nil and passes == 0, "Closed-window events never schedule an automatic roster scan")
+shown = true
+titleNotes:ResumeProcessing()
+check(scheduled ~= nil, "Opening the list schedules deferred maintenance")
+local scan = scheduled
+scheduled, shown = nil, false
+scan()
+check(passes == 0, "A timer queued before closing cannot scan the hidden roster")
+shown, inCombat = true, true
+titleNotes:ResumeProcessing()
+check(scheduled == nil, "Combat defers automatic maintenance")
+inCombat = false
+callbacks.PLAYER_REGEN_ENABLED()
+scan, scheduled = scheduled, nil
+scan()
+callbacks.PLAYER_REGEN_ENABLED()
+check(passes == 1 and scheduled == nil, "Combat recovery runs once and ordinary combat exits do no work")
+titleNotes.Process = liveProcess
 long.note = secret
 titleNotes:Process()
 check(writes == 0 and next(store.backups) == nil, "wait for a readable Title Friend roster")
@@ -205,7 +234,7 @@ loadProduction("Modules/FriendsList.lua")
 local list = modules.FriendsList
 local hovered, shift = nil, false
 local refreshes = 0
-BFL.GetDragGhost = function() end
+list.ShowFriendDragGhost = function() end
 BFL.IsRegionMouseOver = function(_, frame) return hovered == frame end
 BFL.ForceRefreshFriendsList = function() refreshes = refreshes + 1 end
 env.GetCursorPosition = function() return 0, 0 end
@@ -229,6 +258,7 @@ end
 local function friendRow(friend)
 	local row = region()
 	row.friendData, row.dragOverlay, row.scripts = friend, region(), {}
+	row.Name = { GetText = function() return friend.displayName or friend.name end }
 	list:BindFriendGroupAction(row, list:GetFriendUID(friend), friend.rawNote)
 	row.dragOverlay:Hide()
 	function row:SetAlpha(alpha) self.alpha = alpha end

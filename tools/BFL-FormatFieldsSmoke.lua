@@ -20,7 +20,7 @@ for _, locale in ipairs({ "enUS", "deDE", "esES", "esMX", "frFR", "itIT", "ptBR"
 		BFL.IsForever = forever
 		local name, info = settings:GetFormatFields(false), settings:GetFormatFields(true)
 		check(#name == (forever and 11 or 10), locale .. " has incomplete name fields")
-		check(#info == (forever and 15 or 14), locale .. " has incomplete info fields")
+		check(#info == (forever and 16 or 15), locale .. " has incomplete info fields")
 		for _, fields in ipairs({ name, info }) do
 			local seen = {}
 			for _, field in ipairs(fields) do
@@ -31,7 +31,7 @@ for _, locale in ipairs({ "enUS", "deDE", "esES", "esMX", "frFR", "itIT", "ptBR"
 			check((seen["%ruleset%"] == true) == forever, "Ruleset field is shown on the wrong client")
 		end
 		local extra = {}; for _, field in ipairs(info) do extra[field.token] = true end
-		check(extra["%accounts%"] and extra["%games%"], locale .. " is missing info-only fields")
+		check(extra["%accounts%"] and extra["%games%"] and extra["%statusonline%"], locale .. " is missing info-only fields")
 	end
 end
 io.write(string.format("PASS: format references in all 11 locales, ordinary and Forever (%d checks)\n", checks))

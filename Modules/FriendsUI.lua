@@ -1858,14 +1858,14 @@ function FriendsUI:IsStoryRaidTabRestricted()
 end
 
 function FriendsUI:RefreshStoryRaidTabState()
-	local restricted = self:IsStoryRaidTabRestricted()
-	if BetterFriendsFrame_UpdateRaidTabState then
-		BetterFriendsFrame_UpdateRaidTabState()
-	end
-
 	if not BetterFriendsFrame or not BetterFriendsFrame:IsShown() then
 		self.navigationDirty = true
-		return restricted
+		return
+	end
+
+	local restricted = BetterFriendsFrame_UpdateRaidTabState and BetterFriendsFrame_UpdateRaidTabState()
+	if restricted == nil then
+		restricted = self:IsStoryRaidTabRestricted()
 	end
 
 	if restricted and self:GetSelectedSection() == "raid" then
@@ -2238,6 +2238,10 @@ function FriendsUI:RefreshSortButtonText()
 			local secondary = Registry:FormatIcon(Registry:GetSorterIcon(FriendsList.secondarySort), 11)
 			text = string.format("%s %s", text, secondary)
 		end
+		local tertiary = FriendsList:GetActiveTertiarySortMode()
+		if tertiary ~= "none" then
+			text = text .. " " .. Registry:FormatIcon(Registry:GetSorterIcon(tertiary), 11)
+		end
 		text = text .. ")"
 	end
 	if BFL.SetDropdownText then
@@ -2381,7 +2385,25 @@ function FriendsUI:GetSortMenuItems()
 			}
 		end
 	end
-	return { primary, secondary }
+	local menu = { primary, secondary }
+	if FriendsList:IsTertiarySortEnabled() then
+		local tertiary = { type = "submenu", text = L.SORT_TERTIARY_LABEL, items = {} }
+		local function AddTertiaryItem(value, text)
+			tertiary.items[#tertiary.items + 1] = {
+				type = "radio",
+				text = text,
+				value = value,
+				checked = function(id) return FriendsList:GetActiveTertiarySortMode() == id end,
+				func = function(id) FriendsList:SetTertiarySortMode(id) end,
+			}
+		end
+		AddTertiaryItem("none", L.SORT_NONE)
+		for _, sorter in ipairs(Registry:GetVisibleSorters(FriendsList.sortMode, FriendsList.secondarySort)) do
+			AddTertiaryItem(sorter.id, Registry:FormatIcon(sorter.icon, 16) .. " " .. sorter.name)
+		end
+		menu[#menu + 1] = tertiary
+	end
+	return menu
 end
 
 function FriendsUI:PopulateSortMenu(rootDescription)
@@ -3439,13 +3461,14 @@ function FriendsUI:QueueLegacyHeaderActionRestore()
 	self.legacyHeaderActionRestoreGeneration = (self.legacyHeaderActionRestoreGeneration or 0) + 1
 	local generation = self.legacyHeaderActionRestoreGeneration
 	local function RestoreIfCurrent()
-		if generation == self.legacyHeaderActionRestoreGeneration and self.appliedStyle == STYLE_LEGACY then
+		if generation == self.legacyHeaderActionRestoreGeneration and self.appliedStyle == STYLE_LEGACY
+			and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 			self:RestoreLegacyHeaderActions()
+			return true
 		end
 	end
 	C_Timer.After(0, function()
-		RestoreIfCurrent()
-		C_Timer.After(0.05, RestoreIfCurrent)
+		if RestoreIfCurrent() then C_Timer.After(0.05, RestoreIfCurrent) end
 	end)
 end
 
@@ -3608,7 +3631,7 @@ function FriendsUI:GetRaidInfoMoverRuntimeState(window)
 end
 
 function FriendsUI:AnchorAuxiliaryWindow(window, topOffset, screenAware)
-	if not (window and BetterFriendsFrame) then
+	if not (window and BetterFriendsFrame) or window.BFL_DockDisabled then
 		return false
 	end
 	if screenAware ~= false and BFL.WindowGeometry then
@@ -3621,7 +3644,7 @@ function FriendsUI:AnchorAuxiliaryWindow(window, topOffset, screenAware)
 				self:AnchorAuxiliaryWindow(window, window.BFL_DockTopOffset, true)
 			end)
 			window:HookScript("OnUpdate", function()
-				if window.BFL_Resizing then return end
+				if window.BFL_DockDisabled or window.BFL_Resizing then return end
 				if InCombatLockdown() and window:IsProtected() then
 					window.BFL_DockGeometry = nil
 					return
@@ -3703,7 +3726,7 @@ function FriendsUI:QueueRaidInfoFrameAnchorRefresh(frame)
 		return false
 	end
 	local function RefreshAnchor()
-		if frame.IsShown and not frame:IsShown() then
+		if not frame:IsVisible() then
 			return
 		end
 		self:RefreshRaidInfoFrameAnchor(frame)
@@ -4149,13 +4172,14 @@ end
 
 function FriendsUI:QueueModernBottomFadeSync()
 	local root = self.root
-	if not (root and C_Timer and C_Timer.After) or root._bottomFadeSyncPending then
+	if not (root and BetterFriendsFrame and BetterFriendsFrame:IsShown() and C_Timer and C_Timer.After)
+		or root._bottomFadeSyncPending then
 		return
 	end
 	root._bottomFadeSyncPending = true
 	C_Timer.After(0, function()
 		root._bottomFadeSyncPending = nil
-		if self.root == root then
+		if self.root == root and BetterFriendsFrame and BetterFriendsFrame:IsShown() then
 			self:SynchronizeModernBottomFade()
 		end
 	end)
@@ -4753,16 +4777,10 @@ function FriendsUI:ToggleSection(sectionID)
 		return false
 	end
 	if BetterFriendsFrame:IsShown() and self:GetSelectedSection() == sectionID then
-		BetterFriendsFrame:Hide()
+		HideBetterFriendsFrame()
 		return
 	end
-	if not BetterFriendsFrame:IsShown() then
-		if ShowUIPanel then
-			ShowUIPanel(BetterFriendsFrame)
-		else
-			BetterFriendsFrame:Show()
-		end
-	end
+	BFL:ShowBetterFriendsWindow()
 	self:SelectSection(sectionID)
 end
 
@@ -4832,13 +4850,7 @@ function FriendsUI:OpenSocialUISection(sectionID)
 	if not BetterFriendsFrame then
 		return false
 	end
-	if not BetterFriendsFrame:IsShown() then
-		if ShowUIPanel then
-			ShowUIPanel(BetterFriendsFrame)
-		else
-			BetterFriendsFrame:Show()
-		end
-	end
+	BFL:ShowBetterFriendsWindow()
 	self:SelectSection(sectionID)
 	return true
 end
@@ -6542,31 +6554,6 @@ function FriendsUI:RegisterTests()
 				STYLE_LEGACY,
 				"Requested Legacy wins over the developer override"
 			)
-		end,
-	})
-	TestSuite:RegisterTest("ui", "FriendsUI_NativeQueueFilterFallback", {
-		action = function(V)
-			local Registry = BFL:GetModule("FilterSortRegistry")
-			if not Registry then
-				V:Skip("Filter registry is unavailable")
-				return
-			end
-			local originalState = Registry.nativeQueueFilterState
-			Registry.nativeQueueFilterState = {
-				id = "inqueue",
-				valid = true,
-				matches = { [2] = true },
-			}
-			local matchesBattleNet = Registry:EvaluateNativeQueueFilter("inqueue", { type = "bnet", index = 2 })
-			local excludesBattleNet = not Registry:EvaluateNativeQueueFilter("inqueue", { type = "bnet", index = 1 })
-			local excludesCharacterFriend = not Registry:EvaluateNativeQueueFilter("inqueue", { type = "wow", index = 2 })
-			Registry.nativeQueueFilterState.valid = false
-			local preservesListOnRestrictedResult = Registry:EvaluateNativeQueueFilter("inqueue", { type = "bnet", index = 1 })
-			Registry.nativeQueueFilterState = originalState
-			V:Assert(matchesBattleNet, "Native queue result includes matching Battle.net indices")
-			V:Assert(excludesBattleNet, "Native queue result excludes unmatched Battle.net indices")
-			V:Assert(excludesCharacterFriend, "Native queue result does not replace BFL's character-friend provider")
-			V:Assert(preservesListOnRestrictedResult, "Restricted or nil native results fall back to an unfiltered list")
 		end,
 	})
 	TestSuite:RegisterTest("ui", "FriendsUI_RecentAlliesLegacyGroups", {

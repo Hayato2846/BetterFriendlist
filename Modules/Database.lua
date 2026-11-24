@@ -66,6 +66,8 @@ local defaults = {
 	fontSize = "normal", -- "small", "normal", "large"
 	useThemedDialogs = true,
 	settingsWindowSize = {},
+	settingsWindowDetached = false,
+	settingsWindowPosition = {},
 	settingsPreviewWidth = 380,
 	settingsPreviewHeight = 600,
 	settingsPreviewCollapsed = false,
@@ -125,6 +127,9 @@ local defaults = {
 	nameFormatCustom = "%name%", -- Custom format string (used when nameFormatPreset == "custom")
 	infoFormatPreset = "default", -- Preset: "default", "zone", "level", "class_zone", "level_class_zone", "game", "disabled", "custom"
 	infoFormatCustom = "%level%, %zone%", -- Custom info format string (used when infoFormatPreset == "custom")
+	friendFormatColors = {},
+	showFriendLocalTime = false,
+	friendTimeOffsets = {},
 	enableInGameGroup = false, -- Enable dynamic "In-Game" group (default: OFF)
 	inGameGroupMode = "same_game", -- "same_game" (WoW matching project) or "any_game" (Any BNet game)
 	windowScale = 1.0, -- Window scale factor: 0.5 = 50%, 1.0 = 100%, 2.0 = 200% (default: 100%)
@@ -141,6 +146,8 @@ local defaults = {
 	-- Sort Settings
 	primarySort = "status", -- Primary sort method: status, name, level, zone (default: status)
 	secondarySort = "name", -- Secondary sort method: none, name, level, zone (default: name)
+	enableTertiarySort = false,
+	tertiarySort = "none",
 	-- Filter Settings
 	quickFilter = "all", -- Quick filter mode: all, online, offline, wowonline, wow, bnet, hideafk, retail, ingame (default: all)
 	quickFilterTags = {}, -- Selected Friend Tag facets: { [tagId] = true }
@@ -381,7 +388,8 @@ local LEGACY_V2_PROFILE_KEYS = {
 	"fontTabText", "fontSizeTabText", "fontOutlineTabText", "fontShadowTabText", "fontRaidName", "fontSizeRaidName",
 	"fontOutlineRaidName", "fontShadowRaidName", "fontGroupHeader", "fontSizeGroupHeader", "fontOutlineGroupHeader",
 	"fontShadowGroupHeader", "colorGroupCount", "colorGroupArrow", "brokerFont", "brokerFontSize", "brokerFontFlags",
-	"brokerUseCustomFontForNonLatin", "quickFilter", "primarySort", "secondarySort", "customQuickFilters",
+	"brokerUseCustomFontForNonLatin", "quickFilter", "primarySort", "secondarySort", "enableTertiarySort", "tertiarySort",
+	"customQuickFilters",
 	"quickFilterVisibility", "quickFilterOrder", "nextCustomQuickFilterId", "customSorters", "sorterVisibility",
 	"sorterOrder", "nextCustomSorterId", "enableGuildTab", "guildTabFilterMode", "guildTabSortMode",
 	"guildTabShowClassIcons", "guildTabUseNicknames", "brokerEnabled", "brokerShowIcon", "brokerShowLabel",
@@ -471,6 +479,13 @@ local function ValidateProfileCollections(profile)
 		return true
 	end
 	for _, key in ipairs({ "nicknames", "guildNicknames" }) do if not stringMap(profile[key], "string") then return false end end
+	if not stringMap(profile.friendFormatColors, "table") or not stringMap(profile.friendTimeOffsets, "number") then return false end
+	for token, color in pairs(profile.friendFormatColors) do
+		if not token:match("^[a-z]+$") or not IsProfileColor(color, false) then return false end
+	end
+	for _, minutes in pairs(profile.friendTimeOffsets) do
+		if minutes < -720 or minutes > 840 or minutes % 1 ~= 0 then return false end
+	end
 	for _, key in ipairs({ "groupCountColors", "groupArrowColors" }) do
 		if not stringMap(profile[key], "table") then return false end
 	end

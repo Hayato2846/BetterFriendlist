@@ -59,9 +59,9 @@ function Dock:RefreshToggleIcon()
 end
 
 function Dock:CreateToggle(owner)
-	-- Use the same template selection and full button skins as Settings actions.
-	-- The arrow is content; hover/pressed feedback belongs to that shared button.
+	-- Keep the arrow on its own layer so the title action can hide the native button art.
 	local button = BFL.SettingsComponents:CreateButton(owner, "")
+	button.BFL_SettingsTitleAction = true
 	button:SetSize(30, 22)
 	button.Icon = button:CreateTexture(nil, "OVERLAY")
 	button.Icon:SetSize(14, 14)
@@ -74,7 +74,7 @@ function Dock:RefreshAppearance()
 	if not frame then return end
 	local style = BFL:GetModule("LegacySettingsStyle")
 	style:SkinAuxiliaryWindow(frame, frame.Inset)
-	style:SkinActions({ self.toggle })
+	style:SkinTitleAction(self.toggle)
 	local theme, modern, palette = style:GetWindowStyle()
 	style:RefreshWindowBackground(frame, theme, modern, palette)
 	for _, key in ipairs({ "NineSlice", "Bg" }) do
@@ -160,7 +160,7 @@ function Dock:GetDockSpace()
 	local ratio = BFL.WindowGeometry:GetRatio(self.window)
 	local left, bottom, width, height = BFL.WindowGeometry:GetRect(self.review.frame)
 	local spaceLeft, spaceRight = left - 4, UIParent:GetWidth() - left - width - 4
-	local friends = _G.BetterFriendsFrame
+	local friends = not self.review.frame.BFL_DockDisabled and _G.BetterFriendsFrame
 	if friends and friends:IsVisible() then
 		local fx, fy, fw, fh = BFL.WindowGeometry:GetRect(friends)
 		local friendsUI = BFL:GetModule("FriendsUI")
@@ -237,29 +237,17 @@ function Dock:Anchor()
 	local x, y, w, h = geometry:GetRect(owner)
 	if not x then return end
 	local ratio = geometry:GetRatio(frame)
-	-- EUI's public Shell primitive paints a 25px title strip from the top edge.
 	local theme = BFL:GetEffectiveTheme()
-	local eui = theme == "ellesmereui"
-	local toggleHeight, toggleTop = eui and 25 or 22, eui and 0 or -3
-	local toggleWidth, leftInset, rightInset, iconSize, artworkInset = 30, 12, -34, 14, 0
-	local close = theme == "blizzard" and owner.CloseButton
-	local closeX, closeY, closeW, closeH
-	if close then closeX, closeY, closeW, closeH = geometry:GetRect(close) end
-	if closeX then
-		-- Native title controls fill the frame edge. Match the close button's
-		-- actual dimensions and top edge, including client/UI-scale differences.
-		local ownerRatio = geometry:GetRatio(owner)
-		toggleWidth, toggleHeight = closeW / ownerRatio + 6, closeH / ownerRatio
-		toggleTop = (closeY + closeH - y - h) / ownerRatio
-		leftInset = (x + w - closeX - closeW) / ownerRatio
-		rightInset = (closeX - x - w) / ownerRatio - 2
-		iconSize = math.floor(math.min(toggleWidth, toggleHeight) * 2 / 3 + .5)
-		if self.toggle.atlasName == "128-RedButton" then
-			-- The shared red kit's visible top border sits below the close kit's.
-			-- Extend upwards only; keep the aligned bottom and glyph center fixed.
-			artworkInset = toggleHeight / 16
-			toggleHeight, toggleTop = toggleHeight + artworkInset, toggleTop + artworkInset
-		end
+	local toggleHeight, toggleTop = 22, -3
+	local toggleWidth, leftInset, rightInset, iconSize = 30, 12, -34, 14
+	local anchorButton = owner.BFL_SettingsAnchorButton
+	if theme == "blizzard" or theme == "ellesmereui" then
+		local gap
+		toggleWidth, toggleHeight, iconSize, toggleTop, leftInset, rightInset, gap =
+			BFL:GetModule("FrameSettings"):GetSettingsTitleActionLayout(owner, x, y + h, w)
+		if anchorButton then leftInset = leftInset + toggleWidth + gap end
+	elseif anchorButton then
+		leftInset = math.max(leftInset, 11 + anchorButton:GetWidth())
 	end
 	local values = { x, y, w, h, ratio, frame:GetWidth(), frame:GetHeight(), UIParent:GetWidth(), UIParent:GetHeight(), toggleHeight, toggleWidth, toggleTop, leftInset, rightInset }
 	local previous, changed = self.geometry, not self.geometry or self.side ~= self.nextSide

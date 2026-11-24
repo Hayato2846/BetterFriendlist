@@ -24,6 +24,33 @@ equal(list:GetDisplayName(friend), "Ada Lovelace Normal", "friend name token sub
 equal(list:GetFormattedButtonText(friend), "Ada Lovelace Normal", "rendered friend row uses ruleset")
 account.realmName = "CAMWOW US1 Realm 2 pVp (PVP) New"
 equal(list:GetFormattedButtonText(friend), "Ada Lovelace PvP", "location mutation invalidates the rendered-name cache")
+do
+	local originalNickname = BFL.modules.DB.GetNickname
+	BFL.modules.DB.GetNickname = function() return "|cnGREEN_FONT_COLOR:Ally|r" end
+	BFL.Compat.GetPlayerForeverSocialRuleset = function() return "PVE" end
+	list.settingsCache.nameFormatString = "%nickname% %character% %level% %status% %note%"
+	list.settingsCache.colorLevelByDifficulty = false
+	list.settingsCache.grayOtherRuleset = true
+	friend.level, friend.note = 60, "Testing"
+	BFL.NicknameCacheVersion = (BFL.NicknameCacheVersion or 0) + 1
+	friend._cache_text_version = nil
+	local gray = list:GetFormattedButtonText(friend)
+	check(gray:find("|cff808080Ally Ada Lovelace 60", 1, true) and not gray:find("|cn", 1, true),
+		"An unescaped nickname color cannot override ruleset dimming in a custom format")
+	account.realmName = "CAMWOW US1 Realm 1 PVE (Normal) New"
+	check(not list:GetFormattedButtonText(friend):find("|cff808080", 1, true),
+		"A same-ruleset friend keeps their original colors")
+	account.wowProjectID, account.realmName = 1, "Retail Realm"
+	check(list:GetFormattedButtonText(friend):find("|cff808080Ally Ada Lovelace", 1, true),
+		"Switching to a Retail account updates the warm display cache and dims the nickname")
+	list.settingsCache.grayOtherRuleset = false
+	list.settingsCache.nameFormatString = "%character% %realm%"
+	BFL.modules.DB.GetNickname = originalNickname
+	BFL.NicknameCacheVersion = BFL.NicknameCacheVersion + 1
+	friend.level, friend.note = nil, nil
+	friend._cache_text_version = nil
+	account.wowProjectID, account.realmName = 18, "CAMWOW US1 Realm 2 pVp (PVP) New"
+end
 local display = list:BuildAccountDisplay(account)
 equal(display.text, "Ada Lovelace - PvP", "account picker replaces realm with ruleset")
 equal(display.realmName, account.realmName, "display object retains raw realm metadata for callers")
@@ -454,3 +481,36 @@ for _, line in ipairs(tooltip.lines) do
 end
 assert(found, "QuickJoin leader path was not exercised")
 io.write("[OK] QuickJoin GUID leader preserves full regional name without realm\n")
+
+if arg[3] then
+	local playerLevel = 28
+	local difficultyEnv = setmetatable({
+		BFL = {}, DifficultyUtil = {}, QuestDifficultyHighlightColors = {},
+		UnitEffectiveLevel = function() return playerLevel end,
+		UnitQuestTrivialLevelRange = function() return 6 end,
+	}, { __index = _G })
+	local function loadDifficulty(source)
+		return assert(load(source, "@Forever guild broker colors", "t", difficultyEnv))("BetterFriendlist", difficultyEnv.BFL)
+	end
+	local function extract(source, first, last)
+		local start = assert(source:find(first, 1, true))
+		return source:sub(start, assert(source:find(last, start, true)) - 1)
+	end
+	local foreverUI = arg[3] .. "/Interface/AddOns/"
+	local constants = read(foreverUI .. "Blizzard_FrameXMLBase/Constants.lua")
+	loadDifficulty(extract(constants, "QuestDifficultyColors = ", "QuestDifficultyHighlightColors = "))
+	loadDifficulty(read(foreverUI .. "Blizzard_FrameXMLUtil/Mainline/DifficultyUtil.lua"))
+	loadDifficulty(read(repo .. "/Utils/BrokerUtils.lua"))
+	local guild = read(repo .. "/Modules/GuildBroker.lua")
+	local getLevelText = loadDifficulty(extract(guild, "local function GetColoredLevelText(", "-- Click Handlers")
+		.. "\nreturn GetColoredLevelText")
+	assert(getLevelText(28) == "|cffffd10028|r", "Same-level guild member is yellow")
+	assert(getLevelText(32) == "|cffff804032|r", "Four levels higher is orange")
+	assert(getLevelText(58) == "|cffff1a1a58|r", "High-level guild member is red for a level-28 player")
+	assert(getLevelText(22) == "|cff40bf4022|r", "A lower nontrivial guild member is green")
+	playerLevel = 32
+	assert(getLevelText(32) == "|cffffd10032|r", "Guild member color follows the player's effective level")
+	difficultyEnv.GetQuestDifficultyColor = nil
+	assert(getLevelText(32) == "32", "A missing difficulty API leaves the level readable")
+	io.write("[OK] Guild broker level colors use native Forever difficulty thresholds\n")
+end

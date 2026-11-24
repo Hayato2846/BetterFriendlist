@@ -184,6 +184,19 @@ local function FindIconOptionByTexture(options, texture)
 	return nil
 end
 
+local function NormalizeIconZoom(value)
+	if value == true then
+		return true
+	elseif value == nil or value == false then
+		return false
+	end
+	local zoom = tonumber(value)
+	if not zoom or zoom <= 0 then
+		return false
+	end
+	return math.max(0, math.min(0.45, zoom))
+end
+
 local VALID_ICON_MODES = {
 	option = true,
 	selected = true,
@@ -241,19 +254,6 @@ local function CopyTexCoord(texCoord)
 		tonumber(texCoord[3]) or 0,
 		tonumber(texCoord[4]) or 1,
 	}
-end
-
-local function NormalizeIconZoom(value)
-	if value == true then
-		return true
-	elseif value == nil or value == false then
-		return false
-	end
-	local zoom = tonumber(value)
-	if not zoom or zoom <= 0 then
-		return false
-	end
-	return math.max(0, math.min(0.45, zoom))
 end
 
 local function CopyIconProfile(source)

@@ -141,7 +141,8 @@ env.strsplit = function(_, value) return value:match("^([^%-]+)%-?(.*)$") end
 env.FriendsList = { settingsCache = { nameFormatString = "%name% (%character%)", colorClassNames = false } }
 local friendSource = read(repo, "Modules/FriendsList.lua")
 execute(between(friendSource, "function FriendsList:GetDisplayLocation(", "local function GetGroups()")
-	.. between(friendSource, "local function ReplaceTokenCaseInsensitive(", "-- Info Line Formatting (Phase 22)")
+	.. between(friendSource, "local function FormatColorCode(", "local GROUP_HEADER_TEXT_GAP")
+	.. between(friendSource, "function FriendsList:ColorFormatField(", "-- Info Line Formatting (Phase 22)")
 	.. between(friendSource, "function FriendsList:GetDisplayName(", "-- Update \"Send Message\" button state"), "FriendsList display name")
 local list = env.FriendsList
 local friend = { uid = "title-42", type = "bnet", friendLevel = 3, accountName = "Ada Lovelace",
@@ -184,6 +185,19 @@ friend.connected = true
 list.settingsCache.colorClassNames = true
 equal(list:GetDisplayName(friend), "|cffc79c6eAda Lovelace|r", "Online Title names use class color in a name-only layout")
 equal(list:GetDisplayName(friend), "|cffc79c6eAda Lovelace|r", "The cached name-only Title color is retained")
+list.settingsCache.nameFormatPreset = "custom"
+list.settingsCache.friendFormatColors = { name = { r = 1, g = 0, b = 0 } }
+equal(list:GetDisplayName(friend), "|cffff0000Ada Lovelace|r", "Custom colors override a cached class color")
+nickname = "Dome"
+list.settingsCache.nameFormatString = "%name% (%NiCkNaMe%) [%nickname%] (%nickname% and %name%)"
+list.settingsCache.friendFormatColors.nickname = { r = 1, g = 0.5, b = 0 }
+equal(list:GetDisplayName(friend),
+	"|cffff0000Ada Lovelace|r |cffff7f00(Dome)|r |cffff7f00[Dome]|r (|cffff7f00Dome|r and |cffff0000Ada Lovelace|r)",
+	"Only brackets surrounding a single field inherit its custom color")
+nickname = ""
+list.settingsCache.nameFormatString = "%name%"
+list.settingsCache.friendFormatColors = {}
+equal(list:GetDisplayName(friend), "|cffc79c6eAda Lovelace|r", "Resetting a field restores class coloring")
 list.settingsCache.nameFormatString = "  %NaMe%  "
 equal(list:GetDisplayName(friend), "|cffc79c6eAda Lovelace|r", "Name-only detection is case insensitive and ignores surrounding whitespace")
 list.settingsCache.showRealmName, list.settingsCache.showFactionIcons = true, true

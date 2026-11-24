@@ -974,16 +974,37 @@ function Registry:GetPlayerForeverRuleset()
 	return self.playerRuleset
 end
 
-function Registry:IsOtherForeverRuleset(friend, displayedAccount, playerRuleset)
-	if not BFL.IsForever or IsSecretValue(friend) or type(friend) ~= "table" or IsSecretValue(friend.connected)
-		or IsSecretValue(friend.type) or friend.type ~= "bnet" or friend.connected ~= true or not BFL.GetWoWAccountLocation
+function Registry:IsOtherForeverRuleset(friend, displayedAccount, playerRuleset, targetRuleset)
+	if not BFL.IsForever or IsSecretValue(friend) or type(friend) ~= "table"
+		or (issecrettable and issecrettable(friend))
+		or IsSecretValue(friend.connected) or IsSecretValue(friend.type)
+		or friend.type ~= "bnet" or friend.connected ~= true
+		or IsSecretValue(displayedAccount) or type(displayedAccount) ~= "table"
+		or (issecrettable and issecrettable(displayedAccount))
 	then
 		return false
 	end
+
+	local client, project, online = displayedAccount.clientProgram, displayedAccount.wowProjectID, displayedAccount.isOnline
+	if IsSecretValue(client) or IsSecretValue(project) or IsSecretValue(online) or online == false then
+		return false
+	end
+	if client == (BNET_CLIENT_WOW or "WoW") and project == (WOW_PROJECT_MAINLINE or 1) then
+		return true
+	end
+
 	playerRuleset = playerRuleset or self:GetPlayerForeverRuleset()
 	if not playerRuleset then return false end
-	local target = select(5, BFL.GetWoWAccountLocation(displayedAccount))
-	return target ~= nil and target ~= playerRuleset
+	-- false means the caller already checked the account location.
+	if targetRuleset == nil and BFL.GetWoWAccountLocation then
+		targetRuleset = select(5, BFL.GetWoWAccountLocation(displayedAccount))
+	end
+	return targetRuleset and targetRuleset ~= playerRuleset or false
+end
+
+function BFL.FormatDimmedFriendText(text)
+	local base = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[%w_]+:", ""):gsub("|r", "")
+	return "|cff808080" .. base .. "|r"
 end
 
 local function BuiltinQuickFilter_ForeverRuleset(friend)
@@ -1002,23 +1023,6 @@ local function BuiltinQuickFilter_InGame(friend)
 	return HasOnlineGameAccount(friend, function(gameAccountInfo)
 		return IsPlayableClient(gameAccountInfo.clientProgram)
 	end)
-end
-
-local NATIVE_QUEUE_FILTER_FIELDS = {
-	inqueue = "isInQueue",
-	availableforqueue = "isAvailableForQueue",
-}
-
-local function CanUseNativeQueueFilters()
-	return BFL.CanSearchBattleNetFriends and BFL.CanSearchBattleNetFriends() == true
-end
-
-local function BuiltinQuickFilter_InQueue(friend)
-	return Registry:EvaluateNativeQueueFilter("inqueue", friend)
-end
-
-local function BuiltinQuickFilter_AvailableForQueue(friend)
-	return Registry:EvaluateNativeQueueFilter("availableforqueue", friend)
 end
 
 local BUILTIN_QUICK_FILTERS = {
@@ -1110,24 +1114,6 @@ local BUILTIN_QUICK_FILTERS = {
 		icon = BFL_ICON_PREFIX .. "game",
 		order = 90,
 		evaluator = BuiltinQuickFilter_InGame,
-	},
-	{
-		id = "inqueue",
-		labelKey = "FILTER_IN_QUEUE",
-		descriptionKey = "FILTER_IN_QUEUE_DESC",
-		icon = BFL_ICON_PREFIX .. "game",
-		order = 100,
-		evaluator = BuiltinQuickFilter_InQueue,
-		isSupported = CanUseNativeQueueFilters,
-	},
-	{
-		id = "availableforqueue",
-		labelKey = "FILTER_AVAILABLE_FOR_QUEUE",
-		descriptionKey = "FILTER_AVAILABLE_FOR_QUEUE_DESC",
-		icon = BFL_ICON_PREFIX .. "status",
-		order = 110,
-		evaluator = BuiltinQuickFilter_AvailableForQueue,
-		isSupported = CanUseNativeQueueFilters,
 	},
 }
 
@@ -1315,6 +1301,10 @@ function Registry:Initialize()
 				end
 				local broker = BFL:GetModule("Broker")
 				if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
+			if BetterFriendlistDB and BetterFriendlistDB.quickFilter == "foreverruleset"
+				and broker and broker.ScheduleBrokerTextUpdate then
+				broker:ScheduleBrokerTextUpdate()
+			end
 			end
 		end)
 	end
@@ -1362,6 +1352,10 @@ function Registry:NormalizeDB()
 
 	if not IsArray(db.quickFilterOrder) then
 		db.quickFilterOrder = {}
+	end
+	for _, id in ipairs({ "inqueue", "availableforqueue" }) do
+		self:RemoveFromOrder(db.quickFilterOrder, id)
+		db.quickFilterVisibility[id] = nil
 	end
 	if not IsArray(db.sorterOrder) then
 		db.sorterOrder = {}
@@ -1557,14 +1551,15 @@ function Registry:GetVisibleQuickFilters()
 	return self:GetQuickFilters(false)
 end
 
-function Registry:GetSorters(includeHidden)
+function Registry:GetSorters(includeHidden, primaryId, secondaryId)
 	local db = self:EnsureDB()
 	local useBuilderSettings = self:AreBuilderFeaturesEnabled()
 	local orderMap = useBuilderSettings and BuildOrderMap(db and db.sorterOrder) or {}
 	local list = {}
 
 	for _, entry in ipairs(BUILTIN_SORTERS) do
-		if entry.id == NormalizeLocationSortID(entry.id) and (includeHidden or self:IsSorterVisible(entry.id)) then
+		if entry.id ~= primaryId and entry.id ~= secondaryId and entry.id == NormalizeLocationSortID(entry.id)
+			and (includeHidden or self:IsSorterVisible(entry.id)) then
 			local display = BuildDisplayEntry(entry, false)
 			display.visible = self:IsSorterVisible(entry.id)
 			display._order = orderMap[entry.id] or entry.order
@@ -1574,7 +1569,7 @@ function Registry:GetSorters(includeHidden)
 
 	if db and db.customSorters then
 		for id, entry in pairs(db.customSorters) do
-			if includeHidden or self:IsSorterVisible(id) then
+			if id ~= primaryId and id ~= secondaryId and (includeHidden or self:IsSorterVisible(id)) then
 				local display = BuildDisplayEntry(entry, true)
 				display.visible = self:IsSorterVisible(id)
 				display._order = orderMap[id] or 1000
@@ -1590,8 +1585,8 @@ function Registry:GetSorters(includeHidden)
 	return list
 end
 
-function Registry:GetVisibleSorters()
-	return self:GetSorters(false)
+function Registry:GetVisibleSorters(primaryId, secondaryId)
+	return self:GetSorters(false, NormalizeLocationSortID(primaryId), NormalizeLocationSortID(secondaryId))
 end
 
 function Registry:SetQuickFilterVisibility(id, visible)
@@ -1646,64 +1641,6 @@ local function GetQuickFilterPlan(registry, id)
 	return plan
 end
 
-function Registry:IsNativeQueueFilter(id)
-	return NATIVE_QUEUE_FILTER_FIELDS[id] ~= nil
-end
-
-function Registry:RefreshNativeQueueFilter(id)
-	local searchField = NATIVE_QUEUE_FILTER_FIELDS[id]
-	if not searchField then
-		self.nativeQueueFilterState = nil
-		return false
-	end
-
-	local result = BFL.SearchBattleNetFriends and BFL.SearchBattleNetFriends({
-		searchText = "",
-		isOnline = false,
-		isOffline = false,
-		isDND = false,
-		isAFK = false,
-		isInQueue = id == "inqueue",
-		isAvailableForQueue = id == "availableforqueue",
-		tags = {},
-	})
-
-	local matches = {}
-	local valid = type(result) == "table"
-	if valid then
-		for _, friendIndex in ipairs(result) do
-			if type(friendIndex) == "number" and not (BFL.IsSecret and BFL:IsSecret(friendIndex)) then
-				matches[friendIndex] = true
-			end
-		end
-	end
-
-	self.nativeQueueFilterVersion = (self.nativeQueueFilterVersion or 0) + 1
-	self.nativeQueueFilterState = {
-		id = id,
-		field = searchField,
-		valid = valid,
-		matches = matches,
-		version = self.nativeQueueFilterVersion,
-	}
-	return valid
-end
-
-function Registry:EvaluateNativeQueueFilter(id, friend)
-	if friend and friend.settingsSample then
-		return friend.type == "bnet" and friend.sampleQueueStatus == id
-	end
-	local state = self.nativeQueueFilterState
-	if not state or state.id ~= id or state.valid ~= true then
-		-- Restricted/nil native results must never blank BFL's list.
-		return true
-	end
-	if not friend or friend.type ~= "bnet" then
-		return false
-	end
-	return state.matches[friend.index] == true
-end
-
 function Registry:EvaluateSettingsFilterAST(ast, friend)
 	return EvaluateAST(ast, friend)
 end
@@ -1738,7 +1675,6 @@ function Registry:EvaluateQuickFilter(id, friend)
 				or 0
 		end
 		local nicknameVersion = BFL.NicknameCacheVersion or 0
-		local nativeQueueFilterVersion = self.nativeQueueFilterVersion or 0
 		local resultCache = friend._bflQuickFilterResults
 		if
 			friend._bflQuickFilterCacheVersion ~= cacheVersion
@@ -1747,7 +1683,6 @@ function Registry:EvaluateQuickFilter(id, friend)
 			or friend._bflQuickFilterTagsDefinitionVersion ~= tagsDefinitionVersion
 			or friend._bflQuickFilterTagsAssignmentVersion ~= tagsAssignmentVersion
 			or friend._bflQuickFilterNicknameVersion ~= nicknameVersion
-			or friend._bflQuickFilterNativeQueueVersion ~= nativeQueueFilterVersion
 		then
 			resultCache = {}
 			friend._bflQuickFilterResults = resultCache
@@ -1757,7 +1692,6 @@ function Registry:EvaluateQuickFilter(id, friend)
 			friend._bflQuickFilterTagsDefinitionVersion = tagsDefinitionVersion
 			friend._bflQuickFilterTagsAssignmentVersion = tagsAssignmentVersion
 			friend._bflQuickFilterNicknameVersion = nicknameVersion
-			friend._bflQuickFilterNativeQueueVersion = nativeQueueFilterVersion
 		end
 		local cached = resultCache[cacheKey]
 		if cached ~= nil then
@@ -1859,15 +1793,39 @@ local function CompareRawValues(aValue, bValue, fieldDef)
 	return aValue < bValue
 end
 
-local function CompareSortStep(step, a, b, plan)
+local NIL_SORT_VALUE = {}
+
+local function GetCachedSortValue(keys, friend, field, plan)
+	local value = keys[friend]
+	if value == nil then
+		value = GetSortValue(friend, field, plan)
+		keys[friend] = value == nil and NIL_SORT_VALUE or value
+	elseif value == NIL_SORT_VALUE then
+		return nil
+	end
+	return value
+end
+
+local function CompareSortStep(step, a, b, plan, cachedKeys)
 	local field = NormalizeLocationSortID(step.field)
 	local fieldDef = SORT_FIELD_MAP[field]
 	if not fieldDef then
 		return nil
 	end
 
-	local aValue = GetSortValue(a, field, plan)
-	local bValue = GetSortValue(b, field, plan)
+	local aValue, bValue
+	if cachedKeys then
+		local keys = cachedKeys[field]
+		if not keys then
+			keys = {}
+			cachedKeys[field] = keys
+		end
+		aValue = GetCachedSortValue(keys, a, field, plan)
+		bValue = GetCachedSortValue(keys, b, field, plan)
+	else
+		aValue = GetSortValue(a, field, plan)
+		bValue = GetSortValue(b, field, plan)
+	end
 	local aEmpty = IsEmptyValue(aValue)
 	local bEmpty = IsEmptyValue(bValue)
 	if aEmpty ~= bEmpty then
@@ -1888,12 +1846,12 @@ local function CompareSortStep(step, a, b, plan)
 	return result
 end
 
-local function CompareChain(chain, a, b, plan)
+local function CompareChain(chain, a, b, plan, cachedKeys)
 	if type(chain) ~= "table" then
 		return nil
 	end
 	for _, step in ipairs(chain) do
-		local result = CompareSortStep(step, a, b, plan)
+		local result = CompareSortStep(step, a, b, plan, cachedKeys)
 		if result ~= nil then
 			return result
 		end
@@ -1915,18 +1873,27 @@ end
 
 local NAME_FALLBACK_SORT_STEP = { field = "name", direction = "asc", empty = "last" }
 
-function Registry:CreateSortPlan(primaryId, secondaryId, includeHidden)
+function Registry:CreateSortPlan(primaryId, secondaryId, includeHidden, tertiaryId)
 	local primary = ResolveSorterEntry(self, primaryId, not includeHidden, self.FALLBACK_PRIMARY_SORT)
 	local secondary = ResolveSorterEntry(self, secondaryId, true, self.FALLBACK_SECONDARY_SORT)
+	local tertiary
+	if tertiaryId and tertiaryId ~= "none" then
+		tertiary = ResolveSorterEntry(self, tertiaryId, true, "none")
+		if tertiary == primary or tertiary == secondary then
+			tertiary = nil
+		end
+	end
 	return {
 		primary = primary,
 		secondary = secondary,
+		tertiary = tertiary,
+		tertiaryValues = tertiary and {} or nil,
 		primaryContainsFavorite = primary and ChainContainsField(primary.chain, "favorite") or false,
 	}
 end
 
-function Registry:CreateSettingsSortPlan(chain, secondaryID)
-	local plan = self:CreateSortPlan(nil, secondaryID)
+function Registry:CreateSettingsSortPlan(chain, secondaryID, tertiaryID)
+	local plan = self:CreateSortPlan("none", secondaryID, false, tertiaryID)
 	plan.primary = { chain = NormalizeSorterChain(chain) }
 	plan.primaryContainsFavorite = ChainContainsField(plan.primary.chain, "favorite")
 	return plan
@@ -1936,12 +1903,13 @@ function Registry:CompareFriendsWithSortPlan(a, b, plan)
 	plan = plan or self:CreateSortPlan()
 	local primary = plan.primary
 	local secondary = plan.secondary
+	local tertiary = plan.tertiary
 	local result = primary and CompareChain(primary.chain, a, b, plan)
 	if result ~= nil then
 		return result
 	end
 
-	if primary and not plan.primaryContainsFavorite and a.isFavorite ~= b.isFavorite then
+	if not tertiary and primary and not plan.primaryContainsFavorite and a.isFavorite ~= b.isFavorite then
 		return a.isFavorite and true or false
 	end
 
@@ -1952,6 +1920,15 @@ function Registry:CompareFriendsWithSortPlan(a, b, plan)
 		end
 	end
 
+	if tertiary then
+		result = CompareChain(tertiary.chain, a, b, plan, plan.tertiaryValues)
+		if result ~= nil then
+			return result
+		end
+		if primary and not plan.primaryContainsFavorite and a.isFavorite ~= b.isFavorite then
+			return a.isFavorite and true or false
+		end
+	end
 	if not IsFriendOnline(a) and not IsFriendOnline(b) then
 		local aTime = a.lastOnlineTime or 0
 		local bTime = b.lastOnlineTime or 0
@@ -1967,8 +1944,8 @@ function Registry:CompareFriendsWithSortPlan(a, b, plan)
 	return (a.index or a.bnetAccountID or 0) < (b.index or b.bnetAccountID or 0)
 end
 
-function Registry:CompareFriends(a, b, primaryId, secondaryId)
-	return self:CompareFriendsWithSortPlan(a, b, self:CreateSortPlan(primaryId, secondaryId))
+function Registry:CompareFriends(a, b, primaryId, secondaryId, tertiaryId)
+	return self:CompareFriendsWithSortPlan(a, b, self:CreateSortPlan(primaryId, secondaryId, false, tertiaryId))
 end
 
 function Registry:GetQuickFilterText(id)
@@ -2057,14 +2034,28 @@ function Registry:NormalizeSecondarySorterId(id, primaryId)
 	return resolved
 end
 
+function Registry:NormalizeTertiarySorterId(id, primaryId, secondaryId)
+	if type(id) ~= "string" or id == "none" then return "none" end
+	local entry = ResolveSorterEntry(self, id, true, "none")
+	return entry and entry.id ~= NormalizeLocationSortID(primaryId) and entry.id ~= NormalizeLocationSortID(secondaryId)
+		and entry.id or "none"
+end
+
 function Registry:NormalizeCurrentSelections()
 	local db = self:EnsureDB()
 	if not db then
 		return
 	end
-	db.quickFilter = self:NormalizeQuickFilterId(db.quickFilter)
+	local previousFilter = db.quickFilter
+	db.quickFilter = self:NormalizeQuickFilterId(previousFilter)
+	if db.quickFilter ~= previousFilter then
+		local broker = BFL:GetModule("Broker")
+		if broker and broker.ScheduleBrokerTextUpdate then broker:ScheduleBrokerTextUpdate() end
+	end
 	db.primarySort = self:NormalizePrimarySorterId(db.primarySort)
 	db.secondarySort = self:NormalizeSecondarySorterId(db.secondarySort, db.primarySort)
+	db.enableTertiarySort = db.enableTertiarySort == true
+	db.tertiarySort = self:NormalizeTertiarySorterId(db.tertiarySort, db.primarySort, db.secondarySort)
 	local FriendsList = BFL:GetModule("FriendsList")
 	if FriendsList then
 		FriendsList.filterMode = db.quickFilter
@@ -2224,6 +2215,11 @@ function Registry:UpdateCustomQuickFilter(id, patch)
 		filter.ast = NormalizeGroup(patch.ast)
 	end
 	self:InvalidateCaches()
+	if patch.ast ~= nil and db.quickFilter == id then
+		local broker = BFL:GetModule("Broker")
+		if broker and broker.ScheduleBrokerTextUpdate then broker:ScheduleBrokerTextUpdate() end
+		if broker and broker.ScheduleObservedTooltipRefresh then broker:ScheduleObservedTooltipRefresh() end
+	end
 	return true
 end
 

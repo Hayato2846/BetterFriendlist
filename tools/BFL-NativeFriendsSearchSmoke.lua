@@ -2,6 +2,7 @@
 local root = assert(arg[1], "repository root required"):gsub("[\\/]$", "")
 local env, hooks, events = {}, {}, {}
 setmetatable(env, { __index = _G })
+env._G = env
 env.unpack = table.unpack or unpack
 local inCombat, selectedTab = false, 2
 env.InCombatLockdown = function() return inCombat end
@@ -86,6 +87,14 @@ for _, key in ipairs(decorationKeys) do
 	box[key]:SetAlpha(0.75)
 end
 box.Backdrop=box.backdrop
+local skinFill, skinBorder = newFrame(box, true), newFrame(box, true)
+skinFill:SetAlpha(0.9)
+skinBorder:SetAlpha(0.7)
+skinFill.IsObjectType = function(_, kind) return kind == "Texture" end
+box.Background.IsObjectType = skinFill.IsObjectType
+local textRegion = { IsObjectType = function() return false end }
+function box:GetRegions() return textRegion, self.Background, skinFill end
+env.EllesmereUI = { PanelPP = { GetBorders = function(region) return region == box and skinBorder or nil end } }
 view.FilterBar.SearchBar = box
 box:SetPoint("LEFT", view.FilterBar, "LEFT", 15, 0)
 view.RefreshSearchResults = function() error("addon called Blizzard's search") end
@@ -170,6 +179,7 @@ assert(bflBox:IsVisible() and bflBox:IsMouseEnabled(), "the original BFL control
 assert(not view.ScrollBox:IsShown(), "the native list is not rendered as a second list")
 assert(box.Background:GetAlpha() == 0 and box.searchIcon:GetAlpha() == 0 and box.Instructions:GetAlpha() == 0)
 for _,key in ipairs(decorationKeys) do assert(box[key]:GetAlpha()==0,"native input decoration covers the BFL search: "..key) end
+assert(skinFill:GetAlpha() == 0 and skinBorder:GetAlpha() == 0, "EUI artwork is transparent while BFL borrows the input")
 assert(box:GetFontObject() == "Blizzard font" and box:GetTextInsets() == bflBox:GetTextInsets())
 inCombat = false
 box.text = "Mapko"
@@ -221,6 +231,7 @@ assert(assignedWidth == 320 and assignedHeight == 480, "rollback restores the as
 view.rectWidth, view.rectHeight = nil, nil
 assert(box.Background:GetAlpha() == 0.75 and box.searchIcon:GetAlpha() == 0.75 and box.Instructions:GetAlpha() == 0.75)
 for _,key in ipairs(decorationKeys) do assert(box[key]:GetAlpha()==.75,"native input decoration was not restored: "..key) end
+assert(skinFill:GetAlpha() == 0.9 and skinBorder:GetAlpha() == 0.7, "The native search regains its EUI artwork")
 assert(box:GetFontObject() == "Blizzard font" and box:GetTextInsets() == 22)
 section = "friends"
 updateLayout()
@@ -289,6 +300,7 @@ local function originalLayout()
 	assert(box:GetTextInsets() == 22 and box.Background:GetAlpha() == 0.75
 		and box.searchIcon:GetAlpha() == 0.75 and box.Instructions:GetAlpha() == 0.75)
 	assert(bflBox.Instructions:GetAlpha() == 0.8)
+	assert(skinFill:GetAlpha() == 0.9 and skinBorder:GetAlpha() == 0.7)
 	assert(not search:IsInputHosted(bflBox) and not search:Matches(contact, "mapko"))
 end
 
@@ -334,7 +346,8 @@ for _, failure in ipairs({
 	{ view, "SetParent" }, { view, "ClearAllPoints" }, { view, "SetPoint" }, { view, "SetSize" },
 	{ view.ScrollBox, "SetShown" }, { box, "ClearAllPoints" }, { box, "SetAllPoints" },
 	{ box, "SetFrameStrata" }, { box, "SetFrameLevel" }, { box, "SetTextInsets" },
-	{ box.Background, "SetAlpha" }, { bflBox.Instructions, "SetAlpha" }, { view, "SetShown" },
+	{ box.Background, "SetAlpha" }, { skinFill, "SetAlpha" }, { skinBorder, "SetAlpha" },
+	{ bflBox.Instructions, "SetAlpha" }, { view, "SetShown" },
 }) do
 	failAttachment(failure[1], failure[2], "error")
 end
@@ -427,5 +440,13 @@ assert(friends.searchText == "", "a released native query cannot commit after it
 originalLayout()
 hooks.RefreshSearchResults(view)
 assert(not search:Matches(contact, "stale query"), "the standalone Blizzard window cannot publish BFL results")
+
+bflBox.text = "Typed just before closing"
+env.BetterFriendsFrame_OnSearchTextChanged(bflBox, true)
+local localTimer = pendingSearch
+closeBFL()
+assert(localTimer.cancelled, "closing BFL cancels pending local typing")
+localTimer.callback()
+assert(friends.searchText == "", "a queued local callback cannot apply its filter while BFL is closed")
 
 io.write("Native friend search smoke passed.\n")

@@ -143,8 +143,30 @@ local actionButton=region(nil,"Button");actionButton.BFL_SettingGuide={{"Reset",
 local actionText=label("Reset",actionButton);actionText:SetPoint("RIGHT",actionButton,"RIGHT",-10,0)
 flags:BindRow(review,actionButton)
 check(rightOffset(actionText)==-10,"badge column changes action-button text insets")
-review.route="automatic";flags:BindRow(review,neighbour)
+review.route="behavior";flags:BindRow(review,neighbour)
 check(rightOffset(neighbour.DropDown)==0,"a reused row keeps padding from another settings page")
+review.route="rows"
+local localTime=row("SETTINGS_SHOW_FRIEND_LOCAL_TIME","SETTINGS_LEGACY_ROWS_STATUS")
+check(localTime.BFL_NewBadgeShown,"default-off Local Time option is missing its New badge")
+review.route="automatic"
+review.subButtons={navigation("","automatic")}
+profile.enableBetaFeatures=false
+flags:MarkRead("friendTags.dynamicTagGroupFilter", review)
+local tertiaryToggle=row("SETTINGS_ENABLE_TERTIARY_SORT","SETTINGS_GROUP_MANAGEMENT")
+flags:RefreshNavigation(review)
+check(tertiaryToggle.BFL_NewBadgeShown and review.navButtons[3].BFL_NewBadgeShown,"third sort opt-in is missing its New badge")
+function review:GetHoveredGuideRow() return tertiaryToggle end
+flags:HandleClick(review,"GLOBAL_MOUSE_DOWN","LeftButton")
+flags:HandleClick(review,"GLOBAL_MOUSE_UP","LeftButton")
+check(not tertiaryToggle.BFL_NewBadgeShown and not review.navButtons[3].BFL_NewBadgeShown,"hidden third sort keeps navigation badged")
+check(profile.settingsNewReadState.enableTertiarySort=="3.1.9","third sort opt-in uses the wrong revision")
+profile.enableTertiarySort=true
+local tertiarySort=row("SORT_TERTIARY_LABEL","SETTINGS_GROUP_MANAGEMENT")
+flags:RefreshNavigation(review)
+check(tertiarySort.BFL_NewBadgeShown and review.navButtons[3].BFL_NewBadgeShown and review.subButtons[1].BFL_NewBadgeShown,
+	"revealing tertiary sort does not badge the new row and navigation")
+flags:MarkRead("tertiarySort",review)
+check(not review.navButtons[3].BFL_NewBadgeShown and not review.subButtons[1].BFL_NewBadgeShown,"navigation stays badged after both third sort settings were read")
 modules.LegacySettingsReview=review
 profile.settingsNewReadState={useThemedDialogs="3.1.2",fontWindowTitle="next",previousOption="3.0.0"}
 profile.changelogReadState={unchanged=true}

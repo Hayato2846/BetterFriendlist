@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.9]        - 2026-11-24
+
+Add a third sort criterion, customize friend colors, or move Settings independently of the friends list. This update also reduces background work while the friends list is closed.
+
+### All WoW Versions
+
+#### Added
+- **Tertiary Sort** - Use Enable Tertiary Sort under Groups & Filters to add a third criterion to the friends list and detailed broker tooltip. The third slot offers the unused options from Secondary Sort, so you can sort by Ruleset, then Faction, then Nickname in WoW Forever.
+- **Settings Window** - Use the anchor button in the title bar to detach Settings from the friends list. Drag the title bar to move the window, and its position is saved between sessions. Press Escape to close the detached window.
+- **Friend Formatting** - Set or reset individual field colors when Name Formatting or Friend Info Formatting uses Custom. Parentheses and brackets around a single field take on its custom color.
+- **Friend Status** - Use `%statusonline%` in a custom info line to show AFK and DND only. The existing `%status%` field also shows Online for available friends.
+- **Friend Local Time** - Turn on Show Friend Local Time in Display Options to set a friend's time difference from their right-click menu and see their local time in the tooltip. The option starts off and keeps saved time differences when disabled.
+
+#### Improved
+- **Name and Info Formatting** - Each custom format field appears when you select its own Custom preset. Switching presets keeps your saved format.
+- **Group Management** - The third sort criterion, In-Game group mode, and Recently Added duration settings appear under their respective options when enabled. Their saved values are kept when you turn an option off.
+- **Recently Added** - When the friends list is closed, incoming friend changes are processed together. Changes received in combat can catch up when combat ends.
+- **Settings Title Bar** - Blizzard and EllesmereUI use compact title-bar icons for the anchor and preview controls. EllesmereUI gives both controls the same size, and hovering brightens the icon.
+- **Beta Features** - Experimental settings pages appear in the sidebar and search when Beta Features is enabled.
+
+#### Fixed
+- **Friends List** - Closing the window during a refresh stops work on the unfinished list. The next open refreshes the list again.
+- **Group Note Sync** - Pending group and note changes sync when the friends list is open and you're out of combat. Updates for an individual Battle.net friend check that friend's note directly.
+- **Drag and Drop** - Drag friends between groups with single-click whispering enabled. The drag preview uses the name shown in the friends list and matches the current theme.
+- **Raid Tab** - Group changes and combat transitions no longer update the raid controls while the Raid tab or friends window is closed. Auto Raid Assist continues to work in the background.
+- **Guild News** - News updates wait until the Guild News panel is visible.
+- **Who** - The search countdown updates only while its buttons are visible and picks up at the correct time when reopened.
+- **Friends Broker** - The label and tooltip show the same count when a QuickFilter or tag filter is active.
+- **Dynamic Tag Groups** - Collapse All Groups and Expand All Groups now apply to tag groups and are available from their right-click menus.
+- **Guild Broker** - Online guild members' levels use difficulty colors relative to your character's level.
+- **Forever Friend Locations** - When the friends list or broker gets a Forever friend's zone from their Battle.net status, it no longer mistakes text after a dash for the friend's realm.
+- **Settings Window** - Controls stay aligned when reading New badges, changing checkboxes, or resizing the window.
+- **Friend Tags** - Tag icons keep their editor colors in older right-click menus. The tag hint also accounts for the active dynamic tag group filter.
+- **Friend Tag Editor** - Fixed a Lua error when opening certain older tags with custom icons.
+- **Custom Theme** - Friend Tag Editor action icons and the welcome message use the configured theme colors.
+- **Nickname Hint** - The extra nickname hint stays hidden when the friend's name already shows their nickname.
+
+### WoW Retail & WoW Forever
+
+#### Fixed
+- **Social Window** - Opening BetterFriendlist from Blizzard's Social controls respects your window preference and works during combat.
+- **Friends Search** - EllesmereUI's Blizzard window skin no longer covers the BetterFriendlist search field with a second background or border.
+- **Recent Allies** - Closing the friends window stops a pending search from rebuilding the hidden list.
+- **Modern Group Headers** - Korean, Chinese, and Cyrillic group names use fonts that support their characters.
+- **Battle.net Friend Tooltips** - Under Other Game Accounts, the Blizzard marker reflects whether a character is on a different realm or belongs to the other faction.
+- **Quick Filters** - Removed In Queue and Available for Queue because WoW can block these filters. Existing selections switch back to All Friends.
+- **Quick Join** - Group listing changes refresh when you reopen the friends list, reducing background work while it is closed.
+
+### WoW Forever
+
+#### Fixed
+- **Escape** - Escape closes BetterFriendlist alongside Blizzard windows when Respect UI Hierarchy is enabled. In combat, Escape also closes the friends list when WoW allows the window to be hidden.
+- **Gray Out Other Rulesets** - The setting also dims Retail friends and applies the same gray color to nicknames in custom names and the broker.
+- **Title Friend Notes** - BetterFriendlist does less work in the background while your friends list is closed or you're in combat.
+
+---
+
 ## [3.1.8]        - 2026-11-23
 
 ### All WoW Versions
@@ -225,19 +282,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Fixed
 - **Who Searches** - Shift-left-clicking a character name in chat runs the lookup without opening BetterFriendlist's Who tab by default. You can turn automatic opening on under Who settings.
 - **Title Friends** - Title Friends keep their groups and friend notes when they go offline, switch characters, or you log back in.
-
----
-
-## [3.0.3]        - 2026-11-09
-
-### All WoW Versions
-
-#### Fixed
-- **Friend Menus** - Fixed cases where right-clicking a friend failed to open their menu.
-- **Whispers** - Click to Whisper and the Whisper menu option now open the chat box in cases where they previously failed.
-- **Who Searches** - Who no longer skips searches that previously left the results list unchanged.
-
----
 
 ---
 

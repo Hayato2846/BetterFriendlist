@@ -206,6 +206,10 @@ do
 	click({ retailWithoutGUID() })
 	V:AssertEqual(#calls, 1, "An unambiguous Retail account with no GUID sends exactly one invite")
 	V:Assert(calls[1].direct and calls[1].id == 99, "Retail sends the live game-account ID directly")
+	click({ retailWithoutGUID({ hasRealmInfo = true, realmID = 0 }) })
+	V:Assert(calls[1] and calls[1].direct, "PTR can invite the single GUID-less account using hasRealmInfo")
+	click({ retailWithoutGUID({ hasRealmInfo = false }) })
+	V:AssertEqual(#calls, 0, "A positive legacy realm ID cannot override hasRealmInfo=false")
 	click({ retailWithoutGUID({ gameAccountID = 100, playerGuid = "" }), account({ clientProgram = "App" }) })
 	V:Assert(calls[1] and calls[1].direct and calls[1].id == 100, "An app account does not make a WoW target ambiguous")
 	click({ retailWithoutGUID(), retailWithoutGUID({ gameAccountID = 100 }) })
@@ -229,6 +233,8 @@ do
 	V:AssertEqual(#calls, 0, "A restricted GUID is not a missing GUID")
 	click({ retailWithoutGUID({ gameAccountID = secret }) })
 	V:AssertEqual(#calls, 0, "A restricted game-account ID never reaches the invite API")
+	click({ retailWithoutGUID({ hasRealmInfo = secret }) })
+	V:AssertEqual(#calls, 0, "A restricted hasRealmInfo cannot authorize a direct invite through the legacy ID")
 	function BFL:IsSecret() return false end
 	local legacyDispatcher = env.FriendsFrame_InviteOrRequestToJoin
 	env.FriendsFrame_InviteOrRequestToJoin = nil

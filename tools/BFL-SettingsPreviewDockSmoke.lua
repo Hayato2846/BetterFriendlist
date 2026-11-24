@@ -32,6 +32,7 @@ function tooltip:GetFrameLevel() return 20 end
 local env = setmetatable({ BFL=BFL, UIParent=screen, BFL_Tooltip=tooltip }, {__index=_G})
 env._G=env
 assert(loadfile(root .. "/Utils/WindowGeometry.lua", "t", env))("BetterFriendlist",BFL)
+assert(loadfile(root .. "/Modules/FrameSettings.lua", "t", env))("BetterFriendlist",BFL)
 assert(loadfile(root .. "/Modules/SettingsPreviewDock.lua", "t", env))("BetterFriendlist",BFL)
 local dock, geometry = BFL.modules.SettingsPreviewDock, BFL.WindowGeometry
 local function region(parent, width, height)
@@ -237,18 +238,27 @@ theme="dark";dock:Anchor()
 equal(toggle:GetHeight(),22,"other themes inherit EUI-specific button dimensions")
 local savedScale=owner.scale
 theme="blizzard"
+local anchorButton = region(owner)
+anchorButton.Icon = region(anchorButton)
+owner.BFL_SettingsAnchorButton = anchorButton
+owner.BFL_SettingsDragHandle = region(owner)
 for _,scale in ipairs({.5,1,1.5}) do
 	owner.scale=screen:GetEffectiveScale()*scale
 	for _,size in ipairs({24,32}) do
 		owner.CloseButton:SetSize(size,size)
+		BFL.modules.FrameSettings:RefreshSettingsWindowControls(owner)
 		for _,side in ipairs({"left","right"}) do
 			dock.nextSide=side;dock:Anchor()
-			equal(toggle:GetHeight(),size,"Blizzard preview toggle does not match close-button height")
-			equal(toggle:GetWidth(),size+6,"preview toggle did not gain the requested width")
-			equal(toggle.Icon:GetHeight(),math.floor(size*2/3+.5),"Blizzard arrow does not scale with the button")
+			equal(toggle:GetHeight(),20,"Blizzard preview button has the wrong height")
+			equal(toggle:GetWidth(),22,"Blizzard preview button has the wrong hit width")
+			equal(toggle.Icon:GetHeight(),13,"Blizzard preview icon has the wrong height")
 			local point=toggle.points.TOPLEFT or toggle.points.TOPRIGHT
-			equal(point[5],0,"Blizzard preview toggle is below the close button")
-			equal(point[4],dock.side=="left" and -1 or -size-1,"Blizzard preview toggle is not aligned to the native frame edge")
+			equal(point[5],-(size-20)/2,"Blizzard preview toggle is not centered on the close button")
+			equal(point[4],dock.side=="left" and 35 or -size-2,"Blizzard preview toggle does not have a consistent gap")
+			equal(anchorButton.points.TOPLEFT[5],point[5],"Blizzard title buttons do not share the same centerline")
+			equal(anchorButton:GetWidth(),toggle:GetWidth(),"Blizzard title buttons have different widths")
+			equal(anchorButton:GetHeight(),toggle:GetHeight(),"Blizzard title buttons have different heights")
+			equal(anchorButton.Icon:GetWidth(),toggle.Icon:GetWidth(),"Blizzard title buttons use different icon sizes")
 		end
 	end
 end
@@ -257,12 +267,10 @@ theme="dark";dock:Anchor()
 equal(toggle:GetHeight(),22,"Blizzard dimensions leak into another theme")
 equal(toggle.Icon:GetHeight(),14,"Blizzard icon dimensions leak into another theme")
 theme="blizzard";toggle.atlasName="128-RedButton";dock:Anchor()
-local nativeHeight=owner.CloseButton:GetHeight()
-local artworkInset=nativeHeight/16
-local artworkPoint=toggle.points.TOPLEFT or toggle.points.TOPRIGHT
-equal(toggle:GetHeight(),nativeHeight+artworkInset,"shared artwork top margin is not compensated")
-equal(artworkPoint[5],artworkInset,"shared artwork does not extend upwards")
-equal(artworkPoint[5]-toggle:GetHeight(),-nativeHeight,"artwork correction moves the aligned lower edge")
+equal(toggle:GetHeight(),20,"native button artwork changes the title action height")
+dock.nextSide="left";dock:Anchor()
+check(toggle.points.TOPLEFT and toggle.points.TOPLEFT[4]>=35,"left preview action overlaps the Settings anchor button")
+owner.BFL_SettingsAnchorButton=nil
 equal(toggle.Icon.points.CENTER[5],0,"preview arrow is not centered vertically in its button")
 equal(toggle.Icon.color[1],1,"Blizzard arrow is not yellow")
 equal(toggle.Icon.color[2],1,"Blizzard arrow still uses the darker gold accent")

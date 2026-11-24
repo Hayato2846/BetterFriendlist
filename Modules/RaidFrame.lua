@@ -1369,12 +1369,11 @@ end
 
 --- Update the Convert to Raid/Party button state
 function RaidFrame:UpdateConvertButton()
-	local frame = BetterFriendsFrame and BetterFriendsFrame.RaidFrame
-	if not frame or not frame.ConvertToRaidButton then
+	if not IsRaidFrameVisible() then return end
+	local button = BetterFriendsFrame.RaidFrame.ConvertToRaidButton
+	if not button then
 		return
 	end
-
-	local button = frame.ConvertToRaidButton
 	if BFL.IsSocialActionRestricted() or not BFL.IsRaidListEnabled() then
 		button:Disable()
 		button.tooltip = L.GUILD_ACTION_RESTRICTED
